@@ -11,19 +11,19 @@
 
 ## 2. Core Theme & Routing
 
-- [ ] 2.1 Write failing test: `test/core/theme_test.dart` — theme switches between light/dark/system
-- [ ] 2.2 Implement: Material 3 theme with German locale, light/dark/system mode
-- [ ] 2.3 Write failing test: `test/core/router_test.dart` — setup guard redirects to wizard on empty DB
-- [ ] 2.4 Implement: GoRouter with shell route, nested navigation, setup redirect guard
-- [ ] 2.5 Refactor; full suite stays green
+- [x] 2.1 Write failing test: `test/core/theme_test.dart` — theme switches between light/dark/system
+- [x] 2.2 Implement: Material 3 theme with German locale, light/dark/system mode
+- [x] 2.3 Write failing test: `test/core/router_test.dart` — setup guard redirects to wizard on empty DB
+- [x] 2.4 Implement: GoRouter with shell route, nested navigation, setup redirect guard
+- [x] 2.5 Refactor; full suite stays green
 
 ## 3. API Client
 
-- [ ] 3.1 Write failing test: `test/core/api_test.dart` — Dio retries on 5xx, times out after 30s
-- [ ] 3.2 Implement: Dio client with retry interceptor, timeout, port detection
-- [ ] 3.3 Write failing test: `test/core/api_test.dart` — 422 response parses detail fields
-- [ ] 3.4 Implement: Error handling with 422 detail parsing, connection-refused detection
-- [ ] 3.5 Refactor; full suite stays green
+- [x] 3.1 Write failing test: `test/core/api_test.dart` — Dio retries on 5xx, times out after 30s
+- [x] 3.2 Implement: Dio client with retry interceptor, timeout, port detection
+- [x] 3.3 Write failing test: `test/core/api_test.dart` — 422 response parses detail fields
+- [x] 3.4 Implement: Error handling with 422 detail parsing, connection-refused detection
+- [x] 3.5 Refactor; full suite stays green
 
 ## 4. Database Schema (38 tables)
 

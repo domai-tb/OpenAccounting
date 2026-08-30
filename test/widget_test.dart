@@ -10,7 +10,22 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(overrides: [appDatabaseProvider.overrideWithValue(db)], child: const OpenAccountingApp()),
     );
-    expect(find.text('OpenAccounting'), findsOneWidget);
+    await tester.pumpAndSettle();
+    // Batch 2: router with setup guard — empty DB shows Setup Wizard.
+    expect(find.text('Setup Wizard'), findsOneWidget);
+    await db.close();
+  });
+
+  testWidgets('app shows dashboard when configured', (tester) async {
+    final db = createTestDatabase();
+    await db.ensureOpen();
+    await db.executor.runCustom('CREATE TABLE IF NOT EXISTS unternehmen (id INTEGER PRIMARY KEY, name TEXT)');
+    await db.executor.runCustom("INSERT INTO unternehmen (name) VALUES ('Test')");
+    await tester.pumpWidget(
+      ProviderScope(overrides: [appDatabaseProvider.overrideWithValue(db)], child: const OpenAccountingApp()),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Übersicht'), findsOneWidget);
     await db.close();
   });
 }

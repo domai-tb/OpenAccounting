@@ -97,6 +97,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OpenAccounting'**
   String get appTitle;
+
+  /// No description provided for @hello.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello! Your accounting is ready.'**
+  String get hello;
+
+  /// No description provided for @welcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome! You can get started.'**
+  String get welcome;
+
+  /// No description provided for @settingsTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsTheme;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @sidebarOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get sidebarOverview;
+
+  /// No description provided for @sidebarInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices'**
+  String get sidebarInvoices;
+
+  /// No description provided for @sidebarReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts'**
+  String get sidebarReceipts;
+
+  /// No description provided for @sidebarBanking.
+  ///
+  /// In en, this message translates to:
+  /// **'Banking'**
+  String get sidebarBanking;
+
+  /// No description provided for @sidebarContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts'**
+  String get sidebarContacts;
+
+  /// No description provided for @sidebarTaxes.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxes'**
+  String get sidebarTaxes;
+
+  /// No description provided for @sidebarReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get sidebarReports;
+
+  /// No description provided for @sidebarSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get sidebarSettings;
+
+  /// No description provided for @backendUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend not reachable'**
+  String get backendUnreachable;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @notFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Not found'**
+  String get notFound;
+
+  /// No description provided for @invoiceNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice not found'**
+  String get invoiceNotFound;
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your accounting. Local on your device.'**
+  String get setupTitle;
+
+  /// No description provided for @setupStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get setupStart;
+
+  /// No description provided for @confirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Do you really want to delete this invoice?'**
+  String get confirmDelete;
+
+  /// No description provided for @emptyInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoices yet. Create your first invoice.'**
+  String get emptyInvoices;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
