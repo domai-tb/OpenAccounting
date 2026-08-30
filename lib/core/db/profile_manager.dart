@@ -2,14 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 /// Profile management per spec §Profile Management.
-/// Each profile = isolated DB file under <base>/profiles/<name>/openinvoices.db
-/// Active profile tracked via <base>/profile.json {"active": "Name"}
+/// Each profile = isolated DB file under `<base>/profiles/<name>/openinvoices.db`.
+/// Active profile tracked via `<base>/profile.json` `{"active": "Name"}`.
+typedef ProfileDatabaseInitializer = Future<void> Function(String databasePath);
+
 class ProfileManager {
-  ProfileManager({String? baseDir}) : baseDir = baseDir ?? getDefaultBaseDir();
+  ProfileManager({String? baseDir, this.databaseInitializer}) : baseDir = baseDir ?? getDefaultBaseDir();
 
   final String baseDir;
+  final ProfileDatabaseInitializer? databaseInitializer;
 
   String get profileJsonPath => p.join(baseDir, 'profile.json');
 
@@ -41,7 +45,7 @@ class ProfileManager {
   /// Get active profile name. Falls back to first available or 'Default'.
   Future<String> getActiveProfile() async {
     final f = File(profileJsonPath);
-    if (!await f.exists()) {
+    if (!f.existsSync()) {
       final profiles = await listProfiles();
       if (profiles.isNotEmpty) return profiles.first;
       return 'Default';
@@ -52,7 +56,7 @@ class ProfileManager {
       final active = m['active'] as String?;
       if (active != null && active.isNotEmpty) {
         // verify directory exists, else fallback
-        if (await Directory(profileDir(active)).exists()) return active;
+        if (Directory(profileDir(active)).existsSync()) return active;
       }
       final profiles = await listProfiles();
       if (profiles.isNotEmpty) return profiles.first;
@@ -71,11 +75,11 @@ class ProfileManager {
     final current = await getActiveProfile();
     if (current.toLowerCase() == name.toLowerCase()) return false;
     final dir = Directory(profileDir(name));
-    if (!await dir.exists()) {
+    if (!dir.existsSync()) {
       await dir.create(recursive: true);
     }
     final f = File(profileJsonPath);
-    await f.create(recursive: true);
+    f.createSync(recursive: true);
     await f.writeAsString(jsonEncode(<String, String>{'active': name}));
     // ponytail: restart required — caller must restart process to load new DB.
     return true;
@@ -83,7 +87,7 @@ class ProfileManager {
 
   Future<List<String>> listProfiles() async {
     final root = Directory(p.join(baseDir, 'profiles'));
-    if (!await root.exists()) return <String>[];
+    if (!root.existsSync()) return <String>[];
     final ents = await root.list().toList();
     final names = <String>[];
     for (final e in ents) {
@@ -94,13 +98,22 @@ class ProfileManager {
   }
 
   Future<void> createProfile(String name) async {
-    if (name.trim().isEmpty) throw ArgumentError('Profilname darf nicht leer sein');
+    final profileName = name.trim();
+    if (profileName.isEmpty) throw ArgumentError('Profilname darf nicht leer sein');
     final existing = await listProfiles();
-    if (existing.any((e) => e.toLowerCase() == name.toLowerCase())) {
+    if (existing.any((e) => e.toLowerCase() == profileName.toLowerCase())) {
       throw StateError('Profilname existiert bereits');
     }
-    final dir = Directory(profileDir(name));
+    final dir = Directory(profileDir(profileName));
     await dir.create(recursive: true);
+
+    if (databaseInitializer != null) {
+      await databaseInitializer!(databasePath(profileName));
+      return;
+    }
+
+    final database = sqlite3.open(databasePath(profileName));
+    database.close();
   }
 
   /// Delete profile entry — does NOT delete directory for data safety.
@@ -123,7 +136,7 @@ class ProfileManager {
     }
     final oldDir = Directory(profileDir(oldName));
     final newDir = Directory(profileDir(newName));
-    if (!await oldDir.exists()) throw StateError('Profil nicht gefunden: $oldName');
+    if (!oldDir.existsSync()) throw StateError('Profil nicht gefunden: $oldName');
     await oldDir.rename(newDir.path);
     final active = await getActiveProfile();
     if (active.toLowerCase() == oldName.toLowerCase()) {
