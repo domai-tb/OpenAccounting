@@ -53,11 +53,11 @@
 
 ## 7. Backup System
 
-- [ ] 7.1 Write failing test: `test/db/backup_test.dart` — backup creates WAL-safe copy with rotation
-- [ ] 7.2 Implement: Local backup with sqlite3.backup(), rotation (max 5)
-- [ ] 7.3 Write failing test: `test/db/backup_test.dart` — encrypted backup uses AES-256-GCM
-- [ ] 7.4 Implement: External encrypted backup, SMB backup
-- [ ] 7.5 Refactor; full suite stays green
+- [x] 7.1 Write failing test: `test/db/backup_test.dart` — backup creates WAL-safe copy with rotation
+- [x] 7.2 Implement: Local backup with sqlite3.backup(), rotation (max 5)
+- [x] 7.3 Write failing test: `test/db/backup_test.dart` — encrypted backup uses AES-256-GCM
+- [x] 7.4 Implement: External encrypted backup, SMB backup
+- [x] 7.5 Refactor; full suite stays green
 
 ## 8. Master Data (Stammdaten)
 
@@ -75,7 +75,7 @@
 
 ## 9. Invoicing (Rechnungen)
 
-- [ ] 9.1 Write failing test: `test/features/rechnungen/erstellung_test.dart` — create draft invoice
+- [x] 9.1 Write failing test: `test/features/rechnungen/erstellung_test.dart` — create draft invoice
 - [ ] 9.2 Implement: Rechnung creation with positions, Entwurf mode
 - [ ] 9.3 Write failing test: `test/features/rechnungen/finalisierung_test.dart` — finalization locks document, assigns nummer
 - [ ] 9.4 Implement: Finalization flow (lock, PDF generate, nummernkreis)

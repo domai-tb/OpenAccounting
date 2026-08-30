@@ -167,20 +167,21 @@
 | specs/app/spec.md → Print and Export | CSV Export Save Dialog | test/features/app/test_csv_export_save_dialog.dart | test_csv_export_save_dialog | 🔴 red |
 | specs/app/spec.md → Print and Export | CSV Export Cancelled | test/features/app/test_csv_export_cancelled.dart | test_csv_export_cancelled | 🔴 red |
 | specs/app/spec.md → Print and Export | ZIP Export Save Dialog | test/features/app/test_zip_export_save_dialog.dart | test_zip_export_save_dialog | 🔴 red |
-| specs/backup/spec.md → Local WAL-safe backup with rotation | Local backup creation | test/features/backup/test_local_backup_creation.dart | test_local_backup_creation | 🔴 red |
+| specs/backup/spec.md → Local WAL-safe backup with rotation | Local backup creation | test/db/backup_test.dart | creates a restorable backup containing committed data | 🟢 green |
 | specs/backup/spec.md → Local WAL-safe backup with rotation | Backup fails when disk is full | test/features/backup/test_backup_fails_when_disk_is_full.dart | test_backup_fails_when_disk_is_full | 🔴 red |
 | specs/backup/spec.md → Backup before schema migration | Backup before schema migration | test/features/backup/test_backup_before_schema_migration.dart | test_backup_before_schema_migration | 🔴 red |
 | specs/backup/spec.md → Backup before schema migration | Backup failure prevents migration | test/features/backup/test_backup_failure_prevents_migration.dart | test_backup_failure_prevents_migration | 🔴 red |
-| specs/backup/spec.md → External AES-256-GCM encrypted backup | Encrypted external backup | test/features/backup/test_encrypted_external_backup.dart | test_encrypted_external_backup | 🔴 red |
-| specs/backup/spec.md → External AES-256-GCM encrypted backup | Encrypted backup with wrong passphrase on restore | test/features/backup/test_encrypted_backup_with_wrong_passphrase_on_restore.dart | test_encrypted_backup_with_wrong_passphrase_on_restore | 🔴 red |
-| specs/backup/spec.md → Restore from encrypted backup | Restore from encrypted backup | test/features/backup/test_restore_from_encrypted_backup.dart | test_restore_from_encrypted_backup | 🔴 red |
-| specs/backup/spec.md → Restore from encrypted backup | Restore with corrupted encrypted backup | test/features/backup/test_restore_with_corrupted_encrypted_backup.dart | test_restore_with_corrupted_encrypted_backup | 🔴 red |
-| specs/backup/spec.md → SMB network share backup | SMB backup with stored credentials | test/features/backup/test_smb_backup_with_stored_credentials.dart | test_smb_backup_with_stored_credentials | 🔴 red |
-| specs/backup/spec.md → SMB network share backup | SMB backup fails with invalid credentials | test/features/backup/test_smb_backup_fails_with_invalid_credentials.dart | test_smb_backup_fails_with_invalid_credentials | 🔴 red |
-| specs/backup/spec.md → System drive protection with opt-in override | System drive backup rejected | test/features/backup/test_system_drive_backup_rejected.dart | test_system_drive_backup_rejected | 🔴 red |
+| specs/backup/spec.md → Backup target boundaries | External target requires explicit opt-in | test/db/backup_test.dart | requires explicit approval for external backup targets | 🟢 green |
+| specs/backup/spec.md → External AES-256-GCM encrypted backup | Encrypted external backup | test/db/backup_test.dart | encrypted backups store a versioned salt and IV header | 🟢 green |
+| specs/backup/spec.md → External AES-256-GCM encrypted backup | Encrypted backup with wrong passphrase on restore | test/db/backup_test.dart | wrong encrypted passphrase leaves active database unchanged | 🟢 green |
+| specs/backup/spec.md → Restore from encrypted backup | Restore from encrypted backup | test/db/backup_test.dart | restores an encrypted backup with the correct passphrase | 🟢 green |
+| specs/backup/spec.md → Restore from encrypted backup | Restore with corrupted encrypted backup | test/db/backup_test.dart | rejects corrupted encrypted backup without replacing active database | 🟢 green |
+| specs/backup/spec.md → SMB network share backup | SMB backup with stored credentials | test/db/backup_test.dart | uploads a verified backup through the SMB writer boundary | 🟢 green |
+| specs/backup/spec.md → SMB network share backup | SMB backup fails with invalid credentials | test/db/backup_test.dart | maps SMB writer failures without exposing credentials | 🟢 green |
+| specs/backup/spec.md → System drive protection with opt-in override | System drive backup rejected | test/db/backup_test.dart | rejects system-drive encrypted backup without explicit override | 🟢 green |
 | specs/backup/spec.md → System drive protection with opt-in override | System drive override accepted | test/features/backup/test_system_drive_override_accepted.dart | test_system_drive_override_accepted | 🔴 red |
-| specs/backup/spec.md → Restore from backup | Restore from local backup | test/features/backup/test_restore_from_local_backup.dart | test_restore_from_local_backup | 🔴 red |
-| specs/backup/spec.md → Restore from backup | Restore with missing backup file | test/features/backup/test_restore_with_missing_backup_file.dart | test_restore_with_missing_backup_file | 🔴 red |
+| specs/backup/spec.md → Restore from backup | Restore from local backup | test/db/backup_test.dart | restores a local backup atomically | 🟢 green |
+| specs/backup/spec.md → Restore from backup | Restore with missing backup file | test/db/backup_test.dart | missing local backup leaves active database unchanged | 🟢 green |
 | specs/backup/spec.md → Backup scheduling | Scheduled daily backup | test/features/backup/test_scheduled_daily_backup.dart | test_scheduled_daily_backup | 🔴 red |
 | specs/backup/spec.md → Backup scheduling | No duplicate backup within interval | test/features/backup/test_no_duplicate_backup_within_interval.dart | test_no_duplicate_backup_within_interval | 🔴 red |
 | specs/backup/spec.md → Platform-specific backup paths | Linux backup path | test/features/backup/test_linux_backup_path.dart | test_linux_backup_path | 🔴 red |
@@ -265,10 +266,10 @@
 | specs/db/spec.md → Profile Management | Profile Directory Isolation | test/db/profile_test.dart | creates isolated profile directory and database | 🟢 green |
 | specs/db/spec.md → Profile Management | Profile Switch Requires Restart | test/db/profile_test.dart | switches profiles through profile.json and skips same-profile restart | 🟢 green |
 | specs/db/spec.md → Profile Management | Profile Switch Does Not Affect Other Profiles | test/db/profile_test.dart | keeps identical invoice numbers isolated between profile databases | 🟢 green |
-| specs/db/spec.md → Backup System | WAL-Safe Backup Creation | test/features/db/test_wal_safe_backup_creation.dart | test_wal_safe_backup_creation | 🔴 red |
-| specs/db/spec.md → Backup System | Backup Rotation | test/features/db/test_backup_rotation.dart | test_backup_rotation | 🔴 red |
-| specs/db/spec.md → Backup System | Encrypted External Backup | test/features/db/test_encrypted_external_backup.dart | test_encrypted_external_backup | 🔴 red |
-| specs/db/spec.md → Backup System | Backup Directory Does Not Exist | test/features/db/test_backup_directory_does_not_exist.dart | test_backup_directory_does_not_exist | 🔴 red |
+| specs/db/spec.md → Backup System | WAL-Safe Backup Creation | test/db/backup_test.dart | creates a restorable backup containing committed data | 🟢 green |
+| specs/db/spec.md → Backup System | Backup Rotation | test/db/backup_test.dart | retains only the five newest local backups | 🟢 green |
+| specs/db/spec.md → Backup System | Encrypted External Backup | test/db/backup_test.dart | encrypted backups store a versioned salt and IV header | 🟢 green |
+| specs/db/spec.md → Backup System | Backup Directory Does Not Exist | test/db/backup_test.dart | creates a restorable backup containing committed data | 🟢 green |
 | specs/db/spec.md → Seed Data | USt-Sätze Seeded | test/db/seed_test.dart | seeds standard tax rates and document number ranges | 🟢 green |
 | specs/db/spec.md → Seed Data | Nummernkreise Seeded | test/db/seed_test.dart | seeds standard tax rates and document number ranges | 🟢 green |
 | specs/db/spec.md → Seed Data | Kategorien Seeded With SKR Accounts | test/db/seed_test.dart | seeds categories with both SKR mappings | 🟢 green |
