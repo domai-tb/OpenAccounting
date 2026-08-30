@@ -5,9 +5,9 @@
 
 ## 1. Project Setup
 
-- [ ] 1.1 Write failing test: `test/core/setup_test.dart` — app creates database connection on startup
-- [ ] 1.2 Implement: `flutter create openinvoices`, add dependencies (drift, riverpod, go_router, dio, pdf, system_tray, hotkey_manager, window_manager, auto_updater)
-- [ ] 1.3 Refactor; full suite stays green
+- [x] 1.1 Write failing test: `test/core/setup_test.dart` — app creates database connection on startup
+- [x] 1.2 Implement: `flutter create openinvoices`, add dependencies (drift, riverpod, go_router, dio, pdf, system_tray, hotkey_manager, window_manager, auto_updater)
+- [x] 1.3 Refactor; full suite stays green
 
 ## 2. Core Theme & Routing
 
