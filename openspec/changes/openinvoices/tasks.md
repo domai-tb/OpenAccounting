@@ -45,11 +45,11 @@
 
 ## 6. Profile System
 
-- [ ] 6.1 Write failing test: `test/db/profile_test.dart` — switching profile changes database path
-- [ ] 6.2 Implement: profile.json pointer, APP_DATA_DIR per profile, restart requirement
-- [ ] 6.3 Write failing test: `test/db/profile_test.dart` — profile isolation prevents cross-profile data access
-- [ ] 6.4 Implement: Profile-scoped database connections
-- [ ] 6.5 Refactor; full suite stays green
+- [x] 6.1 Write failing test: `test/db/profile_test.dart` — switching profile changes database path
+- [x] 6.2 Implement: profile.json pointer, APP_DATA_DIR per profile, restart requirement
+- [x] 6.3 Write failing test: `test/db/profile_test.dart` — profile isolation prevents cross-profile data access
+- [x] 6.4 Implement: Profile-scoped database connections
+- [x] 6.5 Refactor; full suite stays green
 
 ## 7. Backup System
 

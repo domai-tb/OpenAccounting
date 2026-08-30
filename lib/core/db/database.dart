@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart' as drift_native;
 import 'package:drift_flutter/drift_flutter.dart' show driftDatabase;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
+import 'package:openaccounting/core/db/data_paths.dart';
 import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
-import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/db/seed.dart';
 
 /// Drift-backed app database with 38 tables per spec §Table Definitions.
@@ -19,6 +21,9 @@ class AppDatabase {
       _ownsExecutor = executor == null;
 
   AppDatabase.forTesting(QueryExecutor executor, {this.profileDir}) : _executor = executor, _ownsExecutor = true;
+
+  AppDatabase.forProfile(String profileDirectory)
+    : this(drift_native.NativeDatabase(File(p.join(profileDirectory, 'openinvoices.db'))), profileDirectory);
 
   final QueryExecutor _executor;
   final String? profileDir;
@@ -81,27 +86,11 @@ class AppDatabase {
     try {
       await _executor.runCustom('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch (_) {}
-    final runner = MigrationRunner(executor: _executor, profileDir: profileDir ?? ProfileManager.getDefaultBaseDir());
-    final versionBefore = await runner.getUserVersion();
-    final hasTablesBefore = await runner.hasAnyTables();
-    print('Database version before migration: $versionBefore, hasTables: $hasTablesBefore');
-    final migrated = await runner.run(createSchema: _createAllTables);
-    final versionAfter = await runner.getUserVersion();
-    final hasTablesAfter = await runner.hasAnyTables();
-    print('Database version after migration: $versionAfter, hasTables: $hasTablesAfter, migrated: $migrated');
+    final runner = MigrationRunner(executor: _executor, profileDir: profileDir ?? resolveDefaultBaseDir());
+    await runner.run(createSchema: _createAllTables);
     // Ensure triggers and seed idempotent even when no migration
-    try {
-      await GobdTriggers.install(_executor);
-    } catch (e) {
-      print('Error installing GobdTriggers: $e');
-      rethrow;
-    }
-    try {
-      await SeedData.run(_executor);
-    } catch (e) {
-      print('Error running SeedData: $e');
-      rethrow;
-    }
+    await GobdTriggers.install(_executor);
+    await SeedData.run(_executor);
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -111,7 +100,6 @@ class AppDatabase {
   }
 
   Future<void> _createAllTables() async {
-    print('_createAllTables started');
     // Create in dependency order to satisfy FKs (SQLite allows deferred but we order).
     for (final sql in _schemaSql) {
       await _executor.runCustom(sql);
@@ -119,7 +107,6 @@ class AppDatabase {
     for (final sql in _indexSql) {
       await _executor.runCustom(sql);
     }
-    print('_createAllTables ended');
   }
 
   Future<void> close() async {

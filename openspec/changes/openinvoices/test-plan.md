@@ -264,7 +264,7 @@
 | specs/db/spec.md → GoBD Triggers | Trigger Protects Against Direct SQL | test/db/gobd_test.dart | rejects UPDATE and DELETE for immutable journal rows | 🟢 green |
 | specs/db/spec.md → Profile Management | Profile Directory Isolation | test/db/profile_test.dart | creates isolated profile directory and database | 🟢 green |
 | specs/db/spec.md → Profile Management | Profile Switch Requires Restart | test/db/profile_test.dart | switches profiles through profile.json and skips same-profile restart | 🟢 green |
-| specs/db/spec.md → Profile Management | Profile Switch Does Not Affect Other Profiles | test/features/db/test_profile_switch_does_not_affect_other_profiles.dart | test_profile_switch_does_not_affect_other_profiles | 🔴 red |
+| specs/db/spec.md → Profile Management | Profile Switch Does Not Affect Other Profiles | test/db/profile_test.dart | keeps identical invoice numbers isolated between profile databases | 🟢 green |
 | specs/db/spec.md → Backup System | WAL-Safe Backup Creation | test/features/db/test_wal_safe_backup_creation.dart | test_wal_safe_backup_creation | 🔴 red |
 | specs/db/spec.md → Backup System | Backup Rotation | test/features/db/test_backup_rotation.dart | test_backup_rotation | 🔴 red |
 | specs/db/spec.md → Backup System | Encrypted External Backup | test/features/db/test_encrypted_external_backup.dart | test_encrypted_external_backup | 🔴 red |
@@ -527,11 +527,11 @@
 | specs/pdf/spec.md → Logo Embedding | Logo exceeds header area | test/features/pdf/test_logo_exceeds_header_area.dart | test_logo_exceeds_header_area | 🔴 red |
 | specs/pdf/spec.md → Logo Embedding | Unsupported logo format | test/features/pdf/test_unsupported_logo_format.dart | test_unsupported_logo_format | 🔴 red |
 | specs/profiles/spec.md → Separate databases per profile | New profile creates isolated database | test/features/profiles/test_new_profile_creates_isolated_database.dart | test_new_profile_creates_isolated_database | 🔴 red |
-| specs/profiles/spec.md → Separate databases per profile | Profile isolation | test/features/profiles/test_profile_isolation.dart | test_profile_isolation | 🔴 red |
-| specs/profiles/spec.md → Separate databases per profile | Corrupted profile.json falls back to default | test/features/profiles/test_corrupted_profile_json_falls_back_to_default.dart | test_corrupted_profile_json_falls_back_to_default | 🔴 red |
+| specs/profiles/spec.md → Separate databases per profile | Profile isolation | test/db/profile_test.dart | keeps identical invoice numbers isolated between profile databases | 🟢 green |
+| specs/profiles/spec.md → Separate databases per profile | Corrupted profile.json falls back to default | test/db/profile_test.dart | falls back to first profile when profile pointer is corrupted | 🟢 green |
 | specs/profiles/spec.md → APP_DATA_DIR resolved per profile | Upload path uses active profile | test/features/profiles/test_upload_path_uses_active_profile.dart | test_upload_path_uses_active_profile | 🔴 red |
 | specs/profiles/spec.md → APP_DATA_DIR resolved per profile | Backup path uses active profile | test/features/profiles/test_backup_path_uses_active_profile.dart | test_backup_path_uses_active_profile | 🔴 red |
-| specs/profiles/spec.md → APP_DATA_DIR resolved per profile | Code outside APP_DATA_DIR is rejected | test/features/profiles/test_code_outside_app_data_dir_is_rejected.dart | test_code_outside_app_data_dir_is_rejected | 🔴 red |
+| specs/profiles/spec.md → APP_DATA_DIR resolved per profile | Code outside APP_DATA_DIR is rejected | test/db/profile_test.dart | rejects paths outside active profile data directory | 🟢 green |
 | specs/profiles/spec.md → Profile switching requires restart | Switch profile | test/features/profiles/test_switch_profile.dart | test_switch_profile | 🔴 red |
 | specs/profiles/spec.md → Profile switching requires restart | Switch to non-existent profile | test/features/profiles/test_switch_to_non_existent_profile.dart | test_switch_to_non_existent_profile | 🔴 red |
 | specs/profiles/spec.md → Profile switching requires restart | Switch to same profile is a no-op | test/features/profiles/test_switch_to_same_profile_is_a_no_op.dart | test_switch_to_same_profile_is_a_no_op | 🔴 red |

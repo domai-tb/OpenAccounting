@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:sqlite3/sqlite3.dart';
+
+import 'package:openaccounting/core/db/data_paths.dart';
+import 'package:openaccounting/core/db/profile_database.dart';
 
 /// Profile management per spec §Profile Management.
 /// Each profile = isolated DB file under `<base>/profiles/<name>/openinvoices.db`.
@@ -10,14 +12,29 @@ import 'package:sqlite3/sqlite3.dart';
 typedef ProfileDatabaseInitializer = Future<void> Function(String databasePath);
 
 class ProfileManager {
-  ProfileManager({String? baseDir, this.databaseInitializer}) : baseDir = baseDir ?? getDefaultBaseDir();
+  ProfileManager({String? baseDir, ProfileDatabaseInitializer? databaseInitializer})
+    : baseDir = baseDir ?? getDefaultBaseDir(),
+      databaseInitializer = databaseInitializer ?? initializeProfileDatabase;
 
   final String baseDir;
-  final ProfileDatabaseInitializer? databaseInitializer;
+  final ProfileDatabaseInitializer databaseInitializer;
 
   String get profileJsonPath => p.join(baseDir, 'profile.json');
 
-  String profileDir(String name) => p.join(baseDir, 'profiles', name);
+  String profileDir(String name) => p.join(baseDir, 'profiles', _validateProfileName(name));
+
+  String _validateProfileName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed == '.' || trimmed == '..' || trimmed.contains(RegExp(r'[/\\]'))) {
+      throw ArgumentError('Ungültiger Profilname');
+    }
+    final root = p.absolute(p.join(baseDir, 'profiles'));
+    final target = p.absolute(p.join(root, trimmed));
+    if (target == root || !p.isWithin(root, target)) {
+      throw ArgumentError('Ungültiger Profilname');
+    }
+    return trimmed;
+  }
 
   String databasePath(String name) => p.join(profileDir(name), 'openinvoices.db');
 
@@ -25,21 +42,7 @@ class ProfileManager {
 
   /// Resolve default base directory per platform spec.
   static String getDefaultBaseDir() {
-    if (Platform.isLinux) {
-      final home = Platform.environment['HOME'] ?? '/tmp';
-      return p.join(home, '.local', 'share', 'OpenInvoices');
-    }
-    if (Platform.isMacOS) {
-      final home = Platform.environment['HOME'] ?? '/tmp';
-      return p.join(home, 'Library', 'Application Support', 'OpenInvoices');
-    }
-    if (Platform.isWindows) {
-      final local =
-          Platform.environment['LOCALAPPDATA'] ?? Platform.environment['APPDATA'] ?? r'C:\Users\Default\AppData\Local';
-      return p.join(local, 'OpenInvoices');
-    }
-    final home = Platform.environment['HOME'] ?? '/tmp';
-    return p.join(home, '.local', 'share', 'OpenInvoices');
+    return resolveDefaultBaseDir();
   }
 
   /// Get active profile name. Falls back to first available or 'Default'.
@@ -107,13 +110,7 @@ class ProfileManager {
     final dir = Directory(profileDir(profileName));
     await dir.create(recursive: true);
 
-    if (databaseInitializer != null) {
-      await databaseInitializer!(databasePath(profileName));
-      return;
-    }
-
-    final database = sqlite3.open(databasePath(profileName));
-    database.close();
+    await databaseInitializer(databasePath(profileName));
   }
 
   /// Delete profile entry — does NOT delete directory for data safety.
