@@ -44,7 +44,7 @@ THEN `bestand_aktuell` SHALL decrease to 8.0.
 
 ### Requirement: Stock decrement on invoice finalization
 
-When an invoice is finalized, the system SHALL iterate all line items with articles where `lager_aktiv = true` and decrement `bestand_aktuell` by the line item quantity. The decrement SHALL be atomic (single transaction) and SHALL occur after the invoice is persisted but before the PDF is generated.
+When an invoice is finalized, the system SHALL iterate all line items with articles where `lager_aktiv = true` and decrement `bestand_aktuell` by the line item quantity. The decrement SHALL be atomic (single transaction), SHALL be recorded in `inventarbewegungen`, and SHALL occur after the invoice is persisted but before the PDF is generated.
 
 #### Scenario: Multiple line items
 
@@ -138,7 +138,7 @@ THEN the invoice SHALL be saved successfully as draft.
 
 ### Requirement: Manual stock adjustment
 
-The system SHALL provide a manual stock adjustment interface in the article detail view. The user SHALL be able to set `bestand_aktuell` to an absolute value or adjust by a delta (+/-). Each adjustment SHALL be recorded in a stock movement log (datum, artikel_id, diff, grund). The stock adjustment SHALL NOT require an invoice or journal entry.
+The system SHALL provide a manual stock adjustment interface in the article detail view. The user SHALL be able to set `bestand_aktuell` to an absolute value or adjust by a delta (+/-). Each adjustment SHALL be recorded in the named `inventarbewegungen` table with `datum`, `artikel_id`, `diff`, and `grund`. The stock adjustment SHALL NOT require an invoice or journal entry.
 
 #### Scenario: Absolute stock set
 
@@ -160,6 +160,24 @@ GIVEN an article has `bestand_aktuell = 5`
 WHEN the user sets `bestand_aktuell` to -3 via the manual adjustment interface
 THEN `bestand_aktuell` SHALL be -3
 AND a stock movement log entry SHALL be created with diff=-8.
+
+### Requirement: Inventory movement storage
+
+The inventory feature migration SHALL add exactly one named table, `inventarbewegungen`, with `id`, `artikel_id` (foreign key to `artikel`), `datum`, `diff` (NUMERIC(10,3)), `grund`, and nullable `referenz_typ` and `referenz_id` fields. Invoice decrements, Storno restores, and manual adjustments SHALL each write one movement row in the same transaction as the stock change. `referenz_typ` and `referenz_id` SHALL identify the originating document when applicable.
+
+#### Scenario: Automatic movement recorded
+
+GIVEN an inventory-enabled article is included in a finalized invoice
+WHEN stock is decremented
+THEN `inventarbewegungen` SHALL contain the negative quantity with the invoice reference
+AND the movement row and stock update SHALL commit or roll back together.
+
+#### Scenario: Storno movement recorded
+
+GIVEN an inventory-enabled invoice is storniert
+WHEN stock is restored
+THEN `inventarbewegungen` SHALL contain the positive restored quantity with the Storno reference
+AND the movement row and stock update SHALL commit or roll back together.
 
 ### Requirement: Configurable inventory activation in settings
 

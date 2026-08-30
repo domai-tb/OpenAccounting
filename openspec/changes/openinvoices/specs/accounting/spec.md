@@ -124,7 +124,7 @@ The system SHALL generate Anlage EÜR 2025 with 60+ line items (Zeilen 12–107)
 
 ### Requirement: UStVA (Umsatzsteuer-Voranmeldung)
 
-The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Kennzahlen (KZ) 1–22, configurable by Voranmeldungsrhythmus (monatlich/quartal).
+The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with every statutory Kennzahl required by the configured scenarios, including KZ 12, 61, 66, 81, 83, 89, and 93, configurable by Voranmeldungsrhythmus (monatlich/quartal). The output SHALL not be limited to KZ 1–22.
 
 #### Scenario: KZ 1 — Gesamtumsatz steuerpflichtig
 
@@ -148,7 +148,7 @@ The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Ken
 
 - GIVEN a UStVA period including Differenzbesteuerung entries
 - WHEN the UStVA is computed
-- THEN KZ 18 SHALL show the margin-based USt (marge_25a_brutto × ust_satz_25a / (100 + ust_satz_25a))
+- THEN KZ 18 SHALL show the USt on the taxable margin base `max(marge_25a_brutto, 0)` using `base × ust_satz_25a / (100 + ust_satz_25a)`
 
 #### Scenario: KZ 61 — Vorsteuerabzug ig Erwerb
 
@@ -156,11 +156,26 @@ The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Ken
 - WHEN the UStVA is computed
 - THEN KZ 61 SHALL show the Vorsteuer from those entries (not KZ 66)
 
+#### Scenario: KZ 66 — Allgemeiner Vorsteuerabzug
+
+- GIVEN domestic input-tax claims in `vorsteuer_ansprueche` for a filing period
+- WHEN the UStVA is computed
+- THEN KZ 66 SHALL show the eligible Vorsteuer from those claims
+- AND KZ 66 SHALL exclude claims belonging to the ig Erwerb KZ 61 scenario
+
+#### Scenario: KZ 89/93 — Reverse Charge
+
+- GIVEN journal entries with `ust_sonderfall` set to a configured §13b or other Reverse-Charge case in a filing period
+- WHEN the UStVA is computed
+- THEN the applicable tax base and tax SHALL be reported in KZ 89 and KZ 93
+- AND the same entries SHALL NOT be reported as ordinary domestic turnover
+
 #### Scenario: KZ 81/83 — Differenzbetrag §25a
 
 - GIVEN a UStVA period including §25a entries
 - WHEN the UStVA is computed
-- THEN KZ 81 SHALL show the margin (marge_25a_brutto) and KZ 83 SHALL show the USt on the margin
+- THEN KZ 81 SHALL show the sum of `max(marge_25a_brutto, 0)`
+- AND KZ 83 SHALL show `KZ 81 × ust_satz_25a / (100 + ust_satz_25a)`
 
 #### Scenario: Quarterly filing
 
@@ -294,7 +309,8 @@ The system SHALL generate a complete GoBD-compliant audit trail export as a ZIP 
 
 - GIVEN a period selected for GoBD export
 - WHEN the GoBD export is requested
-- THEN the system SHALL produce a ZIP containing all finalized document PDFs, the journal ledger, EÜR/UStVA reports, and a manifest with SHA-256 hashes for each file
+- THEN the system SHALL produce a ZIP containing all finalized document PDFs, the journal ledger, EÜR/UStVA reports, and a manifest with SHA-256 tamper-evident integrity hashes for each file
+- AND the manifest hashes SHALL NOT be described or treated as digital signatures
 
 #### Scenario: GoBD integrity verification
 
@@ -354,7 +370,7 @@ The system SHALL display both SKR03 and SKR04 account numbers in parallel across
 
 ### Requirement: Tax Calculation
 
-The system SHALL calculate Umsatzsteuer for 19%, 7%, and 0% rates, Kleinunternehmer §19 (no USt), and Differenzbesteuerung §25a (margin scheme).
+The system SHALL calculate Umsatzsteuer for every configured rate, including default 19%, 7%, and 0% rates, custom configured rates, Kleinunternehmer §19 (no USt), and Differenzbesteuerung §25a (margin scheme). A rate SHALL be rejected only when it is invalid or not configured in `ust_saetze`.
 
 #### Scenario: Standard 19% USt
 
@@ -378,7 +394,7 @@ The system SHALL calculate Umsatzsteuer for 19%, 7%, and 0% rates, Kleinunterneh
 
 - GIVEN a position with differenzbesteuerung=true
 - WHEN the position is calculated
-- THEN USt SHALL be computed on the margin (VK_brutto - EK_netto × menge) at the nominal ust_satz_25a, and the invoice SHALL show 0% USt with a §25a note
+- THEN USt SHALL be computed on `max(VK_brutto - (EK_netto × menge), 0)` at the nominal `ust_satz_25a`, and the invoice SHALL show 0% USt with a §25a note
 
 #### Scenario: Mixed document
 
@@ -388,9 +404,9 @@ The system SHALL calculate Umsatzsteuer for 19%, 7%, and 0% rates, Kleinunterneh
 
 #### Scenario: Invalid ust_satz
 
-- GIVEN a position with ust_satz not in {0, 7, 19} (e.g., 10%)
+- GIVEN a position with ust_satz not configured in `ust_saetze` (e.g., 10% when no 10% rate exists)
 - WHEN the Rechnung is calculated
-- THEN the system SHALL reject the calculation with a validation error for the invalid tax rate
+- THEN the system SHALL reject the calculation with a validation error because the rate is invalid or not configured in `ust_saetze`
 
 ### Requirement: Skonto
 
@@ -428,7 +444,7 @@ The system SHALL apply Skonto (cash discount) at company, customer, or invoice l
 
 ### Requirement: Payment Processing
 
-The system SHALL handle partial payments, Überzahlungen (overpayments), and Forderungen (receivables).
+The system SHALL handle partial payments, Überzahlungen (overpayments), and Forderungen (receivables). Payment mutations SHALL be atomic; a retryable payment MUST carry a unique idempotency key so a repeated request cannot create a duplicate payment or journal entry.
 
 #### Scenario: Partial payment
 
@@ -486,7 +502,8 @@ The system SHALL support daily cash close (Tagesabschluss) with expected vs. cou
 
 - GIVEN a Tagesabschluss with zaehlung_json finalized
 - WHEN the Tagesabschluss is committed
-- THEN the system SHALL compute a SHA-256 signature and store it as signatur in the database
+- THEN the system SHALL compute a SHA-256 tamper-evident integrity hash and store it in the existing `signatur` field
+- AND the stored value SHALL NOT be described or treated as a digital signature
 
 #### Scenario: Double close prevention
 
@@ -699,19 +716,21 @@ The system SHALL support monthly or quarterly UStVA filing rhythm, configurable 
 
 ### Requirement: Differenzbesteuerung §25a Accounting
 
-The system SHALL compute Differenzbesteuerung (margin scheme) per §25a UStG with correct journal entries and UStVA reporting.
+The system SHALL compute Differenzbesteuerung (margin scheme) per §25a UStG with one consistent margin base across position calculation, journal entries, UStVA, and PDF output. For each position, `marge_25a_brutto` SHALL equal `VK_brutto - (EK_netto × menge)`; the taxable margin base SHALL be `max(marge_25a_brutto, 0)`.
 
 #### Scenario: §25a journal entry
 
 - GIVEN a Rechnung with §25a positions finalized
 - WHEN the journal entry is created
-- THEN the system SHALL create entries with marge_25a_brutto (VK_brutto - EK_netto × menge) and ust_satz_25a
+- THEN the system SHALL create entries with `marge_25a_brutto = VK_brutto - (EK_netto × menge)` and `ust_satz_25a`
+- AND the taxable margin base SHALL be `max(marge_25a_brutto, 0)`
 
 #### Scenario: §25a UStVA KZ 81/83
 
 - GIVEN a UStVA period including §25a entries
 - WHEN the UStVA is computed
-- THEN KZ 81 SHALL show the total margin (marge_25a_brutto) and KZ 83 SHALL show the USt computed on the margin
+- THEN KZ 81 SHALL show the sum of `max(marge_25a_brutto, 0)`
+- AND KZ 83 SHALL show `KZ 81 × ust_satz_25a / (100 + ust_satz_25a)`
 
 #### Scenario: §25a EÜR treatment
 
@@ -723,7 +742,9 @@ The system SHALL compute Differenzbesteuerung (margin scheme) per §25a UStG wit
 
 - GIVEN a §25a position where VK_brutto < EK_netto × menge (negative margin)
 - WHEN the journal entry is created
-- THEN the marge_25a_brutto SHALL be negative, and no USt SHALL be charged (margin is zero or negative)
+- THEN `marge_25a_brutto` SHALL be negative
+- AND the taxable margin base SHALL be zero
+- AND no USt SHALL be charged
 
 ### Requirement: Storno Correction
 

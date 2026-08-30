@@ -228,17 +228,17 @@ The Unternehmen record MUST store SMTP configuration: smtp_aktiv, smtp_host, smt
 
 ### Requirement: Unternehmen — PDF-Vorlage
 
-The Unternehmen record MUST store pdf_vorlage (INTEGER) indicating which PDF template to use (0 = standard, 1 = with Rabatt column, etc.). The system MUST apply this template when generating all document PDFs.
+The Unternehmen record MUST store `pdf_vorlage` as the template identifier `standard` or `gruen`. `standard` is the default full-color template; `gruen` is the Kleinunternehmer template. Unknown values MUST fall back to `standard` and log a warning. The system MUST apply this representation when generating all document PDFs.
 
-#### Scenario: Template selection affects PDF output
-- GIVEN pdf_vorlage = 1 and an invoice with Rabatt is finalized
+#### Scenario: Grün template selection affects PDF output
+- GIVEN pdf_vorlage = 'gruen' and a Kleinunternehmer invoice is finalized
 - WHEN the PDF is generated
-- THEN the generated PDF includes a Rabatt column and Zwischensumme row
+- THEN the generated PDF uses the Grün/Kleinunternehmer template without USt columns
 
-#### Scenario: Default template applied
-- GIVEN pdf_vorlage = 0 and an invoice is finalized
+#### Scenario: Standard template applied
+- GIVEN pdf_vorlage = 'standard' and an invoice is finalized
 - WHEN the PDF is generated
-- THEN the generated PDF uses the standard template without Rabatt column
+- THEN the generated PDF uses the standard template
 
 ### Requirement: Unternehmen — Unterschrift
 
@@ -396,7 +396,7 @@ Each category MAY have eks_kategorie (VARCHAR, nullable). When set, journal entr
 
 ### Requirement: Konten — CRUD
 
-The system SHALL provide CRUD for bank accounts (Konten). Each account MUST have id, bezeichnung, iban (nullable), bic (nullable), kontoart (ENUM: Girokonto, Sparkonto, Kreditkarte, Paypal, Sonstiges), anbieter (VARCHAR), kennung (VARCHAR), and datev_kontonummer (VARCHAR(8), nullable). IBAN MUST be nullable for non-IBAN accounts (PayPal, Kreditkarte). A partial unique index prevents duplicate IBANs when not null.
+The system SHALL provide CRUD for accounts (Konten). Each account MUST have id, bezeichnung, iban (nullable), bic (nullable), kontoart (ENUM: Girokonto, Sparkonto, Kreditkarte, Paypal, Kasse, Sonstiges), anbieter (VARCHAR), kennung (VARCHAR), and datev_kontonummer (VARCHAR(8), nullable). IBAN MUST be nullable for non-IBAN accounts (PayPal, Kreditkarte, Kasse). A partial unique index prevents duplicate IBANs when not null.
 
 #### Scenario: PayPal account without IBAN
 - GIVEN a user creates a Konto with kontoart = "Paypal"

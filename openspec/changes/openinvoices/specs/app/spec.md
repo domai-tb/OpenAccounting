@@ -44,7 +44,7 @@ AND the filter state SHALL persist across navigation within the section
 
 ### Requirement: State Management
 
-The application SHALL use Riverpod 2.x for state management with automatic caching, provider invalidation, and optimistic updates for all mutable operations.
+The application SHALL retain the existing GetIt/AppScope/AppServices dependency flow and use Flutter-native state mechanisms for page state. Caching and invalidation MAY be implemented by the existing services or an equivalent state layer; Riverpod is not required. Optimistic updates SHALL be limited to idempotent operations. Finalization, payment, stock, and other transactional mutations SHALL commit atomically; a retryable mutation MUST carry a unique idempotency key and repeated requests with that key MUST have one effect.
 
 #### Scenario: Provider Caching
 
@@ -57,22 +57,23 @@ AND no redundant API call SHALL be made
 
 GIVEN the user has loaded the Kunden list more than 5 minutes ago
 WHEN the user navigates back to the Kunden list
-THEN fresh data SHALL be fetched from the backend
+THEN fresh data SHALL be fetched from the repository or data source
 AND the stale cache SHALL be discarded
 
 #### Scenario: Optimistic Update Rollback
 
 GIVEN an invoice is currently marked as unpaid
 WHEN the user marks the invoice as paid
-AND the backend returns a 422 error within 3 seconds
+AND the active data source returns a 422 validation error within 3 seconds
+AND the payment mutation carries a unique idempotency key
 THEN the UI SHALL revert to the previous unpaid state
-AND an error snackbar SHALL display the backend error message
+AND an error snackbar SHALL display the data-source validation message
 
 #### Scenario: Optimistic Update Success
 
 GIVEN an invoice is currently marked as unpaid
 WHEN the user marks the invoice as paid
-AND the backend returns HTTP 200
+AND the idempotent payment mutation returns success
 THEN the invoice SHALL remain in paid state
 AND no rollback SHALL occur
 
@@ -168,36 +169,36 @@ AND the splitter SHALL stop at the minimum boundary
 
 ### Requirement: Error Handling
 
-The application SHALL parse 422 validation error responses from the backend and display field-level errors inline. When the backend is unreachable, a dedicated screen SHALL inform the user with retry options.
+The application SHALL map validation failures from local repositories or enabled integrations to field-level errors inline. An unavailable optional integration SHALL produce a scoped, recoverable error without blocking local-first accounting workflows.
 
 #### Scenario: 422 Validation Error Display
 
 GIVEN the user has filled out a form
 WHEN the user submits the form
-AND the backend returns HTTP 422 with a JSON error body containing field errors
+AND the active data source returns a validation error with a JSON body containing field errors
 THEN each field error SHALL appear beneath the corresponding form field
 AND the form SHALL NOT submit again until all errors are resolved
 
 #### Scenario: 422 Validation Error With Multiple Fields
 
 GIVEN the user has submitted a form with errors in three fields
-WHEN the backend returns HTTP 422
+WHEN the active data source returns HTTP 422
 THEN all three field errors SHALL display simultaneously
 AND the form SHALL remain open for correction
 
-#### Scenario: Backend Unreachable Screen
+#### Scenario: Optional Integration Unavailable
 
-GIVEN the API client has failed to connect to the backend after 3 retry attempts
+GIVEN an enabled optional integration has failed after its permitted retry attempts
 WHEN the app renders the connection state
-THEN a full-screen message SHALL display: "Backend nicht erreichbar"
+THEN a scoped message SHALL display that the optional integration is unavailable
 AND the message SHALL include a "Erneut versuchen" button
-AND the message SHALL include the last attempted port and host
+AND local data and local-first workflows SHALL remain available
 
-#### Scenario: Backend Recovery After Unreachable State
+#### Scenario: Optional Integration Recovery
 
-GIVEN the app is showing the "Backend nicht erreichbar" screen
+GIVEN the app is showing an optional-integration-unavailable message
 WHEN the user clicks "Erneut versuchen"
-AND the backend is now reachable
+AND the integration is now reachable
 THEN the app SHALL dismiss the error screen
 AND navigate to the previously requested route
 
@@ -313,42 +314,42 @@ THEN no validation error SHALL appear for the monetary field
 
 ### Requirement: API Client
 
-The application SHALL use Dio as the HTTP client with automatic retry (exponential backoff, 3 attempts), backend port detection (scan 8000-8010 on localhost), and periodic backend health polling.
+The application MAY use Dio for optional network data sources only. Core local-first workflows SHALL NOT depend on a backend, localhost port scanning, periodic health polling, or backend authentication. Automatic retries SHALL use exponential backoff for idempotent requests such as GET. A retryable finalization, payment, or other transactional mutation MUST carry a unique idempotency key, and the receiving data source MUST deduplicate that key.
 
-#### Scenario: Automatic Port Detection
+#### Scenario: Configured Optional Endpoint
 
-GIVEN the backend is not running on the default port 8002
+GIVEN the user has enabled an optional network integration with a configured endpoint
+WHEN the integration is used
+THEN the client SHALL connect only to that configured endpoint
+AND local-first workflows SHALL remain independent of its availability
+
+#### Scenario: Optional Integration Unavailable at Startup
+
+GIVEN an enabled optional network integration cannot reach its configured endpoint
 WHEN the app starts
-THEN the client SHALL scan ports 8000 through 8010
-AND connect to the first responding port
-
-#### Scenario: Port Detection All Ports Fail
-
-GIVEN no backend is running on any port from 8000 to 8010
-WHEN the app starts
-THEN the client SHALL display the "Backend nicht erreichbar" screen
-AND no API calls SHALL be attempted
+THEN the app SHALL report the integration as unavailable
+AND the app SHALL remain usable in local-first mode
 
 #### Scenario: Retry on Transient Failure
 
-GIVEN a GET request to the backend
+GIVEN a GET request to an optional integration
 WHEN the request fails with a network timeout
 THEN the client SHALL retry up to 3 times with exponential backoff
 AND display a loading indicator during retries
 
 #### Scenario: Retry Exhausted
 
-GIVEN a GET request fails 3 consecutive times
+GIVEN an idempotent GET request fails 3 consecutive times
 WHEN the third retry fails
 THEN the client SHALL stop retrying
-AND the error screen SHALL be displayed
+AND a scoped integration error SHALL be displayed
 
-#### Scenario: Backend Health Polling
+#### Scenario: Optional Integration Recovery Polling
 
-GIVEN the app is in the background
-WHEN the backend becomes unreachable
-THEN the app SHALL poll every 30 seconds
-AND when the backend responds again, refresh the current view
+GIVEN an enabled optional integration is unavailable
+WHEN the app performs a permitted recovery check
+THEN it MAY check the configured endpoint
+AND when the integration responds again, refresh the affected view
 
 ### Requirement: Local Storage
 

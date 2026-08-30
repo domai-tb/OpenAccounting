@@ -4,13 +4,13 @@
 
 ### Requirement: Local WAL-safe backup with rotation
 
-The system SHALL perform WAL-safe local backups using SQLite's `.backup()` API, producing a consistent snapshot even during concurrent writes. Backups SHALL be stored in `~/.local/share/OpenInvoices/backups/`. The system SHALL retain a maximum of 5 backups, automatically deleting the oldest when the limit is exceeded.
+The system SHALL perform WAL-safe local backups using SQLite's `.backup()` API, producing a consistent snapshot even during concurrent writes. Local backups SHALL be stored below the active profile's `APP_DATA_DIR` at `${APP_DATA_DIR}/backups/`. The system SHALL retain a maximum of 5 backups, automatically deleting the oldest when the limit is exceeded.
 
 #### Scenario: Local backup creation
 
 GIVEN the application is running with an active database
 WHEN a local backup is triggered (manually or automatically)
-THEN the system SHALL create a new file named `openinvoices_YYYYMMDD_HHMMSS.db` in the backup directory
+THEN the system SHALL create a new file named `openinvoices_YYYYMMDD_HHMMSS.db` in `${APP_DATA_DIR}/backups/`
 AND the backup SHALL be WAL-safe (consistent snapshot, not corrupted by in-flight writes)
 AND if more than 5 backups exist, the oldest SHALL be deleted.
 
@@ -39,17 +39,28 @@ WHEN the application detects a schema version mismatch requiring migration
 THEN the system SHALL NOT proceed with the migration
 AND SHALL display an error and exit.
 
+### Requirement: Backup target boundaries
+
+Backup destinations SHALL be classified as either local profile backups or external targets. Local backups MUST remain below the active profile's canonical `APP_DATA_DIR`. USB, NAS, SMB, and user-selected local-folder destinations SHALL require an explicit user opt-in and SHALL be validated by their own target-specific path or protocol rules. An approved external destination SHALL NOT be represented as or claimed to be inside `APP_DATA_DIR`.
+
+#### Scenario: External target requires explicit opt-in
+
+GIVEN the user has selected a USB, NAS, SMB, or external local-folder destination
+WHEN the destination is configured
+THEN the system SHALL require explicit confirmation of that external target
+AND SHALL validate it separately from the local `APP_DATA_DIR` backup path.
+
 ### Requirement: External AES-256-GCM encrypted backup
 
-The system SHALL support external backup targets (USB, NAS, local folders) with AES-256-GCM encryption. The backup file SHALL be encrypted with a user-provided passphrase. Encrypted backups SHALL use a standard container format with a random salt and IV stored alongside the ciphertext.
+The system SHALL support explicitly approved external backup targets (USB, NAS, SMB, and local folders) with AES-256-GCM authenticated encryption. A user-provided passphrase SHALL be processed with a standard password-based key-derivation function using a random salt; the passphrase SHALL NOT be stored in plaintext. The encrypted container SHALL store the salt, nonce/IV, authentication tag, and KDF parameters with the ciphertext. External path validation SHALL be separate from local `APP_DATA_DIR` containment.
 
 #### Scenario: Encrypted external backup
 
-GIVEN the user has configured an external backup path and passphrase
+GIVEN the user has explicitly approved an external backup path and supplied a passphrase
 WHEN the user triggers an external backup
 THEN the system SHALL export the database to the configured path
 AND encrypt the file with AES-256-GCM using the provided passphrase
-AND store salt and IV in the backup header
+AND store the salt, nonce/IV, authentication tag, and KDF parameters in the backup header
 AND verify integrity after write.
 
 #### Scenario: Encrypted backup with wrong passphrase on restore
@@ -79,11 +90,11 @@ AND SHALL NOT replace the active database.
 
 ### Requirement: SMB network share backup
 
-The system SHALL support backup to SMB network shares (`smb://` paths). The system SHALL authenticate using stored credentials (SMB username and password). No system-level mount is required; the system SHALL use a pure SMB protocol library.
+The system SHALL support explicitly approved backup targets on SMB network shares (`smb://` paths). The system SHALL authenticate using credentials stored in OS-provided secret storage; credentials SHALL NOT be stored in `profile.json` or backup metadata. No system-level mount is required; the implementation MAY use a platform-compatible SMB data source.
 
 #### Scenario: SMB backup with stored credentials
 
-GIVEN the user has configured an SMB backup target with path, username, and password
+GIVEN the user has explicitly approved an SMB backup target and credentials are available from OS secret storage
 WHEN the user triggers an SMB backup
 THEN the system SHALL connect to the SMB share using provided credentials
 AND write the backup file to the share
@@ -96,19 +107,19 @@ WHEN the user triggers an SMB backup
 THEN the system SHALL display an authentication error message
 AND SHALL NOT write any partial backup file to the share.
 
-### Requirement: System drive protection with opt-in override
+### Requirement: External local-path protection with opt-in override
 
-The system SHALL reject backup targets on system drives (root partition, boot partition) by default. The user SHALL be able to override this protection per-path with an explicit opt-in boolean (`backup_extern_pfad_lokal_ok`).
+The system SHALL reject explicitly configured external local-folder backup targets on system drives (root partition, boot partition) by default. The user SHALL be able to override this protection per-path with an explicit opt-in boolean (`backup_extern_pfad_lokal_ok`). This rule SHALL NOT change the fixed local backup location below `APP_DATA_DIR`.
 
 #### Scenario: System drive backup rejected
 
-GIVEN the user has not set the local override flag
+GIVEN the user has not set the external local-path override flag
 WHEN the user configures a backup path on a system drive (e.g., `/`, `/boot`, `C:\`)
 THEN the system SHALL reject the path with a clear error message.
 
 #### Scenario: System drive override accepted
 
-GIVEN the user has set the local override flag to true for the path
+GIVEN the user has set `backup_extern_pfad_lokal_ok` to true for the external local path
 WHEN the user configures a backup path on a system drive
 THEN the system SHALL accept the path and proceed with backup.
 
@@ -149,22 +160,22 @@ THEN the system SHALL skip the backup and log the skip.
 
 ### Requirement: Platform-specific backup paths
 
-The system SHALL use platform-appropriate default backup paths: `~/.local/share/OpenInvoices/backups/` on Linux, `~/Library/Application Support/OpenInvoices/backups/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/backups/` on Windows.
+The system SHALL use the active profile's platform-appropriate local backup path: `~/.local/share/OpenInvoices/profiles/<active>/backups/` on Linux, `~/Library/Application Support/OpenInvoices/profiles/<active>/backups/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/profiles/<active>/backups/` on Windows.
 
 #### Scenario: Linux backup path
 
 GIVEN the application runs on Linux
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/.local/share/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `~/.local/share/OpenInvoices/profiles/<active>/backups/`.
 
 #### Scenario: macOS backup path
 
 GIVEN the application runs on macOS
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/Library/Application Support/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `~/Library/Application Support/OpenInvoices/profiles/<active>/backups/`.
 
 #### Scenario: Windows backup path
 
 GIVEN the application runs on Windows
 WHEN a local backup is created
-THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/profiles/<active>/backups/`.

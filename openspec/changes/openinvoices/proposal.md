@@ -1,19 +1,19 @@
 ## Why
 
-German freelancers and small businesses (§19 UStG) need a cross-platform desktop invoicing application that handles the complete lifecycle from draft to payment, with integrated accounting that produces GoBD-compliant tax exports (EÜR, UStVA, EKS, GuV, ZM, DATEV). No existing open-source solution covers all these requirements in a single desktop application.
+OpenAccounting is an existing Flutter desktop application for German freelancers and small businesses (§19 UStG). This change extends it with an invoicing workflow that handles the complete lifecycle from draft to payment, with integrated accounting that produces GoBD-compliant tax exports (EÜR, UStVA, EKS, GuV, ZM, DATEV). The change is brownfield: existing local-first architecture and application services remain authoritative.
 
 ## What Changes
 
 - **New**: Complete invoicing system with 7 document types (Rechnung, Storno, Gutschrift, Angebot, Auftrag, Proforma, Lieferschein)
 - **New**: Full accounting suite (Journal, EÜR, UStVA, EKS, GuV, ZM, DATEV EXTF export)
-- **New**: 38-table SQLite database with GoBD-compliant trigger protection
+- **New**: 38-table base SQLite schema with GoBD-compliant trigger protection and explicitly named feature migrations
 - **New**: PDF generation for all document types with ZUGFeRD/XRechnung e-invoicing
 - **New**: Bank CSV/XML import with auto-categorization and deduplication
 - **New**: 4-level dunning system (Mahnwesen) with mail integration
 - **New**: Configurable dashboard with 13+ widgets
 - **New**: Multi-profile system with isolated databases
-- **New**: Local + encrypted external + SMB backup
-- **New**: Desktop integration (system tray, global shortcuts, auto-update)
+- **New**: Local profile backup plus explicitly approved encrypted external and SMB backup targets
+- **New**: Flutter-native desktop integration (system tray, global shortcuts, optional auto-update)
 
 ## Capabilities
 
@@ -36,14 +36,16 @@ German freelancers and small businesses (§19 UStG) need a cross-platform deskto
 - `profiles`: Multi-profile with isolated databases
 
 ### Modified Capabilities
-None — greenfield project.
+- Existing OpenAccounting shell, dependency injection, local database, and feature-service boundaries are retained and extended.
 
 ## Impact
 
-- **New project**: `flutter create openinvoices`
-- **Dependencies**: drift, riverpod, go_router, dio, pdf, system_tray, hotkey_manager, window_manager, auto_updater
+- **Existing project**: extend the current OpenAccounting Flutter desktop app; do not recreate the project or replace its architecture.
+- **Architecture**: retain GetIt, AppScope, AppServices, and Page → UseCase → Repository → DataSource. Riverpod, Tauri, a Python sidecar, and backend authentication are not required for local-first behavior.
+- **Dependencies**: use existing dependencies where possible; Dio remains optional behind data-source boundaries.
 - **Target platforms**: Windows, macOS, Linux
-- **Database**: SQLite with 38 tables, ~200 columns
-- **PDF templates**: 2 (Standard, Grün/Kleinunternehmer)
+- **Database**: SQLite with a 38-table base schema, ~200 columns, and explicitly named feature-migration tables
+- **PDF templates**: `pdf_vorlage` values `standard` and `gruen`; unknown values fall back to `standard`
+- **Backups**: local backups below the active profile `APP_DATA_DIR`; USB/NAS/SMB targets are separate, explicit opt-in destinations
 - **Bank templates**: 15+ predefined CSV formats
 - **Tax forms**: EÜR Anlage 2025, UStVA, EKS Anlage, GuV §141, ZM

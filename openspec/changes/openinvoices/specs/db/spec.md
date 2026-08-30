@@ -68,7 +68,7 @@ AND no floating-point artifacts SHALL appear
 
 ### Requirement: Table Definitions
 
-The database SHALL contain exactly 38 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`.
+The database base schema SHALL contain exactly 38 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`. Feature migrations MAY add only explicitly named tables from a feature specification; such additions are not part of the 38-table base count.
 
 #### Scenario: All Tables Created on Fresh Install
 
@@ -81,7 +81,8 @@ AND each table SHALL have its expected columns and constraints
 
 GIVEN a migration runs against an existing database
 WHEN the migration completes
-THEN the total table count SHALL remain exactly 38
+THEN all 38 base tables SHALL remain present
+AND any additional table SHALL be explicitly named by the applied feature migration
 AND no table SHALL be silently dropped
 
 #### Scenario: Missing Table Detection
@@ -90,6 +91,17 @@ GIVEN a migration should create a new table
 WHEN the CREATE TABLE statement fails
 THEN the migration SHALL roll back
 AND the schema version SHALL NOT be incremented
+
+### Requirement: Explicit feature-table migrations
+
+Feature migrations SHALL declare every table they add, including its columns, constraints, and schema-version change. The inventory feature SHALL add the named `inventarbewegungen` table defined in the inventory specification; no unspecified movement or log table SHALL be created.
+
+#### Scenario: Named inventory table migration
+
+GIVEN the inventory feature migration is enabled
+WHEN the migration completes
+THEN the `inventarbewegungen` table SHALL exist with the columns and constraints specified by the inventory feature
+AND the 38 base tables SHALL remain present.
 
 ### Requirement: Schema Versioning
 
@@ -195,8 +207,8 @@ Each user profile SHALL have an isolated database file. The active profile SHALL
 
 GIVEN a profile named "Max" is active
 WHEN the database path is resolved
-THEN the database SHALL be located at `~/.local/share/OpenInvoices/profile/Max/openinvoices.db`
-AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenInvoices/profile/Erika/openinvoices.db`
+THEN the database SHALL be located at `~/.local/share/OpenInvoices/profiles/Max/openinvoices.db`
+AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenInvoices/profiles/Erika/openinvoices.db`
 
 #### Scenario: Profile Switch Requires Restart
 
@@ -214,7 +226,7 @@ AND "Erika" database SHALL load independently
 
 ### Requirement: Backup System
 
-Backups SHALL be WAL-safe using SQLite's online backup API. Up to 5 backups SHALL be retained, with the oldest automatically deleted. External backups SHALL support AES-256-GCM encryption to configurable paths (NAS, USB).
+Backups SHALL be WAL-safe using SQLite's online backup API. Up to 5 local profile backups SHALL be retained below the active profile's `APP_DATA_DIR`, with the oldest automatically deleted. Explicitly approved external targets SHALL follow the separate target-boundary and authenticated-encryption contract in the backup specification.
 
 #### Scenario: WAL-Safe Backup Creation
 
@@ -232,9 +244,10 @@ AND exactly 5 backups SHALL remain
 
 #### Scenario: Encrypted External Backup
 
-GIVEN an external backup path is configured with a password
+GIVEN an external backup target is explicitly approved and a passphrase is supplied
 WHEN a backup is triggered
 THEN the backup file SHALL be encrypted with AES-256-GCM
+AND the container SHALL authenticate its ciphertext and store its encryption metadata with the file
 AND the file extension SHALL be `.enc`
 
 #### Scenario: Backup Directory Does Not Exist

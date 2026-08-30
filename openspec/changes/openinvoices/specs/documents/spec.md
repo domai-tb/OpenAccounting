@@ -37,7 +37,7 @@ Every document MUST begin in Entwurf (draft) state with ist_entwurf = true. Draf
 
 ### Requirement: Document Lifecycle — Finalization
 
-Finalization is an irreversible action that MUST: set ist_entwurf to false, assign a nummer from the nummernkreis, lock all fields against further editing, generate the PDF, store the Absender_snapshot (company data at finalization time), and record ausgegeben_am (first print/email timestamp). Finalization MUST be confirmed by the user via a confirmation dialog.
+Finalization is an irreversible action that MUST: set ist_entwurf to false, assign a nummer from the nummernkreis, lock all fields against further editing, generate the PDF, store the Absender_snapshot (company data at finalization time), and record ausgegeben_am (first print/email timestamp). Finalization MUST be confirmed by the user via a confirmation dialog and committed atomically. Each retryable finalization request MUST carry a unique idempotency key; repeating that key SHALL return the original result without a second number, PDF, journal entry, or stock change.
 
 #### Scenario: Finalization locks document
 - GIVEN a user finalizes a draft Rechnung
@@ -56,7 +56,7 @@ Finalization is an irreversible action that MUST: set ist_entwurf to false, assi
 
 ### Requirement: Document Lifecycle — Bezahlt
 
-A finalized Rechnung, Gutschrift, or Storno can be marked as Bezahlt (paid). The system MUST record zahlungsdatum (payment date), zahlungsbetrag (paid amount), and optionally link to a journal entry. When zahlungsbetrag exceeds the invoice total, the system MUST handle Überzahlung (see Überzahlung handling).
+A finalized Rechnung, Gutschrift, or Storno can be marked as Bezahlt (paid). The system MUST record zahlungsdatum (payment date), zahlungsbetrag (paid amount), and optionally link to a journal entry. When zahlungsbetrag exceeds the invoice total, the system MUST handle Überzahlung (see Überzahlung handling). Payment mutations MUST be atomic and MUST use a unique idempotency key when retried, so a repeated request cannot create a duplicate payment or journal entry.
 
 #### Scenario: Full payment
 - GIVEN a finalized Rechnung with total 1000 EUR

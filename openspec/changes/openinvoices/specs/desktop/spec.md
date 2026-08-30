@@ -4,13 +4,13 @@
 
 ### Requirement: System Tray
 
-The application SHALL display a system tray icon with a context menu providing: Show/Hide window, Restart Backend, Check for Updates, Quit. The tray icon SHALL remain visible when the window is minimized (not closed).
+The application SHALL display a system tray icon with a context menu providing: Show/Hide window, Refresh data, Check for Updates, Quit. The tray icon SHALL remain visible when the window is minimized (not closed).
 
 #### Scenario: Tray Context Menu Actions
 
 GIVEN the app is running and the tray icon is visible
 WHEN the user right-clicks the system tray icon
-THEN a context menu SHALL appear with "Fenster anzeigen", "Backend neu starten", "Nach Updates suchen", and "Beenden"
+THEN a context menu SHALL appear with "Fenster anzeigen", "Daten aktualisieren", "Nach Updates suchen", and "Beenden"
 AND clicking "Fenster anzeigen" SHALL restore the window to its last position and size
 
 #### Scenario: Close to Tray
@@ -67,7 +67,9 @@ AND the app SHALL function normally without that shortcut
 
 ### Requirement: Auto-Update
 
-The application SHALL check GitHub Releases for updates on startup and periodically (every 4 hours). Updates SHALL be downloaded and installed automatically with user confirmation. The update mechanism SHALL use Tauri's built-in updater with Ed25519 signing verification.
+The application MAY check GitHub Releases for updates on startup and periodically (every 4 hours). If enabled, updates SHALL be downloaded and installed with user confirmation through a Flutter-native or target-OS updater. Package signatures SHALL be verified. Automatic update enablement is deferred until the distribution package and signing trust model are documented; Tauri is not part of this Flutter application.
+
+The following update scenarios apply only when the optional updater is enabled.
 
 #### Scenario: Update Available Notification
 
@@ -210,7 +212,7 @@ The application SHALL accept dragged files onto the main window and specific dro
 
 GIVEN the user has a PDF file on their system
 WHEN the user drags the PDF file onto the Belege drop zone
-THEN the file SHALL be uploaded to the backend
+THEN the file SHALL be stored through the local data source below the active profile `APP_DATA_DIR`
 AND a new Beleg record SHALL be created
 AND the file SHALL be visible in the Belege list
 
@@ -262,50 +264,16 @@ WHEN the user launches OpenInvoices
 THEN a new instance SHALL start normally
 AND the main window SHALL appear
 
-### Requirement: Backend Process Management (Sidecar)
-
-The application SHALL manage a Python backend process as a Tauri sidecar. The backend SHALL start automatically when the app launches and terminate when the app quits. The sidecar SHALL be bundled as a standalone executable via PyInstaller.
-
-#### Scenario: Backend Auto-Start
-
-GIVEN the app has launched
-WHEN the frontend initializes
-THEN the backend sidecar SHALL start automatically
-AND the frontend SHALL poll until the backend responds on a health endpoint
-AND the UI SHALL display "Backend wird gestartet..." during this period
-
-#### Scenario: Backend Crash Recovery
-
-GIVEN the backend process is running
-WHEN the backend process crashes
-THEN the app SHALL detect the crash within 5 seconds
-AND automatically restart the backend sidecar
-AND display a notification: "Backend wurde neu gestartet"
-
-#### Scenario: Backend Shutdown on App Quit
-
-GIVEN the app is running with an active backend sidecar
-WHEN the user quits the application
-THEN the backend sidecar process SHALL be terminated gracefully
-AND any in-progress requests SHALL be allowed to complete (up to 5 second timeout)
-
-#### Scenario: Backend Port Conflict
-
-GIVEN another process is already using the backend port
-WHEN the backend sidecar starts
-THEN the sidecar SHALL log the port conflict error
-AND the app SHALL display "Backend nicht erreichbar" with retry option
-
 ### Requirement: Platform Workarounds
 
-The application SHALL apply platform-specific workarounds: disable GPU acceleration on Linux (Wayland compatibility), hide the console window on Windows in release builds, and handle macOS-specific file path differences for profile storage.
+The application SHALL use Flutter desktop APIs and target-platform integrations for windowing, file associations, tray behavior, shortcuts, and profile paths. It SHALL NOT require Tauri, a webview, or a Python sidecar. Any engine-specific workaround SHALL be used only when supported by the Flutter target and documented for that target.
 
 #### Scenario: Linux GPU Workaround
 
 GIVEN the app launches on Linux
-WHEN the webview initializes
-THEN GPU acceleration SHALL be disabled via the appropriate Tauri/webview flag
-AND the app SHALL render correctly on Wayland and X11
+WHEN the Flutter desktop engine initializes
+THEN the app SHALL use its supported Wayland/X11 configuration
+AND the app SHALL render correctly on the supported Linux display sessions
 
 #### Scenario: Windows Console Hide
 
@@ -317,12 +285,12 @@ THEN no console window SHALL appear alongside the application window
 
 GIVEN the app launches on macOS
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/Library/Application Support/OpenInvoices/profile/<Name>/`
+THEN the profile directory SHALL be at `~/Library/Application Support/OpenInvoices/profiles/<Name>/`
 AND NOT at `~/.local/share/OpenInvoices/` (the Linux convention)
 
 #### Scenario: Linux Profile Path
 
 GIVEN the app launches on Linux
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/.local/share/OpenInvoices/profile/<Name>/`
+THEN the profile directory SHALL be at `~/.local/share/OpenInvoices/profiles/<Name>/`
 AND NOT at `~/Library/Application Support/` (the macOS convention)

@@ -116,7 +116,7 @@ The system SHALL generate a Lieferschein (delivery note) PDF without price colum
 
 ### Requirement: PDF Templates
 
-The system SHALL support two PDF templates: Standard and Grün/Kleinunternehmer. The template is selected based on company configuration.
+The system SHALL support exactly two PDF templates: `standard` and `gruen` (Grün/Kleinunternehmer). The template is selected from the canonical `pdf_vorlage` representation. Unknown values SHALL fall back to `standard` and log a warning.
 
 #### Scenario: Standard template rendering
 
@@ -328,25 +328,25 @@ The system SHALL support generating PDF/A-3 formatted files for GoBD-compliant l
 - WHEN the PDF/A-3 archival file is generated
 - THEN the system SHALL embed the attachment within the PDF/A-3 container
 
-### Requirement: GoBD Signatures
+### Requirement: GoBD Integrity Hashes
 
-The system SHALL generate GoBD-compliant digital signatures for finalized documents.
+The system SHALL generate GoBD-compliant tamper-evident integrity hashes for finalized documents. An unkeyed SHA-256 hash SHALL NOT be described or treated as a digital signature.
 
-#### Scenario: Document finalization signature
+#### Scenario: Document finalization integrity hash
 
 - WHEN a document is finalized
-- THEN the system SHALL compute a SHA-256 hash of the document content and store it as a GoBD signature in the database
+- THEN the system SHALL compute a SHA-256 hash of the document content and store it as the document's GoBD integrity hash in the database
 
-#### Scenario: Signature verification
+#### Scenario: Integrity hash verification
 
-- GIVEN a finalized document with a stored GoBD signature
-- WHEN the signature is verified
-- THEN the system SHALL recompute the hash and compare it against the stored signature, returning valid or invalid
+- GIVEN a finalized document with a stored GoBD integrity hash
+- WHEN the integrity hash is verified
+- THEN the system SHALL recompute the hash and compare it against the stored hash, returning valid or invalid
 
 #### Scenario: Tampered document detection
 
 - GIVEN a finalized document whose PDF content has been modified after finalization
-- WHEN the signature is verified
+- WHEN the integrity hash is verified
 - THEN the system SHALL return invalid and flag the document as tampered
 
 ### Requirement: Mahnung PDF
@@ -407,7 +407,7 @@ The system SHALL generate a daily cash close PDF (Tagesabschluss) with counted a
 
 - GIVEN a Tagesabschluss finalized with zaehlung_json containing counted amounts
 - WHEN the Tagesabschluss PDF is rendered
-- THEN the system SHALL produce a PDF showing the date, expected cash amount, actual counted amount, discrepancy, and a GoBD signature
+- THEN the system SHALL produce a PDF showing the date, expected cash amount, actual counted amount, discrepancy, and the GoBD integrity-hash status
 
 #### Scenario: Counting discrepancy
 
@@ -417,11 +417,11 @@ The system SHALL generate a daily cash close PDF (Tagesabschluss) with counted a
 
 ### Requirement: Content-Disposition Inline
 
-All PDF endpoints returning documents for webview display SHALL use `Content-Disposition: inline` with a filename parameter. `attachment` disposition SHALL NOT be used for PDFs displayed via openUrl().
+All PDF responses consumed by the in-app Flutter viewer SHALL use `Content-Disposition: inline` with a filename parameter. `attachment` disposition SHALL NOT be used for PDFs displayed in that viewer.
 
-#### Scenario: PDF via webview
+#### Scenario: PDF via Flutter viewer
 
-- GIVEN a PDF endpoint returning a document for display in the app webview
+- GIVEN a PDF response returning a document for display in the app's Flutter viewer
 - WHEN the HTTP response is sent
 - THEN the response SHALL have `Content-Disposition: inline; filename="<dateiname>"`
 
@@ -434,8 +434,8 @@ All PDF endpoints returning documents for webview display SHALL use `Content-Dis
 #### Scenario: PDF with attachment disposition (forbidden)
 
 - GIVEN a PDF endpoint using `Content-Disposition: attachment`
-- WHEN the response is sent to the webview
-- THEN the webview SHALL display a black window (failed download) — this is incorrect behavior and SHALL be prevented by the system
+- WHEN the response is sent to the Flutter viewer
+- THEN the viewer SHALL display the PDF inline rather than treating it as a download
 
 ### Requirement: Footer with Page Numbers
 
@@ -489,7 +489,8 @@ The system SHALL handle Differenzbesteuerung (margin scheme) per §25a UStG with
 
 - GIVEN a document containing §25a positions
 - WHEN the document PDF is rendered
-- THEN the summary section SHALL show the Gesamtbrutto, EK-Netto, and Marge (brutto - ek_netto_25a × menge) separately
+- THEN the summary section SHALL show the Gesamtbrutto, EK-Netto, and `marge_25a_brutto = VK_brutto - (EK_netto × menge)` separately
+- AND the taxable margin base used for USt SHALL be `max(marge_25a_brutto, 0)`
 
 #### Scenario: Mixed document with §25a and standard positions
 
