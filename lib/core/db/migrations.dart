@@ -1,8 +1,6 @@
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/core/db/backup_service.dart';
-import 'package:openaccounting/core/db/gobd_triggers.dart';
-import 'package:openaccounting/core/db/seed.dart';
 
 /// Migration runner per spec §Schema Versioning + §Migration System.
 /// Handles PRAGMA user_version, backup-before-migrate, post-hooks.
@@ -43,33 +41,27 @@ class MigrationRunner {
     final version = await getUserVersion();
     final hasTables = await hasAnyTables();
 
-    // If the database is up to date and has tables, do nothing.
     if (version == currentVersion && hasTables) {
       return false;
     }
 
-    // If the database is from the future, we cannot downgrade.
     if (version > currentVersion) {
       return false;
     }
 
-    // If the database is at version 0 and has no tables, it's a fresh install.
     if (version == 0 && !hasTables) {
       await createSchema();
       await setUserVersion(currentVersion);
       return false;
     }
 
-    // If the database is at the current version but has no tables, we need to create the schema.
     if (version == currentVersion && !hasTables) {
       await createSchema();
       await setUserVersion(currentVersion);
       return true;
     }
 
-    // If the database is outdated (version < currentVersion), we need to migrate.
     if (version < currentVersion) {
-      // WAL checkpoint before backup for consistency
       try {
         await executor.runCustom('PRAGMA wal_checkpoint(TRUNCATE)');
       } catch (_) {}
@@ -77,19 +69,26 @@ class MigrationRunner {
       try {
         await backup.createLocalBackup();
       } catch (e) {
-        // Backup failure prevents migration per spec.
         throw StateError('Backup vor Migration fehlgeschlagen: $e');
       }
-      // Execute incremental migrations
-      for (var v = version + 1; v <= currentVersion; v++) {
-        await _migrateTo(v, createSchema);
+
+      await executor.runCustom('BEGIN');
+      try {
+        for (var v = version + 1; v <= currentVersion; v++) {
+          await _migrateTo(v, createSchema);
+        }
+        await _postHooks();
+        await setUserVersion(currentVersion);
+        await executor.runCustom('COMMIT');
+        return true;
+      } catch (error) {
+        try {
+          await executor.runCustom('ROLLBACK');
+        } catch (_) {}
+        rethrow;
       }
-      await _postHooks();
-      await setUserVersion(currentVersion);
-      return true;
     }
 
-    // Should not reach here.
     return false;
   }
 
