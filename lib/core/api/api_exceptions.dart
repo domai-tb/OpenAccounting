@@ -40,6 +40,8 @@ class ValidationException extends ApiException {
             fields.putIfAbsent(field, () => <String>[]).add(msg);
           }
         }
+      } else if (data['detail'] is String) {
+        fields['allgemein'] = <String>[data['detail'] as String];
       } else if (data['detail'] is Map) {
         (data['detail'] as Map).forEach((k, v) {
           final key = k.toString();

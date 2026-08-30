@@ -165,7 +165,6 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = selectedPath;
     Widget item(IconData icon, String label, String path) {
       final selected = isSelected(path);
       if (isCompact) {

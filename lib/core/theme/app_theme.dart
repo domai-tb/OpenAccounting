@@ -114,6 +114,9 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
   @override
   ThemeMode build() {
+    // ponytail: immediate apply + async persistence — return system synchronously
+    // to avoid blocking build; microtask loads saved mode without flash beyond
+    // one frame if saved != system (AsyncNotifier would need loading state).
     Future.microtask(_loadAsync);
     return ThemeMode.system;
   }

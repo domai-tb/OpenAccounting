@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -47,26 +48,11 @@ class DioClient {
             );
           }
 
-          // Connection refused → user-friendly.
-          if (BackendUnreachableException.isConnectionError(err)) {
-            final host = err.requestOptions.uri.host;
-            final port = err.requestOptions.uri.port;
-            final ex = BackendUnreachableException(
-              'Backend nicht erreichbar',
-              host: host,
-              port: port == 0 ? null : port,
-              cause: err.error,
-            );
-            return handler.reject(
-              DioException(requestOptions: err.requestOptions, type: err.type, error: ex, message: ex.message),
-            );
-          }
-
-          // Retry for 5xx or transient timeouts.
+          // Retry first — connection errors respect retry count.
           final retries = (err.requestOptions.extra['retries'] as int?) ?? 0;
           final shouldRetry = _shouldRetry(err);
           if (shouldRetry && retries < maxRetries) {
-            final backoff = Duration(milliseconds: 200 * (1 << retries));
+            final backoff = Duration(milliseconds: 200 * (1 << retries) + Random().nextInt(100));
             if (kDebugMode) {
               debugPrint('DioClient retry ${retries + 1}/$maxRetries after $backoff for ${err.requestOptions.uri}');
             }
@@ -79,6 +65,21 @@ class DioClient {
               if (e is DioException) return handler.reject(e);
               return handler.reject(DioException(requestOptions: opts, error: e, type: DioExceptionType.unknown));
             }
+          }
+
+          // Connection refused → only after retries exhausted (retry block above respects count).
+          if (BackendUnreachableException.isConnectionError(err)) {
+            final host = err.requestOptions.uri.host;
+            final port = err.requestOptions.uri.port;
+            final ex = BackendUnreachableException(
+              'Backend nicht erreichbar',
+              host: host,
+              port: port == 0 ? null : port,
+              cause: err.error,
+            );
+            return handler.reject(
+              DioException(requestOptions: err.requestOptions, type: err.type, error: ex, message: ex.message),
+            );
           }
 
           // Exhausted → if was 5xx, wrap as BackendUnreachable for UI.
@@ -110,26 +111,30 @@ class DioClient {
   Future<Uri?> detectBackendPort({String? host, List<int>? ports}) async {
     final h = host ?? baseHost;
     final list = ports ?? probePorts;
-    for (final port in list) {
-      final uri = Uri.parse('http://$h:$port/health');
-      try {
-        final probe = Dio(
-          BaseOptions(
-            connectTimeout: const Duration(milliseconds: 500),
-            receiveTimeout: const Duration(milliseconds: 500),
-            sendTimeout: const Duration(milliseconds: 500),
-          ),
-        );
-        final resp = await probe.getUri<dynamic>(uri);
-        if (resp.statusCode != null && resp.statusCode! < 500) {
-          dio.options.baseUrl = 'http://$h:$port';
-          return Uri.parse('http://$h:$port');
+    final probe = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(milliseconds: 500),
+        receiveTimeout: const Duration(milliseconds: 500),
+        sendTimeout: const Duration(milliseconds: 500),
+      ),
+    );
+    try {
+      for (final port in list) {
+        final uri = Uri.parse('http://$h:$port/health');
+        try {
+          final resp = await probe.getUri<dynamic>(uri);
+          if (resp.statusCode != null && resp.statusCode! >= 200 && resp.statusCode! < 300) {
+            dio.options.baseUrl = 'http://$h:$port';
+            return Uri.parse('http://$h:$port');
+          }
+        } catch (_) {
+          continue;
         }
-      } catch (_) {
-        continue;
       }
+      return null;
+    } finally {
+      probe.close();
     }
-    return null;
   }
 
   /// Simple health poll every 30s when backend unreachable — caller drives timer.
