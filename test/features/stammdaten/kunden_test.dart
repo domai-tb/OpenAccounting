@@ -201,6 +201,48 @@ VALUES (?, ?, ?, ?, ?)
       expect(stored.note, isNull);
     });
 
+    test('rejects blank required fields and overlong foreign tax numbers', () async {
+      // Arrange: use invalid boundary values for required and bounded fields.
+      final repository = kundenRepository(db);
+      final tooLongTaxNumber = List<String>.filled(51, 'x').join();
+
+      // Act: submit each invalid value through the create boundary.
+      final blankSalutation = createCustomer(repository, anrede: '', name: 'Ungültig');
+      final blankCountry = createCustomer(repository, name: 'Ungültig', land: '');
+      final overlongTaxNumber = createCustomer(repository, name: 'Ungültig', foreignTaxNumber: tooLongTaxNumber);
+
+      // Assert: invalid data is rejected before any customer is persisted.
+      await expectLater(blankSalutation, exactError('Anrede ist Pflicht'));
+      await expectLater(blankCountry, exactError('Land ist Pflicht'));
+      await expectLater(overlongTaxNumber, exactError('Steuernummer Ausland darf höchstens 50 Zeichen enthalten'));
+      expect(await repository.list(), isEmpty);
+    });
+
+    test('rejects unknown update fields', () async {
+      // Arrange: create a valid customer before attempting an unsupported update.
+      final repository = kundenRepository(db);
+      final created = await createCustomer(repository, name: 'Bekannter Kunde');
+
+      // Act: submit a field outside the typed customer contract.
+      final update = repository.update(created.id, <String, dynamic>{'nicht_erlaubt': 'Wert'});
+
+      // Assert: silent data loss is prevented with an explicit error.
+      await expectLater(update, exactError('Unbekanntes Kundenfeld: nicht_erlaubt'));
+      expect(await repository.findById(created.id), isNotNull);
+    });
+
+    test('applies numeric Debitor-Nr prefix to a low counter', () async {
+      // Arrange: configure the documented 1#### customer number format at its initial counter.
+      final repository = kundenRepository(db);
+      await setNextDebitorNumber(1);
+
+      // Act: create the first customer in the range.
+      final created = await createCustomer(repository, name: 'Erster Debitor');
+
+      // Assert: prefix and four-digit padding are both retained.
+      expect(created.debitorNr, '10001');
+    });
+
     test('lists persisted customers', () async {
       // Arrange: create two customers through the repository.
       final repository = kundenRepository(db);
@@ -323,6 +365,29 @@ VALUES (?, ?, ?, ?, ?)
       expect(retained, isNotNull);
       expect(retained.id, created.id);
       expect(retained.name, 'Müller GmbH');
+    });
+
+    test('rejects deletion when a customer document link references the customer', () async {
+      // Arrange: link a customer to a document through the customer-document join table.
+      final repository = kundenRepository(db);
+      final created = await createCustomer(repository, name: 'Belegkunde');
+      final belegId = await db.executor.runInsert('INSERT INTO belege (typ, datum, betrag) VALUES (?, ?, ?)', <Object?>[
+        'sonstiger',
+        '2026-08-30',
+        10,
+      ]);
+      await db.executor.runInsert('INSERT INTO kunden_belege (kunde_id, beleg_id, rolle) VALUES (?, ?, ?)', <Object?>[
+        created.id,
+        belegId,
+        'empfaenger',
+      ]);
+
+      // Act: attempt to delete the referenced customer.
+      final deletion = repository.delete(created.id);
+
+      // Assert: every customer-document reference blocks deletion.
+      await expectLater(deletion, exactError('Kunde kann nicht gelöscht werden: Beleg #$belegId'));
+      expect(await repository.findById(created.id), isNotNull);
     });
 
     test('rejects an invalid German USt-IdNr without persisting the customer', () async {

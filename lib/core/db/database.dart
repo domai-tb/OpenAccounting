@@ -11,6 +11,7 @@ import 'package:openaccounting/core/db/data_paths.dart';
 import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/core/db/seed.dart';
+import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 
 /// Drift-backed app database with 38 tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
@@ -29,6 +30,7 @@ class AppDatabase {
   final String? profileDir;
   final bool _ownsExecutor;
   bool _opened = false;
+  late final KundenRepository _kundenRepository = KundenRepository(_executor);
 
   static const int currentVersion = MigrationRunner.currentVersion;
 
@@ -75,6 +77,13 @@ class AppDatabase {
 
   QueryExecutor get executor => _executor;
 
+  KundenRepository get kundenRepository {
+    if (!_opened) {
+      throw StateError('AppDatabase.ensureOpen() muss vor kundenRepository aufgerufen werden');
+    }
+    return _kundenRepository;
+  }
+
   bool get isOpen => _opened;
 
   Future<void> ensureOpen() async {
@@ -91,6 +100,7 @@ class AppDatabase {
     // Ensure triggers and seed idempotent even when no migration
     await GobdTriggers.install(_executor);
     await SeedData.run(_executor);
+    await _kundenRepository.ensureSchema();
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -228,17 +238,28 @@ CREATE TABLE IF NOT EXISTS artikel_gruppen (
 CREATE TABLE IF NOT EXISTS kunden (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   kundennummer TEXT,
+  debitor_nr TEXT,
+  anrede TEXT NOT NULL DEFAULT 'Herr',
   name TEXT NOT NULL,
   firma TEXT,
-  strasse TEXT,
-  plz TEXT,
-  ort TEXT,
-  land TEXT DEFAULT 'DE',
+  strasse TEXT NOT NULL,
+  hausnummer TEXT,
+  plz TEXT NOT NULL,
+  ort TEXT NOT NULL,
+  land TEXT NOT NULL DEFAULT 'DE',
   email TEXT,
   telefon TEXT,
   ust_idnr TEXT,
+  steuernummer_ausland VARCHAR(50),
   zahlungsziel INTEGER DEFAULT 14,
   skonto_prozent NUMERIC(12,2) DEFAULT 0,
+  skonto_tage INTEGER NOT NULL DEFAULT 0,
+  kreditlimit NUMERIC(12,2),
+  mahngesperrt INTEGER NOT NULL DEFAULT 0 CHECK (mahngesperrt IN (0, 1)),
+  mahngesperrt_bis TEXT,
+  mahngesperrt_grund TEXT,
+  zugferd_aktiv INTEGER NOT NULL DEFAULT 0 CHECK (zugferd_aktiv IN (0, 1)),
+  note TEXT,
   notiz TEXT,
   erstellungsdatum TEXT DEFAULT CURRENT_TIMESTAMP
 )''',
@@ -278,9 +299,11 @@ CREATE TABLE IF NOT EXISTS artikel (
   '''
 CREATE TABLE IF NOT EXISTS rechnungen (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  rechnungsnummer TEXT NOT NULL,
+  rechnungsnummer TEXT,
   typ TEXT NOT NULL,
   status TEXT DEFAULT 'entwurf',
+  ist_entwurf INTEGER NOT NULL DEFAULT 1 CHECK (ist_entwurf IN (0, 1)),
+  eingabemodus TEXT NOT NULL DEFAULT 'netto' CHECK (eingabemodus IN ('netto', 'brutto')),
   kunde_id INTEGER REFERENCES kunden(id),
   lieferant_id INTEGER REFERENCES lieferanten(id),
   datum TEXT NOT NULL,
@@ -607,6 +630,7 @@ CREATE TABLE IF NOT EXISTS import_mapping_vorlagen (
 
 const List<String> _indexSql = <String>[
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_kundennummer_unique ON kunden(kundennummer) WHERE kundennummer IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_debitor_nr_unique ON kunden(debitor_nr) WHERE debitor_nr IS NOT NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_lieferanten_lieferantennummer_unique ON lieferanten(lieferantennummer) WHERE lieferantennummer IS NOT NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_transaktionen_dedupe ON bank_transaktionen(konto_id, dedupe_hash) WHERE dedupe_hash IS NOT NULL',
 ];
