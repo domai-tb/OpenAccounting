@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/database.dart';
 
@@ -10,8 +11,7 @@ void main() {
   });
 
   test('provider creates database instance', () async {
-    final db = AppDatabase.forTesting(createTestDatabase().executor);
-    // Even without ensureOpen, provider instance exists.
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
     expect(db.executor, isNotNull);
     await db.close();
   });
