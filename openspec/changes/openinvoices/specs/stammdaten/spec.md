@@ -186,7 +186,7 @@ Each Artikel of type Artikel or Fremdleistung MAY be linked to a supplier (liefe
 
 ### Requirement: Artikelgruppen
 
-Articles MAY be assigned to Artikelgruppen (article groups). Artikelgruppen have id, typ (string), name, and aktiv flag. Articles reference groups via gruppe_id FK. Groups are used for categorization and filtering in reports and invoice forms.
+The system SHALL support assigning articles to Artikelgruppen (article groups). Artikelgruppen MUST have id, typ (string), name, and aktiv flag. Articles reference groups via gruppe_id FK. Groups are used for categorization and filtering in reports and invoice forms.
 
 #### Scenario: Inactive group hidden from selection
 - GIVEN an article group "Büromaterial" exists with aktiv = false
@@ -382,7 +382,7 @@ Each category MUST have euer_zeile (INTEGER, nullable). When set, journal entrie
 
 ### Requirement: Kategorien — eks_kategorie
 
-Each category MAY have eks_kategorie (VARCHAR, nullable). When set, journal entries are included in the EKS (Einnahmen-Kosten-Spiegel) report under the specified section. The EKS section identifier maps to the Anlage EKS form sections (e.g., B6_5 for Fahrtkosten).
+The system SHALL support an optional eks_kategorie (VARCHAR, nullable) on each category. When set, journal entries are included in the EKS (Einnahmen-Kosten-Spiegel) report under the specified section. The EKS section identifier maps to the Anlage EKS form sections (e.g., B6_5 for Fahrtkosten).
 
 #### Scenario: EKS section assignment
 - GIVEN the category "Fahrtkosten" has eks_kategorie = "B6_5"
