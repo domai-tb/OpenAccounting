@@ -27,8 +27,8 @@
 
 ## 4. Database Schema (38 tables)
 
-- [ ] 4.1 Write failing test: `test/db/schema_test.dart` — all 38 tables exist after database creation
-- [ ] 4.2 Implement: drift tables for kunden, lieferanten, artikel, rechnungen, rechnungspositionen, journal, kategorien, unternehmen, nummernkreise, ust_saetze, konten, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, tagesabschluesse, belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen
+- [x] 4.1 Write failing test: `test/db/schema_test.dart` — all 38 tables exist after database creation
+- [x] 4.2 Implement: drift tables for kunden, lieferanten, artikel, rechnungen, rechnungspositionen, journal, kategorien, unternehmen, nummernkreise, ust_saetze, konten, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, tagesabschluesse, belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen
 - [ ] 4.3 Write failing test: `test/db/schema_test.dart` — NUMERIC(12,2) for all money columns, NUMERIC(12,4) for vk_netto
 - [ ] 4.4 Implement: Column type constraints for monetary precision
 - [ ] 4.5 Refactor; full suite stays green
