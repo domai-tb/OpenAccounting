@@ -53,3 +53,6 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+
+# Exclude TMP files
+.tmp
