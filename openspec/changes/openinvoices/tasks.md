@@ -29,19 +29,19 @@
 
 - [x] 4.1 Write failing test: `test/db/schema_test.dart` — all 38 tables exist after database creation
 - [x] 4.2 Implement: drift tables for kunden, lieferanten, artikel, rechnungen, rechnungspositionen, journal, kategorien, unternehmen, nummernkreise, ust_saetze, konten, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, tagesabschluesse, belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen
-- [ ] 4.3 Write failing test: `test/db/schema_test.dart` — NUMERIC(12,2) for all money columns, NUMERIC(12,4) for vk_netto
-- [ ] 4.4 Implement: Column type constraints for monetary precision
-- [ ] 4.5 Refactor; full suite stays green
+- [x] 4.3 Write failing test: `test/db/schema_test.dart` — NUMERIC(12,2) for all money columns, NUMERIC(12,4) for vk_netto
+- [x] 4.4 Implement: Column type constraints for monetary precision
+- [x] 4.5 Refactor; full suite stays green
 
 ## 5. Database Migrations & GoBD
 
-- [ ] 5.1 Write failing test: `test/db/migration_test.dart` — schema version increments on migration
-- [ ] 5.2 Implement: PRAGMA user_version versioning, migration runner with backup-before-migrate
-- [ ] 5.3 Write failing test: `test/db/gobd_test.dart` — UPDATE on immutable journal row is rejected
-- [ ] 5.4 Implement: GoBD triggers (protect_journal_insert, protect_journal_update, protect_journal_delete)
-- [ ] 5.5 Write failing test: `test/db/seed_test.dart` — seed data populated on fresh database
-- [ ] 5.6 Implement: Seed data (kategorien, ust_saetze, nummernkreise, bank_templates, eu_laender)
-- [ ] 5.7 Refactor; full suite stays green
+- [x] 5.1 Write failing test: `test/db/migration_test.dart` — schema version increments on migration
+- [x] 5.2 Implement: PRAGMA user_version versioning, migration runner with backup-before-migrate
+- [x] 5.3 Write failing test: `test/db/gobd_test.dart` — UPDATE on immutable journal row is rejected
+- [x] 5.4 Implement: GoBD triggers (protect_journal_insert, protect_journal_update, protect_journal_delete)
+- [x] 5.5 Write failing test: `test/db/seed_test.dart` — seed data populated on fresh database
+- [x] 5.6 Implement: Seed data (kategorien, ust_saetze, nummernkreise, bank_templates, eu_laender)
+- [x] 5.7 Refactor; full suite stays green
 
 ## 6. Profile System
 

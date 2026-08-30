@@ -239,40 +239,40 @@
 | specs/dashboard/spec.md → Dashboard config persistence | Config saved on change | test/features/dashboard/test_config_saved_on_change.dart | test_config_saved_on_change | 🔴 red |
 | specs/dashboard/spec.md → Dashboard config persistence | Config loaded on start | test/features/dashboard/test_config_loaded_on_start.dart | test_config_loaded_on_start | 🔴 red |
 | specs/dashboard/spec.md → Dashboard config persistence | Corrupted config falls back to defaults | test/features/dashboard/test_corrupted_config_falls_back_to_defaults.dart | test_corrupted_config_falls_back_to_defaults | 🔴 red |
-| specs/db/spec.md → SQLite Engine Configuration | WAL Mode on Connection | test/features/db/test_wal_mode_on_connection.dart | test_wal_mode_on_connection | 🔴 red |
+| specs/db/spec.md → SQLite Engine Configuration | WAL Mode on Connection | test/db/schema_test.dart | WAL mode and FK enforcement active | 🟢 green |
 | specs/db/spec.md → SQLite Engine Configuration | WAL Mode Already Active | test/features/db/test_wal_mode_already_active.dart | test_wal_mode_already_active | 🔴 red |
-| specs/db/spec.md → SQLite Engine Configuration | Foreign Key Enforcement | test/features/db/test_foreign_key_enforcement.dart | test_foreign_key_enforcement | 🔴 red |
+| specs/db/spec.md → SQLite Engine Configuration | Foreign Key Enforcement | test/db/schema_test.dart | FK enforcement rejects invalid reference | 🟢 green |
 | specs/db/spec.md → SQLite Engine Configuration | Foreign Key Enforcement Disabled by Default | test/features/db/test_foreign_key_enforcement_disabled_by_default.dart | test_foreign_key_enforcement_disabled_by_default | 🔴 red |
-| specs/db/spec.md → Data Type Precision | Money Column Precision | test/features/db/test_money_column_precision.dart | test_money_column_precision | 🔴 red |
+| specs/db/spec.md → Data Type Precision | Money Column Precision | test/db/schema_test.dart | money precision — 123456789.12 stored exactly | 🟢 green |
 | specs/db/spec.md → Data Type Precision | Money Column Overflow | test/features/db/test_money_column_overflow.dart | test_money_column_overflow | 🔴 red |
-| specs/db/spec.md → Data Type Precision | Article Price Precision | test/features/db/test_article_price_precision.dart | test_article_price_precision | 🔴 red |
-| specs/db/spec.md → Data Type Precision | Article Price Zero | test/features/db/test_article_price_zero.dart | test_article_price_zero | 🔴 red |
-| specs/db/spec.md → Table Definitions | All Tables Created on Fresh Install | test/features/db/test_all_tables_created_on_fresh_install.dart | test_all_tables_created_on_fresh_install | 🔴 red |
-| specs/db/spec.md → Table Definitions | Table Count Verification | test/features/db/test_table_count_verification.dart | test_table_count_verification | 🔴 red |
+| specs/db/spec.md → Data Type Precision | Article Price Precision | test/db/schema_test.dart | vk_netto precision 2.9412 *100 =294.12 | 🟢 green |
+| specs/db/spec.md → Data Type Precision | Article Price Zero | test/db/schema_test.dart | vk_netto precision 2.9412 *100 =294.12 | 🟢 green |
+| specs/db/spec.md → Table Definitions | All Tables Created on Fresh Install | test/db/schema_test.dart | all 38 tables exist after creation | 🟢 green |
+| specs/db/spec.md → Table Definitions | Table Count Verification | test/db/schema_test.dart | table count remains 38 after second open | 🟢 green |
 | specs/db/spec.md → Table Definitions | Missing Table Detection | test/features/db/test_missing_table_detection.dart | test_missing_table_detection | 🔴 red |
 | specs/db/spec.md → Schema Versioning | Fresh Database Gets Current Version | test/features/db/test_fresh_database_gets_current_version.dart | test_fresh_database_gets_current_version | 🔴 red |
-| specs/db/spec.md → Schema Versioning | Outdated Database Triggers Migration | test/features/db/test_outdated_database_triggers_migration.dart | test_outdated_database_triggers_migration | 🔴 red |
+| specs/db/spec.md → Schema Versioning | Outdated Database Triggers Migration | test/db/migration_test.dart | increments schema version after an outdated migration | 🟢 green |
 | specs/db/spec.md → Schema Versioning | Already Current Database Skips Migration | test/features/db/test_already_current_database_skips_migration.dart | test_already_current_database_skips_migration | 🔴 red |
 | specs/db/spec.md → Schema Versioning | Future Database Version Rejected | test/features/db/test_future_database_version_rejected.dart | test_future_database_version_rejected | 🔴 red |
 | specs/db/spec.md → Migration System | Backup Before Migration | test/features/db/test_backup_before_migration.dart | test_backup_before_migration | 🔴 red |
 | specs/db/spec.md → Migration System | Idempotent Migration Re-run | test/features/db/test_idempotent_migration_re_run.dart | test_idempotent_migration_re_run | 🔴 red |
 | specs/db/spec.md → Migration System | Post-Migration Hooks | test/features/db/test_post_migration_hooks.dart | test_post_migration_hooks | 🔴 red |
-| specs/db/spec.md → Migration System | Migration Failure Rolls Back | test/features/db/test_migration_failure_rolls_back.dart | test_migration_failure_rolls_back | 🔴 red |
-| specs/db/spec.md → GoBD Triggers | Immutable Journal Row Protection | test/features/db/test_immutable_journal_row_protection.dart | test_immutable_journal_row_protection | 🔴 red |
-| specs/db/spec.md → GoBD Triggers | Mutable Journal Row Modification | test/features/db/test_mutable_journal_row_modification.dart | test_mutable_journal_row_modification | 🔴 red |
-| specs/db/spec.md → GoBD Triggers | Trigger Reinstall After Migration | test/features/db/test_trigger_reinstall_after_migration.dart | test_trigger_reinstall_after_migration | 🔴 red |
-| specs/db/spec.md → GoBD Triggers | Trigger Protects Against Direct SQL | test/features/db/test_trigger_protects_against_direct_sql.dart | test_trigger_protects_against_direct_sql | 🔴 red |
-| specs/db/spec.md → Profile Management | Profile Directory Isolation | test/features/db/test_profile_directory_isolation.dart | test_profile_directory_isolation | 🔴 red |
-| specs/db/spec.md → Profile Management | Profile Switch Requires Restart | test/features/db/test_profile_switch_requires_restart.dart | test_profile_switch_requires_restart | 🔴 red |
+| specs/db/spec.md → Migration System | Migration Failure Rolls Back | test/db/migration_test.dart | rolls back schema changes when migration fails | 🟢 green |
+| specs/db/spec.md → GoBD Triggers | Immutable Journal Row Protection | test/db/gobd_test.dart | rejects UPDATE and DELETE for immutable journal rows | 🟢 green |
+| specs/db/spec.md → GoBD Triggers | Mutable Journal Row Modification | test/db/gobd_test.dart | allows modification of mutable journal rows | 🟢 green |
+| specs/db/spec.md → GoBD Triggers | Trigger Reinstall After Migration | test/db/gobd_test.dart | reinstall restores protection after triggers are removed | 🟢 green |
+| specs/db/spec.md → GoBD Triggers | Trigger Protects Against Direct SQL | test/db/gobd_test.dart | rejects UPDATE and DELETE for immutable journal rows | 🟢 green |
+| specs/db/spec.md → Profile Management | Profile Directory Isolation | test/db/profile_test.dart | creates isolated profile directory and database | 🟢 green |
+| specs/db/spec.md → Profile Management | Profile Switch Requires Restart | test/db/profile_test.dart | switches profiles through profile.json and skips same-profile restart | 🟢 green |
 | specs/db/spec.md → Profile Management | Profile Switch Does Not Affect Other Profiles | test/features/db/test_profile_switch_does_not_affect_other_profiles.dart | test_profile_switch_does_not_affect_other_profiles | 🔴 red |
 | specs/db/spec.md → Backup System | WAL-Safe Backup Creation | test/features/db/test_wal_safe_backup_creation.dart | test_wal_safe_backup_creation | 🔴 red |
 | specs/db/spec.md → Backup System | Backup Rotation | test/features/db/test_backup_rotation.dart | test_backup_rotation | 🔴 red |
 | specs/db/spec.md → Backup System | Encrypted External Backup | test/features/db/test_encrypted_external_backup.dart | test_encrypted_external_backup | 🔴 red |
 | specs/db/spec.md → Backup System | Backup Directory Does Not Exist | test/features/db/test_backup_directory_does_not_exist.dart | test_backup_directory_does_not_exist | 🔴 red |
-| specs/db/spec.md → Seed Data | USt-Sätze Seeded | test/features/db/test_ust_s_tze_seeded.dart | test_ust_s_tze_seeded | 🔴 red |
-| specs/db/spec.md → Seed Data | Nummernkreise Seeded | test/features/db/test_nummernkreise_seeded.dart | test_nummernkreise_seeded | 🔴 red |
-| specs/db/spec.md → Seed Data | Kategorien Seeded With SKR Accounts | test/features/db/test_kategorien_seeded_with_skr_accounts.dart | test_kategorien_seeded_with_skr_accounts | 🔴 red |
-| specs/db/spec.md → Seed Data | Seed Data Not Duplicated on Restart | test/features/db/test_seed_data_not_duplicated_on_restart.dart | test_seed_data_not_duplicated_on_restart | 🔴 red |
+| specs/db/spec.md → Seed Data | USt-Sätze Seeded | test/db/seed_test.dart | seeds standard tax rates and document number ranges | 🟢 green |
+| specs/db/spec.md → Seed Data | Nummernkreise Seeded | test/db/seed_test.dart | seeds standard tax rates and document number ranges | 🟢 green |
+| specs/db/spec.md → Seed Data | Kategorien Seeded With SKR Accounts | test/db/seed_test.dart | seeds categories with both SKR mappings | 🟢 green |
+| specs/db/spec.md → Seed Data | Seed Data Not Duplicated on Restart | test/db/seed_test.dart | is idempotent and preserves existing seed values | 🟢 green |
 | specs/db/spec.md → Indexes and Constraints | Duplicate Konto-Nummer Rejected | test/features/db/test_duplicate_konto_nummer_rejected.dart | test_duplicate_konto_nummer_rejected | 🔴 red |
 | specs/db/spec.md → Indexes and Constraints | Null Kundennummer Allowed | test/features/db/test_null_kundennummer_allowed.dart | test_null_kundennummer_allowed | 🔴 red |
 | specs/db/spec.md → Indexes and Constraints | Duplicate Dedupe Hash Rejected | test/features/db/test_duplicate_dedupe_hash_rejected.dart | test_duplicate_dedupe_hash_rejected | 🔴 red |
