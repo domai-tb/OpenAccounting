@@ -480,23 +480,35 @@ ORDER BY k.id
 
   static Future<void> _ensureSchema(QueryExecutor executor) async {
     await executor.ensureOpen(_NoopTransactionUser());
-    await _addMissingColumns(executor, 'kunden', _kundenColumns);
-    await _addMissingColumns(executor, 'nummernkreise', _nummernkreisColumns);
-    await executor.runCustom(
-      'UPDATE kunden SET debitor_nr = kundennummer WHERE debitor_nr IS NULL AND kundennummer IS NOT NULL',
-    );
-    await executor.runCustom(
-      'UPDATE nummernkreise SET letzte_nummer = naechste_nummer - 1 '
-      'WHERE letzte_nummer IS NULL AND naechste_nummer IS NOT NULL',
-    );
-    await executor.runCustom(
-      'UPDATE nummernkreise SET letze_nummer = naechste_nummer - 1 '
-      'WHERE letze_nummer IS NULL AND naechste_nummer IS NOT NULL',
-    );
-    await executor.runCustom(
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_debitor_nr_unique '
-      'ON kunden(debitor_nr) WHERE debitor_nr IS NOT NULL',
-    );
+    final transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      await _addMissingColumns(transaction, 'kunden', _kundenColumns);
+      await _addMissingColumns(transaction, 'nummernkreise', _nummernkreisColumns);
+      await transaction.runCustom(
+        'UPDATE kunden SET debitor_nr = kundennummer WHERE debitor_nr IS NULL AND kundennummer IS NOT NULL',
+      );
+      await transaction.runCustom(
+        'UPDATE nummernkreise SET letzte_nummer = naechste_nummer - 1 '
+        'WHERE letzte_nummer IS NULL AND naechste_nummer IS NOT NULL',
+      );
+      await transaction.runCustom(
+        'UPDATE nummernkreise SET letze_nummer = naechste_nummer - 1 '
+        'WHERE letze_nummer IS NULL AND naechste_nummer IS NOT NULL',
+      );
+      await transaction.runCustom(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_debitor_nr_unique '
+        'ON kunden(debitor_nr) WHERE debitor_nr IS NOT NULL',
+      );
+      await transaction.send();
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   static Future<void> _addMissingColumns(

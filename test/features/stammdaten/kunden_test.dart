@@ -23,6 +23,15 @@ void main() {
       await db.close();
     });
 
+    test('requires an open database before repository access', () async {
+      // Arrange: construct a database without opening its connection.
+      final unopened = AppDatabase.createTestDatabase();
+      addTearDown(unopened.close);
+
+      // Act and assert: repository access cannot bypass database lifecycle setup.
+      expect(() => unopened.kundenRepository, throwsA(isA<StateError>()));
+    });
+
     dynamic createCustomer(
       dynamic repository, {
       String anrede = 'Herr',
@@ -216,6 +225,18 @@ VALUES (?, ?, ?, ?, ?)
       await expectLater(blankCountry, exactError('Land ist Pflicht'));
       await expectLater(overlongTaxNumber, exactError('Steuernummer Ausland darf höchstens 50 Zeichen enthalten'));
       expect(await repository.list(), isEmpty);
+    });
+
+    test('creates customer schema fields with required constraints', () async {
+      // Arrange: inspect the schema after normal database startup.
+      final columns = await db.executor.runSelect('PRAGMA table_info(kunden)', const <Object?>[]);
+      final byName = <String, Map<String, Object?>>{for (final column in columns) column['name']! as String: column};
+
+      // Act and assert: required fields and bounded tax storage are explicit in SQLite schema.
+      for (final field in <String>['anrede', 'name', 'strasse', 'plz', 'ort', 'land']) {
+        expect(byName[field]!['notnull'], 1, reason: '$field must be NOT NULL');
+      }
+      expect(byName['steuernummer_ausland']!['type'], 'VARCHAR(50)');
     });
 
     test('rejects unknown update fields', () async {

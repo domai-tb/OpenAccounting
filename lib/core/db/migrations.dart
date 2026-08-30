@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 1;
+  static const int currentVersion = 2;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -72,20 +72,39 @@ class MigrationRunner {
         throw StateError('Backup vor Migration fehlgeschlagen: $e');
       }
 
-      await executor.runCustom('BEGIN');
+      final foreignKeysEnabled = await _pragmaEnabled('foreign_keys');
+      final legacyAlterTableEnabled = await _pragmaEnabled('legacy_alter_table');
+      if (foreignKeysEnabled) {
+        await executor.runCustom('PRAGMA foreign_keys = OFF');
+      }
       try {
-        for (var v = version + 1; v <= currentVersion; v++) {
-          await _migrateTo(v, createSchema);
-        }
-        await _postHooks();
-        await setUserVersion(currentVersion);
-        await executor.runCustom('COMMIT');
-        return true;
-      } catch (error) {
+        await executor.runCustom('PRAGMA legacy_alter_table = ON');
+        await executor.runCustom('BEGIN');
         try {
-          await executor.runCustom('ROLLBACK');
+          for (var v = version + 1; v <= currentVersion; v++) {
+            await _migrateTo(v, createSchema);
+          }
+          await _postHooks();
+          await setUserVersion(currentVersion);
+          await executor.runCustom('COMMIT');
+          return true;
+        } catch (error, stackTrace) {
+          try {
+            await executor.runCustom('ROLLBACK');
+          } catch (rollbackError, rollbackStackTrace) {
+            Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+          }
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+      } finally {
+        try {
+          await executor.runCustom('PRAGMA legacy_alter_table = ${legacyAlterTableEnabled ? 1 : 0}');
         } catch (_) {}
-        rethrow;
+        if (foreignKeysEnabled) {
+          try {
+            await executor.runCustom('PRAGMA foreign_keys = ON');
+          } catch (_) {}
+        }
       }
     }
 
@@ -93,11 +112,63 @@ class MigrationRunner {
   }
 
   Future<void> _migrateTo(int version, Future<void> Function() createSchema) async {
-    // ponytail: greenfield — only version 1 exists, future migrations stub.
-    // If upgrading from 0 with existing tables, ensure missing tables created idempotently.
     if (version == 1) {
       await createSchema();
     }
+    if (version == 2) {
+      await createSchema();
+      await _migrateRechnungen();
+    }
+  }
+
+  Future<bool> _pragmaEnabled(String pragma) async {
+    final rows = await executor.runSelect('PRAGMA $pragma', const <Object?>[]);
+    if (rows.isEmpty) return false;
+    final value = rows.first.values.first;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    return value == '1';
+  }
+
+  Future<void> _migrateRechnungen() async {
+    final columns = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
+    var hasDraftFlag = false;
+    var hasInputMode = false;
+    var numberIsRequired = false;
+    for (final column in columns) {
+      final name = column['name'];
+      if (name == 'ist_entwurf') hasDraftFlag = true;
+      if (name == 'eingabemodus') hasInputMode = true;
+      if (name == 'rechnungsnummer') {
+        final notNull = column['notnull'];
+        numberIsRequired = notNull is num && notNull != 0;
+      }
+    }
+
+    if (numberIsRequired || !hasDraftFlag || !hasInputMode) {
+      await _rebuildRechnungen();
+    }
+  }
+
+  Future<void> _rebuildRechnungen() async {
+    await executor.runCustom('ALTER TABLE rechnungen RENAME TO rechnungen_v1');
+    await executor.runCustom(_rechnungenTableSql);
+    await executor.runCustom('''
+INSERT INTO rechnungen (
+  id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, faelligkeit,
+  netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
+  notiz, unternehmen_id, nummernkreis_id, storno_von
+)
+SELECT
+  id, rechnungsnummer, typ, status,
+  CASE WHEN status = 'entwurf' THEN 1 ELSE 0 END,
+  'netto',
+  kunde_id, lieferant_id, datum, faelligkeit,
+  netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
+  notiz, unternehmen_id, nummernkreis_id, storno_von
+FROM rechnungen_v1
+''');
+    await executor.runCustom('DROP TABLE rechnungen_v1');
   }
 
   Future<void> _postHooks() async {
@@ -105,3 +176,26 @@ class MigrationRunner {
     // Triggers and seeds are installed in AppDatabase.ensureOpen after migration.
   }
 }
+
+const String _rechnungenTableSql = '''
+CREATE TABLE rechnungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rechnungsnummer TEXT,
+  typ TEXT NOT NULL,
+  status TEXT DEFAULT 'entwurf',
+  ist_entwurf INTEGER NOT NULL DEFAULT 1 CHECK (ist_entwurf IN (0, 1)),
+  eingabemodus TEXT NOT NULL DEFAULT 'netto' CHECK (eingabemodus IN ('netto', 'brutto')),
+  kunde_id INTEGER REFERENCES kunden(id),
+  lieferant_id INTEGER REFERENCES lieferanten(id),
+  datum TEXT NOT NULL,
+  faelligkeit TEXT,
+  netto_betrag NUMERIC(12,2) DEFAULT 0,
+  brutto_betrag NUMERIC(12,2) DEFAULT 0,
+  ust_betrag NUMERIC(12,2) DEFAULT 0,
+  skonto_prozent NUMERIC(12,2) DEFAULT 0,
+  skonto_faelligkeit TEXT,
+  notiz TEXT,
+  unternehmen_id INTEGER REFERENCES unternehmen(id),
+  nummernkreis_id INTEGER REFERENCES nummernkreise(id),
+  storno_von INTEGER REFERENCES rechnungen(id)
+)''';
