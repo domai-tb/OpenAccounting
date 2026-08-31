@@ -370,7 +370,13 @@ CREATE TABLE IF NOT EXISTS journal (
   storno_von INTEGER REFERENCES journal(id),
   ust_satz_id INTEGER REFERENCES ust_saetze(id),
   konto_skr03_snapshot TEXT,
-  konto_skr04_snapshot TEXT
+  konto_skr04_snapshot TEXT,
+  ust_satz NUMERIC(12,2),
+  ust_sonderfall TEXT,
+  marge_25a_brutto NUMERIC(12,2),
+  ust_satz_25a NUMERIC(12,2),
+  ist_eu_lieferung INTEGER DEFAULT 0,
+  vorsteuer_betrag NUMERIC(12,2)
 )''',
   // 15 bank_templates
   '''
@@ -596,7 +602,8 @@ CREATE TABLE IF NOT EXISTS vorsteuer_ansprueche (
   betrag NUMERIC(12,2) NOT NULL,
   status TEXT DEFAULT 'offen',
   faelligkeit TEXT,
-  unternehmen_id INTEGER REFERENCES unternehmen(id)
+  unternehmen_id INTEGER REFERENCES unternehmen(id),
+  ust_sonderfall TEXT
 )''',
   // 36 schnellbuchungen
   '''

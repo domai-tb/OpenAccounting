@@ -12,7 +12,11 @@ class JournalRepository {
 
   static const Set<String> _allowedArt = <String>{'Einnahme', 'Ausgabe'};
 
+  static const Set<String> _allowedSonderfall = <String>{'ig_erwerb', '13b_abs1', '13b_abs2'};
+
   static final RegExp _betragRegex = RegExp(r'^\d+(\.\d{1,2})?$');
+
+  static final RegExp _betragNegRegex = RegExp(r'^-?\d+(\.\d{1,2})?$');
 
   Future<JournalEntry> create({
     required DateTime datum,
@@ -26,6 +30,12 @@ class JournalRepository {
     String? belegNr,
     int? kontoId,
     int? stornoVon,
+    String? ustSatz,
+    String? ustSonderfall,
+    String? marge25a,
+    String? ustSatz25a,
+    bool? istEuLieferung,
+    String? vorsteuerBetrag,
   }) async {
     final cleanBezeichnung = bezeichnung.trim();
     if (cleanBezeichnung.isEmpty) {
@@ -59,11 +69,95 @@ class JournalRepository {
       throw const JournalException('Art muss Einnahme oder Ausgabe sein');
     }
 
+    // Validate ustSonderfall whitelist
+    String? cleanSonderfall;
+    if (ustSonderfall != null) {
+      final t = ustSonderfall.trim();
+      if (t.isNotEmpty) {
+        if (!_allowedSonderfall.contains(t)) {
+          throw JournalException('Ungültiger ust_sonderfall: $t');
+        }
+        cleanSonderfall = t;
+      }
+    }
+
+    // Validate ustSatz and ustSatz25a against configured ust_saetze
+    String? cleanUstSatz;
+    if (ustSatz != null) {
+      final t = ustSatz.trim();
+      if (t.isNotEmpty) {
+        final numParsed = num.tryParse(t);
+        if (numParsed == null) {
+          throw JournalException('USt-Satz ungültig: $t');
+        }
+        await _ensureSatzConfigured(t, numParsed);
+        cleanUstSatz = t;
+      }
+    }
+    String? cleanUstSatz25a;
+    if (ustSatz25a != null) {
+      final t = ustSatz25a.trim();
+      if (t.isNotEmpty) {
+        final numParsed = num.tryParse(t);
+        if (numParsed == null) {
+          throw JournalException('USt-Satz 25a ungültig: $t');
+        }
+        await _ensureSatzConfigured(t, numParsed);
+        cleanUstSatz25a = t;
+      }
+    }
+
+    String? cleanMarge;
+    if (marge25a != null) {
+      final t = marge25a.trim();
+      if (t.isNotEmpty) {
+        if (!_betragNegRegex.hasMatch(t)) {
+          throw JournalException('marge_25a_brutto ungültig: $t');
+        }
+        // range check absolute
+        final abs = t.startsWith('-') ? t.substring(1) : t;
+        final p = abs.split('.');
+        final ri = p[0].replaceFirst(RegExp('^0+'), '');
+        final ei = ri.isEmpty ? '0' : ri;
+        if (ei.length > 10) {
+          throw const JournalException('marge_25a_brutto außerhalb NUMERIC(12,2)');
+        }
+        if (ei.length == 10 && ei.compareTo('9999999999') > 0) {
+          throw const JournalException('marge_25a_brutto außerhalb NUMERIC(12,2)');
+        }
+        cleanMarge = _formatBetrag(t);
+      }
+    }
+
+    String? cleanVorsteuer;
+    if (vorsteuerBetrag != null) {
+      final t = vorsteuerBetrag.trim();
+      if (t.isNotEmpty) {
+        if (!_betragRegex.hasMatch(t)) {
+          // allow negative? spec says vorsteuer positive, but keep strict positive
+          throw JournalException('vorsteuer_betrag ungültig: $t');
+        }
+        final p = t.split('.');
+        final ri = p[0].replaceFirst(RegExp('^0+'), '');
+        final ei = ri.isEmpty ? '0' : ri;
+        if (ei.length > 10) {
+          throw const JournalException('vorsteuer_betrag außerhalb NUMERIC(12,2)');
+        }
+        if (ei.length == 10 && ei.compareTo('9999999999') > 0) {
+          throw const JournalException('vorsteuer_betrag außerhalb NUMERIC(12,2)');
+        }
+        cleanVorsteuer = _formatBetrag(t);
+      }
+    }
+
+    final int? istEuInt = istEuLieferung == null ? null : (istEuLieferung ? 1 : 0);
+
     final datumStr = _formatDate(datum);
     final id = await executor.runInsert(
       'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         datumStr,
         cleanBezeichnung,
@@ -76,6 +170,12 @@ class JournalRepository {
         belegNr,
         stornoVon,
         kontoId,
+        cleanUstSatz,
+        cleanSonderfall,
+        cleanMarge,
+        cleanUstSatz25a,
+        istEuInt,
+        cleanVorsteuer,
       ],
     );
 
@@ -84,6 +184,36 @@ class JournalRepository {
       throw const JournalException('Journaleintrag konnte nicht gespeichert werden');
     }
     return entry;
+  }
+
+  Future<void> _ensureSatzConfigured(String raw, num parsed) async {
+    try {
+      final rows = await executor.runSelect('SELECT satz FROM ust_saetze', const <Object?>[]);
+      bool found = false;
+      for (final r in rows) {
+        final v = r['satz'];
+        num? n;
+        if (v is num) {
+          n = v;
+        } else if (v is String) {
+          n = num.tryParse(v);
+        }
+        if (n != null && (n - parsed).abs() < 0.0001) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        throw JournalException('USt-Satz nicht konfiguriert: $raw');
+      }
+    } catch (e) {
+      if (e is JournalException) rethrow;
+      // ponytail: if ust_saetze missing, allow 0,7,19 defaults, else reject
+      if (parsed == 0 || parsed == 7 || parsed == 19 || parsed == 7.0 || parsed == 19.0) {
+        return;
+      }
+      throw JournalException('USt-Satz nicht konfiguriert: $raw');
+    }
   }
 
   Future<JournalEntry> storno({required int originalId}) async {
@@ -105,10 +235,45 @@ class JournalRepository {
     final datumStr = _formatDate(now);
     final stornoBezeichnung = 'Storno: ${original.bezeichnung}';
 
+    // Fetch extra fields for storno copy (best-effort, missing columns fallback)
+    String? origUstSatz;
+    String? origSonderfall;
+    String? origMarge;
+    String? origSatz25a;
+    int? origEu;
+    String? origVorsteuer;
+    try {
+      final rows = await executor.runSelect(
+        'SELECT ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag '
+        'FROM journal WHERE id = ?',
+        <Object?>[originalId],
+      );
+      if (rows.isNotEmpty) {
+        final r = rows.single;
+        origUstSatz = r['ust_satz']?.toString();
+        origSonderfall = r['ust_sonderfall'] as String?;
+        origMarge = r['marge_25a_brutto']?.toString();
+        origSatz25a = r['ust_satz_25a']?.toString();
+        origEu = (r['ist_eu_lieferung'] as num?)?.toInt();
+        origVorsteuer = r['vorsteuer_betrag']?.toString();
+      }
+    } catch (_) {}
+
+    // Negate marge and vorsteuer if present
+    String? negMarge;
+    if (origMarge != null && origMarge.trim().isNotEmpty) {
+      negMarge = _negateBetrag(_formatBetrag(origMarge));
+    }
+    String? negVorsteuer;
+    if (origVorsteuer != null && origVorsteuer.trim().isNotEmpty) {
+      negVorsteuer = _negateBetrag(_formatBetrag(origVorsteuer));
+    }
+
     final id = await executor.runInsert(
       'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, storno_von, konto_id) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)',
+      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, storno_von, konto_id, '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         datumStr,
         stornoBezeichnung,
@@ -120,6 +285,12 @@ class JournalRepository {
         original.ustSatzId,
         originalId,
         original.kontoId,
+        origUstSatz,
+        origSonderfall,
+        negMarge,
+        origSatz25a,
+        origEu,
+        negVorsteuer,
       ],
     );
 
@@ -133,7 +304,8 @@ class JournalRepository {
   Future<JournalEntry?> findById(int id) async {
     final rows = await executor.runSelect(
       'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id '
+      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag '
       'FROM journal WHERE id = ?',
       <Object?>[id],
     );
@@ -144,7 +316,8 @@ class JournalRepository {
   Future<List<JournalEntry>> list() async {
     final rows = await executor.runSelect(
       'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id '
+      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag '
       'FROM journal ORDER BY id',
       const <Object?>[],
     );

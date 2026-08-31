@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 2;
+  static const int currentVersion = 3;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -133,6 +133,11 @@ class MigrationRunner {
       await createSchema();
       await _migrateRechnungen();
     }
+    if (version == 3) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateAccounting();
+    }
   }
 
   Future<bool> _pragmaEnabled(String pragma) async {
@@ -161,6 +166,45 @@ class MigrationRunner {
 
     if (numberIsRequired || !hasDraftFlag || !hasInputMode) {
       await _rebuildRechnungen();
+    }
+  }
+
+  Future<void> _migrateAccounting() async {
+    final List<Map<String, Object?>> jCols = await executor.runSelect('PRAGMA table_info(journal)', const <Object?>[]);
+    final Set<String> jNames = <String>{for (final Map<String, Object?> r in jCols) r['name'].toString()};
+    const List<String> jAdds = <String>[
+      'ust_satz NUMERIC(12,2)',
+      'ust_sonderfall TEXT',
+      'marge_25a_brutto NUMERIC(12,2)',
+      'ust_satz_25a NUMERIC(12,2)',
+      'ist_eu_lieferung INTEGER DEFAULT 0',
+      'vorsteuer_betrag NUMERIC(12,2)',
+    ];
+    for (final String col in jAdds) {
+      final String name = col.split(' ').first;
+      if (!jNames.contains(name)) {
+        try {
+          await executor.runCustom('ALTER TABLE journal ADD COLUMN $col');
+        } catch (_) {
+          try {
+            await executor.runCustom('ALTER TABLE journal ADD COLUMN IF NOT EXISTS $col');
+          } catch (_) {}
+        }
+      }
+    }
+    final List<Map<String, Object?>> vCols = await executor.runSelect(
+      'PRAGMA table_info(vorsteuer_ansprueche)',
+      const <Object?>[],
+    );
+    final Set<String> vNames = <String>{for (final Map<String, Object?> r in vCols) r['name'].toString()};
+    if (!vNames.contains('ust_sonderfall')) {
+      try {
+        await executor.runCustom('ALTER TABLE vorsteuer_ansprueche ADD COLUMN ust_sonderfall TEXT');
+      } catch (_) {
+        try {
+          await executor.runCustom('ALTER TABLE vorsteuer_ansprueche ADD COLUMN IF NOT EXISTS ust_sonderfall TEXT');
+        } catch (_) {}
+      }
     }
   }
 

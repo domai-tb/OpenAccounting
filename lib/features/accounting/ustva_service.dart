@@ -68,7 +68,7 @@ class UstvaService {
       // ponytail stub: DDL may lack ust_sonderfall/marge columns → containsKey check, missing → null
       final String? sonderfall = _stringOrNull(row, 'ust_sonderfall');
       final bool isIgErwerb = sonderfall == 'ig_erwerb';
-      final bool isRc = sonderfall != null && !isIgErwerb;
+      final bool isRc = sonderfall == '13b_abs1' || sonderfall == '13b_abs2';
 
       final String? margeRaw = _stringOrNull(row, 'marge_25a_brutto');
       final String? satz25Raw = _stringOrNull(row, 'ust_satz_25a');
@@ -105,11 +105,13 @@ class UstvaService {
       final num? satz = _resolveSatz(row);
       if (satz != null && satz != 0) {
         final int ust = _calcUstFromBrutto(betragCents, satz);
-        if ((satz - 19).abs() < 0.01) {
+        final int satzCents = (satz * 100).round();
+        if (satzCents == 1900) {
           kz3Cents += ust;
-        } else if ((satz - 7).abs() < 0.01) {
+        } else if (satzCents == 700) {
           kz4Cents += ust;
         }
+        // ponytail: custom satz contributes to KZ1 only, no KZ3/4 routing
       }
     }
 
@@ -240,10 +242,12 @@ int _calcUstFromBrutto(int baseCents, num satz) {
   if (satz == 0) {
     return 0;
   }
-  // ponytail: trunc floor, avoids float drift for exact margins (119*19/119=19)
-  final double r = baseCents * satz / (100 + satz);
-  // trunc toward zero for positive, but base is non-negative for USt (margin max 0)
-  return r.floor();
+  final int satzCents = (satz * 100).round();
+  if (satzCents == 0) {
+    return 0;
+  }
+  // ponytail: integer cents avoids float drift: base*19/119 → 1900/11900 exact
+  return (baseCents * satzCents) ~/ (10000 + satzCents);
 }
 
 int _toCents(String raw) {
