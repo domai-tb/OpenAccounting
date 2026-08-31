@@ -1,9 +1,10 @@
 import 'package:drift/drift.dart';
 
+import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/ustva_entity.dart';
 
 /// UStVA KZ 1-22 + special KZs per spec.
-/// ponytail: executor-injected, pure string money, PRAGMA column checks with ponytail stub fallback.
+/// ponytail: executor-injected, pure string money via money.dart, PRAGMA column checks with ponytail stub fallback.
 /// Missing columns (ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a) → 0 contribution, not crash.
 /// Uses brutto portion formula base*ust/(100+ust) with trunc, max(0) for negative margin.
 class UstvaService {
@@ -63,7 +64,7 @@ class UstvaService {
 
     for (final Map<String, Object?> row in jFiltered) {
       final String betragRaw = row['betrag']?.toString() ?? '0.00';
-      final int betragCents = _toCents(_formatBetrag(betragRaw));
+      final int betragCents = money.toCents(money.formatBetrag(betragRaw));
 
       // ponytail stub: DDL may lack ust_sonderfall/marge columns → containsKey check, missing → null
       final String? sonderfall = _stringOrNull(row, 'ust_sonderfall');
@@ -73,7 +74,7 @@ class UstvaService {
       final String? margeRaw = _stringOrNull(row, 'marge_25a_brutto');
       final String? satz25Raw = _stringOrNull(row, 'ust_satz_25a');
       if (margeRaw != null && satz25Raw != null && margeRaw.trim().isNotEmpty && satz25Raw.trim().isNotEmpty) {
-        final int margeCents = _toCents(_formatBetrag(margeRaw));
+        final int margeCents = money.toCents(money.formatBetrag(margeRaw));
         final int base = margeCents < 0 ? 0 : margeCents;
         kz81Cents += base;
         final num? satz25 = _parseSatz(satz25Raw);
@@ -120,7 +121,7 @@ class UstvaService {
     int kz66Cents = 0;
     for (final Map<String, Object?> row in vFiltered) {
       final String betragRaw = row['betrag']?.toString() ?? '0.00';
-      final int betragCents = _toCents(_formatBetrag(betragRaw));
+      final int betragCents = money.toCents(money.formatBetrag(betragRaw));
       final String? sf = _stringOrNull(row, 'ust_sonderfall');
       if (sf == 'ig_erwerb') {
         kz61Cents += betragCents;
@@ -130,16 +131,16 @@ class UstvaService {
     }
 
     final Map<String, String> kz = <String, String>{
-      '1': _fromCents(kz1Cents),
-      '3': _fromCents(kz3Cents),
-      '4': _fromCents(kz4Cents),
-      '18': _fromCents(kz18Cents),
-      '61': _fromCents(kz61Cents),
-      '66': _fromCents(kz66Cents),
-      '81': _fromCents(kz81Cents),
-      '83': _fromCents(kz83Cents),
-      '89': _fromCents(kz89Cents),
-      '93': _fromCents(kz93Cents),
+      '1': money.fromCents(kz1Cents),
+      '3': money.fromCents(kz3Cents),
+      '4': money.fromCents(kz4Cents),
+      '18': money.fromCents(kz18Cents),
+      '61': money.fromCents(kz61Cents),
+      '66': money.fromCents(kz66Cents),
+      '81': money.fromCents(kz81Cents),
+      '83': money.fromCents(kz83Cents),
+      '89': money.fromCents(kz89Cents),
+      '93': money.fromCents(kz93Cents),
       for (int i = 1; i <= 22; i++)
         if (!<String>['1', '3', '4', '18'].contains('$i')) '$i': '0.00',
     };
@@ -248,43 +249,4 @@ int _calcUstFromBrutto(int baseCents, num satz) {
   }
   // ponytail: integer cents avoids float drift: base*19/119 → 1900/11900 exact
   return (baseCents * satzCents) ~/ (10000 + satzCents);
-}
-
-int _toCents(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return 0;
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPartRaw = parts[0].isEmpty ? '0' : parts[0];
-  final String intNoLead = intPartRaw.replaceFirst(RegExp('^0+'), '');
-  final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  final int cents = int.parse(effInt) * 100 + int.parse(dec);
-  return isNeg ? -cents : cents;
-}
-
-String _fromCents(int cents) {
-  final bool isNeg = cents < 0;
-  final int abs = cents.abs();
-  final String intPart = (abs ~/ 100).toString();
-  final String dec = (abs % 100).toString().padLeft(2, '0');
-  return '${isNeg ? '-' : ''}$intPart.$dec';
-}
-
-String _formatBetrag(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return '0.00';
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPart = parts[0].isEmpty ? '0' : parts[0];
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  return '${isNeg ? '-' : ''}$intPart.$dec';
 }

@@ -1,9 +1,11 @@
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/euer_entity.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// EÜR Anlage 2025 — 60+ Zeilen 12–107 per spec.
-/// ponytail: pure string-cent helpers, no double, map-init covers 60+ Zeilen without 60 repetitive branches.
+/// ponytail: pure string-cent helpers via money.dart, no double,
+/// map-init covers 60+ Zeilen without 60 repetitive branches.
 /// ponytail: global executor lock ceiling — per-call if throughput matters.
 class EuerService {
   EuerService(this.executor);
@@ -36,9 +38,9 @@ class EuerService {
         continue;
       }
       final String raw = r['betrag']?.toString() ?? '0.00';
-      final String formatted = _formatBetrag(raw);
+      final String formatted = money.formatBetrag(raw);
       final String current = zeilen[zeile] ?? '0.00';
-      zeilen[zeile] = _add(current, formatted);
+      zeilen[zeile] = money.add(current, formatted);
     }
 
     // Zeile 33 — AfA from anlageverzeichnis, not journal.
@@ -65,7 +67,7 @@ class EuerService {
           }
         }
         final String kostenRaw = r['anschaffungskosten']?.toString() ?? '0.00';
-        final int kostenCents = _toCents(_formatBetrag(kostenRaw));
+        final int kostenCents = money.toCents(money.formatBetrag(kostenRaw));
         final int nutzungsdauer = (r['nutzungsdauer'] as num?)?.toInt() ?? 0;
         if (nutzungsdauer <= 0) {
           continue;
@@ -74,14 +76,14 @@ class EuerService {
         final int baseCents = kostenCents ~/ nutzungsdauer;
         final String privatRaw = r['privatanteil']?.toString() ?? '0';
         // privatanteil: private-use share 0–100% as decimal string; e.g. '30.00' → 3000.
-        final int privatCents = _toCents(_formatBetrag(privatRaw));
+        final int privatCents = money.toCents(money.formatBetrag(privatRaw));
         // factor scales AfA by business share: (10000 - privatCents) / 10000.
         final int factor = 10000 - privatCents;
         final int clampedFactor = factor < 0 ? 0 : (factor > 10000 ? 10000 : factor);
         final int reduced = (baseCents * clampedFactor) ~/ 10000;
         afaCents += reduced;
       }
-      zeilen[33] = _fromCents(afaCents);
+      zeilen[33] = money.fromCents(afaCents);
     } catch (_) {
       // ponytail: anlageverzeichnis missing — keep 0.00.
       zeilen[33] = zeilen[33] ?? '0.00';
@@ -103,7 +105,7 @@ class EuerService {
         int sum = 0;
         for (final Map<String, Object?> r in vRows) {
           final String raw = r['betrag']?.toString() ?? '0.00';
-          sum += _toCents(_formatBetrag(raw));
+          sum += money.toCents(money.formatBetrag(raw));
         }
         // Fallback: if faelligkeit filter yielded 0 but table has rows
         // without date (edge), sum all where substr matches.
@@ -116,13 +118,13 @@ class EuerService {
             final String? faell = r['faelligkeit'] as String?;
             if (faell != null && faell.startsWith(jahrStr)) {
               final String raw = r['betrag']?.toString() ?? '0.00';
-              sum += _toCents(_formatBetrag(raw));
+              sum += money.toCents(money.formatBetrag(raw));
             } else if (faell == null) {
               // ponytail: undated anspruch — ignore for year-specific Soll, keeps 0.
             }
           }
         }
-        vorsteuer = _fromCents(sum);
+        vorsteuer = money.fromCents(sum);
       } catch (_) {
         vorsteuer = '0.00';
       }
@@ -143,9 +145,9 @@ class EuerService {
           int sum = 0;
           for (final Map<String, Object?> r in vRows) {
             final String raw = r['b']?.toString() ?? '0.00';
-            sum += _toCents(_formatBetrag(raw));
+            sum += money.toCents(money.formatBetrag(raw));
           }
-          vorsteuer = _fromCents(sum);
+          vorsteuer = money.fromCents(sum);
         } else {
           vorsteuer = '0.00';
         }
@@ -162,7 +164,7 @@ class EuerService {
       if (z == 106 || z == 107) {
         continue;
       }
-      final int cents = _toCents(e.value);
+      final int cents = money.toCents(e.value);
       if (z < 25) {
         einnahmen += cents;
       } else {
@@ -170,7 +172,7 @@ class EuerService {
       }
     }
     final int gewinnCents = einnahmen - ausgaben;
-    final String gewinn = _fromCents(gewinnCents);
+    final String gewinn = money.fromCents(gewinnCents);
 
     return EuerResult(jahr: jahr, zeilen: zeilen, hinweise: hinweise, vorsteuerBetrag: vorsteuer, gewinn: gewinn);
   }
@@ -183,47 +185,4 @@ bool _useSoll(int jahr, DateTime? cutoverDatum) {
   final DateTime periodStart = DateTime(jahr);
   final DateTime cut = DateTime(cutoverDatum.year, cutoverDatum.month, cutoverDatum.day);
   return !periodStart.isBefore(cut);
-}
-
-int _toCents(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return 0;
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPartRaw = parts[0].isEmpty ? '0' : parts[0];
-  final String intNoLead = intPartRaw.replaceFirst(RegExp('^0+'), '');
-  final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  final int cents = int.parse(effInt) * 100 + int.parse(dec);
-  return isNeg ? -cents : cents;
-}
-
-String _fromCents(int cents) {
-  final bool isNeg = cents < 0;
-  final int abs = cents.abs();
-  final String intPart = (abs ~/ 100).toString();
-  final String dec = (abs % 100).toString().padLeft(2, '0');
-  return '${isNeg ? '-' : ''}$intPart.$dec';
-}
-
-String _add(String a, String b) {
-  return _fromCents(_toCents(a) + _toCents(b));
-}
-
-String _formatBetrag(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return '0.00';
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPart = parts[0].isEmpty ? '0' : parts[0];
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  return '${isNeg ? '-' : ''}$intPart.$dec';
 }

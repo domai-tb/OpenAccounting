@@ -2,9 +2,10 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/accounting/eks_entity.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// Anlage EKS 9-page for Jobcenter Transferleistungen.
-/// ponytail: pure string cents, ponytail stub columns via ALTER on first generate,
+/// ponytail: pure string cents via money.dart, ponytail stub columns via ALTER on first generate,
 /// warn via debugPrint not fail on missing bg/jobcenter.
 class EksService {
   EksService(this.executor);
@@ -111,15 +112,15 @@ class EksService {
       final int? kId = (row['kategorie_id'] as num?)?.toInt();
       final String? eksKat = kId != null ? katMap[kId] : null;
       final String betragRaw = row['betrag']?.toString() ?? '0.00';
-      final String betragStr = _formatBetrag(betragRaw);
-      final int betragCents = _toCents(betragStr);
+      final String betragStr = money.formatBetrag(betragRaw);
+      final int betragCents = money.toCents(betragStr);
       final String art = row['beleg_typ'] as String? ?? row['art'] as String? ?? '';
 
       // Section F Zeilen 23-41 — only F23-41 per Anlage EKS.
       if (eksKat != null && eksKat.isNotEmpty) {
         if (_isFLine(eksKat)) {
           final String current = sectionF[eksKat] ?? '0.00';
-          sectionF[eksKat] = _add(current, betragStr);
+          sectionF[eksKat] = money.add(current, betragStr);
         } else {
           // ponytail: non-F (e.g. B6_5) not in Section F — handled via b6_*.
           debugPrint('EKS skip non-F eks_kategorie: $eksKat');
@@ -160,9 +161,9 @@ class EksService {
       if (kmRaw != null && kmRaw.trim().isNotEmpty) {
         // Keep B6_5 comma handling: "1,5" -> "1.5"
         final String kmTrim = kmRaw.trim().replaceAll(',', '.');
-        final String kmFormatted = _formatBetrag(kmTrim);
+        final String kmFormatted = money.formatBetrag(kmTrim);
         // km can be integer without decimals: format adds .00, ok
-        final int kmCents = _toCents(kmFormatted);
+        final int kmCents = money.toCents(kmFormatted);
         // travel cents = kmCents /10 with rounding (km*0.10)
         final int travel = (kmCents + 5) ~/ 10;
         b65Cents += travel;
@@ -193,13 +194,13 @@ class EksService {
           }
         }
         final String kostenRaw = r['anschaffungskosten']?.toString() ?? '0.00';
-        final int kostenCents = _toCents(_formatBetrag(kostenRaw));
+        final int kostenCents = money.toCents(money.formatBetrag(kostenRaw));
         if (kostenCents == 0) {
           continue;
         }
         final String privatRaw = r['privatanteil']?.toString() ?? r['privat_anteil_prozent']?.toString() ?? '0';
-        final String privatFormatted = _formatBetrag(privatRaw);
-        final int privatCents = _toCents(privatFormatted); // percent*100
+        final String privatFormatted = money.formatBetrag(privatRaw);
+        final int privatCents = money.toCents(privatFormatted); // percent*100
         if (privatCents <= 0) {
           continue;
         }
@@ -239,8 +240,8 @@ class EksService {
     // Ensure sectionF strings are formatted and includes at least tested keys? keep as is; empty map handled
     // For empty period, keep sectionF empty (test allows empty or all 0)
     // B strings
-    final String b65Str = _fromCents(b65Cents);
-    final String b64Str = _fromCents(b64PrivCents);
+    final String b65Str = money.fromCents(b65Cents);
+    final String b64Str = money.fromCents(b64PrivCents);
 
     final EksSectionD sectionD = EksSectionD(
       berufsbezeichnung: berufsbezeichnung,
@@ -251,9 +252,9 @@ class EksService {
     );
 
     final EksPage9 page9 = EksPage9(
-      totalIncome: _fromCents(totalIncomeCents),
-      totalCosts: _fromCents(totalCostsCents),
-      netResult: _fromCents(netCents),
+      totalIncome: money.fromCents(totalIncomeCents),
+      totalCosts: money.fromCents(totalCostsCents),
+      netResult: money.fromCents(netCents),
     );
 
     return EksResult(
@@ -367,47 +368,4 @@ String? _stringOrNull(Map<String, Object?> row, String key) {
     return null;
   }
   return s;
-}
-
-int _toCents(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return 0;
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPartRaw = parts[0].isEmpty ? '0' : parts[0];
-  final String intNoLead = intPartRaw.replaceFirst(RegExp('^0+'), '');
-  final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  final int cents = int.parse(effInt) * 100 + int.parse(dec);
-  return isNeg ? -cents : cents;
-}
-
-String _fromCents(int cents) {
-  final bool isNeg = cents < 0;
-  final int abs = cents.abs();
-  final String intPart = (abs ~/ 100).toString();
-  final String dec = (abs % 100).toString().padLeft(2, '0');
-  return '${isNeg ? '-' : ''}$intPart.$dec';
-}
-
-String _add(String a, String b) {
-  return _fromCents(_toCents(a) + _toCents(b));
-}
-
-String _formatBetrag(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) {
-    return '0.00';
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPart = parts[0].isEmpty ? '0' : parts[0];
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  return '${isNeg ? '-' : ''}$intPart.$dec';
 }

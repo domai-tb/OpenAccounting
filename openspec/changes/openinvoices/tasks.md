@@ -113,7 +113,7 @@
 - [x] 11.8 Implement: Anlage EKS for Jobcenter Transferleistungen
 - [x] 11.9 Write failing test: `test/features/accounting/datev_test.dart` — DATEV EXTF export valid
 - [x] 11.10 Implement: DATEV EXTF Buchungsstapel export
-- [ ] 11.11 Refactor; full suite stays green
+- [x] 11.11 Refactor; full suite stays green
 
 ## 12. Bank Import
 
