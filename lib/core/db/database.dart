@@ -13,6 +13,7 @@ import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/core/db/seed.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
+import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 
 /// Drift-backed app database with 38 tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
@@ -32,6 +33,7 @@ class AppDatabase {
   final bool _ownsExecutor;
   bool _opened = false;
   late final KundenRepository _kundenRepository = KundenRepository(_executor);
+  late final LieferantenRepository _lieferantenRepository = LieferantenRepository(_executor);
 
   static const int currentVersion = MigrationRunner.currentVersion;
 
@@ -85,6 +87,13 @@ class AppDatabase {
     return _kundenRepository;
   }
 
+  LieferantenRepository get lieferantenRepository {
+    if (!_opened) {
+      throw StateError('AppDatabase.ensureOpen() muss vor lieferantenRepository aufgerufen werden');
+    }
+    return _lieferantenRepository;
+  }
+
   bool get isOpen => _opened;
 
   Future<void> ensureOpen() async {
@@ -102,6 +111,7 @@ class AppDatabase {
     await GobdTriggers.install(_executor);
     await SeedData.run(_executor);
     await _kundenRepository.ensureSchema();
+    await _lieferantenRepository.ensureSchema();
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -281,15 +291,23 @@ CREATE TABLE IF NOT EXISTS kunden (
 CREATE TABLE IF NOT EXISTS lieferanten (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   lieferantennummer TEXT,
+  anrede TEXT NOT NULL DEFAULT 'Herr',
   name TEXT NOT NULL,
+  firma TEXT,
   strasse TEXT,
+  hausnummer TEXT,
   plz TEXT,
   ort TEXT,
   land TEXT DEFAULT 'DE',
   email TEXT,
   telefon TEXT,
   ust_idnr TEXT,
-  iban TEXT
+  steuernummer_ausland VARCHAR(50),
+  iban TEXT,
+  zahlungsziel INTEGER DEFAULT 14,
+  skonto_prozent NUMERIC(12,2) DEFAULT 0,
+  skonto_tage INTEGER NOT NULL DEFAULT 0,
+  note TEXT
 )''',
   // 10 artikel
   '''
