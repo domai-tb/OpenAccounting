@@ -105,8 +105,8 @@
 
 - [x] 11.1 Write failing test: `test/features/accounting/journal_test.dart` — booking creates immutable entry
 - [x] 11.2 Implement: Journal with GoBD trigger protection
-- [ ] 11.3 Write failing test: `test/features/accounting/euer_test.dart` — EÜR output matches line items
-- [ ] 11.4 Implement: EÜR Anlage 2025 with 60+ line items
+- [x] 11.3 Write failing test: `test/features/accounting/euer_test.dart` — EÜR output matches line items
+- [x] 11.4 Implement: EÜR Anlage 2025 with 60+ line items
 - [ ] 11.5 Write failing test: `test/features/accounting/ustva_test.dart` — UStVA KZ calculation correct
 - [ ] 11.6 Implement: UStVA KZ 1-22, monthly/quarterly
 - [ ] 11.7 Write failing test: `test/features/accounting/eks_test.dart` — EKS produces 9-page form
