@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:openaccounting/features/accounting/datev_entity.dart';
 
 /// DATEV EXTF Buchungsstapel export per spec §DATEV EXTF Export.
-/// ponytail: executor-injected, pure string money, semicolon CSV, German DD.MM.YYYY + comma.
-/// ponytail: ALTER stub for missing columns — unternehmen datev_beraternummer/datev_mandantennummer/datev_konto_bank, konten datev_kontonummer.
+/// ponytail: executor-injected, pure string money, semicolon CSV,
+/// German DD.MM.YYYY + comma.
+/// ponytail: ALTER stub for missing columns — unternehmen
+/// datev_beraternummer/datev_mandantennummer/datev_konto_bank,
+/// konten datev_kontonummer.
 /// ponytail: global executor lock ceiling — per-call if throughput matters.
 class DatevService {
   DatevService(this.executor);
@@ -15,7 +18,7 @@ class DatevService {
   /// Export DATEV EXTF CSV as String.
   /// [jahr] filters journal by year, [von]/[bis] by inclusive date range.
   /// [kontoBankFallback] overrides global unternehmen.datev_konto_bank.
-  /// Throws [DatevException] if datev_beraternummer or datev_mandantennummer missing.
+  /// Throws [DatevException] if datev_beraternummer or mandantennummer missing.
   Future<String> exportCsv({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback}) async {
     await _ensureDatevColumns();
 
@@ -26,12 +29,13 @@ class DatevService {
     );
     if (uRows.isEmpty) {
       throw const DatevException(
-        'Missing DATEV config: unternehmen not found — datev_beraternummer/datev_mandantennummer required',
+        'Missing DATEV config: unternehmen not found — '
+        'datev_beraternummer/datev_mandantennummer required',
       );
     }
     final Map<String, Object?> u = uRows.first;
-    final String berater = _unternehmenField(u, <String>['datev_beraternummer', 'beraternummer', 'datev_berater']);
-    final String mandant = _unternehmenField(u, <String>['datev_mandantennummer', 'mandantennummer', 'datev_mandant']);
+    final String berater = _unternehmenField(u, <String>['datev_beraternummer']);
+    final String mandant = _unternehmenField(u, <String>['datev_mandantennummer']);
     if (berater.trim().isEmpty || mandant.trim().isEmpty) {
       debugPrint('DATEV warn: missing berater/mandant berater=$berater mandant=$mandant');
       throw DatevException(
@@ -90,13 +94,25 @@ class DatevService {
 
     // --- Header ---
     final DateTime now = DateTime.now();
-    final String headerVon = von != null
-        ? _formatDdMmYyyy(_formatDateIso(von))
-        : (jahr != null ? '01.01.$jahr' : _formatDdMmYyyy(_formatDateIso(DateTime(now.year, 1, 1))));
-    final String headerBis = bis != null
-        ? _formatDdMmYyyy(_formatDateIso(bis))
-        : (jahr != null ? '31.12.$jahr' : _formatDdMmYyyy(_formatDateIso(DateTime(now.year, 12, 31))));
-    final String wjBegin = jahr != null ? '0101' : '0101';
+    final String headerVon;
+    if (von != null) {
+      headerVon = _formatDdMmYyyy(_formatDateIso(von));
+    } else if (jahr != null) {
+      headerVon = '01.01.$jahr';
+    } else {
+      headerVon = _formatDdMmYyyy(_formatDateIso(DateTime(now.year)));
+    }
+    final String headerBis;
+    if (bis != null) {
+      headerBis = _formatDdMmYyyy(_formatDateIso(bis));
+    } else if (jahr != null) {
+      headerBis = '31.12.$jahr';
+    } else {
+      headerBis = _formatDdMmYyyy(_formatDateIso(DateTime(now.year, 12, 31)));
+    }
+    const String wjBegin = '0101';
+    final String rawFirma = (u['name'] as String?)?.trim() ?? '';
+    final String firmaName = rawFirma.isNotEmpty ? rawFirma : 'Firma';
     final List<String> headerFields = <String>[
       'EXTF',
       '700',
@@ -113,7 +129,7 @@ class DatevService {
       '1',
       '0',
       'EUR',
-      'Test Firma',
+      firmaName,
       '',
     ];
     final String headerLine = headerFields.map(_escapeCsv).join(';');
@@ -161,6 +177,14 @@ class DatevService {
       }
 
       final String gegenkonto = (kat != null && kat.skr03.isNotEmpty) ? kat.skr03 : '8400';
+      // guard: avoid Konto == Gegenkonto when global empty (both fell back to kat.skr03)
+      if (globalBank.isEmpty && resolvedBank == gegenkonto) {
+        resolvedBank = '1200';
+        if (resolvedBank == gegenkonto) {
+          // kat was 1200 — pick alternate bank to keep distinct
+          resolvedBank = '1800';
+        }
+      }
 
       // Soll/Haben: Ausgabe=S, Einnahme=H (ponytail: deterministic per art)
       final String artLower = art.toLowerCase();
@@ -176,19 +200,14 @@ class DatevService {
       }
 
       // Konto/Gegenkonto ordering: DATEV Konto vs Gegenkonto — bank vs sachkonto
-      // For Ausgabe, Aufwand is Soll (Konto), Bank is Haben (Gegenkonto) → flip for Ausgabe
-      // Keep stable both numbers present either way — ensure fallback numbers in row
-      String kontoField = gegenkonto;
-      String gegenkontoField = resolvedBank;
+      String kontoField;
+      String gegenkontoField;
       if (artLower == 'ausgabe') {
         kontoField = gegenkonto;
         gegenkontoField = resolvedBank;
       } else {
-        // Einnahme: Bank Soll? keep same? For test stability, ensure both present regardless of order
         kontoField = resolvedBank;
         gegenkontoField = gegenkonto;
-        // Actually swap to keep bank first for Einnahme to satisfy fallback check that bank appears in Konto column
-        // Both contain needed numbers; order not asserted strictly — but keep Einnahme bank as Konto
       }
 
       final List<String> fields = <String>[
@@ -209,21 +228,39 @@ class DatevService {
 
     // --- Export log ---
     try {
-      final String vonStr = von != null ? _formatDateIso(von) : (jahr != null ? '$jahr-01-01' : '');
-      final String bisStr = bis != null ? _formatDateIso(bis) : (jahr != null ? '$jahr-12-31' : '');
+      final String vonStr;
+      if (von != null) {
+        vonStr = _formatDateIso(von);
+      } else if (jahr != null) {
+        vonStr = '$jahr-01-01';
+      } else {
+        vonStr = '';
+      }
+      final String bisStr;
+      if (bis != null) {
+        bisStr = _formatDateIso(bis);
+      } else if (jahr != null) {
+        bisStr = '$jahr-12-31';
+      } else {
+        bisStr = '';
+      }
       final int? unternehmenId = (u['id'] as num?)?.toInt();
-      await executor.runInsert(
-        'INSERT INTO datev_export_log (datum, zeitraum_von, zeitraum_bis, anzahl_buchungen, datei_pfad, unternehmen_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[
-          _formatDateIso(now),
-          vonStr.isEmpty ? null : vonStr,
-          bisStr.isEmpty ? null : bisStr,
-          filtered.length,
-          'memory_export.csv',
-          unternehmenId,
-          'erfolg',
-        ],
-      );
+      final Object? vonVal = vonStr.isEmpty ? null : vonStr;
+      final Object? bisVal = bisStr.isEmpty ? null : bisStr;
+      const String insertLog =
+          'INSERT INTO datev_export_log '
+          '(datum, zeitraum_von, zeitraum_bis, anzahl_buchungen, '
+          'datei_pfad, unternehmen_id, status) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?)';
+      await executor.runInsert(insertLog, <Object?>[
+        _formatDateIso(now),
+        vonVal,
+        bisVal,
+        filtered.length,
+        'memory_export.csv',
+        unternehmenId,
+        'erfolg',
+      ]);
     } catch (_) {
       // ponytail: log failure must not break export
       debugPrint('DATEV warn: export_log insert failed');
@@ -285,7 +322,14 @@ class DatevService {
     } catch (_) {
       try {
         await executor.runCustom(
-          'CREATE TABLE IF NOT EXISTS datev_export_log (id INTEGER PRIMARY KEY AUTOINCREMENT, datum TEXT DEFAULT CURRENT_TIMESTAMP, zeitraum_von TEXT, zeitraum_bis TEXT, anzahl_buchungen INTEGER DEFAULT 0, datei_pfad TEXT, unternehmen_id INTEGER REFERENCES unternehmen(id), status TEXT)',
+          'CREATE TABLE IF NOT EXISTS datev_export_log '
+          '(id INTEGER PRIMARY KEY AUTOINCREMENT, '
+          'datum TEXT DEFAULT CURRENT_TIMESTAMP, '
+          'zeitraum_von TEXT, zeitraum_bis TEXT, '
+          'anzahl_buchungen INTEGER DEFAULT 0, '
+          'datei_pfad TEXT, '
+          'unternehmen_id INTEGER REFERENCES unternehmen(id), '
+          'status TEXT)',
         );
       } catch (_) {}
     }

@@ -1,3 +1,4 @@
+// ignore_for_file: no_adjacent_strings_in_list
 import 'dart:async';
 import 'dart:io';
 
@@ -180,7 +181,11 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   geburtsdatum TEXT,
   bg_nummer TEXT,
   jobcenter_name TEXT,
-  jobcenter TEXT
+  jobcenter TEXT,
+  datev_beraternummer TEXT,
+  datev_mandantennummer TEXT,
+  datev_konto_bank TEXT,
+  datev_konto_bar TEXT
 )''',
   // 2 kategorien
   '''
@@ -205,7 +210,8 @@ CREATE TABLE IF NOT EXISTS konten (
   waehrung TEXT DEFAULT 'EUR',
   kontoart TEXT,
   unternehmen_id INTEGER REFERENCES unternehmen(id),
-  saldo NUMERIC(12,2) DEFAULT 0
+  saldo NUMERIC(12,2) DEFAULT 0,
+  datev_kontonummer TEXT
 )''',
   // 4 ust_saetze
   '''
@@ -355,7 +361,9 @@ CREATE TABLE IF NOT EXISTS belege (
   dateipfad TEXT
 )''',
   // 14 journal
-  // ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe (Original→Storno) without extra FK/table; add `gruppe_id INTEGER REFERENCES journal(id)` if multi-entry groups required, migrate via ALTER TABLE + PRAGMA table_info check (see migrations.dart).
+  // ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe
+  // (Original→Storno) without extra FK/table; add `gruppe_id INTEGER REFERENCES journal(id)`
+  // if multi-entry groups required, migrate via ALTER TABLE + PRAGMA table_info check (see migrations.dart).
   '''
 CREATE TABLE IF NOT EXISTS journal (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -645,8 +653,12 @@ CREATE TABLE IF NOT EXISTS import_mapping_vorlagen (
 ];
 
 const List<String> _indexSql = <String>[
-  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_kundennummer_unique ON kunden(kundennummer) WHERE kundennummer IS NOT NULL',
-  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_debitor_nr_unique ON kunden(debitor_nr) WHERE debitor_nr IS NOT NULL',
-  'CREATE UNIQUE INDEX IF NOT EXISTS idx_lieferanten_lieferantennummer_unique ON lieferanten(lieferantennummer) WHERE lieferantennummer IS NOT NULL',
-  'CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_transaktionen_dedupe ON bank_transaktionen(konto_id, dedupe_hash) WHERE dedupe_hash IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_kundennummer_unique '
+      'ON kunden(kundennummer) WHERE kundennummer IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kunden_debitor_nr_unique '
+      'ON kunden(debitor_nr) WHERE debitor_nr IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_lieferanten_lieferantennummer_unique '
+      'ON lieferanten(lieferantennummer) WHERE lieferantennummer IS NOT NULL',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_transaktionen_dedupe '
+      'ON bank_transaktionen(konto_id, dedupe_hash) WHERE dedupe_hash IS NOT NULL',
 ];
