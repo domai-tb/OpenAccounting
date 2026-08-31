@@ -53,7 +53,7 @@ class EuerService {
         final String? statusRaw = r['status'] as String?;
         final String status = (statusRaw ?? 'aktiv').toLowerCase();
         // ponytail: only 'aktiv' counts — 'inaktiv'/'verkauft' skipped, null treated as aktiv.
-        if (status == 'inaktiv' || status == 'verkauft' || status == 'in_active') {
+        if (status == 'inaktiv' || status == 'verkauft') {
           continue;
         }
         // Optional date filter: skip assets acquired after jahr.
@@ -73,8 +73,9 @@ class EuerService {
         // Linear AfA: kosten / nutzungsdauer, trunc.
         final int baseCents = kostenCents ~/ nutzungsdauer;
         final String privatRaw = r['privatanteil']?.toString() ?? '0';
+        // privatanteil: private-use share 0–100% as decimal string; e.g. '30.00' → 3000.
         final int privatCents = _toCents(_formatBetrag(privatRaw));
-        // privatCents is percent*100 (30.00 -> 3000). Factor (10000 - privat)/10000.
+        // factor scales AfA by business share: (10000 - privatCents) / 10000.
         final int factor = 10000 - privatCents;
         final int clampedFactor = factor < 0 ? 0 : (factor > 10000 ? 10000 : factor);
         final int reduced = (baseCents * clampedFactor) ~/ 10000;
@@ -104,7 +105,8 @@ class EuerService {
           final String raw = r['betrag']?.toString() ?? '0.00';
           sum += _toCents(_formatBetrag(raw));
         }
-        // Fallback: if faelligkeit filter yielded 0 but table has rows without date (edge), sum all where substr matches.
+        // Fallback: if faelligkeit filter yielded 0 but table has rows
+        // without date (edge), sum all where substr matches.
         if (sum == 0 && vRows.isEmpty) {
           final List<Map<String, Object?>> allRows = await executor.runSelect(
             'SELECT betrag, faelligkeit FROM vorsteuer_ansprueche',
@@ -134,7 +136,8 @@ class EuerService {
         final bool hasVorsteuer = cols.any((Map<String, Object?> c) => c['name'] == 'vorsteuer_betrag');
         if (hasVorsteuer) {
           final List<Map<String, Object?>> vRows = await executor.runSelect(
-            "SELECT vorsteuer_betrag as b FROM journal WHERE vorsteuer_betrag IS NOT NULL AND strftime('%Y', datum) = ?",
+            'SELECT vorsteuer_betrag as b FROM journal '
+            "WHERE vorsteuer_betrag IS NOT NULL AND strftime('%Y', datum) = ?",
             <Object?>[jahrStr],
           );
           int sum = 0;
@@ -175,7 +178,7 @@ class EuerService {
 
 bool _useSoll(int jahr, DateTime? cutoverDatum) {
   if (cutoverDatum == null) {
-    return true;
+    return false;
   }
   final DateTime periodStart = DateTime(jahr);
   final DateTime cut = DateTime(cutoverDatum.year, cutoverDatum.month, cutoverDatum.day);
