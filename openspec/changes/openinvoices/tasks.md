@@ -77,7 +77,7 @@
 
 - [x] 9.1 Write failing test: `test/features/rechnungen/erstellung_test.dart` — create draft invoice
 - [x] 9.2 Implement: Rechnung creation with positions, Entwurf mode
-- [ ] 9.3 Write failing test: `test/features/rechnungen/finalisierung_test.dart` — finalization locks document, assigns nummer
+- [x] 9.3 Write failing test: `test/features/rechnungen/finalisierung_test.dart` — finalization locks document, assigns nummer
 - [ ] 9.4 Implement: Finalization flow (lock, PDF generate, nummernkreis)
 - [ ] 9.5 Write failing test: `test/features/rechnungen/storno_test.dart` — Storno creates negative amounts
 - [ ] 9.6 Implement: Storno with Stornogrund, Stornodatum, own nummernkreis
