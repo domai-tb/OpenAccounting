@@ -348,6 +348,7 @@ CREATE TABLE IF NOT EXISTS belege (
   dateipfad TEXT
 )''',
   // 14 journal
+  // ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe (Original→Storno) without extra FK/table; add `gruppe_id INTEGER REFERENCES journal(id)` if multi-entry groups required, migrate via ALTER TABLE + PRAGMA table_info check (see migrations.dart).
   '''
 CREATE TABLE IF NOT EXISTS journal (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -4,6 +4,7 @@ import 'package:openaccounting/features/accounting/journal_entity.dart';
 
 /// Journal repository — raw SQL via drift executor, GoBD via DB triggers.
 /// ponytail: global executor lock ceiling — per-journal if throughput matters.
+/// ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe without extra table/FK; add column + FK if multi-entry groups required.
 class JournalRepository {
   JournalRepository(this.executor);
 
@@ -11,7 +12,7 @@ class JournalRepository {
 
   static const Set<String> _allowedArt = <String>{'Einnahme', 'Ausgabe'};
 
-  static final RegExp _betragRegex = RegExp(r'^-?\d+(\.\d{1,2})?$');
+  static final RegExp _betragRegex = RegExp(r'^\d+(\.\d{1,2})?$');
 
   Future<JournalEntry> create({
     required DateTime datum,
@@ -37,12 +38,21 @@ class JournalRepository {
     if (cleanBetrag.isEmpty) {
       throw const JournalException('Betrag ist Pflicht');
     }
+    if (cleanBetrag.startsWith('-')) {
+      throw const JournalException('Betrag darf nicht negativ sein');
+    }
     if (!_betragRegex.hasMatch(cleanBetrag)) {
       throw const JournalException('Betrag ungültig: max 2 Dezimalstellen');
     }
-    // ponytail: O(1) numeric range — 12,2 means |betrag| < 10^10
-    final parsed = double.tryParse(cleanBetrag);
-    if (parsed == null || parsed.abs() >= 10000000000) {
+    // ponytail: string range check — 12,2 means |betrag| < 10^10, no double parse to keep precision
+    final parts = cleanBetrag.split('.');
+    final rawInt = parts[0];
+    final intPart = rawInt.replaceFirst(RegExp('^0+'), '');
+    final effectiveInt = intPart.isEmpty ? '0' : intPart;
+    if (effectiveInt.length > 10) {
+      throw const JournalException('Betrag außerhalb NUMERIC(12,2)');
+    }
+    if (effectiveInt.length == 10 && effectiveInt.compareTo('9999999999') > 0) {
       throw const JournalException('Betrag außerhalb NUMERIC(12,2)');
     }
     if (!_allowedArt.contains(art)) {
@@ -147,8 +157,9 @@ class JournalRepository {
     final datum = DateTime.tryParse(datumRaw) ?? DateTime(1970, 1, 1);
     final beschreibung = row['beschreibung'] as String? ?? '';
     final kategorieId = (row['kategorie_id'] as num?)?.toInt() ?? 0;
-    final betragNum = row['betrag'] as num? ?? 0;
-    final betrag = betragNum.toStringAsFixed(2);
+    // ponytail: keep string directly — no num→toStringAsFixed, preserves NUMERIC(12,2) precision
+    final betragRaw = row['betrag']?.toString() ?? '0.00';
+    final betrag = _formatBetrag(betragRaw);
     final art = row['beleg_typ'] as String? ?? 'Einnahme';
     final immutable = (row['immutable'] as num? ?? 0).toInt() == 1;
     final kontoSkr03 = row['konto_skr03_snapshot'] as String?;
@@ -157,6 +168,8 @@ class JournalRepository {
     final belegNr = row['beleg_nr'] as String?;
     final stornoVon = (row['storno_von'] as num?)?.toInt();
     final kontoId = (row['konto_id'] as num?)?.toInt();
+    // ponytail: gruppe_id ceiling — column deferred, storno_von chain covers group; read if column exists
+    final gruppeId = row.containsKey('gruppe_id') ? (row['gruppe_id'] as num?)?.toInt() : null;
     return JournalEntry(
       id: id,
       datum: datum,
@@ -171,7 +184,7 @@ class JournalRepository {
       belegNr: belegNr,
       stornoVon: stornoVon,
       kontoId: kontoId,
-      beschreibung: beschreibung,
+      gruppeId: gruppeId ?? stornoVon,
     );
   }
 
@@ -182,9 +195,22 @@ class JournalRepository {
     return '$y-$m-$day';
   }
 
+  String _formatBetrag(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return '0.00';
+    final isNeg = t.startsWith('-');
+    final unsigned = isNeg ? t.substring(1) : t;
+    final parts = unsigned.split('.');
+    final intPart = parts[0].isEmpty ? '0' : parts[0];
+    final decRaw = parts.length > 1 ? parts[1] : '';
+    final dec = (decRaw + '00').substring(0, 2);
+    return '${isNeg ? '-' : ''}$intPart.$dec';
+  }
+
   String _negateBetrag(String betrag) {
-    final v = double.parse(betrag);
-    final neg = -v;
-    return neg.toStringAsFixed(2);
+    final t = betrag.trim();
+    // ponytail: string negation preserves precision, no double parse
+    final neg = t.startsWith('-') ? t.substring(1) : '-$t';
+    return _formatBetrag(neg);
   }
 }

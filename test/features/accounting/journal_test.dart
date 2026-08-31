@@ -73,10 +73,13 @@ void main() {
         betrag: '100.00',
         art: 'Ausgabe',
       );
-      await db.executor.runCustom("UPDATE journal SET beschreibung = 'Geändert' WHERE id = ${mutable.id}");
+      await db.executor.runCustom('UPDATE journal SET beschreibung = ? WHERE id = ?', <Object?>[
+        'Geändert',
+        mutable.id,
+      ]);
       final changed = await repo.findById(mutable.id);
       expect(changed!.bezeichnung, 'Geändert');
-      await db.executor.runCustom('DELETE FROM journal WHERE id = ${mutable.id}');
+      await db.executor.runCustom('DELETE FROM journal WHERE id = ?', <Object?>[mutable.id]);
       expect(await repo.findById(mutable.id), isNull);
 
       // Immutable entry — set immutable=1 then attempt mutation.
@@ -87,15 +90,15 @@ void main() {
         betrag: '200.00',
         art: 'Einnahme',
       );
-      await db.executor.runCustom('UPDATE journal SET immutable = 1 WHERE id = ${fixed.id}');
+      await db.executor.runCustom('UPDATE journal SET immutable = 1 WHERE id = ?', <Object?>[fixed.id]);
 
       const msg = 'GoBD: Dieser Journaleintrag ist unveränderlich';
       await expectLater(
-        db.executor.runCustom("UPDATE journal SET beschreibung = 'Hack' WHERE id = ${fixed.id}"),
+        db.executor.runCustom('UPDATE journal SET beschreibung = ? WHERE id = ?', <Object?>['Hack', fixed.id]),
         throwsA(predicate<Object>((e) => e.toString().contains(msg))),
       );
       await expectLater(
-        db.executor.runCustom('DELETE FROM journal WHERE id = ${fixed.id}'),
+        db.executor.runCustom('DELETE FROM journal WHERE id = ?', <Object?>[fixed.id]),
         throwsA(predicate<Object>((e) => e.toString().contains(msg))),
       );
 
@@ -161,7 +164,7 @@ void main() {
         betrag: '500.00',
         art: 'Einnahme',
       );
-      await db.executor.runCustom('UPDATE journal SET immutable = 1 WHERE id = ${original.id}');
+      await db.executor.runCustom('UPDATE journal SET immutable = 1 WHERE id = ?', <Object?>[original.id]);
 
       final storno = await repo.storno(originalId: original.id);
 

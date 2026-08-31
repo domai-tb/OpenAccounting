@@ -1,5 +1,6 @@
 /// Immutable journal entry per spec §Journal Entries.
 /// ponytail: minimal fields, String betrag keeps NUMERIC(12,2) precision.
+/// ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe (Original→Storno) without extra table/FK; add `gruppe_id INTEGER REFERENCES journal(id)` + population if multi-entry groups required.
 class JournalEntry {
   const JournalEntry({
     required this.id,
@@ -15,7 +16,7 @@ class JournalEntry {
     this.belegNr,
     this.stornoVon,
     this.kontoId,
-    this.beschreibung,
+    this.gruppeId,
   });
 
   final int id;
@@ -31,10 +32,10 @@ class JournalEntry {
   final String? belegNr;
   final int? stornoVon;
   final int? kontoId;
-  final String? beschreibung;
+  final int? gruppeId;
 
-  /// Alias for spec compatibility.
-  String get bezeichnungAlias => bezeichnung;
+  /// DB column is `beschreibung` — alias for `bezeichnung` for spec/DB compatibility.
+  String get beschreibung => bezeichnung;
 }
 
 class JournalException implements Exception {
