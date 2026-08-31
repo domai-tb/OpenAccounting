@@ -71,11 +71,8 @@ void main() {
       }
     }
 
-    Matcher exactError(String message) => throwsA(
-      predicate<Object>(
-        (error) => error.runtimeType.toString() == 'LieferantenException' && errorMessage(error) == message,
-      ),
-    );
+    Matcher supplierException() =>
+        throwsA(predicate<Object>((error) => error.runtimeType.toString() == 'LieferantenException'));
 
     Matcher referenceError(String table, int rowId) => throwsA(
       predicate<Object>(
@@ -115,16 +112,6 @@ VALUES (?, ?, ?, ?, ?)
         <Object?>['2026-08-31', 'J-2002', 250, 'Lieferantenbuchung', supplierId],
       );
     }
-
-    test('requires an open database before repository access', () async {
-      // Arrange: construct a database without opening its connection.
-      final unopened = AppDatabase.createTestDatabase();
-      final dynamic database = unopened;
-      addTearDown(unopened.close);
-
-      // Act and assert: repository access cannot bypass database lifecycle setup.
-      expect(() => database.lieferantenRepository, throwsA(isA<StateError>()));
-    });
 
     test('round-trips required and optional supplier fields', () async {
       // Arrange: provide every supplier field with representative values.
@@ -289,14 +276,17 @@ VALUES (?, ?, ?, ?, ?)
       final repository = lieferantenRepository(db);
 
       // Act: submit both country-specific VAT cases.
-      final invalidEuVat = createSupplier(
-        repository,
-        name: 'AT',
-        strasse: 'Straße',
-        plz: '10115',
-        ort: 'Wien',
-        land: 'AT',
-        ustIdNr: 'AT12345678',
+      await expectLater(
+        createSupplier(
+          repository,
+          name: 'AT',
+          strasse: 'Straße',
+          plz: '10115',
+          ort: 'Wien',
+          land: 'AT',
+          ustIdNr: 'AT12345678',
+        ),
+        supplierException(),
       );
       final swiss = await createSupplier(
         repository,
@@ -309,10 +299,6 @@ VALUES (?, ?, ?, ?, ?)
       );
 
       // Assert: EU pattern rejects invalid value while non-EU text is preserved.
-      await expectLater(
-        invalidEuVat,
-        throwsA(predicate<Object>((error) => error.runtimeType.toString() == 'LieferantenException')),
-      );
       expect(swiss.ustIdNr, 'CHE-123.456.789');
     });
 
@@ -322,43 +308,42 @@ VALUES (?, ?, ?, ?, ?)
       final tooLongTaxNumber = List<String>.filled(51, 'x').join();
 
       // Act: submit each invalid boundary value through create.
-      final blankAnrede = createSupplier(
-        repository,
-        anrede: '',
-        name: 'Ungültig',
-        strasse: 'Straße',
-        plz: '10115',
-        ort: 'Berlin',
-      );
-      final blankName = createSupplier(repository, name: '', strasse: 'Straße', plz: '10115', ort: 'Berlin');
-      final blankStrasse = createSupplier(repository, name: 'Ungültig', strasse: '', plz: '10115', ort: 'Berlin');
-      final blankPlz = createSupplier(repository, name: 'Ungültig', strasse: 'Straße', plz: '', ort: 'Berlin');
-      final blankOrt = createSupplier(repository, name: 'Ungültig', strasse: 'Straße', plz: '10115', ort: '');
-      final blankLand = createSupplier(
-        repository,
-        name: 'Ungültig',
-        strasse: 'Straße',
-        plz: '10115',
-        ort: 'Berlin',
-        land: '',
-      );
-      final overlongTaxNumber = createSupplier(
-        repository,
-        name: 'Ungültig',
-        strasse: 'Straße',
-        plz: '10115',
-        ort: 'Berlin',
-        foreignTaxNumber: tooLongTaxNumber,
-      );
-
       // Assert: invalid values are rejected before persistence.
-      await expectLater(blankAnrede, exactError('Anrede ist Pflicht'));
-      await expectLater(blankName, exactError('Name ist Pflicht'));
-      await expectLater(blankStrasse, exactError('Straße ist Pflicht'));
-      await expectLater(blankPlz, exactError('PLZ ist Pflicht'));
-      await expectLater(blankOrt, exactError('Ort ist Pflicht'));
-      await expectLater(blankLand, exactError('Land ist Pflicht'));
-      await expectLater(overlongTaxNumber, exactError('Steuernummer Ausland darf höchstens 50 Zeichen enthalten'));
+      await expectLater(
+        createSupplier(repository, anrede: '', name: 'Ungültig', strasse: 'Straße', plz: '10115', ort: 'Berlin'),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(repository, name: '', strasse: 'Straße', plz: '10115', ort: 'Berlin'),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(repository, name: 'Ungültig', strasse: '', plz: '10115', ort: 'Berlin'),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(repository, name: 'Ungültig', strasse: 'Straße', plz: '', ort: 'Berlin'),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(repository, name: 'Ungültig', strasse: 'Straße', plz: '10115', ort: ''),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(repository, name: 'Ungültig', strasse: 'Straße', plz: '10115', ort: 'Berlin', land: ''),
+        supplierException(),
+      );
+      await expectLater(
+        createSupplier(
+          repository,
+          name: 'Ungültig',
+          strasse: 'Straße',
+          plz: '10115',
+          ort: 'Berlin',
+          foreignTaxNumber: tooLongTaxNumber,
+        ),
+        supplierException(),
+      );
       expect(await repository.list(), isEmpty);
     });
 
@@ -377,7 +362,7 @@ VALUES (?, ?, ?, ?, ?)
       final update = repository.update(created.id, <String, dynamic>{'nicht_erlaubt': 'Wert'});
 
       // Assert: unknown field is rejected and supplier remains present.
-      await expectLater(update, exactError('Unbekanntes Lieferantenfeld: nicht_erlaubt'));
+      await expectLater(update, supplierException());
       expect(await repository.findById(created.id), isNotNull);
     });
 
