@@ -1,6 +1,6 @@
-// ignore_for_file: dangling_library_doc_comments, non_constant_identifier_names
-/// Immutable EKS result per spec §Anlage EKS 9-page.
-/// ponytail: string money keeps NUMERIC(12,2) precision, pure helpers, warns not throws.
+// ignore_for_file: non_constant_identifier_names
+// Immutable EKS result per spec §Anlage EKS 9-page.
+// ponytail: string money keeps NUMERIC(12,2) precision, pure helpers, warns not throws.
 
 class EksSectionD {
   const EksSectionD({

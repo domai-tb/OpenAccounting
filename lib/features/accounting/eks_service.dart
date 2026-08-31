@@ -1,4 +1,3 @@
-// ignore_for_file: noop_primitive_operations
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
@@ -103,47 +102,44 @@ class EksService {
 
     for (final Map<String, Object?> row in journalRows) {
       final String? datumRaw = row['datum'] as String?;
-      if (datumRaw == null || datumRaw.length < 4 || !datumRaw.startsWith(jahrStr)) {
-        // strict year prefix check: '2025-...'
-        if (datumRaw == null || datumRaw.length < 10) {
-          continue;
-        }
-        if (!datumRaw.startsWith(jahrStr)) {
-          continue;
-        }
+      if (datumRaw == null || datumRaw.length < 4) {
+        continue;
+      }
+      if (!datumRaw.startsWith(jahrStr)) {
+        continue;
       }
       final int? kId = (row['kategorie_id'] as num?)?.toInt();
       final String? eksKat = kId != null ? katMap[kId] : null;
       final String betragRaw = row['betrag']?.toString() ?? '0.00';
       final String betragStr = _formatBetrag(betragRaw);
       final int betragCents = _toCents(betragStr);
-      final String art = (row['beleg_typ'] as String? ?? row['art'] as String? ?? '').toString();
+      final String art = row['beleg_typ'] as String? ?? row['art'] as String? ?? '';
 
-      // Section F Zeilen 23-41 — aggregate any eks_kategorie that maps to F-lines or generic
-      // ponytail: spec Zeilen 23-41, we keep all eks_kategorie but highlight F-lines; test checks F23 etc
+      // Section F Zeilen 23-41 — only F23-41 per Anlage EKS.
       if (eksKat != null && eksKat.isNotEmpty) {
-        // include all, but keep filter to 23-41 if we want? Keep all for completeness, test expects F23
-        final bool isFLine = _isFLine(eksKat);
-        final String key = eksKat;
-        // Only count 23-41 or B lines into sectionF? keep generic
-        if (isFLine || key.startsWith('F') || key.startsWith('B') || _isNumericEks(key)) {
-          final String current = sectionF[key] ?? '0.00';
-          sectionF[key] = _add(current, betragStr);
+        if (_isFLine(eksKat)) {
+          final String current = sectionF[eksKat] ?? '0.00';
+          sectionF[eksKat] = _add(current, betragStr);
         } else {
-          // generic fallback
-          final String current = sectionF[key] ?? '0.00';
-          sectionF[key] = _add(current, betragStr);
+          // ponytail: non-F (e.g. B6_5) not in Section F — handled via b6_*.
+          debugPrint('EKS skip non-F eks_kategorie: $eksKat');
         }
       }
 
       // Income / costs via art
       final bool isEinnahme = art.toLowerCase() == 'einnahme';
       final bool isAusgabe = art.toLowerCase() == 'ausgabe';
-      // ponytail: if art missing, infer from betrag sign? but keep Einnahme default for test where art provided
+      // ponytail: if art missing, infer from betrag sign? but keep
+      // Einnahme default for test where art provided
       if (isEinnahme) {
-        // Only count if eks_kategorie not null (EKS-relevant) else still count? spec says via eks_kategorie, but Page9 should reflect EKS-relevant only
-        // Use eksKat not null check to avoid unrelated journals polluting summary, but if missing keep for robustness?
-        // Test inserts only eks_kategorie journals, so either works. Use counting when eksKat != null else also count? choose eksKat check to be strict
+        // Only count if eks_kategorie not null (EKS-relevant) else still
+        // count? spec says via eks_kategorie, but Page9 should reflect
+        // EKS-relevant only
+        // Use eksKat not null check to avoid unrelated journals polluting
+        // summary, but if missing keep for robustness?
+        // Test inserts only eks_kategorie journals, so either works. Use
+        // counting when eksKat != null else also count? choose eksKat
+        // check to be strict
         if (eksKat != null) {
           totalIncomeCents += betragCents;
         } else {
@@ -162,8 +158,8 @@ class EksService {
       // B6_5 km_anzahl *0.10
       final String? kmRaw = _stringOrNull(row, 'km_anzahl');
       if (kmRaw != null && kmRaw.trim().isNotEmpty) {
-        final String kmTrim = kmRaw.trim();
-        // km_anzahl may be numeric string, handle comma? assume dot
+        // Keep B6_5 comma handling: "1,5" -> "1.5"
+        final String kmTrim = kmRaw.trim().replaceAll(',', '.');
         final String kmFormatted = _formatBetrag(kmTrim);
         // km can be integer without decimals: format adds .00, ok
         final int kmCents = _toCents(kmFormatted);
@@ -177,7 +173,9 @@ class EksService {
     int b64PrivCents = 0;
     try {
       final List<Map<String, Object?>> avRows = await executor.runSelect(
-        'SELECT anschaffungskosten, nutzungsdauer, privatanteil, status, bezeichnung, anschaffungsdatum FROM anlageverzeichnis',
+        'SELECT anschaffungskosten, nutzungsdauer, privatanteil, '
+        'status, bezeichnung, anschaffungsdatum '
+        'FROM anlageverzeichnis',
         const <Object?>[],
       );
       for (final Map<String, Object?> r in avRows) {
@@ -200,13 +198,16 @@ class EksService {
           continue;
         }
         final String privatRaw = r['privatanteil']?.toString() ?? r['privat_anteil_prozent']?.toString() ?? '0';
-        final String privatFormatted = _formatBetrag(privatRaw.toString());
+        final String privatFormatted = _formatBetrag(privatRaw);
         final int privatCents = _toCents(privatFormatted); // percent*100
         if (privatCents <= 0) {
           continue;
         }
-        // Only KFZ? Heuristic: bezeichnung contains KFZ or privatanteil set — test uses Betriebs-KFZ, so count all with privat>0
-        // If bezeichnung not KFZ but privat set, still deduct? keep all privat>0 as Betriebs-KFZ per spec
+        // Only KFZ? Heuristic: bezeichnung contains KFZ or privatanteil
+        // set — test uses Betriebs-KFZ, so count all with privat>0
+        // ponytail: heuristic — any privat>0 counts as Betriebs-KFZ
+        // If bezeichnung not KFZ but privat set, still deduct? keep all
+        // privat>0 as Betriebs-KFZ per spec
         final int nutz = (r['nutzungsdauer'] as num?)?.toInt() ?? 0;
         final int baseCents;
         if (nutz > 0) {
@@ -340,11 +341,6 @@ bool _isFLine(String eks) {
     return true;
   }
   return false;
-}
-
-bool _isNumericEks(String eks) {
-  final int? n = int.tryParse(eks.trim());
-  return n != null;
 }
 
 String _stringOrEmpty(Map<String, Object?> row, String key) {
