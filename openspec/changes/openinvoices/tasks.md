@@ -109,8 +109,8 @@
 - [x] 11.4 Implement: EÜR Anlage 2025 with 60+ line items
 - [x] 11.5 Write failing test: `test/features/accounting/ustva_test.dart` — UStVA KZ calculation correct
 - [x] 11.6 Implement: UStVA KZ 1-22, monthly/quarterly
-- [ ] 11.7 Write failing test: `test/features/accounting/eks_test.dart` — EKS produces 9-page form
-- [ ] 11.8 Implement: Anlage EKS for Jobcenter Transferleistungen
+- [x] 11.7 Write failing test: `test/features/accounting/eks_test.dart` — EKS produces 9-page form
+- [x] 11.8 Implement: Anlage EKS for Jobcenter Transferleistungen
 - [ ] 11.9 Write failing test: `test/features/accounting/datev_test.dart` — DATEV EXTF export valid
 - [ ] 11.10 Implement: DATEV EXTF Buchungsstapel export
 - [ ] 11.11 Refactor; full suite stays green

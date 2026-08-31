@@ -174,7 +174,13 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   backup_extern_pfad TEXT,
   backup_extern_pfad_lokal_ok INTEGER DEFAULT 0,
   logo_pfad TEXT,
-  erstellungsdatum TEXT DEFAULT CURRENT_TIMESTAMP
+  erstellungsdatum TEXT DEFAULT CURRENT_TIMESTAMP,
+  berufsbezeichnung TEXT,
+  kammer_mitgliedschaft TEXT,
+  geburtsdatum TEXT,
+  bg_nummer TEXT,
+  jobcenter_name TEXT,
+  jobcenter TEXT
 )''',
   // 2 kategorien
   '''
@@ -186,7 +192,8 @@ CREATE TABLE IF NOT EXISTS kategorien (
   konto_skr04 TEXT,
   euer_zeile INTEGER,
   aktiv INTEGER DEFAULT 1,
-  typ TEXT
+  typ TEXT,
+  eks_kategorie TEXT
 )''',
   // 3 konten
   '''
@@ -376,7 +383,8 @@ CREATE TABLE IF NOT EXISTS journal (
   marge_25a_brutto NUMERIC(12,2),
   ust_satz_25a NUMERIC(12,2),
   ist_eu_lieferung INTEGER DEFAULT 0,
-  vorsteuer_betrag NUMERIC(12,2)
+  vorsteuer_betrag NUMERIC(12,2),
+  km_anzahl NUMERIC(12,2)
 )''',
   // 15 bank_templates
   '''
