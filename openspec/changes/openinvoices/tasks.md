@@ -103,8 +103,8 @@
 
 ## 11. Accounting (Buchhaltung)
 
-- [ ] 11.1 Write failing test: `test/features/accounting/journal_test.dart` — booking creates immutable entry
-- [ ] 11.2 Implement: Journal with GoBD trigger protection
+- [x] 11.1 Write failing test: `test/features/accounting/journal_test.dart` — booking creates immutable entry
+- [x] 11.2 Implement: Journal with GoBD trigger protection
 - [ ] 11.3 Write failing test: `test/features/accounting/euer_test.dart` — EÜR output matches line items
 - [ ] 11.4 Implement: EÜR Anlage 2025 with 60+ line items
 - [ ] 11.5 Write failing test: `test/features/accounting/ustva_test.dart` — UStVA KZ calculation correct
