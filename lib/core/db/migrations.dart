@@ -38,6 +38,7 @@ class MigrationRunner {
 
   /// Run migrations if needed. Returns true if migration executed.
   Future<bool> run({required Future<void> Function() createSchema}) async {
+    await executor.ensureOpen(_NoopMigrationUser());
     final version = await getUserVersion();
     final hasTables = await hasAnyTables();
 
@@ -50,14 +51,12 @@ class MigrationRunner {
     }
 
     if (version == 0 && !hasTables) {
-      await createSchema();
-      await setUserVersion(currentVersion);
+      await _createFreshSchema(createSchema);
       return false;
     }
 
     if (version == currentVersion && !hasTables) {
-      await createSchema();
-      await setUserVersion(currentVersion);
+      await _createFreshSchema(createSchema);
       return true;
     }
 
@@ -109,6 +108,22 @@ class MigrationRunner {
     }
 
     return false;
+  }
+
+  Future<void> _createFreshSchema(Future<void> Function() createSchema) async {
+    await executor.runCustom('BEGIN');
+    try {
+      await createSchema();
+      await setUserVersion(currentVersion);
+      await executor.runCustom('COMMIT');
+    } catch (error, stackTrace) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<void> _migrateTo(int version, Future<void> Function() createSchema) async {
@@ -199,3 +214,11 @@ CREATE TABLE rechnungen (
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
   storno_von INTEGER REFERENCES rechnungen(id)
 )''';
+
+class _NoopMigrationUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
+}

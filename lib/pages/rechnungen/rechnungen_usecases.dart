@@ -1,6 +1,10 @@
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 
+const double _minimumBinaryRepresentationToleranceInCents = 1e-9;
+const double _relativeBinaryRepresentationTolerance = 2e-14;
+const int _centsPerUnit = 100;
+
 class RechnungenUseCases {
   const RechnungenUseCases(this.repository);
 
@@ -30,11 +34,12 @@ void _validateDraftInput({required String datum, required List<RechnungPositionI
     if (!position.menge.isFinite || position.menge <= 0) {
       throw ArgumentError.value(position.menge, 'menge', 'Muss endlich und positiv sein.');
     }
+    final mengeCents = _currencyCents(position.menge, 'menge');
     if (!position.ustSatz.isFinite || position.ustSatz < 0 || position.ustSatz > 100) {
       throw ArgumentError.value(position.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
     }
 
-    final lineTotalCents = einzelpreisCents * position.menge;
+    final lineTotalCents = einzelpreisCents * mengeCents / 100;
     if (!lineTotalCents.isFinite || gesamtCents != lineTotalCents.round()) {
       throw ArgumentError.value(position.gesamt, 'gesamt', 'Muss dem auf Cent gerundeten Positionswert entsprechen.');
     }
@@ -48,16 +53,17 @@ int _currencyCents(num value, String name) {
     throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
   }
 
-  const scale = 100;
-  // `scaled` is cents; allow only 1e-9 cent of binary representation noise.
-  const binaryRepresentationToleranceInCents = 1e-9;
-  final scaled = value * scale;
+  final scaled = value * _centsPerUnit;
   if (!scaled.isFinite) {
     throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
   }
 
   final cents = scaled.round();
-  if ((scaled - cents).abs() > binaryRepresentationToleranceInCents) {
+  final tolerance = value.abs() * _relativeBinaryRepresentationTolerance;
+  final allowedNoise = tolerance > _minimumBinaryRepresentationToleranceInCents
+      ? tolerance
+      : _minimumBinaryRepresentationToleranceInCents;
+  if ((scaled - cents).abs() > allowedNoise) {
     throw ArgumentError.value(value, name, 'Darf höchstens zwei Nachkommastellen haben.');
   }
   return cents;
