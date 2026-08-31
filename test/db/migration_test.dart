@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart' as drift_native;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
@@ -62,6 +63,7 @@ void main() {
     test('rolls back fresh schema creation when creation fails', () async {
       final executor = drift_native.NativeDatabase.memory();
       addTearDown(executor.close);
+      await executor.ensureOpen(_NoopMigrationUser());
       final runner = MigrationRunner(executor: executor, profileDir: profileDirectory.path);
 
       await expectLater(
@@ -128,4 +130,12 @@ VALUES ('RE-260001', 'rechnung', 'ausgestellt', '2026-08-30')''');
       expect(foreignKeys.single.values.first, 1);
     });
   });
+}
+
+class _NoopMigrationUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
 }

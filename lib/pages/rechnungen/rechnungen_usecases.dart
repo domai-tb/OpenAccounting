@@ -1,8 +1,6 @@
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 
-const double _minimumBinaryRepresentationToleranceInCents = 1e-9;
-const double _relativeBinaryRepresentationTolerance = 2e-14;
 const int _centsPerUnit = 100;
 
 class RechnungenUseCases {
@@ -35,12 +33,16 @@ void _validateDraftInput({required String datum, required List<RechnungPositionI
       throw ArgumentError.value(position.menge, 'menge', 'Muss endlich und positiv sein.');
     }
     final mengeCents = _currencyCents(position.menge, 'menge');
-    if (!position.ustSatz.isFinite || position.ustSatz < 0 || position.ustSatz > 100) {
+    if (!position.ustSatz.isFinite) {
+      throw ArgumentError.value(position.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
+    }
+    final ustSatzCents = _fixedPointCents(position.ustSatz, 'ustSatz');
+    if (ustSatzCents < 0 || ustSatzCents > 10000) {
       throw ArgumentError.value(position.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
     }
 
-    final lineTotalCents = einzelpreisCents * mengeCents / 100;
-    if (!lineTotalCents.isFinite || gesamtCents != lineTotalCents.round()) {
+    final lineTotalCents = (einzelpreisCents * mengeCents + 50) ~/ _centsPerUnit;
+    if (gesamtCents != lineTotalCents) {
       throw ArgumentError.value(position.gesamt, 'gesamt', 'Muss dem auf Cent gerundeten Positionswert entsprechen.');
     }
   }
@@ -53,20 +55,35 @@ int _currencyCents(num value, String name) {
     throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
   }
 
-  final scaled = value * _centsPerUnit;
-  if (!scaled.isFinite) {
+  return _fixedPointCents(value, name);
+}
+
+int _fixedPointCents(num value, String name) {
+  if (!value.isFinite) {
     throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
   }
 
-  final cents = scaled.round();
-  final tolerance = value.abs() * _relativeBinaryRepresentationTolerance;
-  final allowedNoise = tolerance > _minimumBinaryRepresentationToleranceInCents
-      ? tolerance
-      : _minimumBinaryRepresentationToleranceInCents;
-  if ((scaled - cents).abs() > allowedNoise) {
+  final match = RegExp(r'^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$').firstMatch(value.toString());
+  if (match == null) {
     throw ArgumentError.value(value, name, 'Darf höchstens zwei Nachkommastellen haben.');
   }
-  return cents;
+
+  final sign = match.group(1) == '-' ? -1 : 1;
+  final digits = '${match.group(2)}${match.group(3) ?? ''}';
+  final decimalPlaces = (match.group(3)?.length ?? 0) - int.parse(match.group(4) ?? '0');
+  var centDigits = digits;
+  if (decimalPlaces > 2) {
+    final excessPlaces = decimalPlaces - 2;
+    final trailingZeroes = ''.padRight(excessPlaces, '0');
+    if (!centDigits.endsWith(trailingZeroes)) {
+      throw ArgumentError.value(value, name, 'Darf höchstens zwei Nachkommastellen haben.');
+    }
+    centDigits = centDigits.substring(0, centDigits.length - excessPlaces);
+  } else if (decimalPlaces < 2) {
+    centDigits = centDigits.padRight(centDigits.length + 2 - decimalPlaces, '0');
+  }
+
+  return sign * int.parse(centDigits);
 }
 
 bool _isValidIsoDate(String value) {

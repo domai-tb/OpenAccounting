@@ -38,7 +38,6 @@ class MigrationRunner {
 
   /// Run migrations if needed. Returns true if migration executed.
   Future<bool> run({required Future<void> Function() createSchema}) async {
-    await executor.ensureOpen(_NoopMigrationUser());
     final version = await getUserVersion();
     final hasTables = await hasAnyTables();
 
@@ -214,11 +213,3 @@ CREATE TABLE rechnungen (
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
   storno_von INTEGER REFERENCES rechnungen(id)
 )''';
-
-class _NoopMigrationUser extends QueryExecutorUser {
-  @override
-  int get schemaVersion => 0;
-
-  @override
-  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
-}
