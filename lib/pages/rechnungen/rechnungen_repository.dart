@@ -11,9 +11,18 @@ class RechnungenRepository {
     required List<RechnungPositionItem> positionen,
   }) async {
     final id = await dataSource.createDraftRechnung(datum: datum, positionen: positionen);
+    return _loadRechnung(id, missingMessage: 'Entwurfsrechnung wurde nicht gespeichert');
+  }
+
+  Future<RechnungItem> finalizeRechnung({required int rechnungId}) async {
+    final id = await dataSource.finalizeRechnung(rechnungId: rechnungId);
+    return _loadRechnung(id, missingMessage: 'Finalisierte Rechnung wurde nicht gespeichert');
+  }
+
+  Future<RechnungItem> _loadRechnung(int id, {required String missingMessage}) async {
     final invoice = await dataSource.findRechnungById(id);
     if (invoice == null) {
-      throw StateError('Entwurfsrechnung wurde nicht gespeichert');
+      throw StateError(missingMessage);
     }
     final storedPositions = await dataSource.findPositionenByRechnungId(id);
     return RechnungItem(

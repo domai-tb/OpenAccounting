@@ -15,6 +15,10 @@ class RechnungenUseCases {
     _validateDraftInput(datum: datum, positionen: positionen);
     return repository.createDraftRechnung(datum: datum, positionen: positionen);
   }
+
+  Future<RechnungItem> finalizeRechnung({required int rechnungId}) {
+    return repository.finalizeRechnung(rechnungId: rechnungId);
+  }
 }
 
 void _validateDraftInput({required String datum, required List<RechnungPositionItem> positionen}) {
