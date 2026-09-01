@@ -23,6 +23,7 @@ final class PdfGenerator {
 List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
   final showTax = snapshot.template == PdfTemplate.standard;
   final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
+  final textSnapshot = snapshot.texts.forType(snapshot.documentType);
 
   return <pw.Widget>[
     _companyHeader(snapshot.company, snapshot.documentType.label),
@@ -46,9 +47,14 @@ List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
       pw.SizedBox(height: 12),
       pw.Text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet'),
     ],
+    if (_hasText(textSnapshot.einleitungstext)) ...[
+      pw.SizedBox(height: 18),
+      _markdownText(textSnapshot.einleitungstext!),
+    ],
     pw.SizedBox(height: 18),
     _positionTable(snapshot),
     if (!isDeliveryNote) ...[pw.SizedBox(height: 16), _totals(snapshot.totals, showTax: showTax)],
+    if (_hasText(textSnapshot.schlusstext)) ...[pw.SizedBox(height: 18), _markdownText(textSnapshot.schlusstext!)],
   ];
 }
 
@@ -276,6 +282,35 @@ String _formatDate(DateTime date) {
 String? _location(String? postalCode, String? city) {
   final parts = <String>[if (_hasText(postalCode)) postalCode!, if (_hasText(city)) city!];
   return parts.isEmpty ? null : parts.join(' ');
+}
+
+final _markdownPattern = RegExp(
+  r'(?<!\*)\*\*(?!\*)([^*\r\n]+?)(?<!\*)\*\*(?!\*)|'
+  r'(?<!\*)\*(?!\*)([^*\r\n]+?)(?<!\*)\*(?!\*)',
+);
+
+pw.Widget _markdownText(String value) {
+  final spans = <pw.TextSpan>[];
+  var cursor = 0;
+  for (final match in _markdownPattern.allMatches(value)) {
+    if (match.start > cursor) {
+      spans.add(pw.TextSpan(text: value.substring(cursor, match.start)));
+    }
+    final boldText = match.group(1);
+    spans.add(
+      pw.TextSpan(
+        text: boldText ?? match.group(2)!,
+        style: boldText != null
+            ? const pw.TextStyle(fontWeight: pw.FontWeight.bold)
+            : const pw.TextStyle(fontStyle: pw.FontStyle.italic),
+      ),
+    );
+    cursor = match.end;
+  }
+  if (cursor < value.length) {
+    spans.add(pw.TextSpan(text: value.substring(cursor)));
+  }
+  return pw.RichText(text: pw.TextSpan(children: spans));
 }
 
 bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
