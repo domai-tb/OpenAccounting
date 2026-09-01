@@ -93,7 +93,7 @@
 
 - [x] 10.1 Write failing test: `test/features/pdf/rechnung_test.dart` — PDF contains company header, positions, total
 - [x] 10.2 Implement: Rechnung PDF with Standard template
-- [ ] 10.3 Write failing test: `test/features/pdf/angebot_test.dart` — PDF contains Angebot-specific fields
+- [x] 10.3 Write failing test: `test/features/pdf/angebot_test.dart` — PDF contains Angebot-specific fields
 - [ ] 10.4 Implement: All 7 document type PDFs (Rechnung, Storno, Gutschrift, Angebot, Auftrag, Proforma, Lieferschein)
 - [ ] 10.5 Write failing test: `test/features/pdf/einleitungstext_test.dart` — per-type text appears in PDF
 - [ ] 10.6 Implement: Einleitungstext/Schlusstext per document type, no cross-fallback
