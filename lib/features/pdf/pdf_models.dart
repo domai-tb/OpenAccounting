@@ -1,6 +1,62 @@
-enum PdfDocumentType { rechnung, storno, gutschrift, angebot, auftrag, proforma, lieferschein }
+import 'dart:developer' as developer;
 
-enum PdfTemplate { standard, gruen }
+enum PdfDocumentType {
+  rechnung,
+  storno,
+  gutschrift,
+  angebot,
+  auftrag,
+  proforma,
+  lieferschein;
+
+  static PdfDocumentType fromRaw(String? raw) {
+    switch (raw) {
+      case 'rechnung':
+        return rechnung;
+      case 'storno':
+        return storno;
+      case 'gutschrift':
+        return gutschrift;
+      case 'angebot':
+        return angebot;
+      case 'auftrag':
+        return auftrag;
+      case 'proforma':
+        return proforma;
+      case 'lieferschein':
+        return lieferschein;
+      default:
+        throw ArgumentError.value(raw, 'raw', 'Unbekannter Dokumenttyp: $raw');
+    }
+  }
+
+  String get label => switch (this) {
+    rechnung => 'Rechnung',
+    storno => 'Stornorechnung',
+    gutschrift => 'Gutschrift',
+    angebot => 'Angebot',
+    auftrag => 'Auftrag',
+    proforma => 'Proforma-Rechnung',
+    lieferschein => 'Lieferschein',
+  };
+}
+
+enum PdfTemplate {
+  standard,
+  gruen;
+
+  static PdfTemplate fromRaw(String? raw) {
+    if (raw == null || raw == 'standard') {
+      return standard;
+    }
+    if (raw == 'gruen') {
+      return gruen;
+    }
+
+    developer.log('Unbekannte PDF-Vorlage "$raw"; Standard wird verwendet.', name: 'PdfTemplate', level: 900);
+    return standard;
+  }
+}
 
 enum PdfCopyState { original, copy }
 

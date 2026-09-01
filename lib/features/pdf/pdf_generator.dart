@@ -8,7 +8,6 @@ final class PdfGenerator {
   const PdfGenerator();
 
   Future<Uint8List> generate(PdfDocumentSnapshot snapshot) {
-    _validateStandardRechnung(snapshot);
     final document = pw.Document(compress: false);
     document.addPage(
       pw.MultiPage(
@@ -21,18 +20,12 @@ final class PdfGenerator {
   }
 }
 
-void _validateStandardRechnung(PdfDocumentSnapshot snapshot) {
-  if (snapshot.documentType != PdfDocumentType.rechnung) {
-    throw UnsupportedError('Nur Rechnung PDFs werden in dieser Version unterstützt');
-  }
-  if (snapshot.template != PdfTemplate.standard) {
-    throw UnsupportedError('Nur das Standard-Rechnungstemplate wird in dieser Version unterstützt');
-  }
-}
-
 List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
+  final showTax = snapshot.template == PdfTemplate.standard;
+  final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
+
   return <pw.Widget>[
-    _companyHeader(snapshot.company),
+    _companyHeader(snapshot.company, snapshot.documentType.label),
     pw.SizedBox(height: 22),
     _documentHeading(snapshot),
     pw.SizedBox(height: 16),
@@ -41,14 +34,25 @@ List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
       pw.SizedBox(height: 12),
       pw.Text('Datum: ${_formatDate(snapshot.documentDate!)}'),
     ],
+    if (snapshot.documentType == PdfDocumentType.angebot && snapshot.validUntil != null) ...[
+      pw.SizedBox(height: 6),
+      pw.Text('Gültig bis: ${_formatDate(snapshot.validUntil!)}'),
+    ],
+    if (snapshot.documentType == PdfDocumentType.auftrag && _hasText(snapshot.orderStatus)) ...[
+      pw.SizedBox(height: 6),
+      pw.Text('Auftragsstatus: ${snapshot.orderStatus}'),
+    ],
+    if (snapshot.template == PdfTemplate.gruen) ...[
+      pw.SizedBox(height: 12),
+      pw.Text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet'),
+    ],
     pw.SizedBox(height: 18),
-    _positionTable(snapshot.positions),
-    pw.SizedBox(height: 16),
-    _totals(snapshot.totals),
+    _positionTable(snapshot),
+    if (!isDeliveryNote) ...[pw.SizedBox(height: 16), _totals(snapshot.totals, showTax: showTax)],
   ];
 }
 
-pw.Widget _companyHeader(PdfCompanySnapshot company) {
+pw.Widget _companyHeader(PdfCompanySnapshot company, String documentLabel) {
   final details = <String>[
     if (_hasText(company.street)) company.street!,
     if (_hasText(_location(company.postalCode, company.city))) _location(company.postalCode, company.city)!,
@@ -70,7 +74,7 @@ pw.Widget _companyHeader(PdfCompanySnapshot company) {
           for (final detail in details) pw.Text(detail),
         ],
       ),
-      pw.Text('Rechnung', style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+      pw.Text(documentLabel, style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
     ],
   );
 }
@@ -79,7 +83,7 @@ pw.Widget _documentHeading(PdfDocumentSnapshot snapshot) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
-      pw.Text('Rechnung', style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+      pw.Text(snapshot.documentType.label, style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
       pw.Text('Rechnungsnummer: ${snapshot.documentNumber}'),
     ],
   );
@@ -103,72 +107,99 @@ pw.Widget _customerBlock(PdfCustomerSnapshot customer) {
   );
 }
 
-pw.Widget _positionTable(List<PdfPositionSnapshot> positions) {
+pw.Widget _positionTable(PdfDocumentSnapshot snapshot) {
+  final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
+  final showTax = snapshot.template == PdfTemplate.standard && !isDeliveryNote;
+  final headers = isDeliveryNote
+      ? <String>['Pos.', 'Beschreibung', 'Menge']
+      : <String>[
+          'Pos.',
+          'Beschreibung',
+          'Menge',
+          'Einzelpreis',
+          'Rabatt',
+          'Netto',
+          if (showTax) 'USt-Satz',
+          if (showTax) 'USt',
+          'Brutto',
+        ];
+  final alignments = <int, pw.Alignment>{
+    0: pw.Alignment.center,
+    2: pw.Alignment.centerRight,
+    if (!isDeliveryNote) ...<int, pw.Alignment>{
+      3: pw.Alignment.centerRight,
+      4: pw.Alignment.centerRight,
+      5: pw.Alignment.centerRight,
+      if (showTax) 6: pw.Alignment.centerRight,
+      if (showTax) 7: pw.Alignment.centerRight,
+      (showTax ? 8 : 6): pw.Alignment.centerRight,
+    },
+  };
+  final widths = isDeliveryNote
+      ? const <int, pw.TableColumnWidth>{
+          0: pw.FixedColumnWidth(25),
+          1: pw.FlexColumnWidth(2.5),
+          2: pw.FixedColumnWidth(50),
+        }
+      : showTax
+      ? const <int, pw.TableColumnWidth>{
+          0: pw.FixedColumnWidth(25),
+          1: pw.FlexColumnWidth(2.5),
+          2: pw.FixedColumnWidth(38),
+          3: pw.FixedColumnWidth(58),
+          4: pw.FixedColumnWidth(48),
+          5: pw.FixedColumnWidth(58),
+          6: pw.FixedColumnWidth(48),
+          7: pw.FixedColumnWidth(58),
+          8: pw.FixedColumnWidth(58),
+        }
+      : const <int, pw.TableColumnWidth>{
+          0: pw.FixedColumnWidth(25),
+          1: pw.FlexColumnWidth(2.5),
+          2: pw.FixedColumnWidth(38),
+          3: pw.FixedColumnWidth(58),
+          4: pw.FixedColumnWidth(48),
+          5: pw.FixedColumnWidth(58),
+          6: pw.FixedColumnWidth(58),
+        };
+
   return pw.TableHelper.fromTextArray(
-    headers: const <String>[
-      'Pos.',
-      'Beschreibung',
-      'Menge',
-      'Einzelpreis',
-      'Rabatt',
-      'Netto',
-      'USt-Satz',
-      'USt',
-      'Brutto',
-    ],
-    data: positions.map(_positionRow).toList(growable: false),
+    headers: headers,
+    data: snapshot.positions
+        .map((position) => _positionRow(position, isDeliveryNote: isDeliveryNote, showTax: showTax))
+        .toList(growable: false),
     border: pw.TableBorder.all(color: pdf.PdfColors.grey, width: 0.5),
     cellPadding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 4),
     headerStyle: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
     cellStyle: const pw.TextStyle(fontSize: 8),
     headerAlignment: pw.Alignment.centerLeft,
     cellAlignment: pw.Alignment.centerLeft,
-    headerAlignments: const <int, pw.Alignment>{
-      0: pw.Alignment.center,
-      2: pw.Alignment.centerRight,
-      3: pw.Alignment.centerRight,
-      4: pw.Alignment.centerRight,
-      5: pw.Alignment.centerRight,
-      6: pw.Alignment.centerRight,
-      7: pw.Alignment.centerRight,
-      8: pw.Alignment.centerRight,
-    },
-    cellAlignments: const <int, pw.Alignment>{
-      0: pw.Alignment.center,
-      2: pw.Alignment.centerRight,
-      3: pw.Alignment.centerRight,
-      4: pw.Alignment.centerRight,
-      5: pw.Alignment.centerRight,
-      6: pw.Alignment.centerRight,
-      7: pw.Alignment.centerRight,
-      8: pw.Alignment.centerRight,
-    },
-    columnWidths: const <int, pw.TableColumnWidth>{
-      0: pw.FixedColumnWidth(25),
-      1: pw.FlexColumnWidth(2.5),
-      2: pw.FixedColumnWidth(38),
-      3: pw.FixedColumnWidth(58),
-      4: pw.FixedColumnWidth(48),
-      5: pw.FixedColumnWidth(58),
-      6: pw.FixedColumnWidth(48),
-      7: pw.FixedColumnWidth(58),
-      8: pw.FixedColumnWidth(58),
-    },
+    headerAlignments: alignments,
+    cellAlignments: alignments,
+    columnWidths: widths,
   );
 }
 
-List<String> _positionRow(PdfPositionSnapshot position) {
-  return <String>[
+List<String> _positionRow(PdfPositionSnapshot position, {required bool isDeliveryNote, required bool showTax}) {
+  if (isDeliveryNote) {
+    return <String>[position.position?.toString() ?? '', position.description, _formatDecimal(position.quantity)];
+  }
+
+  final row = <String>[
     position.position?.toString() ?? '',
     position.description,
     _formatDecimal(position.quantity),
     _formatCurrency(position.unitPrice),
     _formatDiscount(position),
     _formatCurrency(position.netAmount),
-    '${_formatDecimal(position.taxRate)} %',
-    _formatCurrency(position.taxAmount),
-    _formatCurrency(position.grossAmount),
   ];
+  if (showTax) {
+    row
+      ..add('${_formatDecimal(position.taxRate)} %')
+      ..add(_formatCurrency(position.taxAmount));
+  }
+  row.add(_formatCurrency(position.grossAmount));
+  return row;
 }
 
 String _formatDiscount(PdfPositionSnapshot position) {
@@ -181,12 +212,12 @@ String _formatDiscount(PdfPositionSnapshot position) {
   return '';
 }
 
-pw.Widget _totals(PdfTotalsSnapshot totals) {
+pw.Widget _totals(PdfTotalsSnapshot totals, {required bool showTax}) {
   final rows = <List<String>>[
     if (totals.subtotal != null) <String>['Zwischensumme', _formatCurrency(totals.subtotal!)],
     if (totals.discountAmount != null) <String>['Rabatt', _formatCurrency(totals.discountAmount!)],
     <String>['Netto', _formatCurrency(totals.netAmount)],
-    <String>['USt', _formatCurrency(totals.taxAmount)],
+    if (showTax) <String>['USt', _formatCurrency(totals.taxAmount)],
     <String>['Gesamtbetrag', _formatCurrency(totals.grossAmount)],
   ];
   return pw.Align(

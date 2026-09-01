@@ -51,6 +51,11 @@ void main() {
 
   test('unsupported raw document type is rejected at the existing enum boundary', () {
     expect(() => PdfDocumentType.values.byName('Gutschein'), throwsArgumentError);
+    expect(() => PdfDocumentType.fromRaw('Gutschein'), throwsArgumentError);
+  });
+
+  test('unknown raw template falls back to Standard', () {
+    expect(PdfTemplate.fromRaw('neon'), PdfTemplate.standard);
   });
 
   test('Standard PDF retains USt columns', () async {
@@ -74,6 +79,42 @@ void main() {
     expect(_containsExactLabel(parsedPdf.visibleText, 'USt-Satz'), isFalse);
     expect(_containsExactLabel(parsedPdf.visibleText, 'USt'), isFalse);
   });
+
+  test('Auftrag PDF contains its status metadata', () async {
+    final parsedPdf = parsePdf(
+      await const PdfGenerator().generate(
+        _snapshotFor(documentType: PdfDocumentType.auftrag, orderStatus: 'in_bearbeitung'),
+      ),
+    );
+
+    expect(parsedPdf.visibleText, allOf(contains('Auftragsstatus'), contains('in_bearbeitung')));
+  });
+
+  test('Lieferschein PDF renders description and quantity columns only', () async {
+    final parsedPdf = parsePdf(
+      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.lieferschein)),
+    );
+
+    expect(parsedPdf.visibleText, allOf(contains('Pos.'), contains('Beschreibung'), contains('Menge')));
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        isNot(contains('Einzelpreis')),
+        isNot(contains('Rabatt')),
+        isNot(contains('Netto')),
+        isNot(contains('USt-Satz')),
+      ),
+    );
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        isNot(contains('USt')),
+        isNot(contains('Brutto')),
+        isNot(contains('Gesamtbetrag')),
+        isNot(contains('1.000,00 €')),
+      ),
+    );
+  });
 }
 
 PdfDocumentSnapshot _snapshotFor({
@@ -83,6 +124,7 @@ PdfDocumentSnapshot _snapshotFor({
   DateTime? validUntil,
   DateTime? serviceFrom,
   DateTime? serviceTo,
+  String? orderStatus,
 }) {
   final base = rechnungSnapshot();
   return PdfDocumentSnapshot.from(
@@ -97,6 +139,7 @@ PdfDocumentSnapshot _snapshotFor({
     serviceFrom: serviceFrom,
     serviceTo: serviceTo,
     validUntil: validUntil,
+    orderStatus: orderStatus,
   );
 }
 
