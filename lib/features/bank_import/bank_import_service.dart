@@ -1,11 +1,14 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
-/// BankImportService — upload step only (parse, no DB import).
-/// ponytail ultra: stdlib split + regex ceiling, no csv package.
+/// BankImportService — upload + dedup + auto-rules + score.
+/// ponytail ultra: stdlib split + crypto SHA256 + string money, no csv/xml deps.
 class BankImportService {
   BankImportService(this.executor);
 
@@ -34,6 +37,293 @@ class BankImportService {
       // ponytail: DB missing — fallback to in-code map.
     }
     return merged;
+  }
+
+  // ── Dedup ──────────────────────────────────────────────────────────
+
+  /// SHA-256 hex of Datum|Betrag|Partner|Verwendungszweck.
+  /// Datum formatted YYYY-MM-DD, betrag trimmed, partner/verwendung trimmed.
+  String computeDedupeHash(DateTime datum, String betrag, String partner, String verwendungszweck) {
+    final String dateStr =
+        '${datum.year.toString().padLeft(4, '0')}-'
+        '${datum.month.toString().padLeft(2, '0')}-'
+        '${datum.day.toString().padLeft(2, '0')}';
+    final String input = '$dateStr|${betrag.trim()}|${partner.trim()}|${verwendungszweck.trim()}';
+    return sha256.convert(utf8.encode(input)).toString();
+  }
+
+  /// Auto-categorization: first active rule whose muster is substring of verwendungszweck (case-insensitive), ordered by prioritaet DESC.
+  Future<int?> applyRules(String verwendungszweck) async {
+    final String trimmed = verwendungszweck.trim();
+    if (trimmed.isEmpty) return null;
+    final String lower = trimmed.toLowerCase();
+    try {
+      final List<Map<String, Object?>> rows = await executor.runSelect(
+        'SELECT muster, kategorie_id FROM auto_filter_regeln WHERE aktiv = 1 ORDER BY prioritaet DESC, id ASC',
+        const <Object?>[],
+      );
+      for (final row in rows) {
+        final String muster = (row['muster'] as String? ?? '').trim();
+        if (muster.isEmpty) continue;
+        if (lower.contains(muster.toLowerCase())) {
+          final Object? kid = row['kategorie_id'];
+          if (kid == null) continue;
+          return (kid as num).toInt();
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  // ── Score ──────────────────────────────────────────────────────────
+
+  /// Score 0..100 between [tx] and a journal row.
+  /// Amount within 0.01 => 40, date within 7 days => 30, partner similarity >80% => 30.
+  int computeScore(RawTx tx, Map<String, Object?> journalRow) {
+    final String jBetragRaw = _journalBetrag(journalRow);
+    final DateTime? jDatum = _journalDatum(journalRow);
+    final String jPartner = _journalPartner(journalRow);
+
+    int score = 0;
+
+    // Amount: within 0.01 => 40
+    try {
+      final int txCents = money.toCents(tx.betrag);
+      final int jCents = money.toCents(jBetragRaw);
+      if ((txCents - jCents).abs() <= 1) {
+        score += 40;
+      }
+    } catch (_) {}
+
+    // Date: within 7 days => 30
+    if (jDatum != null) {
+      final int diffDays = tx.datum.difference(jDatum).inDays.abs();
+      if (diffDays <= 7) score += 30;
+    }
+
+    // Partner: similarity >80% => 30
+    final double sim = _partnerSimilarity(tx.partner, jPartner);
+    if (sim > 0.80) score += 30;
+
+    return score.clamp(0, 100);
+  }
+
+  String _journalBetrag(Map<String, Object?> row) {
+    final Object? v = row['betrag'];
+    if (v == null) return '0.00';
+    if (v is num) return v.toStringAsFixed(2);
+    final String s = v.toString().trim();
+    if (s.isEmpty) return '0.00';
+    // Normalize via money helpers if possible
+    try {
+      return money.fromCents(money.toCents(s));
+    } catch (_) {
+      return s;
+    }
+  }
+
+  DateTime? _journalDatum(Map<String, Object?> row) {
+    final Object? v = row['datum'];
+    if (v == null) return null;
+    final String s = v.toString().trim();
+    if (s.isEmpty) return null;
+    // Try ISO YYYY-MM-DD or full iso
+    DateTime? d = DateTime.tryParse(s);
+    if (d != null) return DateTime(d.year, d.month, d.day);
+    // Try DD.MM.YYYY fallback
+    if (s.contains('.')) {
+      final List<String> p = s.split('.');
+      if (p.length == 3) {
+        final int? day = int.tryParse(p[0].trim());
+        final int? mon = int.tryParse(p[1].trim());
+        final int? yr = int.tryParse(p[2].trim());
+        if (day != null && mon != null && yr != null) {
+          try {
+            return DateTime(yr, mon, day);
+          } catch (_) {}
+        }
+      }
+    }
+    return null;
+  }
+
+  String _journalPartner(Map<String, Object?> row) {
+    // Prefer beschreibung, fallback name-like fields
+    for (final String k in <String>['beschreibung', 'partner', 'name', 'empfaenger', 'beleg_nr']) {
+      final Object? v = row[k];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return v.toString().trim();
+      }
+    }
+    return '';
+  }
+
+  double _partnerSimilarity(String a, String b) {
+    final String la = a.trim().toLowerCase();
+    final String lb = b.trim().toLowerCase();
+    if (la.isEmpty || lb.isEmpty) return 0;
+    if (la == lb) return 1;
+    if (la.contains(lb) || lb.contains(la)) return 0.90;
+    final int maxLen = la.length > lb.length ? la.length : lb.length;
+    if (maxLen == 0) return 0;
+    final int dist = _levenshtein(la, lb);
+    return (maxLen - dist) / maxLen;
+  }
+
+  int _levenshtein(String s, String t) {
+    final int m = s.length;
+    final int n = t.length;
+    if (m == 0) return n;
+    if (n == 0) return m;
+    List<int> prev = List<int>.generate(n + 1, (i) => i);
+    List<int> curr = List<int>.filled(n + 1, 0);
+    for (int i = 1; i <= m; i++) {
+      curr[0] = i;
+      for (int j = 1; j <= n; j++) {
+        final int cost = s.codeUnitAt(i - 1) == t.codeUnitAt(j - 1) ? 0 : 1;
+        curr[j] = _min3(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      }
+      final List<int> tmp = prev;
+      prev = curr;
+      curr = tmp;
+    }
+    return prev[n];
+  }
+
+  int _min3(int a, int b, int c) {
+    int m = a < b ? a : b;
+    return m < c ? m : c;
+  }
+
+  // ── Import ─────────────────────────────────────────────────────────
+
+  /// Import [rawTxs] for [kontoId] with dedup + auto-rules + score.
+  /// [mode] = 'manuell' | 'automatisch' — automatisch auto-books high-score matches.
+  /// When [allowDuplicateOverride] true, duplicate hash is suffixed to make unique.
+  Future<ImportResult> importTransactions({
+    required int kontoId,
+    required List<RawTx> rawTxs,
+    String mode = 'manuell',
+    bool allowDuplicateOverride = false,
+  }) async {
+    int imported = 0;
+    int duplicates = 0;
+    int autoCat = 0;
+
+    // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters)
+    List<Map<String, Object?>> journals = <Map<String, Object?>>[];
+    try {
+      journals = await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
+    } catch (_) {
+      journals = <Map<String, Object?>>[];
+    }
+
+    for (final RawTx tx in rawTxs) {
+      String hash = computeDedupeHash(tx.datum, tx.betrag, tx.partner, tx.verwendungszweck);
+
+      // Check duplicate per konto_id+dedupe_hash
+      bool isDuplicate = false;
+      try {
+        final List<Map<String, Object?>> existing = await executor.runSelect(
+          'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
+          <Object?>[kontoId, hash],
+        );
+        isDuplicate = existing.isNotEmpty;
+      } catch (_) {
+        isDuplicate = false;
+      }
+
+      if (isDuplicate && !allowDuplicateOverride) {
+        duplicates++;
+        continue;
+      }
+
+      if (isDuplicate && allowDuplicateOverride) {
+        // suffix hash until unique: original-hash-1, -2, ...
+        int suffix = 1;
+        String candidate = '$hash-$suffix';
+        while (true) {
+          try {
+            final List<Map<String, Object?>> chk = await executor.runSelect(
+              'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
+              <Object?>[kontoId, candidate],
+            );
+            if (chk.isEmpty) break;
+          } catch (_) {
+            break;
+          }
+          suffix++;
+          candidate = '$hash-$suffix';
+          if (suffix > 100) break; // ponytail: suffix ceiling, stable hash loop
+        }
+        hash = candidate;
+      }
+
+      // Apply auto rules
+      final int? kategorieId = await applyRules(tx.verwendungszweck);
+      if (kategorieId != null) autoCat++;
+
+      // Score match against journals — pick best >=90
+      int? matchedJournalId;
+      if (journals.isNotEmpty) {
+        int bestScore = -1;
+        int? bestId;
+        for (final j in journals) {
+          final int s = computeScore(tx, j);
+          if (s > bestScore) {
+            bestScore = s;
+            final Object? jid = j['id'];
+            bestId = jid == null ? null : (jid as num).toInt();
+          }
+        }
+        if (bestScore >= 90 && mode.toLowerCase() == 'automatisch' && bestId != null) {
+          matchedJournalId = bestId;
+        }
+      }
+
+      final String datumStr =
+          '${tx.datum.year.toString().padLeft(4, '0')}-'
+          '${tx.datum.month.toString().padLeft(2, '0')}-'
+          '${tx.datum.day.toString().padLeft(2, '0')}';
+
+      try {
+        await executor.runInsert(
+          'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck, gegenkonto, kategorie_id, journal_id, dedupe_hash, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            kontoId,
+            datumStr,
+            tx.betrag,
+            tx.verwendungszweck,
+            tx.gegenkonto,
+            kategorieId,
+            matchedJournalId,
+            hash,
+            matchedJournalId != null ? 'gebucht' : 'neu',
+          ],
+        );
+        imported++;
+      } catch (_) {
+        // понy: ignore insert error (FK etc) — counts as not imported
+      }
+    }
+
+    // History row
+    try {
+      await executor.runInsert(
+        'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) VALUES (?, ?, ?, ?, ?)',
+        <Object?>[kontoId, 'import.csv', DateTime.now().toIso8601String(), imported, 'importiert'],
+      );
+    } catch (_) {}
+
+    final int manualReview = imported - autoCat;
+    return ImportResult(
+      imported: imported,
+      duplicatesSkipped: duplicates,
+      autoCategorized: autoCat,
+      manualReview: manualReview < 0 ? 0 : manualReview,
+    );
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.

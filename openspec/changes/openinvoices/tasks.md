@@ -119,8 +119,8 @@
 
 - [x] 12.1 Write failing test: `test/features/bank_import/upload_test.dart` — CSV parses into transactions
 - [x] 12.2 Implement: CSV upload and parsing with bank templates
-- [ ] 12.3 Write failing test: `test/features/bank_import/dedup_test.dart` — duplicate hash prevents re-import
-- [ ] 12.4 Implement: SHA-256 deduplication, auto-categorization rules
+- [x] 12.3 Write failing test: `test/features/bank_import/dedup_test.dart` — duplicate hash prevents re-import
+- [x] 12.4 Implement: SHA-256 deduplication, auto-categorization rules
 - [ ] 12.5 Write failing test: `test/features/bank_import/camt_test.dart` — CAMT XML parses correctly
 - [ ] 12.6 Implement: CAMT XML import support
 - [ ] 12.7 Refactor; full suite stays green

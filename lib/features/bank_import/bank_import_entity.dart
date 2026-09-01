@@ -37,6 +37,21 @@ class RawTx {
   final String? dedupeHash;
 }
 
+/// Result of dedup + rule + score import.
+class ImportResult {
+  const ImportResult({
+    required this.imported,
+    required this.duplicatesSkipped,
+    required this.autoCategorized,
+    required this.manualReview,
+  });
+
+  final int imported;
+  final int duplicatesSkipped;
+  final int autoCategorized;
+  final int manualReview;
+}
+
 /// Thrown when CSV cannot be parsed or no template matches.
 class BankImportException implements Exception {
   const BankImportException(this.message);
