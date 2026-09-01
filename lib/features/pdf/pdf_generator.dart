@@ -284,33 +284,84 @@ String? _location(String? postalCode, String? city) {
   return parts.isEmpty ? null : parts.join(' ');
 }
 
-final _markdownPattern = RegExp(
-  r'(?<!\*)\*\*(?!\*)([^*\r\n]+?)(?<!\*)\*\*(?!\*)|'
-  r'(?<!\*)\*(?!\*)([^*\r\n]+?)(?<!\*)\*(?!\*)',
-);
-
 pw.Widget _markdownText(String value) {
+  final tokens = <({int start, int length})>[];
+  for (var index = 0; index < value.length;) {
+    if (value[index] != '*') {
+      index++;
+      continue;
+    }
+    var end = index + 1;
+    while (end < value.length && value[end] == '*') {
+      end++;
+    }
+    final length = end - index;
+    if ((length == 1 || length == 2) && !_isEscaped(value, index)) {
+      tokens.add((start: index, length: length));
+    }
+    index = end;
+  }
+
+  final stack = <({int index, int length})>[];
+  final pairs = <({int opening, int closing})>[];
+  for (var index = 0; index < tokens.length; index++) {
+    final token = tokens[index];
+    if (stack.isNotEmpty && stack.last.length == token.length) {
+      final opening = stack.removeLast();
+      pairs.add((opening: opening.index, closing: index));
+    } else {
+      stack.add((index: index, length: token.length));
+    }
+  }
+
+  final validPairs = pairs.where((pair) {
+    final opening = tokens[pair.opening];
+    final closing = tokens[pair.closing];
+    if (closing.start <= opening.start + opening.length) {
+      return false;
+    }
+    final isNested = pairs.any((other) {
+      if (other == pair) {
+        return false;
+      }
+      final otherOpening = tokens[other.opening];
+      final otherClosing = tokens[other.closing];
+      return otherOpening.start < opening.start && closing.start < otherClosing.start ||
+          opening.start < otherOpening.start && otherClosing.start < closing.start;
+    });
+    return !isNested && !stack.any((unmatched) => unmatched.index < pair.opening);
+  }).toList()..sort((left, right) => tokens[left.opening].start.compareTo(tokens[right.opening].start));
+
   final spans = <pw.TextSpan>[];
   var cursor = 0;
-  for (final match in _markdownPattern.allMatches(value)) {
-    if (match.start > cursor) {
-      spans.add(pw.TextSpan(text: value.substring(cursor, match.start)));
+  for (final pair in validPairs) {
+    final opening = tokens[pair.opening];
+    final closing = tokens[pair.closing];
+    if (opening.start > cursor) {
+      spans.add(pw.TextSpan(text: value.substring(cursor, opening.start)));
     }
-    final boldText = match.group(1);
     spans.add(
       pw.TextSpan(
-        text: boldText ?? match.group(2)!,
-        style: boldText != null
+        text: value.substring(opening.start + opening.length, closing.start),
+        style: opening.length == 2
             ? const pw.TextStyle(fontWeight: pw.FontWeight.bold)
             : const pw.TextStyle(fontStyle: pw.FontStyle.italic),
       ),
     );
-    cursor = match.end;
+    cursor = closing.start + closing.length;
   }
   if (cursor < value.length) {
     spans.add(pw.TextSpan(text: value.substring(cursor)));
   }
   return pw.RichText(text: pw.TextSpan(children: spans));
+}
+
+bool _isEscaped(String value, int markerIndex) {
+  var backslashCount = 0;
+  for (var index = markerIndex - 1; index >= 0 && value[index] == '\\'; index--) {
+    backslashCount++;
+  }
+  return backslashCount.isOdd;
 }
 
 bool _hasText(String? value) => value != null && value.trim().isNotEmpty;

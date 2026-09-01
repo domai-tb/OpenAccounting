@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/features/pdf/pdf_generator.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
@@ -87,45 +89,92 @@ void main() {
     );
   });
 
-  test('PDF renders bold and italic text without Markdown delimiters', () async {
+  test('PDF renders bold and italic text without Markdown delimiters or losing styles', () async {
     const texts = PdfDocumentTextsSnapshot(
-      rechnung: PdfTypeTextSnapshot(einleitungstext: '**bold text** and *italic text*'),
+      rechnung: PdfTypeTextSnapshot(einleitungstext: '**BOLD_STYLE** and *ITALIC_STYLE*'),
     );
-    final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+    final pdfBytes = await const PdfGenerator().generate(
+      _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
     );
+    final parsedPdf = parsePdf(pdfBytes);
+    final pdfSource = latin1.decode(pdfBytes);
+    final boldFontName = _fontUsedForText(pdfSource, 'BOLD_STYLE');
+    final italicFontName = _fontUsedForText(pdfSource, 'ITALIC_STYLE');
 
     expect(
       parsedPdf.visibleText,
-      allOf(contains('bold text'), contains('italic text'), isNot(contains('**')), isNot(contains('*'))),
+      allOf(contains('BOLD_STYLE'), contains('ITALIC_STYLE'), isNot(contains('**')), isNot(contains('*'))),
     );
+    expect(boldFontName, isNotNull);
+    expect(italicFontName, isNotNull);
+    expect(pdfSource, matches(RegExp('/BaseFont/Helvetica-Bold[^\n]*/Name/$boldFontName/')));
+    expect(pdfSource, matches(RegExp('/BaseFont/Helvetica-Oblique[^\n]*/Name/$italicFontName/')));
   });
 
-  test('PDF renders Einleitungstext before positions and Schlusstext after totals', () async {
-    const texts = PdfDocumentTextsSnapshot(
-      rechnung: PdfTypeTextSnapshot(einleitungstext: 'ORDERED INTRO', schlusstext: 'ORDERED CLOSING'),
+  test('malformed, escaped, nested, and unsupported Markdown stays visible and preserves snapshot', () async {
+    const intro =
+        r'**outer *inner* outer** | *unmatched | \*escaped italic\* | \**escaped bold** | __unsupported__ | ~~strike~~';
+    const texts = PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(einleitungstext: intro));
+    final snapshot = _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts);
+    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot));
+
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        contains(r'**outer *inner* outer**'),
+        contains('*unmatched'),
+        contains(r'\*escaped italic\*'),
+        contains(r'\**escaped bold**'),
+        contains('__unsupported__'),
+        contains('~~strike~~'),
+      ),
     );
+    expect(snapshot.texts, same(texts));
+    expect(snapshot.texts.rechnung.einleitungstext, intro);
+  });
+
+  test('Einleitungstext follows address and metadata before positions', () async {
+    const texts = PdfDocumentTextsSnapshot(angebot: PdfTypeTextSnapshot(einleitungstext: 'ORDERED INTRO'));
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.angebot, texts: texts, validUntil: DateTime(2026, 9, 15)),
+      ),
     );
     final visibleText = parsedPdf.visibleText;
+    final addressIndex = visibleText.indexOf('20095 Hamburg');
+    final metadataIndex = visibleText.indexOf('Gültig bis');
     final introIndex = visibleText.indexOf('ORDERED INTRO');
     final positionIndex = visibleText.indexOf('Website-Design');
-    final closingIndex = visibleText.indexOf('ORDERED CLOSING');
-    final totalsIndex = visibleText.indexOf('Gesamtbetrag');
 
+    expect(addressIndex, greaterThanOrEqualTo(0));
+    expect(metadataIndex, greaterThanOrEqualTo(0));
     expect(introIndex, greaterThanOrEqualTo(0));
     expect(positionIndex, greaterThanOrEqualTo(0));
-    expect(closingIndex, greaterThanOrEqualTo(0));
-    expect(totalsIndex, greaterThanOrEqualTo(0));
+    expect(addressIndex, lessThan(introIndex));
+    expect(metadataIndex, lessThan(introIndex));
     expect(introIndex, lessThan(positionIndex));
-    expect(closingIndex, greaterThan(totalsIndex));
+  });
+
+  test('Lieferschein Schlusstext follows positions when totals are absent', () async {
+    const texts = PdfDocumentTextsSnapshot(lieferschein: PdfTypeTextSnapshot(schlusstext: 'DELIVERY CLOSING'));
+    final parsedPdf = parsePdf(
+      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.lieferschein, texts: texts)),
+    );
+    final visibleText = parsedPdf.visibleText;
+    final positionIndex = visibleText.indexOf('Website-Design');
+    final closingIndex = visibleText.indexOf('DELIVERY CLOSING');
+
+    expect(positionIndex, greaterThanOrEqualTo(0));
+    expect(closingIndex, greaterThan(positionIndex));
+    expect(visibleText, isNot(contains('Gesamtbetrag')));
   });
 }
 
 PdfDocumentSnapshot _snapshotWithTexts({
   required PdfDocumentType documentType,
   required PdfDocumentTextsSnapshot texts,
+  DateTime? validUntil,
+  String? orderStatus,
 }) {
   final base = rechnungSnapshot();
   return PdfDocumentSnapshot.from(
@@ -138,5 +187,17 @@ PdfDocumentSnapshot _snapshotWithTexts({
     positions: base.positions,
     totals: base.totals,
     texts: texts,
+    validUntil: validUntil,
+    orderStatus: orderStatus,
   );
+}
+
+String? _fontUsedForText(String pdfSource, String text) {
+  final textOperand = '[($text)]TJ';
+  for (final operation in pdfSource.split('BT ')) {
+    if (operation.contains(textOperand)) {
+      return RegExp(r'/(F\d+) 12 Tf').firstMatch(operation)?.group(1);
+    }
+  }
+  return null;
 }
