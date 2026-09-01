@@ -121,8 +121,8 @@
 - [x] 12.2 Implement: CSV upload and parsing with bank templates
 - [x] 12.3 Write failing test: `test/features/bank_import/dedup_test.dart` — duplicate hash prevents re-import
 - [x] 12.4 Implement: SHA-256 deduplication, auto-categorization rules
-- [ ] 12.5 Write failing test: `test/features/bank_import/camt_test.dart` — CAMT XML parses correctly
-- [ ] 12.6 Implement: CAMT XML import support
+- [x] 12.5 Write failing test: `test/features/bank_import/camt_test.dart` — CAMT XML parses correctly
+- [x] 12.6 Implement: CAMT XML import support
 - [ ] 12.7 Refactor; full suite stays green
 
 ## 13. Dunning (Mahnwesen)

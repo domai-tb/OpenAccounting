@@ -525,6 +525,179 @@ class BankImportService {
     return out;
   }
 
+  // ── CAMT XML ───────────────────────────────────────────────────────
+
+  /// Parse CAMT.053 XML into [RawTx] via regex without xml package.
+  /// ponytail: regex ceiling — `<Ntry>` blocks + `<Amt>`/`<Dt>`/`<Ustrd>`/`<Nm>`/`<IBAN>`.
+  /// Handles comma/dot amounts and CdtDbtInd DBIT/CRDT. Throws [BankImportException]
+  /// for non-CAMT (unsupported) or invalid/malformed XML.
+  List<RawTx> parseCamtXml(String xml) {
+    final String trimmed = xml.trim();
+    if (trimmed.isEmpty) {
+      throw const BankImportException('Datei ist leer');
+    }
+    if (!trimmed.contains('<') || !trimmed.contains('>')) {
+      throw const BankImportException('Ungültiges XML: kein XML-Tag gefunden (invalid)');
+    }
+    if (!trimmed.contains('</')) {
+      throw const BankImportException('Ungültiges XML: kein schliessendes Tag (invalid)');
+    }
+
+    final bool hasDocument = trimmed.contains('<Document') || trimmed.contains(':Document');
+    final bool hasNtry = RegExp(r'<\s*(?:\w+:)?Ntry\b', caseSensitive: false).hasMatch(trimmed);
+    final bool hasBkTo =
+        trimmed.contains('BkToCstmrStmt') || trimmed.contains('BkToStmRpt') || trimmed.contains('BkToCstmr');
+    final bool hasCamtNs =
+        trimmed.toLowerCase().contains('camt') || trimmed.contains('iso:std:iso:20022') || trimmed.contains('iso20022');
+
+    final bool isCamt = (hasDocument && hasNtry && hasBkTo) || (hasCamtNs && hasNtry);
+    if (!isCamt) {
+      throw const BankImportException('Unsupported XML format: Not CAMT');
+    }
+
+    if (hasDocument && !trimmed.contains('</Document') && !trimmed.contains('</document')) {
+      throw const BankImportException('Ungültiges XML: Document nicht geschlossen (invalid)');
+    }
+
+    final RegExp ntryReg = RegExp(
+      r'<\s*(?:\w+:)?Ntry\b[^>]*>(.*?)</\s*(?:\w+:)?Ntry\s*>',
+      dotAll: true,
+      caseSensitive: false,
+    );
+    final Iterable<RegExpMatch> matches = ntryReg.allMatches(trimmed);
+    if (matches.isEmpty) {
+      if (trimmed.contains('<Ntry') || trimmed.contains(':Ntry')) {
+        throw const BankImportException('Ungültiges XML: Ntry nicht geschlossen (invalid)');
+      }
+      throw const BankImportException('Keine Transaktionen gefunden');
+    }
+
+    final List<RawTx> out = <RawTx>[];
+    for (final RegExpMatch m in matches) {
+      final String ntryOuter = m.group(0) ?? '';
+      final String ntryContent = m.group(1) ?? '';
+
+      // Amount — <Amt> with optional attributes
+      final RegExp amtReg = RegExp(r'<\s*(?:\w+:)?Amt\b[^>]*>([^<]+)</\s*(?:\w+:)?Amt\s*>', caseSensitive: false);
+      RegExpMatch? amtM = amtReg.firstMatch(ntryOuter);
+      amtM ??= amtReg.firstMatch(ntryContent);
+      if (amtM == null) {
+        throw const BankImportException('Betrag fehlt in Ntry');
+      }
+      final String amtRaw = amtM.group(1)!.trim();
+
+      // Credit/Debit indicator
+      final RegExp cdtReg = RegExp(
+        r'<\s*(?:\w+:)?CdtDbtInd\s*>([^<]+)</\s*(?:\w+:)?CdtDbtInd\s*>',
+        caseSensitive: false,
+      );
+      final RegExpMatch? cdtM = cdtReg.firstMatch(ntryContent) ?? cdtReg.firstMatch(ntryOuter);
+      final String? cdt = cdtM?.group(1)?.trim().toUpperCase();
+
+      // Parse betrag with CdtDbtInd handling via _parseBetrag
+      String betrag;
+      try {
+        final String stripped = amtRaw.replaceFirst(RegExp('^[+-]'), '').trim();
+        final String effective;
+        if (cdt == 'DBIT') {
+          effective = '-$stripped';
+        } else if (cdt == 'CRDT') {
+          effective = stripped;
+        } else {
+          effective = amtRaw;
+        }
+        betrag = _parseBetrag(effective);
+      } catch (e) {
+        if (e is BankImportException) rethrow;
+        throw BankImportException('Betrag ungültig: $amtRaw');
+      }
+
+      // Datum — prefer BookgDt/Dt, then ValDt/Dt, then generic Dt
+      final RegExp bookgDtReg = RegExp(
+        r'<\s*(?:\w+:)?BookgDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>',
+        dotAll: true,
+        caseSensitive: false,
+      );
+      final RegExp valDtReg = RegExp(
+        r'<\s*(?:\w+:)?ValDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>',
+        dotAll: true,
+        caseSensitive: false,
+      );
+      final RegExp dtReg = RegExp(r'<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>', caseSensitive: false);
+      RegExpMatch? dtM = bookgDtReg.firstMatch(ntryContent);
+      dtM ??= valDtReg.firstMatch(ntryContent);
+      dtM ??= dtReg.firstMatch(ntryContent);
+      dtM ??= bookgDtReg.firstMatch(ntryOuter);
+      dtM ??= valDtReg.firstMatch(ntryOuter);
+      dtM ??= dtReg.firstMatch(ntryOuter);
+      if (dtM == null) {
+        throw const BankImportException('Datum fehlt in Ntry');
+      }
+      final String dtRaw = dtM.group(1)!.trim();
+      late final DateTime datum;
+      try {
+        datum = _parseDate(dtRaw, null);
+      } catch (e) {
+        if (e is BankImportException) rethrow;
+        throw BankImportException('Datum ungültig: $dtRaw');
+      }
+
+      // Verwendungszweck — Ustrd + AddtlNtryInf
+      final RegExp ustrdReg = RegExp(
+        r'<\s*(?:\w+:)?Ustrd\s*>([^<]*?)</\s*(?:\w+:)?Ustrd\s*>',
+        dotAll: true,
+        caseSensitive: false,
+      );
+      final RegExp addtlReg = RegExp(
+        r'<\s*(?:\w+:)?AddtlNtryInf\s*>([^<]*?)</\s*(?:\w+:)?AddtlNtryInf\s*>',
+        dotAll: true,
+        caseSensitive: false,
+      );
+      final List<String> parts = <String>[];
+      for (final RegExpMatch um in ustrdReg.allMatches(ntryContent)) {
+        final String v = um.group(1)!.trim();
+        if (v.isNotEmpty) parts.add(v);
+      }
+      if (parts.isEmpty) {
+        for (final RegExpMatch um in ustrdReg.allMatches(ntryOuter)) {
+          final String v = um.group(1)!.trim();
+          if (v.isNotEmpty) parts.add(v);
+        }
+      }
+      for (final RegExpMatch am in addtlReg.allMatches(ntryContent)) {
+        final String v = am.group(1)!.trim();
+        if (v.isNotEmpty) parts.add(v);
+      }
+      final String verwendungszweck = parts.join(' ').trim();
+
+      // Partner — first Nm in Ntry
+      final RegExp nmReg = RegExp(r'<\s*(?:\w+:)?Nm\s*>([^<]+)</\s*(?:\w+:)?Nm\s*>', caseSensitive: false);
+      final RegExpMatch? nmM = nmReg.firstMatch(ntryContent) ?? nmReg.firstMatch(ntryOuter);
+      final String partner = nmM?.group(1)?.trim() ?? '';
+
+      // Gegenkonto — IBAN
+      final RegExp ibanReg = RegExp(r'<\s*(?:\w+:)?IBAN\s*>([^<]+)</\s*(?:\w+:)?IBAN\s*>', caseSensitive: false);
+      final RegExpMatch? ibanM = ibanReg.firstMatch(ntryContent) ?? ibanReg.firstMatch(ntryOuter);
+      final String? gegenkontoRaw = ibanM?.group(1)?.trim();
+      final String? gegenkonto = (gegenkontoRaw == null || gegenkontoRaw.isEmpty) ? null : gegenkontoRaw;
+
+      out.add(
+        RawTx(
+          datum: datum,
+          betrag: betrag,
+          verwendungszweck: verwendungszweck,
+          partner: partner,
+          gegenkonto: gegenkonto,
+        ),
+      );
+    }
+
+    if (out.isEmpty) {
+      throw const BankImportException('Keine Transaktionen gefunden');
+    }
+    return out;
+  }
+
   String _detectDelimiter(String headerLine) {
     final int semicolon = _countOutsideQuotes(headerLine, ';');
     final int comma = _countOutsideQuotes(headerLine, ',');

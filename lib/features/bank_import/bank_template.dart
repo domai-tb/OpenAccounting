@@ -23,7 +23,7 @@ class BankTemplate {
 
   /// Parse from DB row — bank_templates(konfiguration JSON).
   factory BankTemplate.fromRow(Map<String, Object?> row) {
-    final int id = (row['id'] as num).toInt();
+    final int id = (row['id'] as num?)!.toInt();
     final String name = row['name'] as String? ?? 'Unbekannt';
     final String typ = row['typ'] as String? ?? name.toLowerCase();
     final String rawKonfig = row['konfiguration'] as String? ?? '{}';
