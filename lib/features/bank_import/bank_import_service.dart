@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
@@ -80,7 +81,8 @@ class BankImportService {
   // ── Score ──────────────────────────────────────────────────────────
 
   /// Score 0..100 between [tx] and a journal row.
-  /// Amount within 0.01 => 40, date within 7 days => 30, partner similarity >80% => 30.
+  /// Discrete 40/30/30: amount within 0.01 => 40, date within 7d => 30, partner similarity >80% => 30.
+  /// Threshold 90 requires all three (ponytail: no partial auto-book, conservative by design).
   int computeScore(RawTx tx, Map<String, Object?> journalRow) {
     final String jBetragRaw = _journalBetrag(journalRow);
     final DateTime? jDatum = _journalDatum(journalRow);
@@ -88,7 +90,7 @@ class BankImportService {
 
     int score = 0;
 
-    // Amount: within 0.01 => 40
+    // Amount: within 0.01 => 40 (string money via money.toCents)
     try {
       final int txCents = money.toCents(tx.betrag);
       final int jCents = money.toCents(jBetragRaw);
@@ -130,7 +132,7 @@ class BankImportService {
     final String s = v.toString().trim();
     if (s.isEmpty) return null;
     // Try ISO YYYY-MM-DD or full iso
-    DateTime? d = DateTime.tryParse(s);
+    final DateTime? d = DateTime.tryParse(s);
     if (d != null) return DateTime(d.year, d.month, d.day);
     // Try DD.MM.YYYY fallback
     if (s.contains('.')) {
@@ -193,7 +195,7 @@ class BankImportService {
   }
 
   int _min3(int a, int b, int c) {
-    int m = a < b ? a : b;
+    final int m = a < b ? a : b;
     return m < c ? m : c;
   }
 
@@ -202,15 +204,47 @@ class BankImportService {
   /// Import [rawTxs] for [kontoId] with dedup + auto-rules + score.
   /// [mode] = 'manuell' | 'automatisch' — automatisch auto-books high-score matches.
   /// When [allowDuplicateOverride] true, duplicate hash is suffixed to make unique.
+  /// History row inserted first to obtain `importId` for FK on bank_transaktionen.
   Future<ImportResult> importTransactions({
     required int kontoId,
     required List<RawTx> rawTxs,
     String mode = 'manuell',
     bool allowDuplicateOverride = false,
+    String dateiname = 'import.csv',
+    BankTemplate? template,
   }) async {
     int imported = 0;
     int duplicates = 0;
     int autoCat = 0;
+
+    // History first: obtain importId before child rows (review L312).
+    int? importId;
+    try {
+      try {
+        importId = await executor.runInsert(
+          'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, '
+          'template_typ, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            kontoId,
+            dateiname,
+            DateTime.now().toIso8601String(),
+            rawTxs.length,
+            0,
+            template?.typ,
+            'importiert',
+          ],
+        );
+      } catch (_) {
+        importId = await executor.runInsert(
+          'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) '
+          'VALUES (?, ?, ?, ?, ?)',
+          <Object?>[kontoId, dateiname, DateTime.now().toIso8601String(), rawTxs.length, 'importiert'],
+        );
+      }
+    } catch (e) {
+      debugPrint('bank_import history insert failed: $e');
+      importId = null;
+    }
 
     // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters)
     List<Map<String, Object?>> journals = <Map<String, Object?>>[];
@@ -221,9 +255,11 @@ class BankImportService {
     }
 
     for (final RawTx tx in rawTxs) {
-      String hash = computeDedupeHash(tx.datum, tx.betrag, tx.partner, tx.verwendungszweck);
+      // String money: normalize betrag via money helper to 2 decimals for hash + storage
+      final String normBetrag = _normalizeBetragForStorage(tx.betrag);
+      String hash = computeDedupeHash(tx.datum, normBetrag, tx.partner, tx.verwendungszweck);
 
-      // Check duplicate per konto_id+dedupe_hash
+      // Check duplicate per konto_id+dedupe_hash (review L225: don't swallow DB error)
       bool isDuplicate = false;
       try {
         final List<Map<String, Object?>> existing = await executor.runSelect(
@@ -231,8 +267,9 @@ class BankImportService {
           <Object?>[kontoId, hash],
         );
         isDuplicate = existing.isNotEmpty;
-      } catch (_) {
-        isDuplicate = false;
+      } catch (e, st) {
+        debugPrint('bank_import isDuplicate check failed: $e');
+        Error.throwWithStackTrace(e, st);
       }
 
       if (isDuplicate && !allowDuplicateOverride) {
@@ -241,22 +278,28 @@ class BankImportService {
       }
 
       if (isDuplicate && allowDuplicateOverride) {
-        // suffix hash until unique: original-hash-1, -2, ...
-        int suffix = 1;
-        String candidate = '$hash-$suffix';
-        while (true) {
+        // suffix hash until unique: original-hash-1, -2, ... graceful cap at 100 (L243)
+        bool foundUnique = false;
+        String candidate = hash;
+        for (int suffix = 1; suffix <= 100; suffix++) {
+          candidate = '$hash-$suffix';
           try {
             final List<Map<String, Object?>> chk = await executor.runSelect(
               'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
               <Object?>[kontoId, candidate],
             );
-            if (chk.isEmpty) break;
-          } catch (_) {
-            break;
+            if (chk.isEmpty) {
+              foundUnique = true;
+              break;
+            }
+          } catch (e, st) {
+            debugPrint('bank_import override dup check failed: $e');
+            Error.throwWithStackTrace(e, st);
           }
-          suffix++;
-          candidate = '$hash-$suffix';
-          if (suffix > 100) break; // ponytail: suffix ceiling, stable hash loop
+        }
+        if (!foundUnique) {
+          // ponytail: cap 100 — graceful fallback: throw rather than colliding unique constraint
+          throw const BankImportException('Duplicate override limit reached (100) — manual cleanup required');
         }
         hash = candidate;
       }
@@ -265,7 +308,7 @@ class BankImportService {
       final int? kategorieId = await applyRules(tx.verwendungszweck);
       if (kategorieId != null) autoCat++;
 
-      // Score match against journals — pick best >=90
+      // Score match against journals — pick best >=90 (requires all three 40+30+30)
       int? matchedJournalId;
       if (journals.isNotEmpty) {
         int bestScore = -1;
@@ -287,35 +330,76 @@ class BankImportService {
           '${tx.datum.year.toString().padLeft(4, '0')}-'
           '${tx.datum.month.toString().padLeft(2, '0')}-'
           '${tx.datum.day.toString().padLeft(2, '0')}';
+      final String status = matchedJournalId != null ? 'gebucht' : 'neu';
 
       try {
         await executor.runInsert(
-          'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck, gegenkonto, kategorie_id, journal_id, dedupe_hash, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO bank_transaktionen (konto_id, import_id, datum, betrag, verwendungszweck, '
+          'gegenkonto, gegenkonto_name, kategorie_id, journal_id, dedupe_hash, status) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           <Object?>[
             kontoId,
+            importId,
             datumStr,
-            tx.betrag,
+            normBetrag,
             tx.verwendungszweck,
             tx.gegenkonto,
+            tx.partner,
             kategorieId,
             matchedJournalId,
             hash,
-            matchedJournalId != null ? 'gebucht' : 'neu',
+            status,
           ],
         );
         imported++;
       } catch (_) {
-        // понy: ignore insert error (FK etc) — counts as not imported
+        // ponytail: ignore insert error (FK etc) — counts as not imported
       }
     }
 
-    // History row
-    try {
-      await executor.runInsert(
-        'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) VALUES (?, ?, ?, ?, ?)',
-        <Object?>[kontoId, 'import.csv', DateTime.now().toIso8601String(), imported, 'importiert'],
-      );
-    } catch (_) {}
+    // Update history with final counts (imported, duplicates, template)
+    if (importId != null) {
+      try {
+        try {
+          await executor.runUpdate(
+            'UPDATE bank_imports SET anzahl_transaktionen = ?, duplikate = ?, template_typ = ? WHERE id = ?',
+            <Object?>[imported, duplicates, template?.typ, importId],
+          );
+        } catch (_) {
+          await executor.runUpdate('UPDATE bank_imports SET anzahl_transaktionen = ? WHERE id = ?', <Object?>[
+            imported,
+            importId,
+          ]);
+        }
+      } catch (e) {
+        debugPrint('bank_import history update failed: $e');
+      }
+    } else {
+      // Fallback if initial insert failed — create history now
+      try {
+        try {
+          await executor.runInsert(
+            'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, '
+            'template_typ, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              kontoId,
+              dateiname,
+              DateTime.now().toIso8601String(),
+              imported,
+              duplicates,
+              template?.typ,
+              'importiert',
+            ],
+          );
+        } catch (_) {
+          await executor.runInsert(
+            'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) '
+            'VALUES (?, ?, ?, ?, ?)',
+            <Object?>[kontoId, dateiname, DateTime.now().toIso8601String(), imported, 'importiert'],
+          );
+        }
+      } catch (_) {}
+    }
 
     final int manualReview = imported - autoCat;
     return ImportResult(
@@ -324,6 +408,14 @@ class BankImportService {
       autoCategorized: autoCat,
       manualReview: manualReview < 0 ? 0 : manualReview,
     );
+  }
+
+  String _normalizeBetragForStorage(String raw) {
+    try {
+      return money.fromCents(money.toCents(raw));
+    } catch (_) {
+      return raw.trim();
+    }
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.
