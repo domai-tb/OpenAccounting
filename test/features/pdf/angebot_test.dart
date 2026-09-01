@@ -36,6 +36,29 @@ void main() {
     PdfDocumentType.proforma: 'Proforma-Rechnung',
     PdfDocumentType.lieferschein: 'Lieferschein',
   };
+  const rawDocumentTypes = <String, PdfDocumentType>{
+    'rechnung': PdfDocumentType.rechnung,
+    'storno': PdfDocumentType.storno,
+    'gutschrift': PdfDocumentType.gutschrift,
+    'angebot': PdfDocumentType.angebot,
+    'auftrag': PdfDocumentType.auftrag,
+    'proforma': PdfDocumentType.proforma,
+    'lieferschein': PdfDocumentType.lieferschein,
+  };
+
+  test('document type boundary supports exactly seven values and rejects unknown raw values', () {
+    expect(PdfDocumentType.values, hasLength(7));
+    expect(PdfDocumentType.values, unorderedEquals(documentLabels.keys));
+
+    for (final entry in rawDocumentTypes.entries) {
+      expect(PdfDocumentType.fromRaw(entry.key), entry.value);
+    }
+
+    expect(
+      () => PdfDocumentType.fromRaw('Gutschein'),
+      throwsA(isA<ArgumentError>().having((error) => error.message, 'message', 'Unbekannter Dokumenttyp: Gutschein')),
+    );
+  });
 
   for (final entry in documentLabels.entries) {
     test('${entry.value} PDF renders its exact document label', () async {
@@ -49,13 +72,19 @@ void main() {
     });
   }
 
-  test('unsupported raw document type is rejected at the existing enum boundary', () {
-    expect(() => PdfDocumentType.values.byName('Gutschein'), throwsArgumentError);
-    expect(() => PdfDocumentType.fromRaw('Gutschein'), throwsArgumentError);
-  });
+  test('unknown raw template falls back to Standard in generator and emits a warning', () async {
+    final warnings = <String>[];
+    final template = PdfTemplate.fromRaw('neon', onWarning: warnings.add);
+    final parsedPdf = parsePdf(
+      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.rechnung, template: template)),
+    );
 
-  test('unknown raw template falls back to Standard', () {
-    expect(PdfTemplate.fromRaw('neon'), PdfTemplate.standard);
+    expect(PdfTemplate.values, orderedEquals(<PdfTemplate>[PdfTemplate.standard, PdfTemplate.gruen]));
+    expect(template, PdfTemplate.standard);
+    expect(parsedPdf.visibleText, allOf(contains('USt-Satz'), contains('USt'), contains('190,00 €')));
+    expect(parsedPdf.visibleText, isNot(contains('Gemäß §19 UStG')));
+    expect(warnings, hasLength(1));
+    expect(warnings.single, allOf(contains('neon'), contains('Standard')));
   });
 
   test('Standard PDF retains USt columns', () async {
@@ -75,6 +104,18 @@ void main() {
       ),
     );
 
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        contains('Muster Studio'),
+        contains('Beispiel GmbH'),
+        contains('Website-Design'),
+        contains('2,00'),
+        contains('1.000,00 €'),
+        contains('1.190,00 €'),
+        contains('Gesamtbetrag'),
+      ),
+    );
     expect(parsedPdf.visibleText, contains('Gemäß §19 UStG wird keine Umsatzsteuer berechnet'));
     expect(_containsExactLabel(parsedPdf.visibleText, 'USt-Satz'), isFalse);
     expect(_containsExactLabel(parsedPdf.visibleText, 'USt'), isFalse);
@@ -95,7 +136,16 @@ void main() {
       await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.lieferschein)),
     );
 
-    expect(parsedPdf.visibleText, allOf(contains('Pos.'), contains('Beschreibung'), contains('Menge')));
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        contains('Pos.'),
+        contains('Beschreibung'),
+        contains('Menge'),
+        contains('Website-Design'),
+        contains('2,00'),
+      ),
+    );
     expect(
       parsedPdf.visibleText,
       allOf(

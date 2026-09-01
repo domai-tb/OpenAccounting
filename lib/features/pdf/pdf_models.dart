@@ -45,7 +45,7 @@ enum PdfTemplate {
   standard,
   gruen;
 
-  static PdfTemplate fromRaw(String? raw) {
+  static PdfTemplate fromRaw(String? raw, {void Function(String message)? onWarning}) {
     if (raw == null || raw == 'standard') {
       return standard;
     }
@@ -53,8 +53,13 @@ enum PdfTemplate {
       return gruen;
     }
 
-    developer.log('Unbekannte PDF-Vorlage "$raw"; Standard wird verwendet.', name: 'PdfTemplate', level: 900);
+    final warning = 'Unbekannte PDF-Vorlage "$raw"; Standard wird verwendet.';
+    (onWarning ?? _logWarning)(warning);
     return standard;
+  }
+
+  static void _logWarning(String message) {
+    developer.log(message, name: 'PdfTemplate', level: 900);
   }
 }
 
