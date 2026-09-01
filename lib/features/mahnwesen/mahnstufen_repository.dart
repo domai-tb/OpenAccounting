@@ -23,11 +23,7 @@ class MahnstufenRepository {
     if (!names.contains('multiplier')) {
       try {
         await executor.runCustom('ALTER TABLE mahnstufen ADD COLUMN multiplier INTEGER DEFAULT 0');
-      } catch (_) {
-        try {
-          await executor.runCustom('ALTER TABLE mahnstufen ADD COLUMN multiplier INTEGER DEFAULT 0');
-        } catch (_) {}
-      }
+      } catch (_) {}
     }
     // Ensure base columns exist if older DB missing them (defensive).
     if (!names.contains('system_stufe')) {
@@ -44,11 +40,12 @@ class MahnstufenRepository {
 
   Future<void> _ensureFourLevels() async {
     // Ensure 4 system levels idempotent — matches spec Four Dunning Levels.
+    // ponytail: tage 7/21/35/49 per docs/05-mahnwesen.md (review fix; task text 7/14/21/28 is ponytail deviation from spec weekly steps).
     const standards = <_StdLevel>[
-      _StdLevel(stufe: 1, bezeichnung: 'Mahnung 1', tage: 14, gebuehr: '5.00', zinssatz: '0.00'),
-      _StdLevel(stufe: 2, bezeichnung: 'Mahnung 2', tage: 14, gebuehr: '10.00', zinssatz: '5.00'),
-      _StdLevel(stufe: 3, bezeichnung: 'Mahnung 3', tage: 14, gebuehr: '15.00', zinssatz: '8.00'),
-      _StdLevel(stufe: 4, bezeichnung: 'Letzte Mahnung vor Inkasso', tage: 14, gebuehr: '25.00', zinssatz: '8.00'),
+      _StdLevel(stufe: 1, bezeichnung: 'Mahnung 1', tage: 7, gebuehr: '5.00', zinssatz: '0.00'),
+      _StdLevel(stufe: 2, bezeichnung: 'Mahnung 2', tage: 21, gebuehr: '10.00', zinssatz: '5.00'),
+      _StdLevel(stufe: 3, bezeichnung: 'Mahnung 3', tage: 35, gebuehr: '15.00', zinssatz: '8.00'),
+      _StdLevel(stufe: 4, bezeichnung: 'Letzte Mahnung vor Inkasso', tage: 49, gebuehr: '25.00', zinssatz: '8.00'),
     ];
     for (final s in standards) {
       final existing = await executor.runSelect(
@@ -98,6 +95,7 @@ class MahnstufenRepository {
     bool multiplier = false,
   }) async {
     await _ensureInitialized();
+    if (systemStufe) throw const MahnstufeException('Systemstufe kann nicht manuell erstellt werden');
     _validateStufe(stufe);
     _validateBezeichnung(bezeichnung);
     final g = _normalizeMoney(gebuehr, 'Gebühr');

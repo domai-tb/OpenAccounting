@@ -526,7 +526,8 @@ CREATE TABLE IF NOT EXISTS mahnstufen (
   tage_nach_faelligkeit INTEGER DEFAULT 0,
   gebuehr NUMERIC(12,2) DEFAULT 0,
   zinssatz NUMERIC(12,2) DEFAULT 0,
-  system_stufe INTEGER DEFAULT 0
+  system_stufe INTEGER DEFAULT 0,
+  multiplier INTEGER DEFAULT 0
 )''',
   // 26 mahnwesen_einstellungen
   '''
