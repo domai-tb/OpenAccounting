@@ -19,11 +19,20 @@ void main() {
   });
 
   test('null Rechnung Schlusstext is omitted without falling back to Angebot', () async {
+    final baseline = parsePdf(
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(
+          documentType: PdfDocumentType.rechnung,
+          texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
+        ),
+      ),
+    );
     const texts = PdfDocumentTextsSnapshot(angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'));
     final parsedPdf = parsePdf(
       await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
     );
 
+    expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
     expect(
       parsedPdf.visibleText,
       allOf(isNot(contains('RECHNUNG CLOSING')), isNot(contains('ANGEBOT FALLBACK CLOSING'))),
@@ -31,6 +40,14 @@ void main() {
   });
 
   test('empty Rechnung Schlusstext is omitted without falling back to Angebot', () async {
+    final baseline = parsePdf(
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(
+          documentType: PdfDocumentType.rechnung,
+          texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
+        ),
+      ),
+    );
     const texts = PdfDocumentTextsSnapshot(
       rechnung: PdfTypeTextSnapshot(schlusstext: ''),
       angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'),
@@ -39,6 +56,7 @@ void main() {
       await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
     );
 
+    expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
     expect(
       parsedPdf.visibleText,
       allOf(isNot(contains('RECHNUNG CLOSING')), isNot(contains('ANGEBOT FALLBACK CLOSING'))),
@@ -46,6 +64,14 @@ void main() {
   });
 
   test('whitespace-only Rechnung Schlusstext is omitted without falling back to Angebot', () async {
+    final baseline = parsePdf(
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(
+          documentType: PdfDocumentType.rechnung,
+          texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
+        ),
+      ),
+    );
     const texts = PdfDocumentTextsSnapshot(
       rechnung: PdfTypeTextSnapshot(schlusstext: ' \n\t '),
       angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'),
@@ -54,6 +80,7 @@ void main() {
       await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
     );
 
+    expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
     expect(
       parsedPdf.visibleText,
       allOf(isNot(contains('RECHNUNG CLOSING')), isNot(contains('ANGEBOT FALLBACK CLOSING'))),
