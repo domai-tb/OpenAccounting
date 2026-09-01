@@ -95,6 +95,8 @@ class SeedData {
       [4, 'CAMT XML', 'camt', '{"format": "camt.053"}'],
       [5, 'Sparkasse', 'sparkasse', '{"delimiter": ";", "encoding": "iso-8859-1"}'],
       [6, 'DKB', 'dkb', '{"delimiter": ";", "encoding": "utf-8"}'],
+      [7, 'ING', 'ing', '{"delimiter": ";", "encoding": "utf-8"}'],
+      [8, 'Commerzbank', 'commerzbank', '{"delimiter": ";", "encoding": "utf-8"}'],
     ];
     for (final t in templates) {
       await executor.runCustom(
