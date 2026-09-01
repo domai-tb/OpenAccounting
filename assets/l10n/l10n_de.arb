@@ -21,6 +21,6 @@
   "invoiceNotFound": "Rechnung nicht gefunden",
   "setupTitle": "Deine Buchhaltung. Lokal auf deinem Gerät.",
   "setupStart": "Loslegen",
-  "confirmDelete": "Möchtest Du diese Rechnung wirklich löschen?",
-  "emptyInvoices": "Noch keine Rechnungen. Erstelle Deine erste Rechnung."
+  "confirmDelete": "Möchtest du diese Rechnung wirklich löschen?",
+  "emptyInvoices": "Noch keine Rechnungen. Erstelle deine erste Rechnung."
 }

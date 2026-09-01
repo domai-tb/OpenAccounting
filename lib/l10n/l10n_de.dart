@@ -73,8 +73,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setupStart => 'Loslegen';
 
   @override
-  String get confirmDelete => 'Möchtest Du diese Rechnung wirklich löschen?';
+  String get confirmDelete => 'Möchtest du diese Rechnung wirklich löschen?';
 
   @override
-  String get emptyInvoices => 'Noch keine Rechnungen. Erstelle Deine erste Rechnung.';
+  String get emptyInvoices => 'Noch keine Rechnungen. Erstelle deine erste Rechnung.';
 }

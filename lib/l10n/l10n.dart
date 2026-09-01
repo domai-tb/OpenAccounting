@@ -94,140 +94,140 @@ abstract class AppLocalizations {
 
   /// No description provided for @appTitle.
   ///
-  /// In en, this message translates to:
+  /// In de, this message translates to:
   /// **'OpenAccounting'**
   String get appTitle;
 
   /// No description provided for @hello.
   ///
-  /// In en, this message translates to:
-  /// **'Hello! Your accounting is ready.'**
+  /// In de, this message translates to:
+  /// **'Hallo! Deine Buchhaltung ist bereit.'**
   String get hello;
 
   /// No description provided for @welcome.
   ///
-  /// In en, this message translates to:
-  /// **'Welcome! You can get started.'**
+  /// In de, this message translates to:
+  /// **'Willkommen! Du kannst jetzt loslegen.'**
   String get welcome;
 
   /// No description provided for @settingsTheme.
   ///
-  /// In en, this message translates to:
-  /// **'Appearance'**
+  /// In de, this message translates to:
+  /// **'Darstellung'**
   String get settingsTheme;
 
   /// No description provided for @themeSystem.
   ///
-  /// In en, this message translates to:
+  /// In de, this message translates to:
   /// **'System'**
   String get themeSystem;
 
   /// No description provided for @themeLight.
   ///
-  /// In en, this message translates to:
-  /// **'Light'**
+  /// In de, this message translates to:
+  /// **'Hell'**
   String get themeLight;
 
   /// No description provided for @themeDark.
   ///
-  /// In en, this message translates to:
-  /// **'Dark'**
+  /// In de, this message translates to:
+  /// **'Dunkel'**
   String get themeDark;
 
   /// No description provided for @sidebarOverview.
   ///
-  /// In en, this message translates to:
-  /// **'Overview'**
+  /// In de, this message translates to:
+  /// **'Übersicht'**
   String get sidebarOverview;
 
   /// No description provided for @sidebarInvoices.
   ///
-  /// In en, this message translates to:
-  /// **'Invoices'**
+  /// In de, this message translates to:
+  /// **'Rechnungen'**
   String get sidebarInvoices;
 
   /// No description provided for @sidebarReceipts.
   ///
-  /// In en, this message translates to:
-  /// **'Receipts'**
+  /// In de, this message translates to:
+  /// **'Belege'**
   String get sidebarReceipts;
 
   /// No description provided for @sidebarBanking.
   ///
-  /// In en, this message translates to:
-  /// **'Banking'**
+  /// In de, this message translates to:
+  /// **'Bank & Zahlungen'**
   String get sidebarBanking;
 
   /// No description provided for @sidebarContacts.
   ///
-  /// In en, this message translates to:
-  /// **'Contacts'**
+  /// In de, this message translates to:
+  /// **'Kontakte'**
   String get sidebarContacts;
 
   /// No description provided for @sidebarTaxes.
   ///
-  /// In en, this message translates to:
-  /// **'Taxes'**
+  /// In de, this message translates to:
+  /// **'Steuern'**
   String get sidebarTaxes;
 
   /// No description provided for @sidebarReports.
   ///
-  /// In en, this message translates to:
-  /// **'Reports'**
+  /// In de, this message translates to:
+  /// **'Auswertungen'**
   String get sidebarReports;
 
   /// No description provided for @sidebarSettings.
   ///
-  /// In en, this message translates to:
-  /// **'Settings'**
+  /// In de, this message translates to:
+  /// **'Einstellungen'**
   String get sidebarSettings;
 
   /// No description provided for @backendUnreachable.
   ///
-  /// In en, this message translates to:
-  /// **'Backend not reachable'**
+  /// In de, this message translates to:
+  /// **'Backend nicht erreichbar'**
   String get backendUnreachable;
 
   /// No description provided for @retry.
   ///
-  /// In en, this message translates to:
-  /// **'Retry'**
+  /// In de, this message translates to:
+  /// **'Erneut versuchen'**
   String get retry;
 
   /// No description provided for @notFound.
   ///
-  /// In en, this message translates to:
-  /// **'Not found'**
+  /// In de, this message translates to:
+  /// **'Nicht gefunden'**
   String get notFound;
 
   /// No description provided for @invoiceNotFound.
   ///
-  /// In en, this message translates to:
-  /// **'Invoice not found'**
+  /// In de, this message translates to:
+  /// **'Rechnung nicht gefunden'**
   String get invoiceNotFound;
 
   /// No description provided for @setupTitle.
   ///
-  /// In en, this message translates to:
-  /// **'Your accounting. Local on your device.'**
+  /// In de, this message translates to:
+  /// **'Deine Buchhaltung. Lokal auf deinem Gerät.'**
   String get setupTitle;
 
   /// No description provided for @setupStart.
   ///
-  /// In en, this message translates to:
-  /// **'Get started'**
+  /// In de, this message translates to:
+  /// **'Loslegen'**
   String get setupStart;
 
   /// No description provided for @confirmDelete.
   ///
-  /// In en, this message translates to:
-  /// **'Do you really want to delete this invoice?'**
+  /// In de, this message translates to:
+  /// **'Möchtest du diese Rechnung wirklich löschen?'**
   String get confirmDelete;
 
   /// No description provided for @emptyInvoices.
   ///
-  /// In en, this message translates to:
-  /// **'No invoices yet. Create your first invoice.'**
+  /// In de, this message translates to:
+  /// **'Noch keine Rechnungen. Erstelle deine erste Rechnung.'**
   String get emptyInvoices;
 }
 
