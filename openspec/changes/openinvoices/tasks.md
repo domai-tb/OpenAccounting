@@ -91,7 +91,7 @@
 
 ## 10. PDF Generation
 
-- [ ] 10.1 Write failing test: `test/features/pdf/rechnung_test.dart` — PDF contains company header, positions, total
+- [x] 10.1 Write failing test: `test/features/pdf/rechnung_test.dart` — PDF contains company header, positions, total
 - [ ] 10.2 Implement: Rechnung PDF with Standard template
 - [ ] 10.3 Write failing test: `test/features/pdf/angebot_test.dart` — PDF contains Angebot-specific fields
 - [ ] 10.4 Implement: All 7 document type PDFs (Rechnung, Storno, Gutschrift, Angebot, Auftrag, Proforma, Lieferschein)
