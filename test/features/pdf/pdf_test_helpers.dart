@@ -8,6 +8,7 @@ PdfDocumentSnapshot rechnungSnapshot() {
     documentType: PdfDocumentType.rechnung,
     template: PdfTemplate.standard,
     documentNumber: 'RE-2026-001',
+    documentDate: DateTime(2026, 8, 30),
     company: const PdfCompanySnapshot(
       name: 'Muster Studio',
       street: 'Musterstraße 1',

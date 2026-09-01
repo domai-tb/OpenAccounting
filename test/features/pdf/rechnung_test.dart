@@ -110,9 +110,56 @@ void main() {
     expect(parsedPdf.visibleText, allOf(contains('Website-Design'), contains('2,00')));
   });
 
+  test('Rechnung PDF contains customer address and German date', () async {
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+
+    expect(
+      parsedPdf.visibleText,
+      allOf(contains('Beispiel GmbH'), contains('Kundenweg 2'), contains('20095 Hamburg'), contains('30.08.2026')),
+    );
+  });
+
+  test('Rechnung PDF contains full Standard monetary columns', () async {
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        contains('Pos.'),
+        contains('Beschreibung'),
+        contains('Menge'),
+        contains('Einzelpreis'),
+        contains('Rabatt'),
+        contains('Netto'),
+      ),
+    );
+    expect(
+      parsedPdf.visibleText,
+      allOf(
+        contains('USt-Satz'),
+        contains('USt'),
+        contains('Brutto'),
+        contains('1.000,00 €'),
+        contains('19,00 %'),
+        contains('190,00 €'),
+      ),
+    );
+  });
+
+  test('Rechnung generation leaves snapshot values unchanged', () async {
+    final snapshot = rechnungSnapshot();
+    final positions = snapshot.positions;
+
+    await const PdfGenerator().generate(snapshot);
+
+    expect(snapshot.positions, same(positions));
+    expect(snapshot.documentNumber, 'RE-2026-001');
+    expect(snapshot.totals.grossAmount, 1190);
+  });
+
   test('Rechnung PDF contains German-formatted total', () async {
     final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
 
-    expect(parsedPdf.visibleText, contains('1.190,00 €'));
+    expect(parsedPdf.visibleText, allOf(contains('Gesamtbetrag'), contains('1.190,00 €')));
   });
 }
