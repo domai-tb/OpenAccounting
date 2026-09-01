@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 3;
+  static const int currentVersion = 4;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -138,6 +138,11 @@ class MigrationRunner {
       await _migrateRechnungen();
       await _migrateAccounting();
     }
+    if (version == 4) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateFinalization();
+    }
   }
 
   Future<bool> _pragmaEnabled(String pragma) async {
@@ -208,6 +213,17 @@ class MigrationRunner {
     }
   }
 
+  Future<void> _migrateFinalization() async {
+    final columns = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
+    final names = <String>{for (final column in columns) column['name'].toString()};
+    if (!names.contains('absender_snapshot')) {
+      await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN absender_snapshot TEXT');
+    }
+    if (!names.contains('ausgegeben_am')) {
+      await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN ausgegeben_am TEXT');
+    }
+  }
+
   Future<void> _rebuildRechnungen() async {
     await executor.runCustom('ALTER TABLE rechnungen RENAME TO rechnungen_v1');
     await executor.runCustom(_rechnungenTableSql);
@@ -255,5 +271,7 @@ CREATE TABLE rechnungen (
   notiz TEXT,
   unternehmen_id INTEGER REFERENCES unternehmen(id),
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
-  storno_von INTEGER REFERENCES rechnungen(id)
+  storno_von INTEGER REFERENCES rechnungen(id),
+  absender_snapshot TEXT,
+  ausgegeben_am TEXT
 )''';

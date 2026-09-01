@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:openaccounting/core/db/data_paths.dart';
 import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
+import 'package:openaccounting/core/db/rechnung_triggers.dart';
 import 'package:openaccounting/core/db/seed.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
@@ -23,7 +24,9 @@ class AppDatabase {
     : _executor = executor ?? driftDatabase(name: 'openaccounting'),
       _ownsExecutor = executor == null;
 
-  AppDatabase.forTesting(QueryExecutor executor, {this.profileDir}) : _executor = executor, _ownsExecutor = true;
+  AppDatabase.forTesting(QueryExecutor executor, {this.profileDir})
+    : _executor = _InvoiceErrorMappingExecutor(executor),
+      _ownsExecutor = true;
 
   AppDatabase.forProfile(String profileDirectory)
     : this(drift_native.NativeDatabase(File(p.join(profileDirectory, 'openinvoices.db'))), profileDirectory);
@@ -109,6 +112,7 @@ class AppDatabase {
     await runner.run(createSchema: _createAllTables);
     // Ensure triggers and seed idempotent even when no migration
     await GobdTriggers.install(_executor);
+    await RechnungTriggers.install(_executor);
     await SeedData.run(_executor);
     await _kundenRepository.ensureSchema();
     await _lieferantenRepository.ensureSchema();
@@ -154,6 +158,72 @@ class _NoopUser extends QueryExecutorUser {
 
   @override
   Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
+}
+
+class _InvoiceErrorMappingExecutor extends QueryExecutor {
+  _InvoiceErrorMappingExecutor(this._delegate);
+
+  final QueryExecutor _delegate;
+
+  @override
+  SqlDialect get dialect => _delegate.dialect;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) {
+    return _delegate.runSelect(statement, args);
+  }
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) {
+    return _mapErrors(() => _delegate.runInsert(statement, args));
+  }
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) {
+    return _mapErrors(() => _delegate.runUpdate(statement, args));
+  }
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) {
+    return _mapErrors(() => _delegate.runDelete(statement, args));
+  }
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) {
+    return _mapErrors(() => _delegate.runCustom(statement, args));
+  }
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) {
+    return _mapErrors(() => _delegate.runBatched(statements));
+  }
+
+  @override
+  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
+
+  @override
+  QueryExecutor beginExclusive() => _delegate.beginExclusive();
+
+  @override
+  Future<void> close() => _delegate.close();
+
+  Future<T> _mapErrors<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } catch (error, stackTrace) {
+      final message = error.toString();
+      if (message.contains('Absender-Snapshot ist nach Finalisierung unveränderlich')) {
+        Error.throwWithStackTrace(StateError('Absender-Snapshot ist nach Finalisierung unveränderlich'), stackTrace);
+      }
+      if (message.contains('Dokument ist bereits finalisiert')) {
+        Error.throwWithStackTrace(StateError('Dokument ist bereits finalisiert'), stackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
 }
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -347,7 +417,9 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   notiz TEXT,
   unternehmen_id INTEGER REFERENCES unternehmen(id),
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
-  storno_von INTEGER REFERENCES rechnungen(id)
+  storno_von INTEGER REFERENCES rechnungen(id),
+  absender_snapshot TEXT,
+  ausgegeben_am TEXT
 )''',
   // 12 rechnungspositionen
   '''
