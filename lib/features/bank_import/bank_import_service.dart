@@ -53,7 +53,8 @@ class BankImportService {
     return sha256.convert(utf8.encode(input)).toString();
   }
 
-  /// Auto-categorization: first active rule whose muster is substring of verwendungszweck (case-insensitive), ordered by prioritaet DESC.
+  /// Auto-categorization: first active rule whose muster is substring of
+  /// verwendungszweck (case-insensitive), ordered by prioritaet DESC.
   Future<int?> applyRules(String verwendungszweck) async {
     final String trimmed = verwendungszweck.trim();
     if (trimmed.isEmpty) return null;

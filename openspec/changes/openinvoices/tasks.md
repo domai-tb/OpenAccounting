@@ -123,7 +123,7 @@
 - [x] 12.4 Implement: SHA-256 deduplication, auto-categorization rules
 - [x] 12.5 Write failing test: `test/features/bank_import/camt_test.dart` — CAMT XML parses correctly
 - [x] 12.6 Implement: CAMT XML import support
-- [ ] 12.7 Refactor; full suite stays green
+- [x] 12.7 Refactor; full suite stays green
 
 ## 13. Dunning (Mahnwesen)
 
