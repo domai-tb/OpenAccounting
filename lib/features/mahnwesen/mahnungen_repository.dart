@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/mahnwesen/mahnstufen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/mahnungen_entity.dart';
@@ -28,39 +29,55 @@ class MahnungenRepository {
       if (!names.contains('gebuehr_bezahlt')) {
         try {
           await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN gebuehr_bezahlt NUMERIC(12,2) DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter gebuehr_bezahlt: $e');
+        }
       }
       if (!names.contains('zinsen_bezahlt')) {
         try {
           await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN zinsen_bezahlt NUMERIC(12,2) DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter zinsen_bezahlt: $e');
+        }
       }
       if (!names.contains('uebernommene_gebuehr')) {
         try {
           await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN uebernommene_gebuehr NUMERIC(12,2) DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter uebernommene_gebuehr: $e');
+        }
       }
       if (!names.contains('uebernommene_zinsen')) {
         try {
           await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN uebernommene_zinsen NUMERIC(12,2) DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter uebernommene_zinsen: $e');
+        }
       }
       if (!names.contains('versendet_am')) {
         try {
           await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN versendet_am TEXT');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter versendet_am: $e');
+        }
       }
       // ponytail: fallback to gebuehr column if ADD COLUMN fails — repository logic derives unbezahlt via gebuehr - bezahlt.
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('mahnungen ensure mahnungen: $e');
+    }
     try {
       final colsR = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
       final namesR = <String>{for (final r in colsR) (r['name'] as String?) ?? ''};
       if (!namesR.contains('mahnstufe_aktuell')) {
         try {
           await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN mahnstufe_aktuell INTEGER DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnungen alter mahnstufe_aktuell: $e');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('mahnungen ensure rechnungen: $e');
+    }
   }
 
   // --- Zinsen ---
@@ -93,13 +110,17 @@ class MahnungenRepository {
     await _ensureInitialized();
     // Fetch rechnung.
     final rRows = await executor.runSelect(
-      'SELECT id, rechnungsnummer, kunde_id, brutto_betrag, netto_betrag, faelligkeit, datum FROM rechnungen WHERE id = ? LIMIT 1',
+      'SELECT id, rechnungsnummer, kunde_id, brutto_betrag, '
+      'netto_betrag, faelligkeit, datum '
+      'FROM rechnungen WHERE id = ? LIMIT 1',
       <Object?>[rechnungId],
     );
     if (rRows.isEmpty) throw const MahnungException('Rechnung nicht gefunden');
     final r = rRows.single;
     final sRows = await executor.runSelect(
-      'SELECT id, stufe, bezeichnung, gebuehr, zinssatz, tage_nach_faelligkeit FROM mahnstufen WHERE id = ? LIMIT 1',
+      'SELECT id, stufe, bezeichnung, gebuehr, zinssatz, '
+      'tage_nach_faelligkeit '
+      'FROM mahnstufen WHERE id = ? LIMIT 1',
       <Object?>[stufeId],
     );
     if (sRows.isEmpty) throw const MahnungException('Mahnstufe nicht gefunden');
@@ -130,7 +151,8 @@ class MahnungenRepository {
       try {
         final stufenRepo = MahnstufenRepository(executor);
         gebuehr = await stufenRepo.effektiveGebuehr(stufeId);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('mahnungen effektiveGebuehr: $e');
         gebuehr = _asMoneyString(s['gebuehr']);
       }
     }
@@ -145,80 +167,95 @@ class MahnungenRepository {
       zinsen = berechneZinsen(betrag: betragStr, zinssatz: zinssatzStr, tage: tage);
     }
 
-    // Carry-over: sum unpaid gebühr/zinsen of prior mahnungen for same rechnung.
-    int carryGebuehrCents = 0;
-    int carryZinsenCents = 0;
-    try {
-      final priorRows = await executor.runSelect(
-        'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, zinsen, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt FROM mahnungen WHERE rechnung_id = ?',
-        <Object?>[rechnungId],
-      );
-      for (final pr in priorRows) {
-        final g = money.toCents(_asMoneyString(pr['gebuehr']));
-        final gb = money.toCents(_asMoneyString(pr['gebuehr_bezahlt']));
-        final z = money.toCents(_asMoneyString(pr['zinsen']));
-        final zb = money.toCents(_asMoneyString(pr['zinsen_bezahlt']));
-        final gUnpaid = g - gb;
-        final zUnpaid = z - zb;
-        if (gUnpaid > 0) carryGebuehrCents += gUnpaid;
-        if (zUnpaid > 0) carryZinsenCents += zUnpaid;
-      }
-    } catch (_) {
-      // ponytail: if prior query fails (missing columns), carry stays 0.
-    }
-    final uebernommeneGebuehr = money.fromCents(carryGebuehrCents);
-    final uebernommeneZinsen = money.fromCents(carryZinsenCents);
-
-    final snapshotMap = <String, Object?>{
-      'rechnungsnummer': rechnungsnummer,
-      'betrag': betragStr,
-      'faelligkeit': faelligkeit,
-      'stufe': stufeNum,
-      'stufeBezeichnung': bezeichnung,
-      'gebuehr': gebuehr,
-      'zinsen': zinsen,
-      'uebernommeneGebuehr': uebernommeneGebuehr,
-      'uebernommeneZinsen': uebernommeneZinsen,
-    };
-    final snapshotJson = jsonEncode(snapshotMap);
     final datum = DateTime.now().toIso8601String();
+    int id = 0;
+    String uebernommeneGebuehr = '0.00';
+    String uebernommeneZinsen = '0.00';
 
-    int id;
+    // ponytail: atomic transaction for carry + insert + rechnung update.
+    await executor.runCustom('BEGIN');
     try {
-      id = await executor.runInsert(
-        'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot, gebuehr_bezahlt, zinsen_bezahlt, uebernommene_gebuehr, uebernommene_zinsen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[
+      int carryGebuehrCents = 0;
+      int carryZinsenCents = 0;
+      try {
+        final priorRows = await executor.runSelect(
+          'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+          'zinsen, COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt '
+          'FROM mahnungen WHERE rechnung_id = ?',
+          <Object?>[rechnungId],
+        );
+        carryGebuehrCents = _sumUnpaid(priorRows, 'gebuehr', 'gebuehr_bezahlt');
+        carryZinsenCents = _sumUnpaid(priorRows, 'zinsen', 'zinsen_bezahlt');
+      } catch (e) {
+        debugPrint('mahnungen carry: $e');
+      }
+      uebernommeneGebuehr = money.fromCents(carryGebuehrCents);
+      uebernommeneZinsen = money.fromCents(carryZinsenCents);
+
+      final snapshotMap = <String, Object?>{
+        'rechnungsnummer': rechnungsnummer,
+        'betrag': betragStr,
+        'faelligkeit': faelligkeit,
+        'stufe': stufeNum,
+        'stufeBezeichnung': bezeichnung,
+        'gebuehr': gebuehr,
+        'zinsen': zinsen,
+        'uebernommeneGebuehr': uebernommeneGebuehr,
+        'uebernommeneZinsen': uebernommeneZinsen,
+      };
+      final snapshotJson = jsonEncode(snapshotMap);
+
+      try {
+        id = await executor.runInsert(
+          'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, '
+          'betrag, gebuehr, zinsen, status, snapshot, '
+          'gebuehr_bezahlt, zinsen_bezahlt, uebernommene_gebuehr, '
+          'uebernommene_zinsen) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            rechnungId,
+            kundeId,
+            stufeId,
+            datum,
+            betragStr,
+            gebuehr,
+            zinsen,
+            'offen',
+            snapshotJson,
+            '0.00',
+            '0.00',
+            uebernommeneGebuehr,
+            uebernommeneZinsen,
+          ],
+        );
+      } catch (e) {
+        debugPrint('mahnungen insert full: $e');
+        // ponytail: fallback to minimal DDL without bezahlt/carry columns.
+        id = await executor.runInsert(
+          'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, '
+          'betrag, gebuehr, zinsen, status, snapshot) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[rechnungId, kundeId, stufeId, datum, betragStr, gebuehr, zinsen, 'offen', snapshotJson],
+        );
+      }
+
+      try {
+        await executor.runUpdate('UPDATE rechnungen SET mahnstufe_aktuell = ? WHERE id = ?', <Object?>[
+          stufeNum,
           rechnungId,
-          kundeId,
-          stufeId,
-          datum,
-          betragStr,
-          gebuehr,
-          zinsen,
-          'offen',
-          snapshotJson,
-          '0.00',
-          '0.00',
-          uebernommeneGebuehr,
-          uebernommeneZinsen,
-        ],
-      );
-    } catch (_) {
-      // ponytail: fallback to minimal DDL without bezahlt/carry columns.
-      id = await executor.runInsert(
-        'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[rechnungId, kundeId, stufeId, datum, betragStr, gebuehr, zinsen, 'offen', snapshotJson],
-      );
-    }
+        ]);
+      } catch (e) {
+        debugPrint('mahnungen update mahnstufe: $e');
+      }
 
-    // Update rechnungen.mahnstufe_aktuell.
-    try {
-      await executor.runUpdate('UPDATE rechnungen SET mahnstufe_aktuell = ? WHERE id = ?', <Object?>[
-        stufeNum,
-        rechnungId,
-      ]);
-    } catch (_) {
-      // ponytail: column may not exist on older DB; ignore — ensure adds it next init.
+      await executor.runCustom('COMMIT');
+    } catch (e) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (e2) {
+        debugPrint('mahnungen rollback: $e2');
+      }
+      rethrow;
     }
 
     final created = await getById(id);
@@ -231,12 +268,22 @@ class MahnungenRepository {
     List<Map<String, Object?>> rows;
     try {
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt, COALESCE(uebernommene_gebuehr, 0) as uebernommene_gebuehr, COALESCE(uebernommene_zinsen, 0) as uebernommene_zinsen, versendet_am FROM mahnungen WHERE id = ? LIMIT 1',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot, '
+        'COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt, '
+        'COALESCE(uebernommene_gebuehr, 0) AS uebernommene_gebuehr, '
+        'COALESCE(uebernommene_zinsen, 0) AS uebernommene_zinsen, '
+        'versendet_am '
+        'FROM mahnungen WHERE id = ? LIMIT 1',
         <Object?>[id],
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen getById fallback: $e');
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot FROM mahnungen WHERE id = ? LIMIT 1',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot '
+        'FROM mahnungen WHERE id = ? LIMIT 1',
         <Object?>[id],
       );
     }
@@ -249,12 +296,22 @@ class MahnungenRepository {
     List<Map<String, Object?>> rows;
     try {
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt, COALESCE(uebernommene_gebuehr, 0) as uebernommene_gebuehr, COALESCE(uebernommene_zinsen, 0) as uebernommene_zinsen, versendet_am FROM mahnungen WHERE rechnung_id = ? ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot, '
+        'COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt, '
+        'COALESCE(uebernommene_gebuehr, 0) AS uebernommene_gebuehr, '
+        'COALESCE(uebernommene_zinsen, 0) AS uebernommene_zinsen, '
+        'versendet_am '
+        'FROM mahnungen WHERE rechnung_id = ? ORDER BY datum ASC, id ASC',
         <Object?>[rechnungId],
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen listByRechnung fallback: $e');
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot FROM mahnungen WHERE rechnung_id = ? ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot '
+        'FROM mahnungen WHERE rechnung_id = ? ORDER BY datum ASC, id ASC',
         <Object?>[rechnungId],
       );
     }
@@ -266,12 +323,22 @@ class MahnungenRepository {
     List<Map<String, Object?>> rows;
     try {
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt, COALESCE(uebernommene_gebuehr, 0) as uebernommene_gebuehr, COALESCE(uebernommene_zinsen, 0) as uebernommene_zinsen, versendet_am FROM mahnungen WHERE kunde_id = ? ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot, '
+        'COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt, '
+        'COALESCE(uebernommene_gebuehr, 0) AS uebernommene_gebuehr, '
+        'COALESCE(uebernommene_zinsen, 0) AS uebernommene_zinsen, '
+        'versendet_am '
+        'FROM mahnungen WHERE kunde_id = ? ORDER BY datum ASC, id ASC',
         <Object?>[kundeId],
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen listByKunde fallback: $e');
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot FROM mahnungen WHERE kunde_id = ? ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot '
+        'FROM mahnungen WHERE kunde_id = ? ORDER BY datum ASC, id ASC',
         <Object?>[kundeId],
       );
     }
@@ -283,12 +350,22 @@ class MahnungenRepository {
     List<Map<String, Object?>> rows;
     try {
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt, COALESCE(uebernommene_gebuehr, 0) as uebernommene_gebuehr, COALESCE(uebernommene_zinsen, 0) as uebernommene_zinsen, versendet_am FROM mahnungen ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot, '
+        'COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt, '
+        'COALESCE(uebernommene_gebuehr, 0) AS uebernommene_gebuehr, '
+        'COALESCE(uebernommene_zinsen, 0) AS uebernommene_zinsen, '
+        'versendet_am '
+        'FROM mahnungen ORDER BY datum ASC, id ASC',
         const <Object?>[],
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen listAll fallback: $e');
       rows = await executor.runSelect(
-        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, gebuehr, zinsen, status, snapshot FROM mahnungen ORDER BY datum ASC, id ASC',
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot '
+        'FROM mahnungen ORDER BY datum ASC, id ASC',
         const <Object?>[],
       );
     }
@@ -306,7 +383,8 @@ class MahnungenRepository {
     final effective = newCents > maxCents ? current.gebuehr : norm;
     try {
       await executor.runUpdate('UPDATE mahnungen SET gebuehr_bezahlt = ? WHERE id = ?', <Object?>[effective, id]);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen updateGebuehrBezahlt: $e');
       throw const MahnungException('Gebühr bezahlt konnte nicht aktualisiert werden');
     }
     final updated = await getById(id);
@@ -324,7 +402,8 @@ class MahnungenRepository {
     final effective = newCents > maxCents ? current.zinsen : norm;
     try {
       await executor.runUpdate('UPDATE mahnungen SET zinsen_bezahlt = ? WHERE id = ?', <Object?>[effective, id]);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen updateZinsenBezahlt: $e');
       throw const MahnungException('Zinsen bezahlt konnte nicht aktualisiert werden');
     }
     final updated = await getById(id);
@@ -336,22 +415,17 @@ class MahnungenRepository {
     await _ensureInitialized();
     try {
       final rows = await executor.runSelect(
-        'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, zinsen, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt FROM mahnungen WHERE rechnung_id = ?',
+        'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'zinsen, COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt '
+        'FROM mahnungen WHERE rechnung_id = ?',
         <Object?>[rechnungId],
       );
       int total = 0;
-      for (final r in rows) {
-        final g = money.toCents(_asMoneyString(r['gebuehr']));
-        final gb = money.toCents(_asMoneyString(r['gebuehr_bezahlt']));
-        final z = money.toCents(_asMoneyString(r['zinsen']));
-        final zb = money.toCents(_asMoneyString(r['zinsen_bezahlt']));
-        final gUnpaid = g - gb;
-        final zUnpaid = z - zb;
-        if (gUnpaid > 0) total += gUnpaid;
-        if (zUnpaid > 0) total += zUnpaid;
-      }
+      total += _sumUnpaid(rows, 'gebuehr', 'gebuehr_bezahlt');
+      total += _sumUnpaid(rows, 'zinsen', 'zinsen_bezahlt');
       return money.fromCents(total);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen getCarryOver: $e');
       return '0.00';
     }
   }
@@ -362,27 +436,20 @@ class MahnungenRepository {
     await _ensureInitialized();
     try {
       final rows = await executor.runSelect(
-        'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) as gebuehr_bezahlt, zinsen, COALESCE(zinsen_bezahlt, 0) as zinsen_bezahlt FROM mahnungen WHERE rechnung_id = ?',
+        'SELECT gebuehr, COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'zinsen, COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt '
+        'FROM mahnungen WHERE rechnung_id = ?',
         <Object?>[rechnungId],
       );
-      int gTotal = 0;
-      int zTotal = 0;
-      for (final r in rows) {
-        final g = money.toCents(_asMoneyString(r['gebuehr']));
-        final gb = money.toCents(_asMoneyString(r['gebuehr_bezahlt']));
-        final z = money.toCents(_asMoneyString(r['zinsen']));
-        final zb = money.toCents(_asMoneyString(r['zinsen_bezahlt']));
-        final gUnpaid = g - gb;
-        final zUnpaid = z - zb;
-        if (gUnpaid > 0) gTotal += gUnpaid;
-        if (zUnpaid > 0) zTotal += zUnpaid;
-      }
+      final gTotal = _sumUnpaid(rows, 'gebuehr', 'gebuehr_bezahlt');
+      final zTotal = _sumUnpaid(rows, 'zinsen', 'zinsen_bezahlt');
       return <String, String>{
         'gebuehr': money.fromCents(gTotal),
         'zinsen': money.fromCents(zTotal),
         'total': money.fromCents(gTotal + zTotal),
       };
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen getCarryOverBreakdown: $e');
       return <String, String>{'gebuehr': '0.00', 'zinsen': '0.00', 'total': '0.00'};
     }
   }
@@ -396,7 +463,8 @@ class MahnungenRepository {
         now,
         id,
       ]);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen markSent: $e');
       await executor.runUpdate('UPDATE mahnungen SET status = ? WHERE id = ?', <Object?>['versendet', id]);
     }
     final updated = await getById(id);
@@ -424,12 +492,24 @@ class MahnungenRepository {
       ]);
       if (rows.isEmpty) return 0;
       return _asInt(rows.single['mahnstufe_aktuell']) ?? 0;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('mahnungen getInvoiceDunningLevel: $e');
       return 0;
     }
   }
 
   // --- helpers ---
+
+  int _sumUnpaid(List<Map<String, Object?>> rows, String totalKey, String paidKey) {
+    var sum = 0;
+    for (final r in rows) {
+      final total = money.toCents(_asMoneyString(r[totalKey]));
+      final paid = money.toCents(_asMoneyString(r[paidKey]));
+      final unpaid = total - paid;
+      if (unpaid > 0) sum += unpaid;
+    }
+    return sum;
+  }
 
   Mahnung _fromRow(Map<String, Object?> r) {
     final gebuehrStr = _asMoneyString(r['gebuehr']);

@@ -116,6 +116,13 @@ class AppDatabase {
     await SeedData.run(_executor);
     await _kundenRepository.ensureSchema();
     await _lieferantenRepository.ensureSchema();
+    // ponytail: bank_imports history completeness — add columns lazily for pre-existing DBs
+    try {
+      await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN duplikate INTEGER DEFAULT 0');
+    } catch (_) {}
+    try {
+      await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN template_typ TEXT');
+    } catch (_) {}
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -419,7 +426,8 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
   storno_von INTEGER REFERENCES rechnungen(id),
   absender_snapshot TEXT,
-  ausgegeben_am TEXT
+  ausgegeben_am TEXT,
+  mahnstufe_aktuell INTEGER DEFAULT 0
 )''',
   // 12 rechnungspositionen
   '''
@@ -492,7 +500,7 @@ CREATE TABLE IF NOT EXISTS bank_templates (
   typ TEXT NOT NULL,
   konfiguration TEXT
 )''',
-  // 16 bank_imports
+  // 16 bank_imports — ponytail: duplikate+template_typ added for history completeness (review L312)
   '''
 CREATE TABLE IF NOT EXISTS bank_imports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -500,6 +508,8 @@ CREATE TABLE IF NOT EXISTS bank_imports (
   dateiname TEXT,
   datum TEXT DEFAULT CURRENT_TIMESTAMP,
   anzahl_transaktionen INTEGER DEFAULT 0,
+  duplikate INTEGER DEFAULT 0,
+  template_typ TEXT,
   status TEXT DEFAULT 'importiert'
 )''',
   // 17 bank_transaktionen
@@ -622,7 +632,12 @@ CREATE TABLE IF NOT EXISTS mahnungen (
   gebuehr NUMERIC(12,2) DEFAULT 0,
   zinsen NUMERIC(12,2) DEFAULT 0,
   status TEXT DEFAULT 'offen',
-  snapshot TEXT
+  snapshot TEXT,
+  gebuehr_bezahlt NUMERIC(12,2) DEFAULT 0,
+  zinsen_bezahlt NUMERIC(12,2) DEFAULT 0,
+  uebernommene_gebuehr NUMERIC(12,2) DEFAULT 0,
+  uebernommene_zinsen NUMERIC(12,2) DEFAULT 0,
+  versendet_am TEXT
 )''',
   // 28 forderungen
   '''

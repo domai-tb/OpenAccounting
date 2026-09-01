@@ -1,7 +1,7 @@
 /// Shared money helpers for accounting — string cents to avoid double drift.
-/// ponytail: pure functions, trunc to 2 decimals, no abstraction beyond needed.
+/// ponytail: pure functions, round half-up on 3rd decimal to match normalize.
 int toCents(String raw) {
-  final String t = raw.trim();
+  final String t = raw.trim().replaceAll(',', '.');
   if (t.isEmpty) {
     return 0;
   }
@@ -12,8 +12,26 @@ int toCents(String raw) {
   final String intNoLead = intPartRaw.replaceFirst(RegExp('^0+'), '');
   final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
   final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  final int cents = int.parse(effInt) * 100 + int.parse(dec);
+  int decCents = 0;
+  bool carry = false;
+  if (decRaw.length <= 2) {
+    final String dec = '${decRaw}00'.substring(0, 2);
+    decCents = int.parse(dec);
+  } else {
+    final int firstTwo = int.parse(decRaw.substring(0, 2));
+    final int third = int.tryParse(decRaw[2]) ?? 0;
+    if (third >= 5) {
+      decCents = firstTwo + 1;
+      if (decCents == 100) {
+        decCents = 0;
+        carry = true;
+      }
+    } else {
+      decCents = firstTwo;
+    }
+  }
+  int cents = int.parse(effInt) * 100 + decCents;
+  if (carry) cents += 100;
   return isNeg ? -cents : cents;
 }
 
@@ -26,7 +44,7 @@ String fromCents(int cents) {
 }
 
 String formatBetrag(String raw) {
-  final String t = raw.trim();
+  final String t = raw.trim().replaceAll(',', '.');
   if (t.isEmpty) {
     return '0.00';
   }
@@ -35,8 +53,25 @@ String formatBetrag(String raw) {
   final List<String> parts = unsigned.split('.');
   final String intPart = parts[0].isEmpty ? '0' : parts[0];
   final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  return '${isNeg ? '-' : ''}$intPart.$dec';
+  // ponytail: round half-up for display, same as toCents.
+  if (decRaw.length <= 2) {
+    final String dec = '${decRaw}00'.substring(0, 2);
+    return '${isNeg ? '-' : ''}$intPart.$dec';
+  }
+  final int firstTwo = int.parse(decRaw.substring(0, 2).padRight(2, '0'));
+  final int third = int.tryParse(decRaw.length > 2 ? decRaw[2] : '0') ?? 0;
+  var decCents = firstTwo;
+  var carryInt = 0;
+  if (third >= 5) {
+    decCents += 1;
+    if (decCents == 100) {
+      decCents = 0;
+      carryInt = 1;
+    }
+  }
+  final int intVal = int.parse(intPart) + carryInt;
+  final String dec = decCents.toString().padLeft(2, '0');
+  return '${isNeg ? '-' : ''}$intVal.$dec';
 }
 
 String add(String a, String b) {

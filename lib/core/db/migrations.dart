@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 4;
+  static const int currentVersion = 5;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -143,6 +143,10 @@ class MigrationRunner {
       await _migrateRechnungen();
       await _migrateFinalization();
     }
+    if (version == 5) {
+      await createSchema();
+      await _migrateMahnwesen();
+    }
   }
 
   Future<bool> _pragmaEnabled(String pragma) async {
@@ -224,6 +228,42 @@ class MigrationRunner {
     }
   }
 
+  Future<void> _migrateMahnwesen() async {
+    final mCols = await executor.runSelect('PRAGMA table_info(mahnungen)', const <Object?>[]);
+    final mNames = <String>{for (final r in mCols) r['name'].toString()};
+    const mAdds = <String, String>{
+      'gebuehr_bezahlt': 'NUMERIC(12,2) DEFAULT 0',
+      'zinsen_bezahlt': 'NUMERIC(12,2) DEFAULT 0',
+      'uebernommene_gebuehr': 'NUMERIC(12,2) DEFAULT 0',
+      'uebernommene_zinsen': 'NUMERIC(12,2) DEFAULT 0',
+      'versendet_am': 'TEXT',
+    };
+    for (final e in mAdds.entries) {
+      if (!mNames.contains(e.key)) {
+        try {
+          await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN ${e.key} ${e.value}');
+        } catch (_) {
+          try {
+            await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN IF NOT EXISTS ${e.key} ${e.value}');
+          } catch (_) {}
+        }
+      }
+    }
+    final rCols = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
+    final rNames = <String>{for (final r in rCols) r['name'].toString()};
+    if (!rNames.contains('mahnstufe_aktuell')) {
+      try {
+        await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN mahnstufe_aktuell INTEGER DEFAULT 0');
+      } catch (_) {
+        try {
+          await executor.runCustom(
+            'ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS mahnstufe_aktuell INTEGER DEFAULT 0',
+          );
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> _rebuildRechnungen() async {
     await executor.runCustom('ALTER TABLE rechnungen RENAME TO rechnungen_v1');
     await executor.runCustom(_rechnungenTableSql);
@@ -273,5 +313,6 @@ CREATE TABLE rechnungen (
   nummernkreis_id INTEGER REFERENCES nummernkreise(id),
   storno_von INTEGER REFERENCES rechnungen(id),
   absender_snapshot TEXT,
-  ausgegeben_am TEXT
+  ausgegeben_am TEXT,
+  mahnstufe_aktuell INTEGER DEFAULT 0
 )''';
