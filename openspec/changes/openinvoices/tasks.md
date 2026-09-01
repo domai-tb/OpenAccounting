@@ -95,7 +95,7 @@
 - [x] 10.2 Implement: Rechnung PDF with Standard template
 - [x] 10.3 Write failing test: `test/features/pdf/angebot_test.dart` — PDF contains Angebot-specific fields
 - [x] 10.4 Implement: All 7 document type PDFs (Rechnung, Storno, Gutschrift, Angebot, Auftrag, Proforma, Lieferschein)
-- [ ] 10.5 Write failing test: `test/features/pdf/einleitungstext_test.dart` — per-type text appears in PDF
+- [x] 10.5 Write failing test: `test/features/pdf/einleitungstext_test.dart` — per-type text appears in PDF
 - [ ] 10.6 Implement: Einleitungstext/Schlusstext per document type, no cross-fallback
 - [ ] 10.7 Write failing test: `test/features/pdf/kopie_test.dart` — copy shows KOPIE watermark
 - [ ] 10.8 Implement: KOPIE watermark on document copies
