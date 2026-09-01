@@ -339,6 +339,8 @@ class SperrungService {
   }
 
   Mahnung _fromMahnungRow(Map<String, Object?> r) {
+    // ponytail: local asMoney/asInt duped from repos — variant uses money.toCents vs manual clamp,
+    // not byte-identical; helper extraction overhead exceeds benefit.
     String asMoney(Object? v) {
       if (v == null) return '0.00';
       if (v is num) return v.toStringAsFixed(2);

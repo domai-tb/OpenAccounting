@@ -499,6 +499,8 @@ class MahnungenRepository {
   }
 
   // --- helpers ---
+  // ponytail: _asMoneyString duped with mahnstufen_repository — byte-identical 8 lines but _normalizeMoney
+  // diverges (MahnstufeException vs MahnungException); shared file not justified for 3 repos.
 
   int _sumUnpaid(List<Map<String, Object?>> rows, String totalKey, String paidKey) {
     var sum = 0;

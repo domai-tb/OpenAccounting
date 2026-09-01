@@ -194,6 +194,8 @@ class MahnstufenRepository {
   }
 
   // Helpers
+  // ponytail: _asMoneyString/_normalizeMoney duped across mahnwesen repos — not byte-identical (exception type
+  // + comment diverge), extraction to mahnwesen_helpers.dart adds file+import churn for ~8 lines; keep duplicated.
 
   Mahnstufe _fromRow(Map<String, Object?> r) {
     return Mahnstufe(

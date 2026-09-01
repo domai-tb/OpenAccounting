@@ -133,7 +133,7 @@
 - [x] 13.4 Implement: Mahnung creation with rechnung snapshot, Gebühr/Zinsen tracking
 - [x] 13.5 Write failing test: `test/features/mahnwesen/sperrung_test.dart` — Kundensperrung at threshold
 - [x] 13.6 Implement: Kundensperrung (warnung + sperrung), Mahnsperre per Kunde
-- [ ] 13.7 Refactor; full suite stays green
+- [x] 13.7 Refactor; full suite stays green
 
 ## 14. Dashboard
 
