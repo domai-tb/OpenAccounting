@@ -131,8 +131,8 @@
 - [x] 13.2 Implement: Mahnstufen CRUD with system_stufe protection
 - [x] 13.3 Write failing test: `test/features/mahnwesen/mahnung_test.dart` — dunning creates snapshot
 - [x] 13.4 Implement: Mahnung creation with rechnung snapshot, Gebühr/Zinsen tracking
-- [ ] 13.5 Write failing test: `test/features/mahnwesen/sperrung_test.dart` — Kundensperrung at threshold
-- [ ] 13.6 Implement: Kundensperrung (warnung + sperrung), Mahnsperre per Kunde
+- [x] 13.5 Write failing test: `test/features/mahnwesen/sperrung_test.dart` — Kundensperrung at threshold
+- [x] 13.6 Implement: Kundensperrung (warnung + sperrung), Mahnsperre per Kunde
 - [ ] 13.7 Refactor; full suite stays green
 
 ## 14. Dashboard
