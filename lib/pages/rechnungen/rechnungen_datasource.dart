@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 
@@ -57,7 +59,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       await transaction.ensureOpen(_NoopTransactionUser());
       final invoiceRows = await transaction.runSelect(
         '''
-SELECT id, ist_entwurf, datum
+SELECT id, ist_entwurf, datum, unternehmen_id
 FROM rechnungen
 WHERE id = ?
 ''',
@@ -80,7 +82,7 @@ WHERE id = ?
         '''
 SELECT id, format, naechste_nummer, aktiv
 FROM nummernkreise
-WHERE typ = ?
+WHERE typ = ? AND aktiv = 1
 ORDER BY id
 LIMIT 1
 ''',
@@ -91,22 +93,47 @@ LIMIT 1
       }
 
       final range = rangeRows.single;
-      if (_asInt(range['aktiv']) != 1) {
-        throw StateError('Rechnungsausgang-Nummernkreis ist inaktiv');
-      }
       final format = range['format']?.toString().trim() ?? '';
-      if (format.isEmpty) {
-        throw StateError('Rechnungsausgang-Nummernkreis hat kein Format');
+      final sequenceMatches = _sequenceMatchesForFormat(format);
+      if (sequenceMatches == null || sequenceMatches.length != 1) {
+        throw StateError('Rechnungsausgang-Nummernkreis-Format muss genau ein Sequenz-Token enthalten');
       }
-      final nextNumber = _asInt(range['naechste_nummer']);
-      if (nextNumber == null || nextNumber < 1) {
+
+      final storedNextNumber = _asInt(range['naechste_nummer']);
+      if (storedNextNumber == null || storedNextNumber < 1) {
         throw StateError('Rechnungsausgang-Nummernkreis ist erschöpft');
       }
-      final sequenceWidth = _sequenceWidth(format);
-      if (sequenceWidth != null && (sequenceWidth > 9 || nextNumber > _maximumForWidth(sequenceWidth))) {
+
+      final latestRows = await transaction.runSelect(
+        '''
+SELECT datum
+FROM rechnungen
+WHERE nummernkreis_id = ? AND ist_entwurf = 0 AND rechnungsnummer IS NOT NULL
+''',
+        <Object?>[range['id']],
+      );
+      DateTime? latestDate;
+      for (final row in latestRows) {
+        final date = DateTime.tryParse(row['datum']?.toString() ?? '');
+        if (date != null && (latestDate == null || date.isAfter(latestDate))) {
+          latestDate = date;
+        }
+      }
+      if (latestDate != null && latestDate.year > invoiceDate.year) {
+        throw StateError('Rechnungsdatum liegt vor letzter finalisierter Rechnung');
+      }
+      final nextNumber = latestDate != null && latestDate.year < invoiceDate.year ? 1 : storedNextNumber;
+      final sequenceWidth = _sequenceWidth(sequenceMatches.single);
+      if (sequenceWidth > 9 || nextNumber > _maximumForWidth(sequenceWidth)) {
         throw StateError('Rechnungsausgang-Nummernkreis ist erschöpft');
       }
       final documentNumber = _formatNumber(format, invoiceDate.year, nextNumber);
+
+      final companyRows = invoice['unternehmen_id'] == null
+          ? const <Map<String, Object?>>[]
+          : await transaction.runSelect('SELECT * FROM unternehmen WHERE id = ?', <Object?>[invoice['unternehmen_id']]);
+      final senderSnapshot = jsonEncode(companyRows.isEmpty ? <String, Object?>{} : companyRows.single);
+      final issuedAt = DateTime.now().toUtc().toIso8601String();
 
       final sequenceUpdated = await transaction.runUpdate(
         '''
@@ -114,7 +141,7 @@ UPDATE nummernkreise
 SET naechste_nummer = ?
 WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
 ''',
-        <Object?>[nextNumber + 1, range['id'], nextNumber],
+        <Object?>[nextNumber + 1, range['id'], storedNextNumber],
       );
       if (sequenceUpdated != 1) {
         throw StateError('Rechnungsausgang-Nummernkreis konnte nicht atomar reserviert werden');
@@ -123,10 +150,10 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
       final invoiceUpdated = await transaction.runUpdate(
         '''
 UPDATE rechnungen
-SET rechnungsnummer = ?, nummernkreis_id = ?, ist_entwurf = 0, status = ?
+SET rechnungsnummer = ?, nummernkreis_id = ?, ist_entwurf = 0, status = ?, absender_snapshot = ?, ausgegeben_am = ?
 WHERE id = ? AND ist_entwurf = 1
 ''',
-        <Object?>[documentNumber, range['id'], 'offen', rechnungId],
+        <Object?>[documentNumber, range['id'], 'offen', senderSnapshot, issuedAt, rechnungId],
       );
       if (invoiceUpdated != 1) {
         throw StateError('Rechnung konnte nicht finalisiert werden');
@@ -168,16 +195,26 @@ ORDER BY position, id
     );
   }
 
+  static List<RegExpMatch>? _sequenceMatchesForFormat(String format) {
+    final tokens = _formatTokenPattern.allMatches(format).toList(growable: false);
+    var end = 0;
+    for (final token in tokens) {
+      if (token.start != end) return null;
+      end = token.end;
+    }
+    if (end != format.length) return null;
+    return _sequenceTokenPattern.allMatches(format).toList(growable: false);
+  }
+
   static int? _asInt(Object? value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '');
   }
 
-  static int? _sequenceWidth(String format) {
-    final match = RegExp(r'\{(#+|N+)\}|(#+)').firstMatch(format);
-    final token = match?.group(1) ?? match?.group(2);
-    return token?.length;
+  static int _sequenceWidth(RegExpMatch match) {
+    final token = match.group(1) ?? match.group(0)!;
+    return token.length;
   }
 
   static int _maximumForWidth(int width) {
@@ -194,14 +231,17 @@ ORDER BY position, id
         .replaceAll('{YY}', _twoDigits(year % 100))
         .replaceAll('YYYY', year.toString())
         .replaceAll('YY', _twoDigits(year % 100));
-    return result.replaceAllMapped(RegExp(r'\{(#+|N+)\}|(#+)'), (match) {
-      final token = match.group(1) ?? match.group(2)!;
+    return result.replaceAllMapped(_sequenceTokenPattern, (match) {
+      final token = match.group(1) ?? match.group(0)!;
       return number.toString().padLeft(token.length, '0');
     });
   }
 
   static String _twoDigits(int value) => value.toString().padLeft(2, '0');
 }
+
+final RegExp _formatTokenPattern = RegExp(r'\{(?:YYYY|YY|#+|N+)\}|YYYY|YY|#+|(?<![A-Za-z])N+(?![A-Za-z])|[^{}#]');
+final RegExp _sequenceTokenPattern = RegExp(r'\{(#+|N+)\}|#+|(?<![A-Za-z])N+(?![A-Za-z])');
 
 class _NoopTransactionUser extends QueryExecutorUser {
   @override

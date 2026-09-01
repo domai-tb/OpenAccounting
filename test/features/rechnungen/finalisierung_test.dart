@@ -61,9 +61,7 @@ void main() {
     await expectLater(
       secondFinalization,
       throwsA(
-        predicate<Object>(
-          (error) => error is StateError && error.message.toString().contains('Dokument ist bereits finalisiert'),
-        ),
+        predicate<Object>((error) => error is StateError && error.message.contains('Dokument ist bereits finalisiert')),
       ),
     );
   });
@@ -128,7 +126,7 @@ void main() {
     // Assert
     await expectLater(
       finalization,
-      throwsA(predicate<Object>((error) => error is StateError && error.message.toString().contains('Format'))),
+      throwsA(predicate<Object>((error) => error is StateError && error.message.contains('Format'))),
     );
     final draftRows = await database.executor.runSelect(
       'SELECT ist_entwurf, rechnungsnummer FROM rechnungen WHERE id = ?',
@@ -162,23 +160,52 @@ void main() {
 
     // Act
     final Future<void> invoiceUpdate = database.executor.runCustom(
-      'UPDATE rechnungen SET status = ? WHERE id = ?',
-      <Object?>['storniert', draft.id],
+      'UPDATE rechnungen SET datum = ? WHERE id = ?',
+      <Object?>['2026-02-02', draft.id],
     );
 
     // Assert
     await expectLater(
       invoiceUpdate,
       throwsA(
-        predicate<Object>(
-          (error) => error is StateError && error.message.toString().contains('Dokument ist bereits finalisiert'),
-        ),
+        predicate<Object>((error) => error is StateError && error.message.contains('Dokument ist bereits finalisiert')),
       ),
     );
-    final invoiceRows = await database.executor.runSelect('SELECT status FROM rechnungen WHERE id = ?', <Object?>[
+    final invoiceRows = await database.executor.runSelect('SELECT datum FROM rechnungen WHERE id = ?', <Object?>[
       draft.id,
     ]);
-    expect(invoiceRows.single['status'], 'offen');
+    expect(invoiceRows.single['datum'], '2026-02-01');
+
+    final Future<void> idUpdate = database.executor.runCustom('UPDATE rechnungen SET id = ? WHERE id = ?', <Object?>[
+      draft.id + 1000,
+      draft.id,
+    ]);
+    await expectLater(
+      idUpdate,
+      throwsA(
+        predicate<Object>((error) => error is StateError && error.message.contains('Dokument ist bereits finalisiert')),
+      ),
+    );
+
+    await database.executor.runCustom('UPDATE rechnungen SET status = ? WHERE id = ?', <Object?>[
+      'storniert',
+      draft.id,
+    ]);
+    final statusRows = await database.executor.runSelect('SELECT status FROM rechnungen WHERE id = ?', <Object?>[
+      draft.id,
+    ]);
+    expect(statusRows.single['status'], 'storniert');
+
+    final Future<void> invalidStatusUpdate = database.executor.runCustom(
+      'UPDATE rechnungen SET status = ? WHERE id = ?',
+      <Object?>['entwurf', draft.id],
+    );
+    await expectLater(
+      invalidStatusUpdate,
+      throwsA(
+        predicate<Object>((error) => error is StateError && error.message.contains('Dokument ist bereits finalisiert')),
+      ),
+    );
   });
 
   test('rejects direct UPDATE of finalized invoice position', () async {
@@ -208,9 +235,7 @@ void main() {
     await expectLater(
       positionUpdate,
       throwsA(
-        predicate<Object>(
-          (error) => error is StateError && error.message.toString().contains('Dokument ist bereits finalisiert'),
-        ),
+        predicate<Object>((error) => error is StateError && error.message.contains('Dokument ist bereits finalisiert')),
       ),
     );
     final positionRows = await database.executor.runSelect(
@@ -228,6 +253,9 @@ void main() {
     await database.executor.runCustom(
       "INSERT INTO unternehmen (name, strasse, plz, ort) VALUES ('Test GmbH', 'Alte Straße 1', '10115', 'Berlin')",
     );
+    final companyRows = await database.executor.runSelect('SELECT id FROM unternehmen WHERE name = ?', const <Object?>[
+      'Test GmbH',
+    ]);
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
@@ -238,6 +266,10 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
       ],
     );
+    await database.executor.runCustom('UPDATE rechnungen SET unternehmen_id = ? WHERE id = ?', <Object?>[
+      companyRows.single['id'],
+      draft.id,
+    ]);
     final draftRows = await database.executor.runSelect(
       'SELECT absender_snapshot, ausgegeben_am FROM rechnungen WHERE id = ?',
       <Object?>[draft.id],
@@ -294,5 +326,204 @@ void main() {
     const tolerance = Duration(seconds: 1);
     expect(parsedIssuedAt.isBefore(finalizationStarted.subtract(tolerance)), isFalse);
     expect(parsedIssuedAt.isAfter(finalizationEnded.add(tolerance)), isFalse);
+  });
+
+  test('uses invoice company for sender snapshot', () async {
+    // Arrange
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    await database.executor.runCustom(
+      "INSERT INTO unternehmen (name, strasse, plz, ort) VALUES ('Other GmbH', 'Andere Straße 1', '10117', 'Berlin')",
+    );
+    await database.executor.runCustom(
+      "INSERT INTO unternehmen (name, strasse, plz, ort) VALUES ('Selected GmbH', 'Gewählte Straße 2', '20095', 'Hamburg')",
+    );
+    final companyRows = await database.executor.runSelect('SELECT id FROM unternehmen WHERE name = ?', const <Object?>[
+      'Selected GmbH',
+    ]);
+    await database.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
+    );
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final draft = await useCases.createDraftRechnung(
+      datum: '2026-03-02',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+    await database.executor.runCustom('UPDATE rechnungen SET unternehmen_id = ? WHERE id = ?', <Object?>[
+      companyRows.single['id'],
+      draft.id,
+    ]);
+
+    // Act
+    await useCases.finalizeRechnung(rechnungId: draft.id);
+
+    // Assert
+    final rows = await database.executor.runSelect('SELECT absender_snapshot FROM rechnungen WHERE id = ?', <Object?>[
+      draft.id,
+    ]);
+    final snapshot = jsonDecode(rows.single['absender_snapshot']! as String) as Map<String, dynamic>;
+    expect(snapshot['name'], 'Selected GmbH');
+    expect(snapshot['strasse'], 'Gewählte Straße 2');
+  });
+
+  test('uses current-year date when latest finalized row was inserted later', () async {
+    // Arrange
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    await database.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 101 WHERE typ = 'rechnung_ausgang'",
+    );
+    final rangeRows = await database.executor.runSelect(
+      'SELECT id FROM nummernkreise WHERE typ = ? ORDER BY id LIMIT 1',
+      const <Object?>['rechnung_ausgang'],
+    );
+    final rangeId = rangeRows.single['id'];
+    await database.executor.runCustom(
+      'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id) '
+      "VALUES ('RE-260100', 'rechnung', 'offen', '2026-01-01', 0, 'netto', ?)",
+      <Object?>[rangeId],
+    );
+    await database.executor.runCustom(
+      'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id) '
+      "VALUES ('RE-250100', 'rechnung', 'offen', '2025-12-31', 0, 'netto', ?)",
+      <Object?>[rangeId],
+    );
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final draft = await useCases.createDraftRechnung(
+      datum: '2026-02-01',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+
+    // Act
+    final finalized = await useCases.finalizeRechnung(rechnungId: draft.id);
+
+    // Assert
+    expect(finalized.rechnungsnummer, 'RE-260101');
+  });
+
+  test('rejects a draft dated before the latest finalized invoice', () async {
+    // Arrange
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    await database.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
+    );
+    final rangeRows = await database.executor.runSelect(
+      'SELECT id FROM nummernkreise WHERE typ = ? ORDER BY id LIMIT 1',
+      const <Object?>['rechnung_ausgang'],
+    );
+    await database.executor.runCustom(
+      'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id) '
+      "VALUES ('RE-260001', 'rechnung', 'offen', '2026-01-01', 0, 'netto', ?)",
+      <Object?>[rangeRows.single['id']],
+    );
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final draft = await useCases.createDraftRechnung(
+      datum: '2025-12-31',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+
+    // Act / Assert
+    await expectLater(
+      useCases.finalizeRechnung(rechnungId: draft.id),
+      throwsA(predicate<Object>((error) => error is StateError && error.message.contains('vor letzter'))),
+    );
+  });
+
+  test('rejects malformed or multiple sequence tokens without changing counter', () async {
+    for (final format in <String>['RE-{YY####', 'RE-YY####-##']) {
+      // Arrange
+      final database = AppDatabase.createTestDatabase();
+      addTearDown(database.close);
+      await database.ensureOpen();
+      await database.executor.runCustom(
+        'UPDATE nummernkreise SET format = ?, naechste_nummer = 7 WHERE typ = ?',
+        <Object?>[format, 'rechnung_ausgang'],
+      );
+      final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+      final draft = await useCases.createDraftRechnung(
+        datum: '2026-01-15',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+        ],
+      );
+
+      // Act / Assert
+      await expectLater(
+        useCases.finalizeRechnung(rechnungId: draft.id),
+        throwsA(predicate<Object>((error) => error is StateError && error.message.contains('Format'))),
+      );
+      final rangeRows = await database.executor.runSelect(
+        'SELECT naechste_nummer FROM nummernkreise WHERE typ = ?',
+        const <Object?>['rechnung_ausgang'],
+      );
+      expect(rangeRows.single['naechste_nummer'], 7);
+    }
+  });
+
+  test('rejects finalization when all invoice ranges are inactive', () async {
+    // Arrange
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    await database.executor.runCustom("UPDATE nummernkreise SET aktiv = 0 WHERE typ = 'rechnung_ausgang'");
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final draft = await useCases.createDraftRechnung(
+      datum: '2026-01-15',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+
+    // Act / Assert
+    await expectLater(
+      useCases.finalizeRechnung(rechnungId: draft.id),
+      throwsA(predicate<Object>((error) => error is StateError && error.message.contains('Nummernkreis'))),
+    );
+    final draftRows = await database.executor.runSelect('SELECT ist_entwurf FROM rechnungen WHERE id = ?', <Object?>[
+      draft.id,
+    ]);
+    expect(draftRows.single['ist_entwurf'], 1);
+  });
+
+  test('rolls back reserved number when finalization update aborts', () async {
+    // Arrange
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    await database.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
+    );
+    await database.executor.runCustom('''
+CREATE TRIGGER fail_rechnung_finalization BEFORE UPDATE OF rechnungsnummer ON rechnungen
+WHEN OLD.ist_entwurf = 1 BEGIN SELECT RAISE(ABORT, 'forced finalization failure'); END
+''');
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final draft = await useCases.createDraftRechnung(
+      datum: '2026-01-15',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+
+    // Act / Assert
+    await expectLater(
+      useCases.finalizeRechnung(rechnungId: draft.id),
+      throwsA(predicate<Object>((error) => error.toString().contains('forced finalization failure'))),
+    );
+    final rangeRows = await database.executor.runSelect(
+      'SELECT naechste_nummer FROM nummernkreise WHERE typ = ?',
+      const <Object?>['rechnung_ausgang'],
+    );
+    expect(rangeRows.single['naechste_nummer'], 7);
   });
 }
