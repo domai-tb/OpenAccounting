@@ -5,7 +5,27 @@ enum PdfTemplate { standard, gruen }
 enum PdfCopyState { original, copy }
 
 final class PdfCompanySnapshot {
-  factory PdfCompanySnapshot({
+  /// Const construction is available for snapshots whose optional byte lists are already immutable.
+  const PdfCompanySnapshot({
+    required this.name,
+    this.street,
+    this.postalCode,
+    this.city,
+    this.country,
+    this.phone,
+    this.email,
+    this.website,
+    this.taxNumber,
+    this.vatId,
+    this.iban,
+    this.bic,
+    this.accountHolder,
+    this.logoBytes,
+    this.signatureBytes,
+  });
+
+  /// Copies collection inputs before exposing them through the immutable snapshot.
+  factory PdfCompanySnapshot.from({
     required String name,
     String? street,
     String? postalCode,
@@ -184,7 +204,26 @@ final class PdfDocumentTextsSnapshot {
 }
 
 final class PdfDocumentSnapshot {
-  factory PdfDocumentSnapshot({
+  /// Const construction is available when [positions] is already immutable.
+  const PdfDocumentSnapshot({
+    required this.documentType,
+    required this.template,
+    required this.documentNumber,
+    required this.company,
+    required this.customer,
+    required this.positions,
+    required this.totals,
+    this.texts = const PdfDocumentTextsSnapshot(),
+    this.copyState = PdfCopyState.original,
+    this.documentDate,
+    this.serviceFrom,
+    this.serviceTo,
+    this.validUntil,
+    this.orderStatus,
+  });
+
+  /// Copies position inputs before exposing them through the immutable snapshot.
+  factory PdfDocumentSnapshot.from({
     required PdfDocumentType documentType,
     required PdfTemplate template,
     required String documentNumber,
@@ -200,7 +239,7 @@ final class PdfDocumentSnapshot {
     DateTime? validUntil,
     String? orderStatus,
   }) {
-    return PdfDocumentSnapshot._(
+    return PdfDocumentSnapshot(
       documentType: documentType,
       template: template,
       documentNumber: documentNumber,
@@ -217,23 +256,6 @@ final class PdfDocumentSnapshot {
       orderStatus: orderStatus,
     );
   }
-
-  const PdfDocumentSnapshot._({
-    required this.documentType,
-    required this.template,
-    required this.documentNumber,
-    required this.company,
-    required this.customer,
-    required this.positions,
-    required this.totals,
-    required this.texts,
-    required this.copyState,
-    this.documentDate,
-    this.serviceFrom,
-    this.serviceTo,
-    this.validUntil,
-    this.orderStatus,
-  });
 
   final PdfDocumentType documentType;
   final PdfTemplate template;

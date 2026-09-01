@@ -4,11 +4,11 @@ import 'dart:typed_data';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
 
 PdfDocumentSnapshot rechnungSnapshot() {
-  return PdfDocumentSnapshot(
+  return PdfDocumentSnapshot.from(
     documentType: PdfDocumentType.rechnung,
     template: PdfTemplate.standard,
     documentNumber: 'RE-2026-001',
-    company: PdfCompanySnapshot(
+    company: const PdfCompanySnapshot(
       name: 'Muster Studio',
       street: 'Musterstraße 1',
       postalCode: '10115',
@@ -49,7 +49,7 @@ final class ParsedPdf {
 }
 
 ParsedPdf parseUncompressedPdf(Uint8List pdfBytes) {
-  final source = latin1.decode(pdfBytes);
+  final source = _decodePdfBytes(pdfBytes);
   final streams = _uncompressedStreams(source);
   if (streams.isEmpty) {
     throw const FormatException('PDF contains no uncompressed content stream');
@@ -71,6 +71,14 @@ ParsedPdf parseUncompressedPdf(Uint8List pdfBytes) {
 }
 
 ParsedPdf parsePdf(Uint8List pdfBytes) => parseUncompressedPdf(pdfBytes);
+
+String _decodePdfBytes(Uint8List bytes) => String.fromCharCodes(bytes.map((byte) => byte == 0x80 ? 0x20AC : byte));
+
+Uint8List uncompressedPdf(List<int> streamBytes) {
+  final prefix = latin1.encode('%PDF-1.4\n1 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n');
+  final suffix = latin1.encode('\nendstream\nendobj\n%%EOF\n');
+  return Uint8List.fromList(<int>[...prefix, ...streamBytes, ...suffix]);
+}
 
 Iterable<String> _uncompressedStreams(String source) sync* {
   final streamPattern = RegExp(r'(<<.*?>>)\s*stream(?:\r\n|\n|\r)(.*?)\r?\nendstream', dotAll: true);
@@ -142,6 +150,12 @@ List<_PdfToken> _tokenize(String source) {
     }
     if (character == '%') {
       index = _skipComment(source, index);
+      continue;
+    }
+    if (character == '/') {
+      final name = _readName(source, index);
+      tokens.add(_PdfToken.name(name.value));
+      index = name.nextIndex;
       continue;
     }
     if (character == '(') {
@@ -272,7 +286,18 @@ List<_PdfToken> _tokenize(String source) {
 }
 
 ({String value, int nextIndex}) _readWord(String source, int startIndex) {
+  if (_isDelimiter(source[startIndex])) {
+    return (value: source[startIndex], nextIndex: startIndex + 1);
+  }
   var index = startIndex;
+  while (index < source.length && !_isDelimiter(source[index])) {
+    index++;
+  }
+  return (value: source.substring(startIndex, index), nextIndex: index);
+}
+
+({String value, int nextIndex}) _readName(String source, int startIndex) {
+  var index = startIndex + 1;
   while (index < source.length && !_isDelimiter(source[index])) {
     index++;
   }
@@ -311,7 +336,7 @@ bool _isWhitespace(String character) => character.codeUnitAt(0) <= 32;
 
 bool _isDelimiter(String character) => _isWhitespace(character) || '[]()<>/%'.contains(character);
 
-enum _PdfTokenKind { word, string, arrayStart, arrayEnd }
+enum _PdfTokenKind { word, name, string, arrayStart, arrayEnd }
 
 final class _PdfToken {
   const _PdfToken.arrayEnd() : kind = _PdfTokenKind.arrayEnd, value = '';
@@ -319,6 +344,8 @@ final class _PdfToken {
   const _PdfToken.arrayStart() : kind = _PdfTokenKind.arrayStart, value = '';
 
   const _PdfToken.string(this.value) : kind = _PdfTokenKind.string;
+
+  const _PdfToken.name(this.value) : kind = _PdfTokenKind.name;
 
   const _PdfToken.word(this.value) : kind = _PdfTokenKind.word;
 
