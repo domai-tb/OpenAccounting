@@ -127,8 +127,8 @@
 
 ## 13. Dunning (Mahnwesen)
 
-- [ ] 13.1 Write failing test: `test/features/mahnwesen/stufen_test.dart` — 4 levels configured correctly
-- [ ] 13.2 Implement: Mahnstufen CRUD with system_stufe protection
+- [x] 13.1 Write failing test: `test/features/mahnwesen/stufen_test.dart` — 4 levels configured correctly
+- [x] 13.2 Implement: Mahnstufen CRUD with system_stufe protection
 - [ ] 13.3 Write failing test: `test/features/mahnwesen/mahnung_test.dart` — dunning creates snapshot
 - [ ] 13.4 Implement: Mahnung creation with rechnung snapshot, Gebühr/Zinsen tracking
 - [ ] 13.5 Write failing test: `test/features/mahnwesen/sperrung_test.dart` — Kundensperrung at threshold
