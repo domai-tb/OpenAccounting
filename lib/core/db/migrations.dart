@@ -145,6 +145,7 @@ class MigrationRunner {
     }
     if (version == 5) {
       await createSchema();
+      await _migrateRechnungen();
       await _migrateMahnwesen();
     }
   }

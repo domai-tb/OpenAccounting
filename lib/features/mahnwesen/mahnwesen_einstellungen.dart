@@ -15,13 +15,19 @@ class MahnwesenEinstellungen {
   final int? unternehmenId;
   final int graceTage;
 
-  MahnwesenEinstellungen copyWith({int? schwelleWarnung, int? schwelleSperrung, bool? aktiv, int? graceTage}) {
+  MahnwesenEinstellungen copyWith({
+    int? schwelleWarnung,
+    int? schwelleSperrung,
+    bool? aktiv,
+    int? graceTage,
+    int? unternehmenId,
+  }) {
     return MahnwesenEinstellungen(
       id: id,
       schwelleWarnung: schwelleWarnung ?? this.schwelleWarnung,
       schwelleSperrung: schwelleSperrung ?? this.schwelleSperrung,
       aktiv: aktiv ?? this.aktiv,
-      unternehmenId: unternehmenId,
+      unternehmenId: unternehmenId ?? this.unternehmenId,
       graceTage: graceTage ?? this.graceTage,
     );
   }

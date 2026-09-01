@@ -21,6 +21,7 @@ void main() {
       einstellungenRepo = MahnwesenEinstellungenRepository(db.executor);
       stufenRepo = MahnstufenRepository(db.executor);
       mahnungenRepo = MahnungenRepository(db.executor);
+      await einstellungenRepo.update(aktiv: true);
     });
 
     tearDown(() async {

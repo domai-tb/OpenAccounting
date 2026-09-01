@@ -618,7 +618,10 @@ CREATE TABLE IF NOT EXISTS mahnwesen_einstellungen (
   aktiv INTEGER DEFAULT 0,
   schwelle_warnung INTEGER DEFAULT 2,
   schwelle_sperrung INTEGER DEFAULT 3,
-  unternehmen_id INTEGER REFERENCES unternehmen(id)
+  unternehmen_id INTEGER REFERENCES unternehmen(id),
+  grace_tage INTEGER DEFAULT 0,
+  zinssatz_default NUMERIC(12,2) DEFAULT 0,
+  email_template TEXT
 )''',
   // 27 mahnungen
   '''

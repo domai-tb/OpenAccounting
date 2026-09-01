@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/mahnwesen/kunden_sperrung_entity.dart';
 import 'package:openaccounting/features/mahnwesen/mahnungen_entity.dart';
@@ -33,35 +34,49 @@ class SperrungService {
       if (!kNames.contains('mahngesperrt')) {
         try {
           await executor.runCustom('ALTER TABLE kunden ADD COLUMN mahngesperrt INTEGER NOT NULL DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('sperrung: ALTER mahngesperrt failed: $e');
+        }
       }
       if (!kNames.contains('mahngesperrt_bis')) {
         try {
           await executor.runCustom('ALTER TABLE kunden ADD COLUMN mahngesperrt_bis TEXT');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('sperrung: ALTER mahngesperrt_bis failed: $e');
+        }
       }
       if (!kNames.contains('mahngesperrt_grund')) {
         try {
           await executor.runCustom('ALTER TABLE kunden ADD COLUMN mahngesperrt_grund TEXT');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('sperrung: ALTER mahngesperrt_grund failed: $e');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('sperrung: _ensureSperrungColumns kunden failed: $e');
+    }
     try {
       final eCols = await executor.runSelect('PRAGMA table_info(mahnwesen_einstellungen)', const <Object?>[]);
       final eNames = <String>{for (final r in eCols) (r['name'] as String?) ?? ''};
       if (!eNames.contains('schwelle_warnung')) {
         try {
           await executor.runCustom('ALTER TABLE mahnwesen_einstellungen ADD COLUMN schwelle_warnung INTEGER DEFAULT 2');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('sperrung: ALTER schwelle_warnung failed: $e');
+        }
       }
       if (!eNames.contains('schwelle_sperrung')) {
         try {
           await executor.runCustom(
             'ALTER TABLE mahnwesen_einstellungen ADD COLUMN schwelle_sperrung INTEGER DEFAULT 3',
           );
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('sperrung: ALTER schwelle_sperrung failed: $e');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('sperrung: _ensureSperrungColumns einstellungen failed: $e');
+    }
   }
 
   Future<int?> _maxStufeForKunde(int kundeId) async {
@@ -78,7 +93,9 @@ class SperrungService {
       );
       final v = rows.isNotEmpty ? rows.single['max_stufe'] : null;
       maxStufe = _asInt(v);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('sperrung: _maxStufeForKunde direct failed: $e');
+    }
     if (maxStufe != null) return maxStufe;
     // Fallback via rechnungen.kunde_id when mahnungen.kunde_id null/empty.
     try {
@@ -92,22 +109,25 @@ class SperrungService {
       );
       final v2 = rows2.isNotEmpty ? rows2.single['max_stufe'] : null;
       return _asInt(v2);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('sperrung: _maxStufeForKunde fallback failed: $e');
       return null;
     }
   }
 
   Future<bool> isWarnung(int kundeId) async {
+    final settings = await einstellungenRepo.get();
+    if (!settings.aktiv) return false;
     final max = await _maxStufeForKunde(kundeId);
     if (max == null) return false;
-    final settings = await einstellungenRepo.get();
     return max >= settings.schwelleWarnung;
   }
 
   Future<bool> isSperrung(int kundeId) async {
+    final settings = await einstellungenRepo.get();
+    if (!settings.aktiv) return false;
     final max = await _maxStufeForKunde(kundeId);
     if (max == null) return false;
-    final settings = await einstellungenRepo.get();
     return max >= settings.schwelleSperrung;
   }
 
@@ -122,9 +142,21 @@ class SperrungService {
     if (!_asBool(row['mahngesperrt'])) return false;
     final bis = _asString(row['mahngesperrt_bis']);
     if (bis == null || bis.trim().isEmpty) return true;
+    final trimmed = bis.trim();
+    if (trimmed.length < 10) {
+      throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
+    }
+    final bisStr = trimmed.substring(0, 10);
+    final dateRegExp = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    if (!dateRegExp.hasMatch(bisStr)) {
+      throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
+    }
+    final parsedBis = DateTime.tryParse(bisStr);
+    if (parsedBis == null || _toDateString(parsedBis) != bisStr) {
+      throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
+    }
     final todayStr = _toDateString(asOf ?? DateTime.now());
     // ponytail: lexical YYYY-MM-DD compare equals date compare.
-    final bisStr = bis.trim().substring(0, 10);
     return bisStr.compareTo(todayStr) >= 0;
   }
 
@@ -136,11 +168,11 @@ class SperrungService {
   }
 
   Future<void> assertCanCreateInvoice(int kundeId, {DateTime? asOf}) async {
-    final can = await canCreateInvoice(kundeId, asOf: asOf);
-    if (!can) {
-      if (await isMahngesperrt(kundeId, asOf: asOf)) {
-        throw const KundenSperrungException('Kunde ist mahngesperrt');
-      }
+    final mahn = await isMahngesperrt(kundeId, asOf: asOf);
+    if (mahn) {
+      throw const KundenSperrungException('Kunde ist mahngesperrt');
+    }
+    if (await isSperrung(kundeId)) {
       throw const KundenSperrungException('Kunde gesperrt: Mahnstufe erreicht');
     }
   }
@@ -154,9 +186,15 @@ class SperrungService {
     if (bis != null) {
       final t = bis.trim();
       if (t.isNotEmpty) {
-        // Validate YYYY-MM-DD.
+        if (t.length < 10) {
+          throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
+        }
+        final dateRegExp = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+        if (!dateRegExp.hasMatch(t)) {
+          throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
+        }
         final parsed = DateTime.tryParse(t);
-        if (parsed == null) {
+        if (parsed == null || _toDateString(parsed) != t) {
           throw const KundenSperrungException('Datum ungültig: YYYY-MM-DD erwartet');
         }
         bisNorm = t.substring(0, 10);

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/mahnwesen/mahnwesen_einstellungen.dart';
 
@@ -22,21 +23,29 @@ class MahnwesenEinstellungenRepository {
       if (!names.contains('grace_tage')) {
         try {
           await executor.runCustom('ALTER TABLE mahnwesen_einstellungen ADD COLUMN grace_tage INTEGER DEFAULT 0');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnwesen_einstellungen: ALTER grace_tage failed: $e');
+        }
       }
       if (!names.contains('email_template')) {
         try {
           await executor.runCustom('ALTER TABLE mahnwesen_einstellungen ADD COLUMN email_template TEXT');
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnwesen_einstellungen: ALTER email_template failed: $e');
+        }
       }
       if (!names.contains('zinssatz_default')) {
         try {
           await executor.runCustom(
             'ALTER TABLE mahnwesen_einstellungen ADD COLUMN zinssatz_default NUMERIC(12,2) DEFAULT 0',
           );
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('mahnwesen_einstellungen: ALTER zinssatz_default failed: $e');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('mahnwesen_einstellungen: _ensureColumns failed: $e');
+    }
   }
 
   Future<MahnwesenEinstellungen> get() async {
@@ -51,11 +60,14 @@ class MahnwesenEinstellungenRepository {
       // ponytail: singleton default per spec §Default settings.
       try {
         final id = await executor.runInsert(
-          'INSERT INTO mahnwesen_einstellungen (schwelle_warnung, schwelle_sperrung, aktiv, grace_tage) VALUES (?, ?, ?, ?)',
+          'INSERT INTO mahnwesen_einstellungen '
+          '(schwelle_warnung, schwelle_sperrung, aktiv, grace_tage) '
+          'VALUES (?, ?, ?, ?)',
           const <Object?>[2, 3, 0, 0],
         );
         return await _fetchById(id);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('mahnwesen_einstellungen: insert with grace_tage failed: $e');
         // fallback if grace_tage column missing on very old DB — insert without it.
         final id = await executor.runInsert(
           'INSERT INTO mahnwesen_einstellungen (schwelle_warnung, schwelle_sperrung, aktiv) VALUES (?, ?, ?)',
@@ -70,6 +82,9 @@ class MahnwesenEinstellungenRepository {
   Future<MahnwesenEinstellungen> getOrCreate() => get();
 
   Future<MahnwesenEinstellungen> setSchwellen({required int warnung, required int sperrung}) async {
+    if (warnung >= sperrung) {
+      throw ArgumentError('warnung muss < sperrung sein');
+    }
     return update(schwelleWarnung: warnung, schwelleSperrung: sperrung);
   }
 
@@ -99,10 +114,20 @@ class MahnwesenEinstellungenRepository {
       assignments['aktiv'] = aktiv ? 1 : 0;
     }
     if (graceTage != null) {
+      if (graceTage < 0) {
+        throw ArgumentError('graceTage darf nicht negativ sein');
+      }
       assignments['grace_tage'] = graceTage;
     }
     if (unternehmenId != null) {
       assignments['unternehmen_id'] = unternehmenId;
+    }
+    if (assignments.containsKey('schwelle_warnung') || assignments.containsKey('schwelle_sperrung')) {
+      final effWarn = assignments['schwelle_warnung'] as int? ?? current.schwelleWarnung;
+      final effSperr = assignments['schwelle_sperrung'] as int? ?? current.schwelleSperrung;
+      if (effWarn >= effSperr) {
+        throw ArgumentError('warnung muss < sperrung sein');
+      }
     }
     if (assignments.isEmpty) return current;
     final setClause = assignments.keys.map((k) => '$k = ?').join(', ');
@@ -110,6 +135,7 @@ class MahnwesenEinstellungenRepository {
     try {
       await executor.runUpdate('UPDATE mahnwesen_einstellungen SET $setClause WHERE id = ?', values);
     } catch (e) {
+      debugPrint('mahnwesen_einstellungen: update failed: $e');
       // ponytail: fallback if grace_tage column missing — retry without it.
       if (assignments.containsKey('grace_tage')) {
         final filtered = Map<String, Object?>.from(assignments)..remove('grace_tage');
