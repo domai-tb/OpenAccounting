@@ -180,15 +180,16 @@ class DashboardRepository {
 
   Future<List<Map<String, Object?>>> fetchLagerwarnung() async {
     return executor.runSelect(
-      'SELECT id, bezeichnung, bestand_aktuell, mindestbestand FROM artikel '
-      'WHERE mindestbestand > 0 AND bestand_aktuell <= mindestbestand',
+      'SELECT id, bezeichnung, COALESCE(NULLIF(bestand_aktuell, 0), bestand) AS bestand_aktuell, mindestbestand FROM artikel '
+      'WHERE mindestbestand > 0 AND COALESCE(NULLIF(bestand_aktuell, 0), bestand) <= mindestbestand',
       const <Object?>[],
     );
   }
 
   Future<List<Map<String, Object?>>> fetchLagerbestand() async {
     return executor.runSelect(
-      'SELECT id, bezeichnung, bestand_aktuell, mindestbestand FROM artikel WHERE aktiv = 1 LIMIT 20',
+      'SELECT id, bezeichnung, COALESCE(NULLIF(bestand_aktuell, 0), bestand) AS bestand_aktuell, mindestbestand '
+      'FROM artikel WHERE aktiv = 1 LIMIT 20',
       const <Object?>[],
     );
   }

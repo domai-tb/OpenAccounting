@@ -170,6 +170,19 @@ void main() {
       expect(low.map((row) => row['bezeichnung']), contains('CurrentStock'));
     });
 
+    test('legacy articles use bestand as effective dashboard stock', () async {
+      await db.executor.runInsert(
+        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, mindestbestand, aktiv) VALUES (?, ?, ?, ?, ?)',
+        <Object?>['LegacyStock', '10.00', 10, 5, 1],
+      );
+
+      final warnings = await repo.fetchLagerwarnung();
+      final stock = await repo.fetchLagerbestand();
+
+      expect(warnings.map((row) => row['bezeichnung']), isNot(contains('LegacyStock')));
+      expect(stock.singleWhere((row) => row['bezeichnung'] == 'LegacyStock')['bestand_aktuell'], 10);
+    });
+
     test('Zahlungseingänge excludes outgoing bank transactions', () async {
       final kontoId = await db.executor.runInsert('INSERT INTO konten (name, saldo) VALUES (?, ?)', <Object?>[
         'Geschäftskonto',
@@ -241,6 +254,29 @@ void main() {
         container.read(dashboardWidgetDataProvider('offene_rechnungen').future),
         throwsA(isA<StateError>()),
       );
+    });
+
+    testWidgets('provider failure shows safe German error without exception details', (tester) async {
+      const config = DashboardConfig(
+        order: <String>['offene_rechnungen'],
+        visibility: <String, bool>{'offene_rechnungen': true},
+        quickLinks: <QuickLink>[],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardConfigProvider.overrideWith((ref) async => config),
+            dashboardWidgetDataProvider('offene_rechnungen')
+                .overrideWith((ref) async => throw StateError('raw provider details')),
+          ],
+          child: const MaterialApp(home: DashboardPageImpl()),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Fehler beim Laden'), findsOneWidget);
+      expect(find.textContaining('raw provider details'), findsNothing);
     });
 
     testWidgets('dashboard renders every visible widget card from providers', (tester) async {

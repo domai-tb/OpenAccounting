@@ -8,6 +8,13 @@ import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
+const String _dashboardLoadError = 'Fehler beim Laden';
+
+String _dashboardErrorMessage(String area, Object error, StackTrace stackTrace) {
+  debugPrint('dashboard $area failed: $error\n$stackTrace');
+  return _dashboardLoadError;
+}
+
 /// Dashboard page — scrollable grid 2-4 columns responsive via LayoutBuilder.
 /// DESIGN §6 32px padding, §11 Dashboard numbers first, §10 radius 12.
 class DashboardPageImpl extends ConsumerWidget {
@@ -46,7 +53,8 @@ class DashboardPageImpl extends ConsumerWidget {
       ),
       body: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(child: Text('Fehler: $e')),
+        error: (Object e, StackTrace stackTrace) =>
+            Center(child: Text(_dashboardErrorMessage('config', e, stackTrace))),
         data: (DashboardConfig cfg) {
           final List<String> visible = cfg.order.where((String id) => cfg.visibility[id] ?? true).toList();
           return LayoutBuilder(
@@ -104,7 +112,8 @@ class _DashboardConfigSheet extends ConsumerWidget {
             Expanded(
               child: cfgAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (Object e, _) => Center(child: Text('Fehler: $e')),
+                error: (Object e, StackTrace stackTrace) =>
+                    Center(child: Text(_dashboardErrorMessage('config', e, stackTrace))),
                 data: (DashboardConfig cfg) {
                   final List<String> order = cfg.order;
                   return ReorderableListView.builder(
@@ -159,7 +168,8 @@ class _WidgetCard extends ConsumerWidget {
     final String? route = dashboardWidgetRoutes[id];
     return dataAsync.when(
       loading: () => DashboardCard(title: title, icon: icon, isLoading: true),
-      error: (Object e, _) => DashboardCard(title: title, icon: icon, error: e.toString()),
+      error: (Object e, StackTrace stackTrace) =>
+          DashboardCard(title: title, icon: icon, error: _dashboardErrorMessage('widget $id', e, stackTrace)),
       data: (WidgetData? data) {
         if (data == null) return const SizedBox.shrink();
         final Widget content = _buildContent(context, data);
