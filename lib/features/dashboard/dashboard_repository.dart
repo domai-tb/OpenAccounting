@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 
 /// Dashboard repository — JSON config in unternehmen.dashboard_config.
@@ -21,17 +22,10 @@ class DashboardRepository {
 
   Future<void> ensureColumn() async {
     try {
-      final cols = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
-      final names = <String>{for (final r in cols) (r['name'] as String?) ?? ''};
-      if (!names.contains('dashboard_config')) {
-        try {
-          await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
-        } catch (e) {
-          debugPrint('dashboard ensure column: $e');
-        }
-      }
-    } catch (e) {
-      debugPrint('dashboard ensureColumn failed: $e');
+      // ponytail: minimal ALTER, rely on DB ensureOpen + UnternehmenRepository; idempotent.
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
+    } catch (_) {
+      // column exists — ignore
     }
   }
 
@@ -128,6 +122,7 @@ class DashboardRepository {
     final old = order.indexOf(id);
     if (old == -1) return;
     order.removeAt(old);
+    // ignore: noop_primitive_operations
     final clamped = newIndex.clamp(0, order.length).toInt();
     order.insert(clamped, id);
     await saveConfig(cfg.copyWith(order: order));
@@ -160,8 +155,8 @@ class DashboardRepository {
         const <Object?>[],
       );
       final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = (rows.first['s'] as num?)?.toDouble() ?? 0.0;
-      return <String, Object?>{'count': c, 'sum': s.toStringAsFixed(2)};
+      final s = money.formatBetrag('${rows.first['s']}');
+      return <String, Object?>{'count': c, 'sum': s};
     } catch (_) {
       return <String, Object?>{'count': 0, 'sum': '0.00'};
     }
@@ -176,8 +171,8 @@ class DashboardRepository {
         const <Object?>[],
       );
       final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = (rows.first['s'] as num?)?.toDouble() ?? 0.0;
-      return <String, Object?>{'count': c, 'sum': s.toStringAsFixed(2)};
+      final s = money.formatBetrag('${rows.first['s']}');
+      return <String, Object?>{'count': c, 'sum': s};
     } catch (_) {
       return <String, Object?>{'count': 0, 'sum': '0.00'};
     }
@@ -263,9 +258,9 @@ class DashboardRepository {
         'COALESCE(SUM(CASE WHEN betrag < 0 THEN betrag ELSE 0 END),0) as aus FROM journal',
         const <Object?>[],
       );
-      final ein = (rows.first['ein'] as num?)?.toDouble() ?? 0.0;
-      final aus = (rows.first['aus'] as num?)?.toDouble() ?? 0.0;
-      return <String, Object?>{'einnahmen': ein.toStringAsFixed(2), 'ausgaben': aus.toStringAsFixed(2)};
+      final ein = money.formatBetrag('${rows.first['ein']}');
+      final aus = money.formatBetrag('${rows.first['aus']}');
+      return <String, Object?>{'einnahmen': ein, 'ausgaben': aus};
     } catch (_) {
       return <String, Object?>{'einnahmen': '0.00', 'ausgaben': '0.00'};
     }
@@ -279,8 +274,8 @@ class DashboardRepository {
         const <Object?>[],
       );
       final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = (rows.first['s'] as num?)?.toDouble() ?? 0.0;
-      return <String, Object?>{'count': c, 'sum': s.toStringAsFixed(2)};
+      final s = money.formatBetrag('${rows.first['s']}');
+      return <String, Object?>{'count': c, 'sum': s};
     } catch (_) {
       return <String, Object?>{'count': 0, 'sum': '0.00'};
     }
@@ -289,12 +284,12 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchKontostand() async {
     try {
       final rows = await executor.runSelect('SELECT COALESCE(SUM(saldo),0) as s FROM konten', const <Object?>[]);
-      final s = (rows.first['s'] as num?)?.toDouble() ?? 0.0;
+      final s = money.formatBetrag('${rows.first['s']}');
       final details = await executor.runSelect(
         'SELECT id, name, saldo FROM konten ORDER BY name LIMIT 10',
         const <Object?>[],
       );
-      return <String, Object?>{'sum': s.toStringAsFixed(2), 'konten': details};
+      return <String, Object?>{'sum': s, 'konten': details};
     } catch (_) {
       return <String, Object?>{'sum': '0.00', 'konten': <Map<String, Object?>>[]};
     }

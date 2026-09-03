@@ -109,11 +109,13 @@ class _DashboardConfigSheet extends ConsumerWidget {
                   final List<String> order = cfg.order;
                   return ReorderableListView.builder(
                     itemCount: order.length,
+                    // ignore: deprecated_member_use
                     onReorder: (int oldIndex, int newIndex) {
-                      if (newIndex > oldIndex) newIndex -= 1;
+                      var target = newIndex;
+                      if (target > oldIndex) target -= 1;
                       final String id = order[oldIndex];
                       final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
-                      unawaited(repo.reorderWidget(id, newIndex).then((_) => ref.invalidate(dashboardConfigProvider)));
+                      unawaited(repo.reorderWidget(id, target).then((_) => ref.invalidate(dashboardConfigProvider)));
                     },
                     itemBuilder: (BuildContext context, int index) {
                       final String id = order[index];

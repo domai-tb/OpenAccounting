@@ -141,7 +141,7 @@
 - [x] 14.2 Implement: Widget providers for Offene Rechnungen, Zahlungseingänge, Lagerwarnung, etc.
 - [x] 14.3 Write failing test: `test/features/dashboard/config_test.dart` — widget order persists
 - [x] 14.4 Implement: Dashboard config (Reihenfolge, Sichtbarkeit, Schnellzugriff)
-- [ ] 14.5 Refactor; full suite stays green
+- [x] 14.5 Refactor; full suite stays green
 
 ## 15. Desktop Integration
 
