@@ -137,8 +137,8 @@
 
 ## 14. Dashboard
 
-- [ ] 14.1 Write failing test: `test/features/dashboard/widgets_test.dart` — all 13+ widgets render
-- [ ] 14.2 Implement: Widget providers for Offene Rechnungen, Zahlungseingänge, Lagerwarnung, etc.
+- [x] 14.1 Write failing test: `test/features/dashboard/widgets_test.dart` — all 13+ widgets render
+- [x] 14.2 Implement: Widget providers for Offene Rechnungen, Zahlungseingänge, Lagerwarnung, etc.
 - [ ] 14.3 Write failing test: `test/features/dashboard/config_test.dart` — widget order persists
 - [ ] 14.4 Implement: Dashboard config (Reihenfolge, Sichtbarkeit, Schnellzugriff)
 - [ ] 14.5 Refactor; full suite stays green

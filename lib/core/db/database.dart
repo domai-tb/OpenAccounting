@@ -123,6 +123,9 @@ class AppDatabase {
     try {
       await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN template_typ TEXT');
     } catch (_) {}
+    try {
+      await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
+    } catch (_) {}
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -272,7 +275,8 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   datev_beraternummer TEXT,
   datev_mandantennummer TEXT,
   datev_konto_bank TEXT,
-  datev_konto_bar TEXT
+  datev_konto_bar TEXT,
+  dashboard_config TEXT
 )''',
   // 2 kategorien
   '''

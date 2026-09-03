@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
+import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
+
+/// Dashboard page — scrollable grid 2-4 columns responsive via LayoutBuilder.
+/// DESIGN §6 32px padding, §11 Dashboard numbers first, §10 radius 12.
+class DashboardPageImpl extends ConsumerWidget {
+  const DashboardPageImpl({super.key});
+
+  int _columnsForWidth(double w) {
+    if (w >= 1600) return 4;
+    if (w >= 1200) return 3;
+    if (w >= 900) return 2;
+    return 2;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cfgAsync = ref.watch(dashboardConfigProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Übersicht'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Aktualisieren',
+            onPressed: () => ref.invalidate(dashboardConfigProvider),
+          ),
+        ],
+      ),
+      body: cfgAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Fehler: $e')),
+        data: (cfg) {
+          final visible = cfg.order.where((id) => cfg.visibility[id] ?? true).toList();
+          return LayoutBuilder(
+            builder: (context, c) {
+              final cols = _columnsForWidth(c.maxWidth);
+              return Padding(
+                padding: const EdgeInsets.all(32),
+                child: GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.6,
+                  ),
+                  itemCount: visible.length,
+                  itemBuilder: (context, i) {
+                    final id = visible[i];
+                    return _WidgetCard(id: id);
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WidgetCard extends ConsumerWidget {
+  const _WidgetCard({required this.id});
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dataAsync = ref.watch(dashboardWidgetDataProvider(id));
+    final title = dashboardWidgetTitles[id] ?? id;
+    final icon = dashboardWidgetIcons[id];
+    final route = dashboardWidgetRoutes[id];
+    return dataAsync.when(
+      loading: () => DashboardCard(title: title, icon: icon, isLoading: true),
+      error: (e, _) => DashboardCard(title: title, icon: icon, error: e.toString()),
+      data: (data) {
+        if (data == null) return const SizedBox.shrink();
+        final Widget content = _buildContent(data);
+        final String? empty = _emptyFor(data);
+        return DashboardCard(
+          title: data.title,
+          icon: data.icon,
+          content: empty == null ? content : null,
+          emptyMessage: empty,
+          subtitle: data.subtitle,
+          onTap: route != null ? () => _navigate(context, route) : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(WidgetData d) {
+    switch (d.id) {
+      case 'offene_rechnungen':
+      case 'ueberfaellige_rechnungen':
+      case 'offene_verbindlichkeiten':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('${d.count ?? 0} Rechnungen', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('${d.sum ?? '0.00'} €'),
+          ],
+        );
+      case 'kontostand':
+        return Text('${d.sum ?? '0.00'} €', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold));
+      case 'einnahmen_ausgaben':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[Text('Einnahmen: ${d.sum ?? '0.00'} €'), Text('Ausgaben: ${d.subtitle ?? '0.00'} €')],
+        );
+      case 'quick_links':
+        final links = d.raw as List<QuickLink>?;
+        if (links == null || links.isEmpty) return const Text('Keine Links');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[for (final l in links) Text('${l.label} → ${l.route}')],
+        );
+      case 'ustva_frist':
+        return Text(d.subtitle ?? '');
+      default:
+        final list = d.raw as List?;
+        if (list == null || list.isEmpty) return const SizedBox.shrink();
+        return Text('${d.count} Einträge');
+    }
+  }
+
+  String? _emptyFor(WidgetData d) {
+    if (d.id == 'lagerwarnung' && (d.count ?? 0) == 0) return 'Keine Warnungen';
+    if (d.id == 'lagerbestand' && (d.count ?? 0) == 0) return 'Kein Lagerbestand';
+    if (d.id == 'mahnung_warnung' && (d.count ?? 0) == 0) return 'Keine Mahnungen';
+    if (d.id == 'fristen' && (d.count ?? 0) == 0) return 'Keine Fristen';
+    if (d.id == 'aktivitaets_log' && (d.count ?? 0) == 0) return 'Keine Aktivitäten';
+    if (d.id == 'zahlungseingaenge' && (d.count ?? 0) == 0) return 'Keine Zahlungen';
+    return null;
+  }
+
+  void _navigate(BuildContext context, String route) {
+    // ponytail: navigation stub — go_router handles real routing.
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Navigate $route')));
+  }
+}
