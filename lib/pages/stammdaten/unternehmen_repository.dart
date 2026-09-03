@@ -111,15 +111,9 @@ class UnternehmenRepository {
     final assignments = <String, Object?>{};
     for (final e in values.entries) {
       final col = _normalizeColumn(e.key);
-      if (!existing.contains(col)) {
-        // ponytail: dynamic column creation for 80+ fields
-        try {
-          await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN $col TEXT');
-          existing.add(col);
-        } catch (_) {
-          continue;
-        }
-      }
+      if (col.isEmpty || col.contains(RegExp(r'[^a-z0-9_]'))) continue;
+      if (!existing.contains(col)) continue;
+
       // special handling for pdf_vorlage
       if (col == 'pdf_vorlage') {
         final v = e.value as String?;
@@ -234,7 +228,7 @@ class UnternehmenRepository {
       'qrZahlungAktiv': 'qr_zahlung_aktiv',
       'qr_zahlung_aktiv': 'qr_zahlung_aktiv',
     };
-    return map[key] ?? key.toLowerCase();
+    return map[key] ?? '';
   }
 
   static Future<void> _ensureSchema(QueryExecutor executor) async {
