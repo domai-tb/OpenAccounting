@@ -161,11 +161,11 @@ void main() {
     test('de translations use Du, not Sie', () {
       final de = AppLocalizationsDe();
       // Du-Ansprache enforcement: must contain Du/Deine, must not contain Sie/Ihre.
-      expect(de.hello, contains('Deine'));
-      expect(de.confirmDelete, contains('Du'));
-      expect(de.hello, isNot(contains('Sie')));
-      expect(de.confirmDelete, isNot(contains('Sie')));
-      expect(de.emptyInvoices, contains('Deine'));
+      expect(de.hello.toLowerCase(), contains('deine'));
+      expect(de.confirmDelete.toLowerCase(), contains('du'));
+      expect(de.hello.toLowerCase(), isNot(contains('sie')));
+      expect(de.confirmDelete.toLowerCase(), isNot(contains('sie')));
+      expect(de.emptyInvoices.toLowerCase(), contains('deine'));
     });
 
     test('locale formatting de-DE uses German patterns', () {

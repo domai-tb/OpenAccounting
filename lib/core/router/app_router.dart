@@ -32,19 +32,16 @@ enum AppRoute {
 
 Future<bool> hasUnternehmen(AppDatabase db) async {
   try {
-    final rows = await db.executor.runSelect('SELECT COUNT(*) as c FROM unternehmen', const []);
+    final rows = await db.executor.runSelect('SELECT name FROM unternehmen', const []);
     if (rows.isEmpty) return false;
-    final v = rows.first['c'];
-    if (v is int) return v > 0;
-    if (v is num) return v > 0;
-    return false;
-  } on Exception catch (e) {
-    // ponytail: no such table → treat as unconfigured, redirect to /setup.
-    final msg = e.toString().toLowerCase();
-    if (msg.contains('no such table') || msg.contains('unternehmens')) {
-      return false;
+    if (rows.length == 1) {
+      final name = rows.first['name'];
+      if (name == 'Meine Firma' || name == null) return false;
     }
-    rethrow;
+    return true;
+  } catch (_) {
+    // ponytail: no such table or not open → treat as unconfigured, redirect to /setup.
+    return false;
   }
 }
 
