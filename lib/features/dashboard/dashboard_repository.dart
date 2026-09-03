@@ -104,6 +104,53 @@ class DashboardRepository {
     return cfg.order.where((id) => cfg.visibility[id] ?? true).toList();
   }
 
+  /// Ponytail ultra: immediate persistence helpers — YAGNI, one-liner wrappers over load/save.
+  // ignore: avoid_positional_boolean_parameters
+  Future<void> toggleVisibility(String id, bool visible) async {
+    final cfg = await loadConfig();
+    final vis = Map<String, bool>.from(cfg.visibility)..[id] = visible;
+    await saveConfig(cfg.copyWith(visibility: vis));
+  }
+
+  Future<void> updateOrder(List<String> ids) async {
+    final cfg = await loadConfig();
+    final all = dashboardWidgetIds.toSet();
+    final order = ids.where(all.contains).toList();
+    for (final d in dashboardWidgetIds) {
+      if (!order.contains(d)) order.add(d);
+    }
+    await saveConfig(cfg.copyWith(order: order));
+  }
+
+  Future<void> reorderWidget(String id, int newIndex) async {
+    final cfg = await loadConfig();
+    final order = List<String>.from(cfg.order);
+    final old = order.indexOf(id);
+    if (old == -1) return;
+    // ignore: noop_primitive_operations
+    final clamped = newIndex.clamp(0, order.length - 1).toInt();
+    order.removeAt(old);
+    order.insert(clamped, id);
+    await saveConfig(cfg.copyWith(order: order));
+  }
+
+  Future<void> addQuickLink(QuickLink link) async {
+    final cfg = await loadConfig();
+    final links = List<QuickLink>.from(cfg.quickLinks)..add(link);
+    await saveConfig(cfg.copyWith(quickLinks: links));
+  }
+
+  Future<void> removeQuickLink(String route) async {
+    final cfg = await loadConfig();
+    final links = cfg.quickLinks.where((e) => e.route != route).toList();
+    await saveConfig(cfg.copyWith(quickLinks: links));
+  }
+
+  Future<void> setQuickLinks(List<QuickLink> links) async {
+    final cfg = await loadConfig();
+    await saveConfig(cfg.copyWith(quickLinks: List<QuickLink>.from(links)));
+  }
+
   // --- Widget data queries (ponytail: minimal, resilient to empty tables) ---
 
   Future<Map<String, Object?>> fetchOffeneRechnungen() async {
