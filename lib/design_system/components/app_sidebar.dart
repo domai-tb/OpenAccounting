@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+// TODO(l10n): replace hardcoded labels with AppLocalizations.
+
 /// Persistent sidebar per DESIGN §4.
 /// 240 px expanded, 72 px rail with tooltip, drawer <900 handled by AppShell.
 class AppSidebar extends StatelessWidget {
-  const AppSidebar({required this.isCompact, required this.selectedPath, required this.isSelected, super.key});
+  const AppSidebar({required this.isCompact, required this.isSelected, super.key});
 
   final bool isCompact;
-  final String selectedPath;
   final bool Function(String) isSelected;
 
   @override

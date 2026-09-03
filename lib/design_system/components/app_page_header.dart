@@ -13,14 +13,17 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: Text(title),
+      title: Text(title, overflow: TextOverflow.ellipsis),
       actions: actions,
       bottom: subtitle != null
           ? PreferredSize(
               preferredSize: const Size.fromHeight(24),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Padding(padding: const EdgeInsets.only(left: 16, bottom: 8), child: Text(subtitle!)),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false),
+                ),
               ),
             )
           : null,

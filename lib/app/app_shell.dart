@@ -22,7 +22,7 @@ class AppShell extends StatelessWidget {
         final isCompact = width >= 900 && width < 1200;
         final isDrawer = width < 900;
         final sidebarWidth = isCompact ? 72.0 : 240.0;
-        final sidebar = AppSidebar(isCompact: isCompact, selectedPath: location, isSelected: _isSelected);
+        final sidebar = AppSidebar(isCompact: isCompact, isSelected: _isSelected);
         if (isDrawer) {
           return Scaffold(
             appBar: AppBar(title: const Text('OpenAccounting')),

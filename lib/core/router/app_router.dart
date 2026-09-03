@@ -1,5 +1,3 @@
-export 'package:openaccounting/app/app_shell.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +5,8 @@ import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+
+export 'package:openaccounting/app/app_shell.dart';
 
 /// DESIGN §3 App Shell, §4 Sidebar (240px), §34 Breakpoints, §8 Theme handling.
 /// ponytail: single GoRouter + ShellRoute — no per-feature router explosion.
@@ -38,9 +38,13 @@ Future<bool> hasUnternehmen(AppDatabase db) async {
     if (v is int) return v > 0;
     if (v is num) return v > 0;
     return false;
-  } catch (_) {
+  } on Exception catch (e) {
     // ponytail: no such table → treat as unconfigured, redirect to /setup.
-    return false;
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('no such table') || msg.contains('unternehmens')) {
+      return false;
+    }
+    rethrow;
   }
 }
 
