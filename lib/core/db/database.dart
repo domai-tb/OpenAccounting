@@ -156,6 +156,26 @@ class AppDatabase {
     try {
       await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
     } catch (_) {}
+    for (final col in <String>[
+      'einleitungstext_rechnung TEXT',
+      'schlusstext_rechnung TEXT',
+      'einleitungstext_angebot TEXT',
+      'schlusstext_angebot TEXT',
+      'einleitungstext_auftrag TEXT',
+      'schlusstext_auftrag TEXT',
+      'einleitungstext_proforma TEXT',
+      'schlusstext_proforma TEXT',
+      'einleitungstext_lieferschein TEXT',
+      'schlusstext_lieferschein TEXT',
+      'einleitungstext_gutschrift TEXT',
+      'schlusstext_gutschrift TEXT',
+      'einleitungstext_storno TEXT',
+      'schlusstext_storno TEXT',
+    ]) {
+      try {
+        await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN $col');
+      } catch (_) {}
+    }
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -306,7 +326,21 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   datev_mandantennummer TEXT,
   datev_konto_bank TEXT,
   datev_konto_bar TEXT,
-  dashboard_config TEXT
+  dashboard_config TEXT,
+  einleitungstext_rechnung TEXT,
+  schlusstext_rechnung TEXT,
+  einleitungstext_angebot TEXT,
+  schlusstext_angebot TEXT,
+  einleitungstext_auftrag TEXT,
+  schlusstext_auftrag TEXT,
+  einleitungstext_proforma TEXT,
+  schlusstext_proforma TEXT,
+  einleitungstext_lieferschein TEXT,
+  schlusstext_lieferschein TEXT,
+  einleitungstext_gutschrift TEXT,
+  schlusstext_gutschrift TEXT,
+  einleitungstext_storno TEXT,
+  schlusstext_storno TEXT
 )''',
   // 2 kategorien
   '''

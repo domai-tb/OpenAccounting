@@ -9,13 +9,15 @@ final class PdfGenerator {
 
   Future<Uint8List> generate(PdfDocumentSnapshot snapshot) {
     final document = pw.Document(compress: false);
-    document.addPage(
-      pw.MultiPage(
-        pageFormat: pdf.PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(36),
-        build: (_) => _buildPage(snapshot),
-      ),
+    final isCopy = snapshot.copyState == PdfCopyState.copy;
+    final pageTheme = pw.PageTheme(
+      pageFormat: pdf.PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(36),
+      buildBackground: isCopy
+          ? (pw.Context context) => pw.FullPage(ignoreMargins: true, child: pw.Watermark.text('KOPIE'))
+          : null,
     );
+    document.addPage(pw.MultiPage(pageTheme: pageTheme, build: (_) => _buildPage(snapshot)));
     return document.save();
   }
 }

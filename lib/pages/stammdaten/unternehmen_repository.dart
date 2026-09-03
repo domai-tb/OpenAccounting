@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/pdf/pdf_models.dart';
 
 class UnternehmenException implements Exception {
   const UnternehmenException(this.message);
@@ -37,6 +38,34 @@ class Unternehmen {
   String? get smtpHost => data['smtp_host'] as String?;
   int? get smtpPort => data['smtp_port'] is int ? data['smtp_port'] as int : int.tryParse('${data['smtp_port']}');
   String? get dashboardConfig => data['dashboard_config'] as String?;
+
+  String? get einleitungstextRechnung => data['einleitungstext_rechnung'] as String?;
+  String? get schlusstextRechnung => data['schlusstext_rechnung'] as String?;
+  String? get einleitungstextAngebot => data['einleitungstext_angebot'] as String?;
+  String? get schlusstextAngebot => data['schlusstext_angebot'] as String?;
+  String? get einleitungstextAuftrag => data['einleitungstext_auftrag'] as String?;
+  String? get schlusstextAuftrag => data['schlusstext_auftrag'] as String?;
+  String? get einleitungstextProforma => data['einleitungstext_proforma'] as String?;
+  String? get schlusstextProforma => data['schlusstext_proforma'] as String?;
+  String? get einleitungstextLieferschein => data['einleitungstext_lieferschein'] as String?;
+  String? get schlusstextLieferschein => data['schlusstext_lieferschein'] as String?;
+  String? get einleitungstextGutschrift => data['einleitungstext_gutschrift'] as String?;
+  String? get schlusstextGutschrift => data['schlusstext_gutschrift'] as String?;
+  String? get einleitungstextStorno => data['einleitungstext_storno'] as String?;
+  String? get schlusstextStorno => data['schlusstext_storno'] as String?;
+
+  PdfDocumentTextsSnapshot get pdfTexts => PdfDocumentTextsSnapshot(
+    rechnung: PdfTypeTextSnapshot(einleitungstext: einleitungstextRechnung, schlusstext: schlusstextRechnung),
+    angebot: PdfTypeTextSnapshot(einleitungstext: einleitungstextAngebot, schlusstext: schlusstextAngebot),
+    auftrag: PdfTypeTextSnapshot(einleitungstext: einleitungstextAuftrag, schlusstext: schlusstextAuftrag),
+    proforma: PdfTypeTextSnapshot(einleitungstext: einleitungstextProforma, schlusstext: schlusstextProforma),
+    lieferschein: PdfTypeTextSnapshot(
+      einleitungstext: einleitungstextLieferschein,
+      schlusstext: schlusstextLieferschein,
+    ),
+    gutschrift: PdfTypeTextSnapshot(einleitungstext: einleitungstextGutschrift, schlusstext: schlusstextGutschrift),
+    storno: PdfTypeTextSnapshot(einleitungstext: einleitungstextStorno, schlusstext: schlusstextStorno),
+  );
 
   static bool _asBool(Object? v) => v is bool
       ? v
@@ -81,6 +110,20 @@ class UnternehmenRepository {
     _ColumnDefinition('est_vorauszahlungen_aktiv', 'INTEGER DEFAULT 0'),
     _ColumnDefinition('gewst_vorauszahlungen_aktiv', 'INTEGER DEFAULT 0'),
     _ColumnDefinition('dashboard_config', 'TEXT'),
+    _ColumnDefinition('einleitungstext_rechnung', 'TEXT'),
+    _ColumnDefinition('schlusstext_rechnung', 'TEXT'),
+    _ColumnDefinition('einleitungstext_angebot', 'TEXT'),
+    _ColumnDefinition('schlusstext_angebot', 'TEXT'),
+    _ColumnDefinition('einleitungstext_auftrag', 'TEXT'),
+    _ColumnDefinition('schlusstext_auftrag', 'TEXT'),
+    _ColumnDefinition('einleitungstext_proforma', 'TEXT'),
+    _ColumnDefinition('schlusstext_proforma', 'TEXT'),
+    _ColumnDefinition('einleitungstext_lieferschein', 'TEXT'),
+    _ColumnDefinition('schlusstext_lieferschein', 'TEXT'),
+    _ColumnDefinition('einleitungstext_gutschrift', 'TEXT'),
+    _ColumnDefinition('schlusstext_gutschrift', 'TEXT'),
+    _ColumnDefinition('einleitungstext_storno', 'TEXT'),
+    _ColumnDefinition('schlusstext_storno', 'TEXT'),
     _ColumnDefinition('profilmanager_aktiv', 'INTEGER DEFAULT 0'),
     _ColumnDefinition('iban', 'TEXT'),
     _ColumnDefinition('bic', 'TEXT'),
@@ -227,6 +270,34 @@ class UnternehmenRepository {
       'unterschrift_auf_rechnung': 'unterschrift_auf_rechnung',
       'qrZahlungAktiv': 'qr_zahlung_aktiv',
       'qr_zahlung_aktiv': 'qr_zahlung_aktiv',
+      'einleitungstextRechnung': 'einleitungstext_rechnung',
+      'einleitungstext_rechnung': 'einleitungstext_rechnung',
+      'schlusstextRechnung': 'schlusstext_rechnung',
+      'schlusstext_rechnung': 'schlusstext_rechnung',
+      'einleitungstextAngebot': 'einleitungstext_angebot',
+      'einleitungstext_angebot': 'einleitungstext_angebot',
+      'schlusstextAngebot': 'schlusstext_angebot',
+      'schlusstext_angebot': 'schlusstext_angebot',
+      'einleitungstextAuftrag': 'einleitungstext_auftrag',
+      'einleitungstext_auftrag': 'einleitungstext_auftrag',
+      'schlusstextAuftrag': 'schlusstext_auftrag',
+      'schlusstext_auftrag': 'schlusstext_auftrag',
+      'einleitungstextProforma': 'einleitungstext_proforma',
+      'einleitungstext_proforma': 'einleitungstext_proforma',
+      'schlusstextProforma': 'schlusstext_proforma',
+      'schlusstext_proforma': 'schlusstext_proforma',
+      'einleitungstextLieferschein': 'einleitungstext_lieferschein',
+      'einleitungstext_lieferschein': 'einleitungstext_lieferschein',
+      'schlusstextLieferschein': 'schlusstext_lieferschein',
+      'schlusstext_lieferschein': 'schlusstext_lieferschein',
+      'einleitungstextGutschrift': 'einleitungstext_gutschrift',
+      'einleitungstext_gutschrift': 'einleitungstext_gutschrift',
+      'schlusstextGutschrift': 'schlusstext_gutschrift',
+      'schlusstext_gutschrift': 'schlusstext_gutschrift',
+      'einleitungstextStorno': 'einleitungstext_storno',
+      'einleitungstext_storno': 'einleitungstext_storno',
+      'schlusstextStorno': 'schlusstext_storno',
+      'schlusstext_storno': 'schlusstext_storno',
     };
     return map[key] ?? '';
   }
