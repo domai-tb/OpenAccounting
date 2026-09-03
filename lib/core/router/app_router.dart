@@ -1,7 +1,12 @@
+export 'package:openaccounting/app/app_shell.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/design_system/components/app_page.dart';
+import 'package:openaccounting/design_system/components/app_page_header.dart';
 
 /// DESIGN §3 App Shell, §4 Sidebar (240px), §34 Breakpoints, §8 Theme handling.
 /// ponytail: single GoRouter + ShellRoute — no per-feature router explosion.
@@ -51,7 +56,6 @@ GoRouter createRouter(AppDatabase db) {
       return null;
     },
     routes: <RouteBase>[
-      GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
       ShellRoute(
         builder: (context, state, child) => AppShell(location: state.matchedLocation, child: child),
         routes: <RouteBase>[
@@ -95,6 +99,7 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(path: '/reports', builder: (context, state) => const ReportsPage()),
           GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
+          GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
         ],
       ),
     ],
@@ -107,119 +112,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return createRouter(db);
 });
 
-/// App shell with sidebar 240px (expanded ≥1200), compact 72px (900-1199),
-/// drawer <900 per DESIGN §34.
-class AppShell extends StatelessWidget {
-  const AppShell({required this.location, required this.child, super.key});
-
-  final String location;
-  final Widget child;
-
-  bool _isSelected(String path) {
-    if (path == '/') return location == '/';
-    return location.startsWith(path);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final isCompact = width >= 900 && width < 1200;
-        final isDrawer = width < 900;
-        final sidebarWidth = isCompact ? 72.0 : 240.0;
-
-        final sidebar = _Sidebar(isCompact: isCompact, selectedPath: location, isSelected: _isSelected);
-
-        if (isDrawer) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('OpenAccounting')),
-            drawer: Drawer(child: sidebar),
-            body: child,
-          );
-        }
-
-        return Scaffold(
-          body: Row(
-            children: <Widget>[
-              SizedBox(
-                width: sidebarWidth,
-                child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(child: child),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.isCompact, required this.selectedPath, required this.isSelected});
-
-  final bool isCompact;
-  final String selectedPath;
-  final bool Function(String) isSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget item(IconData icon, String label, String path) {
-      final selected = isSelected(path);
-      if (isCompact) {
-        return Tooltip(
-          message: label,
-          child: ListTile(leading: Icon(icon), selected: selected, onTap: () => context.go(path)),
-        );
-      }
-      return ListTile(leading: Icon(icon), title: Text(label), selected: selected, onTap: () => context.go(path));
-    }
-
-    return ListView(
-      children: <Widget>[
-        const SizedBox(height: 16),
-        if (isCompact)
-          const Icon(Icons.account_balance_wallet, size: 32)
-        else
-          const ListTile(leading: Icon(Icons.account_balance_wallet), title: Text('OpenAccounting')),
-        const Divider(),
-        if (!isCompact)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('ÜBERSICHT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        item(Icons.dashboard, 'Übersicht', '/'),
-        if (!isCompact)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('GESCHÄFT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        item(Icons.receipt_long, 'Rechnungen', '/invoices'),
-        item(Icons.receipt, 'Belege', '/receipts'),
-        item(Icons.account_balance, 'Bank & Zahlungen', '/banking'),
-        item(Icons.contacts, 'Kontakte', '/contacts'),
-        if (!isCompact)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('STEUERN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ),
-        item(Icons.percent, 'Steuern', '/taxes'),
-        item(Icons.bar_chart, 'Auswertungen', '/reports'),
-        const Divider(),
-        item(Icons.settings, 'Einstellungen', '/settings'),
-        item(Icons.help, 'Hilfe', '/help'),
-      ],
-    );
-  }
-}
-
 // Minimal placeholder pages — real feature pages replace in later batches.
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Übersicht')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Übersicht'),
+      body: Center(child: Text('Übersicht')),
+    );
+  }
 }
 
 class InvoicesPage extends StatelessWidget {
@@ -229,11 +132,14 @@ class InvoicesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = filterTyp != null || filterStatus != null
-        ? 'Rechnungen typ=$filterTyp status=$filterStatus'
-        : 'Rechnungen';
+    final String label;
+    if (filterTyp != null || filterStatus != null) {
+      label = 'Rechnungen typ=$filterTyp status=$filterStatus';
+    } else {
+      label = 'Rechnungen';
+    }
     return Scaffold(
-      appBar: AppBar(title: Text(label)),
+      appBar: AppPageHeader(title: label),
       body: Center(child: Text(label)),
     );
   }
@@ -243,68 +149,124 @@ class InvoiceDetailPage extends StatelessWidget {
   const InvoiceDetailPage({required this.id, super.key});
   final String id;
   @override
-  Widget build(BuildContext context) => Scaffold(body: Center(child: Text('Rechnung $id')));
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppPageHeader(title: 'Rechnung $id'),
+      body: Center(child: Text('Rechnung $id')),
+    );
+  }
 }
 
 class ReceiptsPage extends StatelessWidget {
   const ReceiptsPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Belege')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Belege'),
+      body: Center(child: Text('Belege')),
+    );
+  }
 }
 
 class BankingPage extends StatelessWidget {
   const BankingPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Bank & Zahlungen')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Bank & Zahlungen'),
+      body: Center(child: Text('Bank & Zahlungen')),
+    );
+  }
 }
 
 class ContactsPage extends StatelessWidget {
   const ContactsPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Kontakte')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Kontakte'),
+      body: Center(child: Text('Kontakte')),
+    );
+  }
 }
 
 class ContactDetailPage extends StatelessWidget {
   const ContactDetailPage({required this.id, super.key});
   final String id;
   @override
-  Widget build(BuildContext context) => Scaffold(body: Center(child: Text('Kontakt $id')));
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppPageHeader(title: 'Kontakt $id'),
+      body: Center(child: Text('Kontakt $id')),
+    );
+  }
 }
 
 class TaxesPage extends StatelessWidget {
   const TaxesPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Steuern')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Steuern'),
+      body: Center(child: Text('Steuern')),
+    );
+  }
 }
 
 class ReportsPage extends StatelessWidget {
   const ReportsPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Auswertungen')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Auswertungen'),
+      body: Center(child: Text('Auswertungen')),
+    );
+  }
 }
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Einstellungen')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Einstellungen'),
+      body: Center(child: Text('Einstellungen')),
+    );
+  }
 }
 
 class HelpPage extends StatelessWidget {
   const HelpPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Hilfe')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Hilfe'),
+      body: Center(child: Text('Hilfe')),
+    );
+  }
 }
 
 class SetupPage extends StatelessWidget {
   const SetupPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Setup Wizard')));
+  Widget build(BuildContext context) {
+    return const AppPage(
+      header: AppPageHeader(title: 'Setup'),
+      maxWidth: 900,
+      child: Text('Setup Wizard'),
+    );
+  }
 }
 
 class NotFoundPage extends StatelessWidget {
   const NotFoundPage({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(body: Center(child: Text('Nicht gefunden')));
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      appBar: AppPageHeader(title: 'Nicht gefunden'),
+      body: Center(child: Text('Nicht gefunden')),
+    );
+  }
 }
 
 /// Backend unreachable UI per DESIGN §46.
