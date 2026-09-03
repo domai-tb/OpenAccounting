@@ -237,11 +237,6 @@ class UnternehmenRepository {
     try {
       await t.ensureOpen(_NoopUser());
       await _addMissing(t, 'unternehmen', _unternehmenColumns);
-      // ensure singleton row
-      final rows = await t.runSelect('SELECT id FROM unternehmen WHERE id = 1', const <Object?>[]);
-      if (rows.isEmpty) {
-        await t.runInsert('INSERT INTO unternehmen (id, name) VALUES (1, ?)', const <Object?>['Meine Firma']);
-      }
       await t.send();
     } catch (e, s) {
       try {
