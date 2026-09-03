@@ -78,16 +78,16 @@
 - [x] 9.1 Write failing test: `test/features/rechnungen/erstellung_test.dart` — create draft invoice
 - [x] 9.2 Implement: Rechnung creation with positions, Entwurf mode
 - [x] 9.3 Write failing test: `test/features/rechnungen/finalisierung_test.dart` — finalization locks document, assigns nummer
-- [ ] 9.4 Implement: Finalization flow (lock, PDF generate, nummernkreis)
-- [ ] 9.5 Write failing test: `test/features/rechnungen/storno_test.dart` — Storno creates negative amounts
-- [ ] 9.6 Implement: Storno with Stornogrund, Stornodatum, own nummernkreis
-- [ ] 9.7 Write failing test: `test/features/rechnungen/gutschrift_test.dart` — Gutschrift references original
-- [ ] 9.8 Implement: Gutschrift with bidirectional link
-- [ ] 9.9 Write failing test: `test/features/rechnungen/ketten_test.dart` — Angebot → Auftrag → LS → Rechnung conversion
-- [ ] 9.10 Implement: Document conversion chains with position propagation
-- [ ] 9.11 Write failing test: `test/features/rechnungen/eingabemodus_test.dart` — netto and brutto produce correct totals
-- [ ] 9.12 Implement: Server-side preview as single source of truth
-- [ ] 9.13 Refactor; full suite stays green
+- [x] 9.4 Implement: Finalization flow (lock, PDF generate, nummernkreis)
+- [x] 9.5 Write failing test: `test/features/rechnungen/storno_test.dart` — Storno creates negative amounts
+- [x] 9.6 Implement: Storno with Stornogrund, Stornodatum, own nummernkreis
+- [x] 9.7 Write failing test: `test/features/rechnungen/gutschrift_test.dart` — Gutschrift references original
+- [x] 9.8 Implement: Gutschrift with bidirectional link
+- [x] 9.9 Write failing test: `test/features/rechnungen/ketten_test.dart` — Angebot → Auftrag → LS → Rechnung conversion
+- [x] 9.10 Implement: Document conversion chains with position propagation
+- [x] 9.11 Write failing test: `test/features/rechnungen/eingabemodus_test.dart` — netto and brutto produce correct totals
+- [x] 9.12 Implement: Server-side preview as single source of truth
+- [x] 9.13 Refactor; full suite stays green
 
 ## 10. PDF Generation
 

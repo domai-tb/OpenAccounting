@@ -8,6 +8,7 @@ class RechnungPositionItem {
     this.artikelId,
     this.position,
     this.id,
+    this.rabattProzent,
   });
 
   final int? id;
@@ -18,6 +19,7 @@ class RechnungPositionItem {
   final num gesamt;
   final num ustSatz;
   final int? position;
+  final num? rabattProzent;
 }
 
 class RechnungItem {
