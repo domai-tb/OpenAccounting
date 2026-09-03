@@ -5,6 +5,7 @@ import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
 
@@ -60,7 +61,7 @@ GoRouter createRouter(AppDatabase db) {
       ShellRoute(
         builder: (context, state, child) => AppShell(location: state.matchedLocation, child: child),
         routes: <RouteBase>[
-          GoRoute(path: '/', builder: (context, state) => const DashboardPage()),
+          GoRoute(path: '/', builder: (context, state) => const DashboardPageImpl()),
           GoRoute(
             path: '/invoices',
             builder: (context, state) {
@@ -114,17 +115,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 // Minimal placeholder pages — real feature pages replace in later batches.
-
-class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Übersicht'),
-      body: Center(child: Text('Dashboard bereit')),
-    );
-  }
-}
 
 class InvoicesPage extends StatelessWidget {
   const InvoicesPage({this.filterTyp, this.filterStatus, super.key});

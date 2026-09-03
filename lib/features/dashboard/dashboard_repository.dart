@@ -127,9 +127,8 @@ class DashboardRepository {
     final order = List<String>.from(cfg.order);
     final old = order.indexOf(id);
     if (old == -1) return;
-    // ignore: noop_primitive_operations
-    final clamped = newIndex.clamp(0, order.length - 1).toInt();
     order.removeAt(old);
+    final clamped = newIndex.clamp(0, order.length).toInt();
     order.insert(clamped, id);
     await saveConfig(cfg.copyWith(order: order));
   }

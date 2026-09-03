@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
+import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
 /// Dashboard page — scrollable grid 2-4 columns responsive via LayoutBuilder.
@@ -18,6 +21,14 @@ class DashboardPageImpl extends ConsumerWidget {
     return 2;
   }
 
+  void _showConfig(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) => const _DashboardConfigSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cfgAsync = ref.watch(dashboardConfigProvider);
@@ -25,6 +36,7 @@ class DashboardPageImpl extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Übersicht'),
         actions: <Widget>[
+          IconButton(icon: const Icon(Icons.tune), tooltip: 'Anpassen', onPressed: () => _showConfig(context)),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Aktualisieren',
@@ -34,12 +46,12 @@ class DashboardPageImpl extends ConsumerWidget {
       ),
       body: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Fehler: $e')),
-        data: (cfg) {
-          final visible = cfg.order.where((id) => cfg.visibility[id] ?? true).toList();
+        error: (Object e, _) => Center(child: Text('Fehler: $e')),
+        data: (DashboardConfig cfg) {
+          final List<String> visible = cfg.order.where((String id) => cfg.visibility[id] ?? true).toList();
           return LayoutBuilder(
-            builder: (context, c) {
-              final cols = _columnsForWidth(c.maxWidth);
+            builder: (BuildContext context, BoxConstraints c) {
+              final int cols = _columnsForWidth(c.maxWidth);
               return Padding(
                 padding: const EdgeInsets.all(32),
                 child: GridView.builder(
@@ -50,8 +62,8 @@ class DashboardPageImpl extends ConsumerWidget {
                     childAspectRatio: 1.6,
                   ),
                   itemCount: visible.length,
-                  itemBuilder: (context, i) {
-                    final id = visible[i];
+                  itemBuilder: (BuildContext context, int i) {
+                    final String id = visible[i];
                     return _WidgetCard(id: id);
                   },
                 ),
@@ -64,6 +76,74 @@ class DashboardPageImpl extends ConsumerWidget {
   }
 }
 
+/// Minimal config sheet — SwitchListTile per widget + ReorderableListView.
+/// ponytail: immediate save via repo.* + ref.invalidate ensures hidden not fetch.
+class _DashboardConfigSheet extends ConsumerWidget {
+  const _DashboardConfigSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<DashboardConfig> cfgAsync = ref.watch(dashboardConfigProvider);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.85,
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: <Widget>[
+                  const Expanded(
+                    child: Text('Dashboard anpassen', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: cfgAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object e, _) => Center(child: Text('Fehler: $e')),
+                data: (DashboardConfig cfg) {
+                  final List<String> order = cfg.order;
+                  return ReorderableListView.builder(
+                    itemCount: order.length,
+                    onReorder: (int oldIndex, int newIndex) {
+                      if (newIndex > oldIndex) newIndex -= 1;
+                      final String id = order[oldIndex];
+                      final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                      unawaited(repo.reorderWidget(id, newIndex).then((_) => ref.invalidate(dashboardConfigProvider)));
+                    },
+                    itemBuilder: (BuildContext context, int index) {
+                      final String id = order[index];
+                      final String title = dashboardWidgetTitles[id] ?? id;
+                      final bool visible = cfg.visibility[id] ?? true;
+                      return SwitchListTile(
+                        key: ValueKey<String>(id),
+                        title: Text(title),
+                        subtitle: Text(id),
+                        value: visible,
+                        secondary: const Icon(Icons.drag_handle),
+                        onChanged: (bool value) {
+                          final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                          unawaited(
+                            repo.toggleVisibility(id, value).then((_) => ref.invalidate(dashboardConfigProvider)),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _WidgetCard extends ConsumerWidget {
   const _WidgetCard({required this.id});
 
@@ -71,14 +151,14 @@ class _WidgetCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dataAsync = ref.watch(dashboardWidgetDataProvider(id));
-    final title = dashboardWidgetTitles[id] ?? id;
-    final icon = dashboardWidgetIcons[id];
-    final route = dashboardWidgetRoutes[id];
+    final AsyncValue<WidgetData?> dataAsync = ref.watch(dashboardWidgetDataProvider(id));
+    final String title = dashboardWidgetTitles[id] ?? id;
+    final IconData? icon = dashboardWidgetIcons[id];
+    final String? route = dashboardWidgetRoutes[id];
     return dataAsync.when(
       loading: () => DashboardCard(title: title, icon: icon, isLoading: true),
-      error: (e, _) => DashboardCard(title: title, icon: icon, error: e.toString()),
-      data: (data) {
+      error: (Object e, _) => DashboardCard(title: title, icon: icon, error: e.toString()),
+      data: (WidgetData? data) {
         if (data == null) return const SizedBox.shrink();
         final Widget content = _buildContent(context, data);
         final String? empty = _emptyFor(data);
@@ -115,12 +195,12 @@ class _WidgetCard extends ConsumerWidget {
           children: <Widget>[Text('Einnahmen: ${d.sum ?? '0.00'} €'), Text('Ausgaben: ${d.subtitle ?? '0.00'} €')],
         );
       case 'quick_links':
-        final links = d.raw as List<QuickLink>?;
+        final List<QuickLink>? links = d.raw as List<QuickLink>?;
         if (links == null || links.isEmpty) return const Text('Keine Links');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            for (final l in links)
+            for (final QuickLink l in links)
               InkWell(
                 onTap: () => context.go(l.route),
                 child: Padding(
@@ -133,7 +213,7 @@ class _WidgetCard extends ConsumerWidget {
       case 'ustva_frist':
         return Text(d.subtitle ?? '');
       default:
-        final list = d.raw as List?;
+        final List<dynamic>? list = d.raw as List?;
         if (list == null || list.isEmpty) return const SizedBox.shrink();
         return Text('${d.count} Einträge');
     }
