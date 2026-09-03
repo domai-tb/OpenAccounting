@@ -1,7 +1,7 @@
 ## 1. Desktop Shell Layout
 
 - [x] 1.1 Write failing test: `test/app/app_shell_test.dart` — shell renders on every primary route + not black fallback (assert fails for right reason, not import error)
-- [ ] 1.2 Implement: `lib/app/app_shell.dart` + `lib/design_system/components/app_sidebar.dart` + `lib/design_system/components/app_page.dart` to pass 1.1 (three-area shell with sidebar/header/canvas, not black Container)
+- [x] 1.2 Implement: `lib/app/app_shell.dart` + `lib/design_system/components/app_sidebar.dart` + `lib/design_system/components/app_page.dart` to pass 1.1 (three-area shell with sidebar/header/canvas, not black Container)
 - [ ] 1.3 Refactor; full suite stays green
 
 ## 2. Sidebar Navigation (240/72/drawer + persist)
