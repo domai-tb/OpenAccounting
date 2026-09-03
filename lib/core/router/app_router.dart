@@ -120,7 +120,7 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Übersicht'),
-      body: Center(child: Text('Übersicht')),
+      body: Center(child: Text('Dashboard bereit')),
     );
   }
 }
@@ -140,7 +140,7 @@ class InvoicesPage extends StatelessWidget {
     }
     return Scaffold(
       appBar: AppPageHeader(title: label),
-      body: Center(child: Text(label)),
+      body: Center(child: Text('Liste: $label')),
     );
   }
 }
@@ -152,7 +152,7 @@ class InvoiceDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppPageHeader(title: 'Rechnung $id'),
-      body: Center(child: Text('Rechnung $id')),
+      body: Center(child: Text('Detail: Rechnung $id')),
     );
   }
 }
@@ -163,7 +163,7 @@ class ReceiptsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Belege'),
-      body: Center(child: Text('Belege')),
+      body: Center(child: Text('Belege – Übersicht')),
     );
   }
 }
@@ -174,7 +174,7 @@ class BankingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Bank & Zahlungen'),
-      body: Center(child: Text('Bank & Zahlungen')),
+      body: Center(child: Text('Bank – Übersicht')),
     );
   }
 }
@@ -185,7 +185,7 @@ class ContactsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Kontakte'),
-      body: Center(child: Text('Kontakte')),
+      body: Center(child: Text('Kontakte – Liste')),
     );
   }
 }
@@ -197,7 +197,7 @@ class ContactDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppPageHeader(title: 'Kontakt $id'),
-      body: Center(child: Text('Kontakt $id')),
+      body: Center(child: Text('Detail: Kontakt $id')),
     );
   }
 }
@@ -208,7 +208,7 @@ class TaxesPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Steuern'),
-      body: Center(child: Text('Steuern')),
+      body: Center(child: Text('Steuern – Übersicht')),
     );
   }
 }
@@ -219,7 +219,7 @@ class ReportsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Auswertungen'),
-      body: Center(child: Text('Auswertungen')),
+      body: Center(child: Text('Auswertungen – Übersicht')),
     );
   }
 }
@@ -230,7 +230,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Einstellungen'),
-      body: Center(child: Text('Einstellungen')),
+      body: Center(child: Text('Einstellungen – Bereich')),
     );
   }
 }
@@ -241,7 +241,7 @@ class HelpPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Hilfe'),
-      body: Center(child: Text('Hilfe')),
+      body: Center(child: Text('Hilfe – Übersicht')),
     );
   }
 }
@@ -252,7 +252,6 @@ class SetupPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const AppPage(
       header: AppPageHeader(title: 'Setup'),
-      maxWidth: 900,
       child: Text('Setup Wizard'),
     );
   }
@@ -264,7 +263,7 @@ class NotFoundPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       appBar: AppPageHeader(title: 'Nicht gefunden'),
-      body: Center(child: Text('Nicht gefunden')),
+      body: Center(child: Text('Seite nicht gefunden')),
     );
   }
 }
