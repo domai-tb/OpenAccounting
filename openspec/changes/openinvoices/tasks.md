@@ -61,17 +61,17 @@
 
 ## 8. Master Data (Stammdaten)
 
-- [ ] 8.1 Write failing test: `test/features/stammdaten/kunden_test.dart` — create/read/update/delete Kunden
-- [ ] 8.2 Implement: Kunden CRUD with all fields (20+), Debitor-Nr auto-assign
-- [ ] 8.3 Write failing test: `test/features/stammdaten/lieferanten_test.dart` — create/read/update/delete Lieferanten
-- [ ] 8.4 Implement: Lieferanten CRUD, Kreditor-Nr auto-assign
-- [ ] 8.5 Write failing test: `test/features/stammdaten/artikel_test.dart` — artikel with 4 types, VK-Preise precision
-- [ ] 8.6 Implement: Artikel CRUD, vk_eingabe flag, NUMERIC(12,4) precision
-- [ ] 8.7 Write failing test: `test/features/stammdaten/unternehmen_test.dart` — 80+ fields saved correctly
-- [ ] 8.8 Implement: Unternehmen CRUD with all sub-features (SMTP, PDF, logo, etc.)
-- [ ] 8.9 Write failing test: `test/features/stammdaten/kategorien_test.dart` — SKR03/04 mapping, euer_zeile
-- [ ] 8.10 Implement: Kategorien CRUD with SKR/EÜR/eks mapping
-- [ ] 8.11 Refactor; full suite stays green
+- [x] 8.1 Write failing test: `test/features/stammdaten/kunden_test.dart` — create/read/update/delete Kunden
+- [x] 8.2 Implement: Kunden CRUD with all fields (20+), Debitor-Nr auto-assign
+- [x] 8.3 Write failing test: `test/features/stammdaten/lieferanten_test.dart` — create/read/update/delete Lieferanten
+- [x] 8.4 Implement: Lieferanten CRUD, Kreditor-Nr auto-assign
+- [x] 8.5 Write failing test: `test/features/stammdaten/artikel_test.dart` — artikel with 4 types, VK-Preise precision
+- [x] 8.6 Implement: Artikel CRUD, vk_eingabe flag, NUMERIC(12,4) precision
+- [x] 8.7 Write failing test: `test/features/stammdaten/unternehmen_test.dart` — 80+ fields saved correctly
+- [x] 8.8 Implement: Unternehmen CRUD with all sub-features (SMTP, PDF, logo, etc.)
+- [x] 8.9 Write failing test: `test/features/stammdaten/kategorien_test.dart` — SKR03/04 mapping, euer_zeile
+- [x] 8.10 Implement: Kategorien CRUD with SKR/EÜR/eks mapping
+- [x] 8.11 Refactor; full suite stays green
 
 ## 9. Invoicing (Rechnungen)
 

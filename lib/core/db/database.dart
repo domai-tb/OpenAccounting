@@ -13,8 +13,11 @@ import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/core/db/rechnung_triggers.dart';
 import 'package:openaccounting/core/db/seed.dart';
+import 'package:openaccounting/pages/stammdaten/artikel_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
+import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
+import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 
 /// Drift-backed app database with 38 tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
@@ -37,6 +40,9 @@ class AppDatabase {
   bool _opened = false;
   late final KundenRepository _kundenRepository = KundenRepository(_executor);
   late final LieferantenRepository _lieferantenRepository = LieferantenRepository(_executor);
+  late final ArtikelRepository _artikelRepository = ArtikelRepository(_executor);
+  late final UnternehmenRepository _unternehmenRepository = UnternehmenRepository(_executor);
+  late final KategorienRepository _kategorienRepository = KategorienRepository(_executor);
 
   static const int currentVersion = MigrationRunner.currentVersion;
 
@@ -97,6 +103,27 @@ class AppDatabase {
     return _lieferantenRepository;
   }
 
+  ArtikelRepository get artikelRepository {
+    if (!_opened) {
+      throw StateError('AppDatabase.ensureOpen() muss vor artikelRepository aufgerufen werden');
+    }
+    return _artikelRepository;
+  }
+
+  UnternehmenRepository get unternehmenRepository {
+    if (!_opened) {
+      throw StateError('AppDatabase.ensureOpen() muss vor unternehmenRepository aufgerufen werden');
+    }
+    return _unternehmenRepository;
+  }
+
+  KategorienRepository get kategorienRepository {
+    if (!_opened) {
+      throw StateError('AppDatabase.ensureOpen() muss vor kategorienRepository aufgerufen werden');
+    }
+    return _kategorienRepository;
+  }
+
   bool get isOpen => _opened;
 
   Future<void> ensureOpen() async {
@@ -116,6 +143,9 @@ class AppDatabase {
     await SeedData.run(_executor);
     await _kundenRepository.ensureSchema();
     await _lieferantenRepository.ensureSchema();
+    await _artikelRepository.ensureSchema();
+    await _unternehmenRepository.ensureSchema();
+    await _kategorienRepository.ensureSchema();
     // ponytail: bank_imports history completeness — add columns lazily for pre-existing DBs
     try {
       await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN duplikate INTEGER DEFAULT 0');
