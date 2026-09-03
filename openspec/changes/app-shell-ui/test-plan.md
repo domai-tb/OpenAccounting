@@ -9,9 +9,9 @@
 | specs/app-shell/spec.md → Sidebar Navigation | Drawer at narrow window | test/app/app_shell_test.dart | test_sidebar_drawer_at_800 | 🔴 red |
 | specs/app-shell/spec.md → Sidebar Navigation | Sidebar collapses and persists | test/app/app_shell_test.dart | test_sidebar_collapses_and_persists | 🔴 red |
 | specs/app-shell/spec.md → Sidebar Navigation | Sidebar navigation highlights correctly | test/app/app_shell_test.dart | test_sidebar_highlights_correctly | 🔴 red |
-| specs/app-shell/spec.md → Page Header | Header shows title and primary action | test/design_system/app_page_header_test.dart | test_header_shows_title_and_primary | 🔴 red |
-| specs/app-shell/spec.md → Page Header | Header filter toolbar present | test/design_system/app_page_header_test.dart | test_header_filter_toolbar_present | 🔴 red |
-| specs/app-shell/spec.md → Page Header | Header without primary action still renders subtitle | test/design_system/app_page_header_test.dart | test_header_without_primary_shows_subtitle | 🔴 red |
+| specs/app-shell/spec.md → Page Header | Header shows title and primary action | test/design_system/app_page_header_test.dart | test_header_shows_title_and_primary | 🟢 green |
+| specs/app-shell/spec.md → Page Header | Header filter toolbar present | test/design_system/app_page_header_test.dart | test_header_filter_toolbar_present | 🟢 green |
+| specs/app-shell/spec.md → Page Header | Header without primary action still renders subtitle | test/design_system/app_page_header_test.dart | test_header_without_primary_shows_subtitle | 🟢 green |
 | specs/app-shell/spec.md → Content Canvas and Layout Constraints | Form width constrained on ultrawide | test/design_system/app_page_test.dart | test_form_width_constrained_on_ultrawide | 🔴 red |
 | specs/app-shell/spec.md → Content Canvas and Layout Constraints | Page padding adapts to window size | test/design_system/app_page_test.dart | test_page_padding_adapts | 🔴 red |
 | specs/app-shell/spec.md → Content Canvas and Layout Constraints | Table uses full width | test/design_system/app_page_test.dart | test_table_uses_full_width | 🔴 red |
