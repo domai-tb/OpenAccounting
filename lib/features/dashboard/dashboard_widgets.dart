@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -153,8 +152,7 @@ final dashboardConfigProvider = FutureProvider<DashboardConfig>((ref) async {
   return repo.loadConfig();
 });
 
-Future<WidgetData> _fetchWidgetData(QueryExecutor exec, String id) async {
-  final repo = DashboardRepository(exec);
+Future<WidgetData> _fetchWidgetData(DashboardRepository repo, String id) async {
   final title = dashboardWidgetTitles[id] ?? id;
   final icon = dashboardWidgetIcons[id];
   final route = dashboardWidgetRoutes[id];
@@ -246,6 +244,6 @@ Future<WidgetData> _fetchWidgetData(QueryExecutor exec, String id) async {
 final dashboardWidgetDataProvider = FutureProvider.family<WidgetData?, String>((ref, id) async {
   final cfg = await ref.watch(dashboardConfigProvider.future);
   if (cfg.visibility[id] == false) return null;
-  final db = ref.watch(appDatabaseProvider);
-  return _fetchWidgetData(db.executor, id);
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return _fetchWidgetData(repo, id);
 });

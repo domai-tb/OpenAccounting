@@ -148,94 +148,66 @@ class DashboardRepository {
   // --- Widget data queries (ponytail: minimal, resilient to empty tables) ---
 
   Future<Map<String, Object?>> fetchOffeneRechnungen() async {
-    try {
-      final rows = await executor.runSelect(
-        "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-        "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'rechnung'",
-        const <Object?>[],
-      );
-      final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = money.formatBetrag('${rows.first['s']}');
-      return <String, Object?>{'count': c, 'sum': s};
-    } catch (_) {
-      return <String, Object?>{'count': 0, 'sum': '0.00'};
-    }
+    final rows = await executor.runSelect(
+      "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
+      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'rechnung'",
+      const <Object?>[],
+    );
+    final c = (rows.first['c'] as num?)?.toInt() ?? 0;
+    final s = money.formatBetrag('${rows.first['s']}');
+    return <String, Object?>{'count': c, 'sum': s};
   }
 
   Future<Map<String, Object?>> fetchUeberfaelligeRechnungen() async {
-    try {
-      final rows = await executor.runSelect(
-        "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-        "FROM rechnungen WHERE status != 'bezahlt' AND faelligkeit IS NOT NULL "
-        "AND date(faelligkeit) < date('now')",
-        const <Object?>[],
-      );
-      final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = money.formatBetrag('${rows.first['s']}');
-      return <String, Object?>{'count': c, 'sum': s};
-    } catch (_) {
-      return <String, Object?>{'count': 0, 'sum': '0.00'};
-    }
+    final rows = await executor.runSelect(
+      "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
+      "FROM rechnungen WHERE status != 'bezahlt' AND faelligkeit IS NOT NULL "
+      "AND date(faelligkeit) < date('now')",
+      const <Object?>[],
+    );
+    final c = (rows.first['c'] as num?)?.toInt() ?? 0;
+    final s = money.formatBetrag('${rows.first['s']}');
+    return <String, Object?>{'count': c, 'sum': s};
   }
 
   Future<List<Map<String, Object?>>> fetchZahlungseingaenge({int limit = 5}) async {
-    try {
-      return await executor.runSelect(
-        'SELECT id, datum, betrag, verwendungszweck FROM bank_transaktionen '
-        'ORDER BY datum DESC LIMIT ?',
-        <Object?>[limit],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      'SELECT id, datum, betrag, verwendungszweck FROM bank_transaktionen '
+      'WHERE betrag > 0 ORDER BY datum DESC LIMIT ?',
+      <Object?>[limit],
+    );
   }
 
   Future<List<Map<String, Object?>>> fetchLagerwarnung() async {
-    try {
-      return await executor.runSelect(
-        'SELECT id, bezeichnung, bestand, mindestbestand FROM artikel '
-        'WHERE mindestbestand > 0 AND bestand <= mindestbestand',
-        const <Object?>[],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      'SELECT id, bezeichnung, bestand_aktuell, mindestbestand FROM artikel '
+      'WHERE mindestbestand > 0 AND bestand_aktuell <= mindestbestand',
+      const <Object?>[],
+    );
   }
 
   Future<List<Map<String, Object?>>> fetchLagerbestand() async {
-    try {
-      return await executor.runSelect(
-        'SELECT id, bezeichnung, bestand, mindestbestand FROM artikel WHERE aktiv = 1 LIMIT 20',
-        const <Object?>[],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      'SELECT id, bezeichnung, bestand_aktuell, mindestbestand FROM artikel WHERE aktiv = 1 LIMIT 20',
+      const <Object?>[],
+    );
   }
 
   Future<List<Map<String, Object?>>> fetchMahnungWarnung() async {
-    try {
-      return await executor.runSelect(
-        "SELECT id, rechnung_id, betrag, status FROM mahnungen WHERE status = 'offen' "
-        "ORDER BY datum DESC LIMIT 10",
-        const <Object?>[],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      "SELECT id, rechnung_id, betrag, status FROM mahnungen WHERE status = 'offen' "
+      "ORDER BY datum DESC LIMIT 10",
+      const <Object?>[],
+    );
   }
 
   Future<List<Map<String, Object?>>> fetchFristen() async {
-    try {
-      return await executor.runSelect(
-        "SELECT id, rechnungsnummer, faelligkeit, brutto_betrag FROM rechnungen "
-        "WHERE faelligkeit IS NOT NULL AND date(faelligkeit) BETWEEN date('now') AND date('now','+30 days') "
-        "ORDER BY faelligkeit ASC LIMIT 10",
-        const <Object?>[],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      "SELECT id, rechnungsnummer, faelligkeit, brutto_betrag FROM rechnungen "
+      "WHERE faelligkeit IS NOT NULL AND date(faelligkeit) BETWEEN date('now') AND date('now','+30 days') "
+      "ORDER BY faelligkeit ASC LIMIT 10",
+      const <Object?>[],
+    );
   }
 
   Future<Map<String, Object?>> fetchUstvaFrist() async {
@@ -252,57 +224,41 @@ class DashboardRepository {
   }
 
   Future<Map<String, Object?>> fetchEinnahmenAusgaben() async {
-    try {
-      final rows = await executor.runSelect(
-        'SELECT COALESCE(SUM(CASE WHEN betrag > 0 THEN betrag ELSE 0 END),0) as ein, '
-        'COALESCE(SUM(CASE WHEN betrag < 0 THEN betrag ELSE 0 END),0) as aus FROM journal',
-        const <Object?>[],
-      );
-      final ein = money.formatBetrag('${rows.first['ein']}');
-      final aus = money.formatBetrag('${rows.first['aus']}');
-      return <String, Object?>{'einnahmen': ein, 'ausgaben': aus};
-    } catch (_) {
-      return <String, Object?>{'einnahmen': '0.00', 'ausgaben': '0.00'};
-    }
+    final rows = await executor.runSelect(
+      'SELECT COALESCE(SUM(CASE WHEN betrag > 0 THEN betrag ELSE 0 END),0) as ein, '
+      'COALESCE(SUM(CASE WHEN betrag < 0 THEN betrag ELSE 0 END),0) as aus FROM journal',
+      const <Object?>[],
+    );
+    final ein = money.formatBetrag('${rows.first['ein']}');
+    final aus = money.formatBetrag('${rows.first['aus']}');
+    return <String, Object?>{'einnahmen': ein, 'ausgaben': aus};
   }
 
   Future<Map<String, Object?>> fetchOffeneVerbindlichkeiten() async {
-    try {
-      final rows = await executor.runSelect(
-        "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-        "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'eingangsrechnung'",
-        const <Object?>[],
-      );
-      final c = (rows.first['c'] as num?)?.toInt() ?? 0;
-      final s = money.formatBetrag('${rows.first['s']}');
-      return <String, Object?>{'count': c, 'sum': s};
-    } catch (_) {
-      return <String, Object?>{'count': 0, 'sum': '0.00'};
-    }
+    final rows = await executor.runSelect(
+      "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
+      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'eingangsrechnung'",
+      const <Object?>[],
+    );
+    final c = (rows.first['c'] as num?)?.toInt() ?? 0;
+    final s = money.formatBetrag('${rows.first['s']}');
+    return <String, Object?>{'count': c, 'sum': s};
   }
 
   Future<Map<String, Object?>> fetchKontostand() async {
-    try {
-      final rows = await executor.runSelect('SELECT COALESCE(SUM(saldo),0) as s FROM konten', const <Object?>[]);
-      final s = money.formatBetrag('${rows.first['s']}');
-      final details = await executor.runSelect(
-        'SELECT id, name, saldo FROM konten ORDER BY name LIMIT 10',
-        const <Object?>[],
-      );
-      return <String, Object?>{'sum': s, 'konten': details};
-    } catch (_) {
-      return <String, Object?>{'sum': '0.00', 'konten': <Map<String, Object?>>[]};
-    }
+    final rows = await executor.runSelect('SELECT COALESCE(SUM(saldo),0) as s FROM konten', const <Object?>[]);
+    final s = money.formatBetrag('${rows.first['s']}');
+    final details = await executor.runSelect(
+      'SELECT id, name, saldo FROM konten ORDER BY name LIMIT 10',
+      const <Object?>[],
+    );
+    return <String, Object?>{'sum': s, 'konten': details};
   }
 
   Future<List<Map<String, Object?>>> fetchAktivitaetsLog({int limit = 10}) async {
-    try {
-      return await executor.runSelect(
-        'SELECT id, datum, beschreibung, betrag FROM journal ORDER BY datum DESC, id DESC LIMIT ?',
-        <Object?>[limit],
-      );
-    } catch (_) {
-      return <Map<String, Object?>>[];
-    }
+    return executor.runSelect(
+      'SELECT id, datum, beschreibung, betrag FROM journal ORDER BY datum DESC, id DESC LIMIT ?',
+      <Object?>[limit],
+    );
   }
 }

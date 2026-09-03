@@ -53,7 +53,7 @@ class DashboardConfig {
 
   String toJsonString() => jsonEncode(toJson());
 
-  static DashboardConfig fromJsonString(String raw) {
+  factory DashboardConfig.fromJsonString(String raw) {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, Object?>) return DashboardConfig.fromJson(decoded);

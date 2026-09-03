@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
+import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
@@ -49,7 +50,7 @@ void main() {
       // seed creates unternehmen row? ensure one exists via save then null.
       // Insert unternehmen if missing.
       final rows = await db.executor.runSelect('SELECT COUNT(*) as c FROM unternehmen', const []);
-      if ((rows.first['c'] as num).toInt() == 0) {
+      if (((rows.first['c'] as num?) ?? 0).toInt() == 0) {
         await db.executor.runInsert('INSERT INTO unternehmen (name, dashboard_config) VALUES (?, ?)', <Object?>[
           'Test',
           null,
@@ -140,19 +141,53 @@ void main() {
       expect(low, isEmpty);
       // insert artikel low stock
       await db.executor.runInsert(
-        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, mindestbestand, aktiv) VALUES (?, ?, ?, ?, ?)',
-        <Object?>['WarnArtikel', '10.00', 2, 5, 1],
+        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, bestand_aktuell, mindestbestand, aktiv) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['WarnArtikel', '10.00', 2, 2, 5, 1],
       );
       low = await repo.fetchLagerwarnung();
       expect(low, hasLength(1));
       expect(low.first['bezeichnung'], 'WarnArtikel');
       // insert normal stock should not appear
       await db.executor.runInsert(
-        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, mindestbestand, aktiv) VALUES (?, ?, ?, ?, ?)',
-        <Object?>['OkArtikel', '20.00', 10, 5, 1],
+        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, bestand_aktuell, mindestbestand, aktiv) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['OkArtikel', '20.00', 10, 10, 5, 1],
       );
       low = await repo.fetchLagerwarnung();
       expect(low, hasLength(1));
+    });
+
+    test('Lagerwarnung follows current inventory quantity', () async {
+      await db.executor.runInsert(
+        'INSERT INTO artikel (bezeichnung, vk_netto, bestand, bestand_aktuell, mindestbestand, aktiv) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['CurrentStock', '10.00', 10, 2, 5, 1],
+      );
+
+      final low = await repo.fetchLagerwarnung();
+
+      expect(low.map((row) => row['bezeichnung']), contains('CurrentStock'));
+    });
+
+    test('Zahlungseingänge excludes outgoing bank transactions', () async {
+      final kontoId = await db.executor.runInsert('INSERT INTO konten (name, saldo) VALUES (?, ?)', <Object?>[
+        'Geschäftskonto',
+        '0.00',
+      ]);
+      await db.executor.runInsert(
+        'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck) VALUES (?, ?, ?, ?)',
+        <Object?>[kontoId, '2026-01-02', '125.00', 'Kundenzahlung'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck) VALUES (?, ?, ?, ?)',
+        <Object?>[kontoId, '2026-01-01', '-25.00', 'Software'],
+      );
+
+      final payments = await repo.fetchZahlungseingaenge();
+
+      expect(payments, hasLength(1));
+      expect(payments.single['verwendungszweck'], 'Kundenzahlung');
     });
 
     test('13 widget fetch each returns valid WidgetData', () async {
@@ -195,6 +230,40 @@ void main() {
   });
 
   group('DashboardCard widget', () {
+    test('widget provider exposes data-source failures to error rendering', () async {
+      final db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      await db.close();
+      final container = ProviderContainer(overrides: [appDatabaseProvider.overrideWithValue(db)]);
+      addTearDown(container.dispose);
+
+      await expectLater(
+        container.read(dashboardWidgetDataProvider('offene_rechnungen').future),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    testWidgets('dashboard renders every visible widget card from providers', (tester) async {
+      final db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
+      tester.view.physicalSize = const Size(1600, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: DashboardPageImpl()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final id in dashboardWidgetIds) {
+        expect(find.text(dashboardWidgetTitles[id]!), findsOneWidget, reason: 'widget $id should render');
+      }
+    });
+
     testWidgets('renders title, icon, content', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -298,7 +367,7 @@ void main() {
         <Object?>['RE-O', 'rechnung', 'offen', 0, 'netto', kundeId, '2025-01-01', '2025-01-10', '150.00', '126.05'],
       );
       final ue = await repo.fetchUeberfaelligeRechnungen();
-      expect((ue['count'] as int) >= 1, isTrue);
+      expect(((ue['count'] as int?) ?? 0) >= 1, isTrue);
 
       await db.executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ) VALUES (?, ?, ?, ?, ?)',
@@ -327,7 +396,7 @@ void main() {
 
       final uf = await repo.fetchUstvaFrist();
       expect(uf['frist'], isNotNull);
-      expect((uf['frist'] as String).length, 10);
+      expect((uf['frist'] as String? ?? '').length, 10);
     });
   });
 }
