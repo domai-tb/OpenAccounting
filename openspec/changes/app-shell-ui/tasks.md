@@ -7,7 +7,7 @@
 ## 2. Sidebar Navigation (240/72/drawer + persist)
 
 - [x] 2.1 Write failing test: `test/app/app_shell_test.dart` — expanded at 1280, compact rail at 1024, drawer at 800, collapses and persists, highlights correctly (assert fails)
-- [ ] 2.2 Implement: `lib/design_system/components/app_sidebar.dart` with `LayoutBuilder` 240/72/drawer, `SidebarController` `SharedPreferences` `openaccounting.sidebar_expanded`, workspace selector, `● Lokal` indicator, tooltip, temporary expand, selected highlight
+- [x] 2.2 Implement: `lib/design_system/components/app_sidebar.dart` with `LayoutBuilder` 240/72/drawer, `SidebarController` `SharedPreferences` `openaccounting.sidebar_expanded`, workspace selector, `● Lokal` indicator, tooltip, temporary expand, selected highlight
 - [ ] 2.3 Refactor; full suite stays green
 
 ## 3. Page Header
