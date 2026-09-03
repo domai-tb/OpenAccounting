@@ -205,7 +205,8 @@ class DashboardRepository {
     return <String, Object?>{
       'frist': frist.toIso8601String().substring(0, 10),
       'label':
-          'UStVA fällig am ${frist.day.toString().padLeft(2, '0')}.${frist.month.toString().padLeft(2, '0')}.${frist.year}',
+          'UStVA fällig am ${frist.day.toString().padLeft(2, '0')}.'
+          '${frist.month.toString().padLeft(2, '0')}.${frist.year}',
     };
   }
 

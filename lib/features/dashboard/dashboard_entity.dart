@@ -54,10 +54,14 @@ class DashboardConfig {
   String toJsonString() => jsonEncode(toJson());
 
   static DashboardConfig fromJsonString(String raw) {
-    final decoded = jsonDecode(raw);
-    if (decoded is Map<String, Object?>) return DashboardConfig.fromJson(decoded);
-    if (decoded is Map) return DashboardConfig.fromJson(Map<String, Object?>.from(decoded));
-    throw const FormatException('dashboard_config not a JSON object');
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, Object?>) return DashboardConfig.fromJson(decoded);
+      if (decoded is Map) return DashboardConfig.fromJson(Map<String, Object?>.from(decoded));
+    } catch (_) {
+      return defaultDashboardConfig();
+    }
+    return defaultDashboardConfig();
   }
 
   DashboardConfig copyWith({List<String>? order, Map<String, bool>? visibility, List<QuickLink>? quickLinks}) {

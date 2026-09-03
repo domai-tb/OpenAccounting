@@ -251,12 +251,16 @@ final dashboardWidgetDataProvider = FutureProvider.family<WidgetData?, String>((
 });
 
 // Individual typed providers for convenience (optional, ponytail ultra minimal).
-final offeneRechnungenProvider = FutureProvider<WidgetData>((ref) async {
+final offeneRechnungenProvider = FutureProvider<WidgetData?>((ref) async {
+  final cfg = await ref.watch(dashboardConfigProvider.future);
+  if (cfg.visibility['offene_rechnungen'] == false) return null;
   final db = ref.watch(appDatabaseProvider);
   return _fetchWidgetData(db.executor, 'offene_rechnungen');
 });
 
-final lagerwarnungProvider = FutureProvider<WidgetData>((ref) async {
+final lagerwarnungProvider = FutureProvider<WidgetData?>((ref) async {
+  final cfg = await ref.watch(dashboardConfigProvider.future);
+  if (cfg.visibility['lagerwarnung'] == false) return null;
   final db = ref.watch(appDatabaseProvider);
   return _fetchWidgetData(db.executor, 'lagerwarnung');
 });

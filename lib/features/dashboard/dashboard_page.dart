@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
@@ -13,6 +14,7 @@ class DashboardPageImpl extends ConsumerWidget {
     if (w >= 1600) return 4;
     if (w >= 1200) return 3;
     if (w >= 900) return 2;
+    if (w < 700) return 1;
     return 2;
   }
 
@@ -78,7 +80,7 @@ class _WidgetCard extends ConsumerWidget {
       error: (e, _) => DashboardCard(title: title, icon: icon, error: e.toString()),
       data: (data) {
         if (data == null) return const SizedBox.shrink();
-        final Widget content = _buildContent(data);
+        final Widget content = _buildContent(context, data);
         final String? empty = _emptyFor(data);
         return DashboardCard(
           title: data.title,
@@ -92,7 +94,7 @@ class _WidgetCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(WidgetData d) {
+  Widget _buildContent(BuildContext context, WidgetData d) {
     switch (d.id) {
       case 'offene_rechnungen':
       case 'ueberfaellige_rechnungen':
@@ -117,7 +119,16 @@ class _WidgetCard extends ConsumerWidget {
         if (links == null || links.isEmpty) return const Text('Keine Links');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[for (final l in links) Text('${l.label} → ${l.route}')],
+          children: <Widget>[
+            for (final l in links)
+              InkWell(
+                onTap: () => context.go(l.route),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('${l.label} → ${l.route}', style: const TextStyle(color: Colors.blue)),
+                ),
+              ),
+          ],
         );
       case 'ustva_frist':
         return Text(d.subtitle ?? '');
@@ -139,7 +150,6 @@ class _WidgetCard extends ConsumerWidget {
   }
 
   void _navigate(BuildContext context, String route) {
-    // ponytail: navigation stub — go_router handles real routing.
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Navigate $route')));
+    context.go(route);
   }
 }
