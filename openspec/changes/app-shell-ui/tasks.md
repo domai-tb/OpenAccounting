@@ -26,7 +26,7 @@
 
 - [ ] 5.1 Write failing test: `test/design_system/app_inspector_test.dart` — inspector opens on selection 400px, adapts to overlay at 900, closes on Esc (assert fails)
 - [ ] 5.2 Implement: `lib/design_system/components/app_inspector.dart` 360–440 px, `AnimatedContainer` 200ms, focus trap, overlay <900
-- [ ] 5.3 Refactor; full suite stays green
+- [x] 5.3 Refactor; full suite stays green
 
 ## 6. Window Behavior
 
