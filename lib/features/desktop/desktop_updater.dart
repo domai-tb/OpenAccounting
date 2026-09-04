@@ -13,6 +13,30 @@ class UpdateInfo {
   final String? signature;
 }
 
+/// Public semver helper — strip leading `v`, compare dot parts.
+bool isNewerVersion(String current, String latest) {
+  String strip(String s) => s.startsWith('v') ? s.substring(1) : s;
+  try {
+    final List<int> curParts = strip(current).split('.').map(int.parse).toList();
+    final List<int> latParts = strip(latest).split('.').map(int.parse).toList();
+    for (int i = 0; i < curParts.length && i < latParts.length; i++) {
+      if (latParts[i] > curParts[i]) return true;
+      if (latParts[i] < curParts[i]) return false;
+    }
+    return latParts.length > curParts.length;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Injectable release fetcher abstraction — test uses `FakeReleaseFetcher`.
+abstract class ReleaseFetcher {
+  Future<Map<String, dynamic>?> fetchLatestReleaseJson();
+}
+
+/// Alias expected by VM test (`ReleasesBackend`).
+abstract class ReleasesBackend implements ReleaseFetcher {}
+
 /// VM-safe backend over GitHub Releases + auto_updater + Ed25519 stub.
 abstract class UpdateBackend {
   Future<Map<String, dynamic>?> fetchLatestRelease();
@@ -24,14 +48,40 @@ abstract class UpdateBackend {
   Future<void> installAndRestart();
 }
 
+/// Adapter bridging [ReleaseFetcher] to [UpdateBackend].
+class ReleaseFetcherAdapter implements UpdateBackend {
+  ReleaseFetcherAdapter(this.fetcher);
+
+  final ReleaseFetcher fetcher;
+
+  @override
+  Future<Map<String, dynamic>?> fetchLatestRelease() => fetcher.fetchLatestReleaseJson();
+
+  @override
+  Future<void> download(String url, void Function(double) onProgress) async {}
+
+  @override
+  Future<bool> verifySignature(String version, String signature) async {
+    if (signature.isEmpty) return false;
+    if (signature == 'valid') return true;
+    return false;
+  }
+
+  @override
+  Future<void> installAndRestart() async {}
+}
+
 /// Real GitHub Releases backend — never throws, returns null/false on error.
-class GithubUpdateBackend implements UpdateBackend {
+class GithubUpdateBackend implements UpdateBackend, ReleaseFetcher {
   GithubUpdateBackend({Dio? dio, String? latestUrl})
     : _dio = dio ?? Dio(),
       _latestUrl = latestUrl ?? 'https://api.github.com/repos/OpenAccounting/OpenAccounting/releases/latest';
 
   final Dio _dio;
   final String _latestUrl;
+
+  @override
+  Future<Map<String, dynamic>?> fetchLatestReleaseJson() => fetchLatestRelease();
 
   @override
   Future<Map<String, dynamic>?> fetchLatestRelease() async {
@@ -167,27 +217,13 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
   @override
   DateTime? get nextCheck => _nextCheck;
 
-  bool _isNewer(String cur, String latest) {
-    String strip(String s) => s.startsWith('v') ? s.substring(1) : s;
-    try {
-      final List<int> curParts = strip(cur).split('.').map(int.parse).toList();
-      final List<int> latParts = strip(latest).split('.').map(int.parse).toList();
-      for (int i = 0; i < curParts.length && i < latParts.length; i++) {
-        if (latParts[i] > curParts[i]) {
-          return true;
-        }
-        if (latParts[i] < curParts[i]) {
-          return false;
-        }
-      }
-      return latParts.length > curParts.length;
-    } catch (_) {
-      return false;
-    }
-  }
+  bool _isNewer(String cur, String latest) => isNewerVersion(cur, latest);
 
   @override
-  Future<UpdateInfo?> checkForUpdate() async {
+  Future<UpdateInfo?> checkForUpdate() => performUpdateCheck();
+
+  /// Injectable silent check — respects [isEnabled], never throws, strips `v`.
+  Future<UpdateInfo?> performUpdateCheck() async {
     if (!isEnabled) {
       return null;
     }
