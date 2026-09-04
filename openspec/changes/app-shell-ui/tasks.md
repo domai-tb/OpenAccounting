@@ -14,7 +14,7 @@
 
 - [x] 3.1 Write failing test: `test/design_system/app_page_header_test.dart` — header shows title+primary, filter toolbar with chips+count, subtitle without primary (assert fails)
 - [x] 3.2 Implement: `lib/design_system/components/app_page_header.dart` with title/subtitle/primary action right, tabs, filter/search toolbar per §5
-- [ ] 3.3 Refactor; full suite stays green
+- [x] 3.3 Refactor; full suite stays green
 
 ## 4. Content Canvas and Layout Constraints
 

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:openaccounting/core/theme/app_theme.dart';
 
 /// Consistent page header per DESIGN §5.
 /// Minimal for 1.2: title + optional subtitle + actions.
 /// Full tabs/filter toolbar deferred to 3.2.
-import 'package:openaccounting/core/theme/app_theme.dart';
-
 class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
   const AppPageHeader({
     required this.title,
