@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 
 /// Content canvas per DESIGN §6.
-/// Provides responsive padding and width constraint.
-/// For 1.2: ConstrainedBox 720–900 for forms (setup). Tables may use full width
-/// by passing larger maxWidth. Padding 32/24/16 deferred but constrained check passes.
+/// Responsive padding via LayoutBuilder + 4px grid tokens.
+/// Form cap 720–900, tables use larger maxWidth.
 class AppPage extends StatelessWidget {
   const AppPage({required this.child, this.header, this.maxWidth = 900, this.padding, super.key});
 
@@ -15,16 +14,34 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectivePadding = padding ?? const EdgeInsets.all(AppSpacing.xxl);
-    final content = Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Padding(padding: effectivePadding, child: child),
-      ),
+    final PreferredSizeWidget? appBar = header;
+    final Widget content = LayoutBuilder(
+      builder: (context, constraints) {
+        final EdgeInsetsGeometry effectivePadding = padding ?? _responsivePadding(constraints.maxWidth);
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(padding: effectivePadding, child: child),
+          ),
+        );
+      },
     );
-    if (header != null) {
-      return Scaffold(appBar: header, body: content);
+    if (appBar != null) {
+      return Scaffold(appBar: appBar, body: content);
     }
     return Scaffold(body: content);
   }
+}
+
+EdgeInsets _responsivePadding(double maxWidth) {
+  if (!maxWidth.isFinite) {
+    return const EdgeInsets.all(AppSpacing.xxl);
+  }
+  if (maxWidth >= 1200) {
+    return const EdgeInsets.all(AppSpacing.xxl);
+  }
+  if (maxWidth >= 900) {
+    return const EdgeInsets.all(AppSpacing.xl);
+  }
+  return const EdgeInsets.all(AppSpacing.lg);
 }
