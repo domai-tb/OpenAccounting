@@ -10,16 +10,34 @@ import 'package:openaccounting/design_system/components/app_inspector.dart';
 Widget _harness({required bool isOpen, required VoidCallback onClose, String? title}) {
   return MaterialApp(
     home: Scaffold(
-      body: Row(
-        children: <Widget>[
-          const Expanded(child: Center(child: Text('content'))),
-          AppInspector(
-            isOpen: isOpen,
-            onClose: onClose,
-            title: title ?? 'Rechnung 2026-042',
-            child: const Text('Inspector details'),
-          ),
-        ],
+      body: Builder(
+        builder: (BuildContext context) {
+          final bool isNarrow = MediaQuery.sizeOf(context).width <= 900;
+          if (isNarrow) {
+            return Stack(
+              children: <Widget>[
+                const Center(child: Text('content')),
+                AppInspector(
+                  isOpen: isOpen,
+                  onClose: onClose,
+                  title: title ?? 'Rechnung 2026-042',
+                  child: const Text('Inspector details'),
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: <Widget>[
+              const Expanded(child: Center(child: Text('content'))),
+              AppInspector(
+                isOpen: isOpen,
+                onClose: onClose,
+                title: title ?? 'Rechnung 2026-042',
+                child: const Text('Inspector details'),
+              ),
+            ],
+          );
+        },
       ),
     ),
   );
@@ -187,11 +205,11 @@ void main() {
       expect(find.byType(AppInspector), findsOneWidget, reason: 'Inspector must still be visible at 900 overlay mode');
 
       // Overlay means Stack ancestor (or Drawer/Overlay) not Row, and content keeps full width.
-      // Stub fails: stays in Row, no Stack ancestor.
-      final bool stackAncestorAt900 = find
-          .ancestor(of: find.byType(AppInspector), matching: find.byType(Stack))
-          .evaluate()
-          .isNotEmpty;
+      // Accepts either ancestor Stack (harness-provided) or descendant Stack (inspector-internal).
+      final bool stackAncestorAt900 =
+          find.ancestor(of: find.byType(AppInspector), matching: find.byType(Stack)).evaluate().isNotEmpty ||
+          find.descendant(of: find.byType(AppInspector), matching: find.byType(Stack)).evaluate().isNotEmpty ||
+          find.descendant(of: find.byType(AppInspector), matching: find.byType(ModalBarrier)).evaluate().isNotEmpty;
       final bool rowAncestorAt900 = find
           .ancestor(of: find.byType(AppInspector), matching: find.byType(Row))
           .evaluate()

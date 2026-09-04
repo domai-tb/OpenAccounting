@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:openaccounting/core/theme/app_theme.dart';
 
-/// Optional inspector per DESIGN §14 — 360–440 px, overlay <900, Esc, focus trap.
-/// Stub for RED phase 5.1: import succeeds but behavior wrong so tests fail for
-/// right reason (width/overlay/Esc) not import error. Real impl replaces this.
+/// Inspector — DESIGN §14, §34: 360–440 px, overlay <900, Esc, focus trap.
+/// 400 px default, AnimatedContainer 200 ms, MediaQuery <900 -> Stack overlay.
 class AppInspector extends StatelessWidget {
   const AppInspector({required this.child, required this.isOpen, required this.onClose, this.title, super.key});
 
@@ -16,17 +17,45 @@ class AppInspector extends StatelessWidget {
     if (!isOpen) {
       return const SizedBox.shrink();
     }
-    // ponytail: stub — wrong width 200 (outside 360–440), no AnimatedContainer,
-    // no overlay logic, no Esc handling, no FocusScope focus trap.
-    return Container(
-      width: 200,
-      color: Theme.of(context).colorScheme.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final bool isOverlay = MediaQuery.sizeOf(context).width < 900;
+    final Widget panel = _panel(context);
+    if (isOverlay) {
+      return Stack(
         children: <Widget>[
-          if (title != null) Padding(padding: const EdgeInsets.all(16), child: Text(title!)),
-          Expanded(child: child),
+          Positioned.fill(
+            child: ModalBarrier(color: Colors.black54, onDismiss: onClose),
+          ),
+          Positioned(top: 0, right: 0, bottom: 0, child: panel),
         ],
+      );
+    }
+    return panel;
+  }
+
+  Widget _panel(BuildContext context) {
+    return FocusScope(
+      autofocus: true,
+      onKeyEvent: (FocusNode node, KeyEvent event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
+          onClose();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 360, maxWidth: 440),
+        child: AnimatedContainer(
+          duration: AppDuration.normal,
+          width: 400,
+          color: Theme.of(context).colorScheme.surface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (title != null) Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: Text(title!)),
+              Expanded(child: child),
+            ],
+          ),
+        ),
       ),
     );
   }
