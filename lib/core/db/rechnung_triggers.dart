@@ -32,7 +32,6 @@ WHEN OLD.ist_entwurf = 0 AND (
   NEW.nummernkreis_id IS NOT OLD.nummernkreis_id OR
   NEW.storno_von IS NOT OLD.storno_von OR
   NEW.ausgegeben_am IS NOT OLD.ausgegeben_am OR
-  NEW.mahnstufe_aktuell IS NOT OLD.mahnstufe_aktuell OR
   NEW.status IS NULL OR
   NEW.status NOT IN ('offen', 'teilbezahlt', 'bezahlt', 'storniert')
 )
