@@ -145,13 +145,13 @@
 
 ## 15. Desktop Integration
 
-- [ ] 15.1 Write failing test: `test/features/desktop/tray_test.dart` — system tray shows icon
-- [ ] 15.2 Implement: System tray with context menu
-- [ ] 15.3 Write failing test: `test/features/desktop/shortcuts_test.dart` — global shortcuts registered
-- [ ] 15.4 Implement: Global keyboard shortcuts (Ctrl+F, Ctrl+Shift+E, +, E/A)
-- [ ] 15.5 Write failing test: `test/features/desktop/update_test.dart` — auto-update checks GitHub Releases
-- [ ] 15.6 Implement: Auto-updater for GitHub Releases
-- [ ] 15.7 Refactor; full suite stays green
+- [x] 15.1 Write failing test: `test/features/desktop/tray_test.dart` — system tray shows icon
+- [x] 15.2 Implement: System tray with context menu
+- [x] 15.3 Write failing test: `test/features/desktop/shortcuts_test.dart` — global shortcuts registered
+- [x] 15.4 Implement: Global keyboard shortcuts (Ctrl+F, Ctrl+Shift+E, +, E/A)
+- [x] 15.5 Write failing test: `test/features/desktop/update_test.dart` — auto-update checks GitHub Releases
+- [x] 15.6 Implement: Auto-updater for GitHub Releases
+- [x] 15.7 Refactor; full suite stays green
 
 ## 16. Receivables & Inventory
 

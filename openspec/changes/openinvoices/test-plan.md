@@ -278,23 +278,23 @@
 | specs/db/spec.md → Indexes and Constraints | Null Kundennummer Allowed | test/features/db/test_null_kundennummer_allowed.dart | test_null_kundennummer_allowed | 🔴 red |
 | specs/db/spec.md → Indexes and Constraints | Duplicate Dedupe Hash Rejected | test/features/db/test_duplicate_dedupe_hash_rejected.dart | test_duplicate_dedupe_hash_rejected | 🔴 red |
 | specs/db/spec.md → Indexes and Constraints | Dedupe Hash Null Allowed | test/features/db/test_dedupe_hash_null_allowed.dart | test_dedupe_hash_null_allowed | 🔴 red |
-| specs/desktop/spec.md → System Tray | Tray Context Menu Actions | test/features/desktop/test_tray_context_menu_actions.dart | test_tray_context_menu_actions | 🔴 red |
-| specs/desktop/spec.md → System Tray | Close to Tray | test/features/desktop/test_close_to_tray.dart | test_close_to_tray | 🔴 red |
-| specs/desktop/spec.md → System Tray | Close to Tray Disabled | test/features/desktop/test_close_to_tray_disabled.dart | test_close_to_tray_disabled | 🔴 red |
-| specs/desktop/spec.md → System Tray | Tray Icon Not Shown | test/features/desktop/test_tray_icon_not_shown.dart | test_tray_icon_not_shown | 🔴 red |
-| specs/desktop/spec.md → Global Keyboard Shortcuts | Global Show/Hide | test/features/desktop/test_global_show_hide.dart | test_global_show_hide | 🔴 red |
-| specs/desktop/spec.md → Global Keyboard Shortcuts | Global Show/Hide Toggles | test/features/desktop/test_global_show_hide_toggles.dart | test_global_show_hide_toggles | 🔴 red |
-| specs/desktop/spec.md → Global Keyboard Shortcuts | Global New Invoice | test/features/desktop/test_global_new_invoice.dart | test_global_new_invoice | 🔴 red |
-| specs/desktop/spec.md → Global Keyboard Shortcuts | Shortcut Conflict Detection | test/features/desktop/test_shortcut_conflict_detection.dart | test_shortcut_conflict_detection | 🔴 red |
-| specs/desktop/spec.md → Auto-Update | Update Available Notification | test/features/desktop/test_update_available_notification.dart | test_update_available_notification | 🔴 red |
-| specs/desktop/spec.md → Auto-Update | Update Download and Install | test/features/desktop/test_update_download_and_install.dart | test_update_download_and_install | 🔴 red |
-| specs/desktop/spec.md → Auto-Update | Update Download Cancelled | test/features/desktop/test_update_download_cancelled.dart | test_update_download_cancelled | 🔴 red |
-| specs/desktop/spec.md → Auto-Update | Signing Verification Failure | test/features/desktop/test_signing_verification_failure.dart | test_signing_verification_failure | 🔴 red |
-| specs/desktop/spec.md → Auto-Update | No Update Available | test/features/desktop/test_no_update_available.dart | test_no_update_available | 🔴 red |
-| specs/desktop/spec.md → Window Management | Window State Persistence | test/features/desktop/test_window_state_persistence.dart | test_window_state_persistence | 🔴 red |
-| specs/desktop/spec.md → Window Management | Minimum Size Enforcement | test/features/desktop/test_minimum_size_enforcement.dart | test_minimum_size_enforcement | 🔴 red |
-| specs/desktop/spec.md → Window Management | Maximize State Persistence | test/features/desktop/test_maximize_state_persistence.dart | test_maximize_state_persistence | 🔴 red |
-| specs/desktop/spec.md → Window Management | Window State Corruption Recovery | test/features/desktop/test_window_state_corruption_recovery.dart | test_window_state_corruption_recovery | 🔴 red |
+| specs/desktop/spec.md → System Tray | Tray Context Menu Actions | test/features/desktop/tray_test.dart | test_tray_context_menu_actions | 🟢 green |
+| specs/desktop/spec.md → System Tray | Close to Tray | test/features/desktop/tray_test.dart | test_close_to_tray | 🟢 green |
+| specs/desktop/spec.md → System Tray | Close to Tray Disabled | test/features/desktop/tray_test.dart | test_close_to_tray_disabled | 🟢 green |
+| specs/desktop/spec.md → System Tray | Tray Icon Not Shown | test/features/desktop/tray_test.dart | test_tray_icon_not_shown | 🟢 green |
+| specs/desktop/spec.md → Global Keyboard Shortcuts | Global Show/Hide | test/features/desktop/shortcuts_test.dart | test_global_show_hide | 🟢 green |
+| specs/desktop/spec.md → Global Keyboard Shortcuts | Global Show/Hide Toggles | test/features/desktop/shortcuts_test.dart | test_global_show_hide_toggles | 🟢 green |
+| specs/desktop/spec.md → Global Keyboard Shortcuts | Global New Invoice | test/features/desktop/shortcuts_test.dart | test_global_new_invoice | 🟢 green |
+| specs/desktop/spec.md → Global Keyboard Shortcuts | Shortcut Conflict Detection | test/features/desktop/shortcuts_test.dart | test_shortcut_conflict_detection | 🟢 green |
+| specs/desktop/spec.md → Auto-Update | Update Available Notification | test/features/desktop/update_test.dart | test_update_available_notification | 🟢 green |
+| specs/desktop/spec.md → Auto-Update | Update Download and Install | test/features/desktop/update_test.dart | test_update_download_and_install | 🟢 green |
+| specs/desktop/spec.md → Auto-Update | Update Download Cancelled | test/features/desktop/update_test.dart | test_update_download_cancelled | 🟢 green |
+| specs/desktop/spec.md → Auto-Update | Signing Verification Failure | test/features/desktop/update_test.dart | test_signing_verification_failure | 🟢 green |
+| specs/desktop/spec.md → Auto-Update | No Update Available | test/features/desktop/update_test.dart | test_no_update_available | 🟢 green |
+| specs/desktop/spec.md → Window Management | Window State Persistence | test/features/desktop/window_state.dart | test_window_state_persistence | 🟢 green |
+| specs/desktop/spec.md → Window Management | Minimum Size Enforcement | test/features/desktop/window_state.dart | test_minimum_size_enforcement | 🟢 green |
+| specs/desktop/spec.md → Window Management | Maximize State Persistence | test/features/desktop/window_state.dart | test_maximize_state_persistence | 🟢 green |
+| specs/desktop/spec.md → Window Management | Window State Corruption Recovery | test/features/desktop/window_state.dart | test_window_state_corruption_recovery | 🟢 green |
 | specs/desktop/spec.md → File Associations | PDF File Association | test/features/desktop/test_pdf_file_association.dart | test_pdf_file_association | 🔴 red |
 | specs/desktop/spec.md → File Associations | CSV File Association | test/features/desktop/test_csv_file_association.dart | test_csv_file_association | 🔴 red |
 | specs/desktop/spec.md → File Associations | File Association With No App Running | test/features/desktop/test_file_association_with_no_app_running.dart | test_file_association_with_no_app_running | 🔴 red |
