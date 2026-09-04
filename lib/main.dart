@@ -8,10 +8,18 @@ import 'package:openaccounting/core/app.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
+import 'package:openaccounting/features/desktop/window_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
+    try {
+      final WindowStateService windowState = WindowStateService();
+      // ponytail: fire-and-forget, never block launch
+      unawaited(windowState.init().catchError((Object _) {}));
+    } catch (_) {
+      // VM / unsupported — continue
+    }
     try {
       final DesktopTrayService tray = createDesktopTrayService();
       // ponytail: fire-and-forget, never block launch
