@@ -20,7 +20,7 @@
 
 - [ ] 4.1 Write failing test: `test/design_system/app_page_test.dart` — form width 720–900 cap at 1920, padding 32/24/16, table full width (assert fails)
 - [ ] 4.2 Implement: `lib/design_system/components/app_page.dart` with `ConstrainedBox` + `LayoutBuilder` + `AppSpacing` tokens, 4px grid, responsive padding
-- [ ] 4.3 Refactor; full suite stays green
+- [x] 4.3 Refactor; full suite stays green
 
 ## 5. Optional Inspector
 
