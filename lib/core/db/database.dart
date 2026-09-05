@@ -176,6 +176,25 @@ class AppDatabase {
         await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN $col');
       } catch (_) {}
     }
+    try {
+      await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN lagerfuehrung_aktiv INTEGER DEFAULT 0');
+    } catch (_) {}
+    // recurring: rechnungsvorlagen status/auftrag_id, buchungsvorlagen intervall etc., vorlage_id links
+    for (final String sql in <String>[
+      'ALTER TABLE rechnungsvorlagen ADD COLUMN status TEXT DEFAULT \'aktiv\'',
+      'ALTER TABLE rechnungsvorlagen ADD COLUMN auftrag_id INTEGER REFERENCES rechnungen(id)',
+      'ALTER TABLE buchungsvorlagen ADD COLUMN intervall TEXT',
+      'ALTER TABLE buchungsvorlagen ADD COLUMN naechste_faelligkeit TEXT',
+      'ALTER TABLE buchungsvorlagen ADD COLUMN art TEXT',
+      'ALTER TABLE buchungsvorlagen ADD COLUMN lieferant_id INTEGER REFERENCES lieferanten(id)',
+      'ALTER TABLE buchungsvorlagen ADD COLUMN status TEXT DEFAULT \'aktiv\'',
+      'ALTER TABLE rechnungen ADD COLUMN vorlage_id INTEGER REFERENCES rechnungsvorlagen(id)',
+      'ALTER TABLE journal ADD COLUMN vorlage_id INTEGER REFERENCES buchungsvorlagen(id)',
+    ]) {
+      try {
+        await _executor.runCustom(sql);
+      } catch (_) {}
+    }
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
     if (v == 0) {
@@ -495,7 +514,8 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   storno_von INTEGER REFERENCES rechnungen(id),
   absender_snapshot TEXT,
   ausgegeben_am TEXT,
-  mahnstufe_aktuell INTEGER DEFAULT 0
+  mahnstufe_aktuell INTEGER DEFAULT 0,
+  vorlage_id INTEGER
 )''',
   // 12 rechnungspositionen
   '''
@@ -558,7 +578,8 @@ CREATE TABLE IF NOT EXISTS journal (
   ust_satz_25a NUMERIC(12,2),
   ist_eu_lieferung INTEGER DEFAULT 0,
   vorsteuer_betrag NUMERIC(12,2),
-  km_anzahl NUMERIC(12,2)
+  km_anzahl NUMERIC(12,2),
+  vorlage_id INTEGER REFERENCES buchungsvorlagen(id)
 )''',
   // 15 bank_templates
   '''
@@ -624,7 +645,9 @@ CREATE TABLE IF NOT EXISTS rechnungsvorlagen (
   intervall TEXT,
   naechste_faelligkeit TEXT,
   aktiv INTEGER DEFAULT 1,
-  vorlage_daten TEXT
+  vorlage_daten TEXT,
+  status TEXT DEFAULT 'aktiv',
+  auftrag_id INTEGER REFERENCES rechnungen(id)
 )''',
   // 21 buchungsvorlagen
   '''
@@ -636,7 +659,12 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen (
   betrag NUMERIC(12,2) DEFAULT 0,
   beschreibung TEXT,
   modus TEXT DEFAULT 'direkt',
-  aktiv INTEGER DEFAULT 1
+  aktiv INTEGER DEFAULT 1,
+  intervall TEXT,
+  naechste_faelligkeit TEXT,
+  art TEXT,
+  lieferant_id INTEGER REFERENCES lieferanten(id),
+  status TEXT DEFAULT 'aktiv'
 )''',
   // 22 anlageverzeichnis
   '''

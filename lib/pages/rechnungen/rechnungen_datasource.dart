@@ -317,14 +317,50 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         throw StateError('Rechnungsausgang-Nummernkreis konnte nicht atomar reserviert werden');
       }
 
+      await _ensureInventarTable(transaction);
+      // Validierung: Minusbestand prüfen bevor gebucht wird (atomar)
+      final insufficient = <String>[];
+      final lagerItems = <Map<String, Object?>>[];
       for (final p in posRows) {
         final artikelId = p['artikel_id'];
         if (artikelId == null) continue;
+        final rows = await transaction.runSelect(
+          'SELECT lager_aktiv, bestand_aktuell, minusbestand_erlaubt, bezeichnung FROM artikel WHERE id = ?',
+          <Object?>[artikelId],
+        );
+        if (rows.isEmpty) continue;
+        final lagerAktiv = _asInt(rows.single['lager_aktiv']) == 1;
+        if (!lagerAktiv) continue;
+        lagerItems.add(p);
+        final bestand = _asNum(rows.single['bestand_aktuell']);
+        final minusErlaubt = _asInt(rows.single['minusbestand_erlaubt']) == 1;
         final menge = _asNum(p['menge']);
-        await transaction.runUpdate('UPDATE artikel SET bestand = bestand - ? WHERE id = ?', <Object?>[
-          menge,
-          artikelId,
-        ]);
+        if (!minusErlaubt && bestand - menge < -0.0001) {
+          insufficient.add(rows.single['bezeichnung'].toString());
+        }
+      }
+      if (insufficient.isNotEmpty) {
+        throw StateError('Bestand unzureichend für Artikel: ${insufficient.join(', ')}');
+      }
+      for (final p in lagerItems) {
+        final artikelId = p['artikel_id'];
+        final menge = _asNum(p['menge']);
+        await transaction.runUpdate(
+          'UPDATE artikel SET bestand_aktuell = bestand_aktuell - ?, bestand = bestand - ? WHERE id = ?',
+          <Object?>[menge, menge, artikelId],
+        );
+        await transaction.runInsert(
+          'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
+          'VALUES (?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            artikelId,
+            invoiceDate.toIso8601String().substring(0, 10),
+            -menge,
+            'Rechnungsausgang $documentNumber',
+            'rechnung',
+            rechnungId,
+          ],
+        );
       }
 
       final pdfPath = 'pdfs/$documentNumber.pdf';
@@ -470,13 +506,23 @@ WHERE id = ? AND ist_entwurf = 1
         'offen',
         stornoId,
       ]);
+      await _ensureInventarTable(transaction);
       for (final r in posRows) {
         if (r['artikel_id'] == null) continue;
+        final aid = r['artikel_id'];
+        final lagerRows = await transaction.runSelect('SELECT lager_aktiv FROM artikel WHERE id = ?', <Object?>[aid]);
+        if (lagerRows.isEmpty) continue;
+        if (_asInt(lagerRows.single['lager_aktiv']) != 1) continue;
         final menge = _asNum(r['menge']);
-        await transaction.runUpdate('UPDATE artikel SET bestand = bestand + ? WHERE id = ?', <Object?>[
-          menge,
-          r['artikel_id'],
-        ]);
+        await transaction.runUpdate(
+          'UPDATE artikel SET bestand_aktuell = bestand_aktuell + ?, bestand = bestand + ? WHERE id = ?',
+          <Object?>[menge, menge, aid],
+        );
+        await transaction.runInsert(
+          'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
+          'VALUES (?, ?, ?, ?, ?, ?)',
+          <Object?>[aid, datum, menge, 'Storno $docNo', 'storno', stornoId],
+        );
       }
       await transaction.runUpdate(
         'UPDATE rechnungen SET status = ?, storno_datum = ?, storno_grund = ? WHERE id = ?',
@@ -890,6 +936,19 @@ ORDER BY position, id
     if (width > 9 || nextNo > _maximumForWidth(width)) throw StateError('$kreisTyp-Nummernkreis ist erschöpft');
     final nummer = _formatNumber(format, invDate.year, nextNo);
     return _AllocatedNumber(nummer: nummer, kreisId: range['id'] as int, nextNo: nextNo, stored: stored);
+  }
+
+  Future<void> _ensureInventarTable(QueryExecutor ex) async {
+    await ex.runCustom(
+      'CREATE TABLE IF NOT EXISTS inventarbewegungen ('
+      'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'artikel_id INTEGER NOT NULL REFERENCES artikel(id), '
+      'datum TEXT NOT NULL, '
+      'diff NUMERIC(10,3) NOT NULL, '
+      'grund TEXT NOT NULL, '
+      'referenz_typ TEXT, '
+      'referenz_id INTEGER)',
+    );
   }
 
   Future<void> _reserveNumber(TransactionExecutor transaction, _AllocatedNumber alloc) async {

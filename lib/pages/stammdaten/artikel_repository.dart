@@ -310,6 +310,72 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     return ArtikelGruppe(id: id, name: name, beschreibung: beschreibung, typ: typ, aktiv: aktiv);
   }
 
+  Future<List<Artikel>> lagerWarnungen() async {
+    await ensureSchema();
+    final rows = await executor.runSelect(
+      '$_artikelSelect WHERE lager_aktiv = 1 AND bestand_aktuell <= mindestbestand ORDER BY id',
+      const <Object?>[],
+    );
+    return rows.map(_fromRow).toList(growable: false);
+  }
+
+  Future<List<Map<String, Object?>>> inventarBewegungen(int artikelId) async {
+    await _ensureInventarTable(executor);
+    return executor.runSelect('SELECT * FROM inventarbewegungen WHERE artikel_id = ? ORDER BY id', <Object?>[
+      artikelId,
+    ]);
+  }
+
+  Future<Artikel> setBestand(int id, num neuerBestand, {String grund = 'Manuelle Korrektur'}) async {
+    await ensureSchema();
+    await _ensureInventarTable(executor);
+    final t = executor.beginTransaction();
+    try {
+      await t.ensureOpen(_NoopUser());
+      final cur = await t.runSelect('SELECT bestand_aktuell FROM artikel WHERE id = ?', <Object?>[id]);
+      if (cur.isEmpty) throw const ArtikelException('Artikel nicht gefunden');
+      final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
+      final diff = neuerBestand - old;
+      await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
+        neuerBestand,
+        neuerBestand.toInt(),
+        id,
+      ]);
+      await t.runInsert(
+        'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund) VALUES (?, ?, ?, ?)',
+        <Object?>[id, DateTime.now().toIso8601String().substring(0, 10), diff, grund],
+      );
+      await t.send();
+      final updated = await findById(id);
+      if (updated == null) throw const ArtikelException('Artikel nicht gefunden');
+      return updated;
+    } catch (e, s) {
+      try {
+        await t.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(e, s);
+    }
+  }
+
+  Future<Artikel> adjustBestand(int id, num delta, {String grund = 'Manuelle Korrektur'}) async {
+    final cur = await findById(id);
+    if (cur == null) throw const ArtikelException('Artikel nicht gefunden');
+    return setBestand(id, cur.bestandAktuell + delta, grund: grund);
+  }
+
+  Future<void> _ensureInventarTable(QueryExecutor ex) async {
+    await ex.runCustom(
+      'CREATE TABLE IF NOT EXISTS inventarbewegungen ('
+      'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+      'artikel_id INTEGER NOT NULL REFERENCES artikel(id), '
+      'datum TEXT NOT NULL, '
+      'diff NUMERIC(10,3) NOT NULL, '
+      'grund TEXT NOT NULL, '
+      'referenz_typ TEXT, '
+      'referenz_id INTEGER)',
+    );
+  }
+
   Future<num> _resolveUstSatz(int? id, num? direct) async {
     if (direct != null) return direct;
     if (id != null) {

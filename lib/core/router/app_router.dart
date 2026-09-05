@@ -6,6 +6,9 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
+import 'package:openaccounting/features/setup/setup_repository.dart';
+import 'package:openaccounting/features/setup/wizard_page.dart';
+import 'package:openaccounting/features/setup/wizard_service.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
 
@@ -256,14 +259,14 @@ class HelpPage extends StatelessWidget {
   }
 }
 
-class SetupPage extends StatelessWidget {
+class SetupPage extends ConsumerWidget {
   const SetupPage({super.key});
   @override
-  Widget build(BuildContext context) {
-    return const AppPage(
-      header: AppPageHeader(title: 'Setup'),
-      child: Text('Setup Wizard'),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    // ponytail: delegate to feature WizardPage with DB-backed service.
+    final AppDatabase db = ref.watch(appDatabaseProvider);
+    final WizardService svc = WizardService(repository: SetupRepository(db.executor));
+    return WizardPage(service: svc);
   }
 }
 
