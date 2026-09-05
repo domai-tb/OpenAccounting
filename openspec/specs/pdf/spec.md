@@ -4,13 +4,19 @@
 
 ### Requirement: Document Type Coverage
 
-The system SHALL generate PDFs for seven document types: Rechnung (invoice), Storno (credit note reversal), Gutschrift (credit note), Angebot (quote), Auftrag (order), Proforma (proforma invoice), and Lieferschein (delivery note).
+The system SHALL generate PDFs for eight document types: Rechnung (invoice), Storno (credit note reversal), Gutschrift (credit note), Angebot (quote), Auftrag (order), Proforma (proforma invoice), Lieferschein (delivery note), and Mahnung (dunning letter).
 
 #### Scenario: Rechnung generation
 
 - GIVEN a finalized Rechnung with positions, customer data, and company data
 - WHEN the Rechnung PDF is requested
 - THEN the system SHALL produce a PDF with document type label "Rechnung", the document number from the Nummernkreis, and all position lines with netto/brutto/USt columns
+
+#### Scenario: Mahnung generation
+
+- GIVEN a finalized Mahnung with a dunning level (Mahnstufe)
+- WHEN the Mahnung PDF is requested
+- THEN the system SHALL produce a PDF titled "Mahnung" with the dunning level displayed in the header
 
 #### Scenario: Unsupported document type
 
