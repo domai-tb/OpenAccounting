@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/design_system/tokens/duration.dart';
+import 'package:openaccounting/design_system/tokens/spacing.dart';
 
 /// Inspector — DESIGN §14, §34: 360–440 px, overlay <900, Esc, focus trap.
 /// 400 px default, AnimatedContainer 200 ms, MediaQuery <900 -> Stack overlay.

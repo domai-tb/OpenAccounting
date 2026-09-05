@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/theme/app_colors.dart';
+import 'package:openaccounting/design_system/tokens/radius.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+export 'package:openaccounting/design_system/tokens/duration.dart';
+export 'package:openaccounting/design_system/tokens/radius.dart';
+export 'package:openaccounting/design_system/tokens/spacing.dart';
 
 /// DESIGN §7 seed #4F46E5, §8 Theme Behavior, §10 radius/borders.
 abstract final class AppTheme {
@@ -81,30 +86,6 @@ abstract final class AppTheme {
       labelSmall: base.labelSmall?.copyWith(fontSize: 12, fontWeight: FontWeight.w400),
     );
   }
-}
-
-/// DESIGN §42 tokens — spacing, radius, duration.
-abstract final class AppSpacing {
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 24;
-  static const double xxl = 32;
-  static const double xxxl = 48;
-}
-
-abstract final class AppRadius {
-  static const double control = 8;
-  static const double card = 12;
-  static const double menu = 10;
-  static const double dialog = 14;
-}
-
-abstract final class AppDuration {
-  static const Duration fast = Duration(milliseconds: 120);
-  static const Duration normal = Duration(milliseconds: 200);
-  static const Duration slow = Duration(milliseconds: 240);
 }
 
 /// ThemeMode persistence via SharedPreferences.

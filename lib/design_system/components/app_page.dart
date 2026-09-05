@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/design_system/tokens/spacing.dart';
 
 /// Content canvas per DESIGN §6.
 /// Responsive padding via LayoutBuilder + 4px grid tokens.

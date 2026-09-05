@@ -102,6 +102,25 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
+          // German alias per specs/app/spec.md deep-link scenario — preserve query.
+          GoRoute(
+            path: '/rechnungen',
+            redirect: (BuildContext context, GoRouterState state) {
+              final q = state.uri.query;
+              return q.isEmpty ? '/invoices' : '/invoices?$q';
+            },
+          ),
+          GoRoute(
+            path: '/belege',
+            redirect: (BuildContext context, GoRouterState state) {
+              final q = state.uri.query;
+              return q.isEmpty ? '/receipts' : '/receipts?$q';
+            },
+          ),
+          GoRoute(path: '/bank', redirect: (BuildContext context, GoRouterState state) => '/banking'),
+          GoRoute(path: '/kontakte', redirect: (BuildContext context, GoRouterState state) => '/contacts'),
+          GoRoute(path: '/steuern', redirect: (BuildContext context, GoRouterState state) => '/taxes'),
+          GoRoute(path: '/auswertungen', redirect: (BuildContext context, GoRouterState state) => '/reports'),
         ],
       ),
     ],

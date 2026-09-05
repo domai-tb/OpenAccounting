@@ -569,4 +569,147 @@ void main() {
       expect(isRechnungenFocused || hasFocusInSidebar, isTrue, reason: 'Rechnungen tile should be focusable via Tab.');
     });
   });
+
+  group('App Taxonomy Supersede — specs/app/spec.md §Layout Structure', () {
+    testWidgets('test_sidebar_taxonomy_supersedes_old', (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{'openaccounting.sidebar_expanded': true});
+      final db = await _configuredDb();
+      final router = createRouter(db);
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+      addTearDown(() async => db.close());
+      addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+      await tester.pumpWidget(_wrap(router));
+      await tester.pumpAndSettle();
+
+      // New taxonomy groups must exist.
+      expect(
+        find.text('ÜBERSICHT'),
+        findsOneWidget,
+        reason: 'ÜBERSICHT group missing — taxonomy superseded old sections',
+      );
+      expect(find.text('GESCHÄFT'), findsOneWidget, reason: 'GESCHÄFT group missing');
+      expect(find.text('STEUERN'), findsOneWidget, reason: 'STEUERN group missing');
+
+      // New item labels per DESIGN §4 / delta spec.
+      expect(find.text('Rechnungen'), findsWidgets, reason: 'Rechnungen missing in GESCHÄFT');
+      expect(find.text('Belege'), findsWidgets, reason: 'Belege missing');
+      expect(find.text('Bank & Zahlungen'), findsWidgets, reason: 'Bank & Zahlungen missing');
+      expect(find.text('Kontakte'), findsWidgets, reason: 'Kontakte missing');
+      expect(find.text('Steuern'), findsWidgets, reason: 'Steuern missing in STEUERN');
+      expect(find.text('Auswertungen'), findsWidgets, reason: 'Auswertungen missing');
+
+      // Old 6 collapsible sections must NOT appear.
+      const oldLabels = <String>['Fakturierung', 'Buchhaltung', 'Auswertung', 'Stammdaten', 'Hilfsmittel'];
+      for (final label in oldLabels) {
+        expect(find.text(label), findsNothing, reason: 'Old taxonomy "$label" must not appear — superseded');
+      }
+      // Einstellungen existed but was inside old collapsible; now pinned flat — ensure not inside ExpansionTile.
+      // Old layout used ExpansionTile for collapsible groups; new sidebar is flat ListView.
+      final hasExpansionTile = find.byType(ExpansionTile).evaluate().isNotEmpty;
+      expect(
+        hasExpansionTile,
+        isFalse,
+        reason: 'Flat taxonomy must not use ExpansionTile — old 6 collapsible sections retired',
+      );
+    });
+
+    testWidgets('test_old_layout_tests_retired', (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{'openaccounting.sidebar_expanded': true});
+      final db = await _configuredDb();
+      final router = createRouter(db);
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+      addTearDown(() async => db.close());
+      addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+      await tester.pumpWidget(_wrap(router));
+      await tester.pumpAndSettle();
+
+      // Old splitter minima 240/480 must not be assumed — shell is AppShell with sidebar/header/canvas,
+      // not a horizontal SplitView. Verify no SizedBox(480) splitter remnant.
+      final sizedBoxes = tester.widgetList<SizedBox>(find.byType(SizedBox)).toList();
+      final has480 = sizedBoxes.any((SizedBox s) => s.width == 480.0);
+      expect(has480, isFalse, reason: 'Old 240/480 splitter must be retired — new shell uses 240/72/drawer taxonomy');
+      // Old collapsible group titles must be gone (same check as supersede, explicit retired contract).
+      expect(find.text('Fakturierung'), findsNothing, reason: 'Retired: Fakturierung section must be removed');
+      expect(find.text('Buchhaltung'), findsNothing, reason: 'Retired: Buchhaltung section must be removed');
+    });
+
+    testWidgets('test_deep_link_highlights_correct', (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{'openaccounting.sidebar_expanded': true});
+      final db = await _configuredDb();
+      final router = createRouter(db);
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+      addTearDown(() async => db.close());
+      addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+      await tester.pumpWidget(_wrap(router));
+      await tester.pumpAndSettle();
+
+      // Deep link with query param — GESCHÄFT → Rechnungen highlighted (DESIGN §4, delta spec scenario).
+      router.go('/invoices?status=offen');
+      await tester.pumpAndSettle();
+      ListTile rechTile = tester
+          .widgetList<ListTile>(find.widgetWithText(ListTile, 'Rechnungen'))
+          .firstWhere(
+            (ListTile t) => t.selected,
+            orElse: () => tester.widget<ListTile>(find.widgetWithText(ListTile, 'Rechnungen').first),
+          );
+      expect(
+        rechTile.selected,
+        isTrue,
+        reason: 'Deep link /invoices?status=offen must highlight GESCHÄFT → Rechnungen',
+      );
+      expect(rechTile.selectedTileColor, isNotNull, reason: 'Highlight must be unmistakable (selectedTileColor set)');
+
+      // Detail route still highlights parent.
+      router.go('/invoices/42');
+      await tester.pumpAndSettle();
+      rechTile = tester
+          .widgetList<ListTile>(find.widgetWithText(ListTile, 'Rechnungen'))
+          .firstWhere((ListTile t) => t.selected);
+      expect(rechTile.selected, isTrue, reason: 'Detail /invoices/42 must still highlight Rechnungen via startsWith');
+
+      // Other GESCHÄFT items highlight correctly.
+      router.go('/receipts');
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widgetList<ListTile>(find.widgetWithText(ListTile, 'Belege'))
+            .where((ListTile t) => t.selected)
+            .isNotEmpty,
+        isTrue,
+        reason: 'GESCHÄFT → Belege must highlight at /receipts',
+      );
+
+      router.go('/taxes');
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widgetList<ListTile>(find.widgetWithText(ListTile, 'Steuern'))
+            .where((ListTile t) => t.selected)
+            .isNotEmpty,
+        isTrue,
+        reason: 'STEUERN → Steuern must highlight at /taxes',
+      );
+
+      // German alias deep link per delta spec: /rechnungen?status=offen redirects and highlights Rechnungen.
+      router.go('/rechnungen?status=offen');
+      await tester.pumpAndSettle();
+      final rechnungenSelected = tester
+          .widgetList<ListTile>(find.widgetWithText(ListTile, 'Rechnungen'))
+          .where((ListTile t) => t.selected);
+      expect(
+        rechnungenSelected.isNotEmpty,
+        isTrue,
+        reason: 'German alias /rechnungen?status=offen must resolve and highlight GESCHÄFT → Rechnungen',
+      );
+    });
+  });
 }

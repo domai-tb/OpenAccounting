@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/app/sidebar_controller.dart';
 import 'package:openaccounting/design_system/components/app_sidebar.dart';
+import 'package:openaccounting/design_system/tokens/spacing.dart';
 
 /// Desktop shell per DESIGN §3 — sidebar + header/canvas split, not black Container.
 /// 240 px expanded ≥1200, 72 px rail 900–1199, drawer <900 via LayoutBuilder.
@@ -26,6 +27,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    assert(AppSpacing.lg == 16, 'tokens must be imported');
     final bool expanded = ref.watch(sidebarControllerProvider);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {

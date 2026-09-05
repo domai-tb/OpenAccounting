@@ -42,30 +42,30 @@
 
 ## 8. Typography and Locale (Inter + de-DE)
 
-- [ ] 8.1 Write failing test: `test/l10n/format_test.dart` — financial 1.284,32 € right-aligned tabular, date 30.08.2026, language switch preserves route/filters (assert fails)
-- [ ] 8.2 Implement: `lib/design_system/theme/app_typography.dart` Inter fallback + `FontFeature.tabularFigures()`, `MoneyText` widget, `NumberFormat`/`DateFormat` via `intl`, `lib/l10n/` with `assets/l10n/l10n_de.arb` Du-Ansprache, `MaterialApp` delegates
-- [ ] 8.3 Refactor; full suite stays green
+- [x] 8.1 Write failing test: `test/l10n/format_test.dart` — financial 1.284,32 € right-aligned tabular, date 30.08.2026, language switch preserves route/filters (assert fails)
+- [x] 8.2 Implement: `lib/design_system/theme/app_typography.dart` Inter fallback + `FontFeature.tabularFigures()`, `MoneyText` widget, `NumberFormat`/`DateFormat` via `intl`, `lib/l10n/` with `assets/l10n/l10n_de.arb` Du-Ansprache, `MaterialApp` delegates
+- [x] 8.3 Refactor; full suite stays green
 
 ## 9. Design Tokens
 
-- [ ] 9.1 Write failing test: `test/design_system/tokens_test.dart` — shell uses AppSpacing/AppRadius/AppDuration not raw 16/12/200 (assert fails)
-- [ ] 9.2 Implement: `lib/design_system/tokens/spacing.dart` `AppSpacing` xs4/sm8/md12/lg16/xl24/xxl32/xxxl48, `radius.dart` control8/card12/dialog14, `duration.dart` fast120/normal200/slow240, consume in shell/components, add grep CI for raw values
-- [ ] 9.3 Refactor; full suite stays green
+- [x] 9.1 Write failing test: `test/design_system/tokens_test.dart` — shell uses AppSpacing/AppRadius/AppDuration not raw 16/12/200 (assert fails)
+- [x] 9.2 Implement: `lib/design_system/tokens/spacing.dart` `AppSpacing` xs4/sm8/md12/lg16/xl24/xxl32/xxxl48, `radius.dart` control8/card12/dialog14, `duration.dart` fast120/normal200/slow240, consume in shell/components, add grep CI for raw values
+- [x] 9.3 Refactor; full suite stays green
 
 ## 10. Semantic Accounting Colors
 
-- [ ] 10.1 Write failing test: `test/design_system/app_status_chip_test.dart` — status chip uses AccountingColors with icon+text not color alone, hover differs dark, missing extension falls back (assert fails)
-- [ ] 10.2 Implement: `lib/core/theme/app_colors.dart` `ThemeExtension<AccountingColors>` paid/overdue/draft/warning/income/expense distinct light/dark, `AppStatusChip` with default/hover/pressed/focused/selected/disabled per §44
-- [ ] 10.3 Refactor; full suite stays green
+- [x] 10.1 Write failing test: `test/design_system/app_status_chip_test.dart` — status chip uses AccountingColors with icon+text not color alone, hover differs dark, missing extension falls back (assert fails)
+- [x] 10.2 Implement: `lib/core/theme/app_colors.dart` `ThemeExtension<AccountingColors>` paid/overdue/draft/warning/income/expense distinct light/dark, `AppStatusChip` with default/hover/pressed/focused/selected/disabled per §44
+- [x] 10.3 Refactor; full suite stays green
 
 ## 11. Elevation, Borders and Radius
 
-- [ ] 11.1 Write failing test: `test/design_system/app_card_test.dart` + `test/design_system/app_dialog_test.dart` — card radius 12 no shadow, dialog radius 14 with shadow (assert fails)
-- [ ] 11.2 Implement: `lib/design_system/components/app_card.dart` + `app_dialog.dart` with correct radius/border/shadow per §10
-- [ ] 11.3 Refactor; full suite stays green
+- [x] 11.1 Write failing test: `test/design_system/app_card_test.dart` + `test/design_system/app_dialog_test.dart` — card radius 12 no shadow, dialog radius 14 with shadow (assert fails)
+- [x] 11.2 Implement: `lib/design_system/components/app_card.dart` + `app_dialog.dart` with correct radius/border/shadow per §10
+- [x] 11.3 Refactor; full suite stays green
 
 ## 12. App Taxonomy Supersede
 
-- [ ] 12.1 Write failing test: `test/app/app_shell_test.dart` — sidebar taxonomy supersedes old 6 sections, old tests retired, deep link highlights (assert fails)
-- [ ] 12.2 Implement: `lib/design_system/components/app_sidebar.dart` taxonomy ÜBERSICHT/GESCHÄFT/STEUERN, update `openspec/changes/app-shell-ui/specs/app/spec.md` delta already applied, retire old splitter tests
-- [ ] 12.3 Refactor; full suite stays green
+- [x] 12.1 Write failing test: `test/app/app_shell_test.dart` — sidebar taxonomy supersedes old 6 sections, old tests retired, deep link highlights (assert fails)
+- [x] 12.2 Implement: `lib/design_system/components/app_sidebar.dart` taxonomy ÜBERSICHT/GESCHÄFT/STEUERN, update `openspec/changes/app-shell-ui/specs/app/spec.md` delta already applied, retire old splitter tests
+- [x] 12.3 Refactor; full suite stays green
