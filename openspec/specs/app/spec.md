@@ -122,49 +122,22 @@ AND no "Sie" form SHALL appear in any user-facing string
 
 ### Requirement: Layout Structure
 
-The application SHALL use a sidebar-plus-detail layout. The sidebar SHALL contain 6 collapsible sections: Fakturierung, Buchhaltung, Auswertung, Stammdaten, Einstellungen, and Hilfsmittel. The detail area SHALL implement a list-detail splitter with resizable panes.
+The application SHALL use a persistent left sidebar per DESIGN.md §4 supplemented by the shell in `app-shell`. The sidebar SHALL be 240 px expanded at ≥1200 px, 72 px rail at 900–1199 px (icons only with tooltip, temporary expand), and overlay drawer at <900 px. The taxonomy SHALL be ÜBERSICHT (Übersicht) / GESCHÄFT (Rechnungen, Belege, Bank & Zahlungen, Kontakte) / STEUERN (Steuern, Auswertungen) / Einstellungen/Hilfe pinned, with workspace selector at top and “● Lokal” indicator at bottom, replacing the previous 6 collapsible sections (Fakturierung/Buchhaltung/Auswertung/Stammdaten/Einstellungen/Hilfsmittel) which are superseded by this change.
 
-#### Scenario: Sidebar Section Collapse
+#### Scenario: Sidebar taxonomy supersedes old sections
+- **GIVEN** the new shell is mounted
+- **WHEN** the sidebar renders
+- **THEN** it SHALL show ÜBERSICHT/GESCHÄFT/STEUERN groups not the old 6 sections, and no test SHALL expect the old Fakturierung/Buchhaltung collapsible groups
 
-GIVEN a sidebar section is currently expanded
-WHEN the user clicks the section header
-THEN that section SHALL toggle to collapsed
-AND collapsed sections SHALL show only the section icon and title
-AND the collapsed state SHALL persist across sessions
+#### Scenario: Old layout tests are retired
+- **GIVEN** a test asserts the old list-detail splitter with 240/480 minima from the previous spec
+- **WHEN** the new shell runs
+- **THEN** that test SHALL be updated or removed, and the new spec's sidebar/header/canvas scenarios SHALL be the source of truth
 
-#### Scenario: Sidebar Section Expand
-
-GIVEN a sidebar section is currently collapsed
-WHEN the user clicks the section header
-THEN that section SHALL expand to show all navigation items
-
-#### Scenario: Responsive Layout Adaptation
-
-GIVEN the window width is less than 900px
-WHEN the layout renders
-THEN the sidebar SHALL collapse to an icon-only rail
-AND tapping a section SHALL show a temporary overlay menu
-
-#### Scenario: Responsive Layout Restoration
-
-GIVEN the window width is less than 900px and sidebar is in rail mode
-WHEN the user resizes the window to 900px or wider
-THEN the sidebar SHALL restore to its previous expanded/collapsed state
-
-#### Scenario: Splitter Resize
-
-GIVEN the list and detail panes are visible
-WHEN the user drags the splitter between list and detail panes
-THEN the list pane width SHALL adjust proportionally
-AND the minimum list pane width SHALL be 240px
-AND the minimum detail pane width SHALL be 480px
-
-#### Scenario: Splitter Resize Below Minimum
-
-GIVEN the list pane is at its minimum width of 240px
-WHEN the user attempts to drag the splitter further left
-THEN the list pane SHALL not shrink below 240px
-AND the splitter SHALL stop at the minimum boundary
+#### Scenario: Deep link still highlights correct section
+- **GIVEN** the user opens `/rechnungen?status=offen` under the new taxonomy
+- **WHEN** the route resolves
+- **THEN** GESCHÄFT → Rechnungen SHALL be highlighted, preserving deep-link behavior from the previous spec
 
 ### Requirement: Error Handling
 
