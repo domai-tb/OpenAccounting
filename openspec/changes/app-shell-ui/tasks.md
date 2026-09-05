@@ -30,9 +30,9 @@
 
 ## 6. Window Behavior
 
-- [ ] 6.1 Write failing test: `test/app/window_test.dart` — window respects minimum 960×640 and state persists (assert fails)
-- [ ] 6.2 Implement: `lib/main.dart` `window_manager` `WindowOptions(1280x800, minimumSize 960x640, center:true)` + `waitUntilReadyToShow` + persist `window_bounds`/`window_maximized` with off-screen guard
-- [ ] 6.3 Refactor; full suite stays green
+- [x] 6.1 Write failing test: `test/app/window_test.dart` — window respects minimum 960×640 and state persists (assert fails)
+- [x] 6.2 Implement: `lib/main.dart` `window_manager` `WindowOptions(1280x800, minimumSize 960x640, center:true)` + `waitUntilReadyToShow` + persist `window_bounds`/`window_maximized` with off-screen guard
+- [x] 6.3 Refactor; full suite stays green
 
 ## 7. Material 3 Theming (seed #4F46E5)
 

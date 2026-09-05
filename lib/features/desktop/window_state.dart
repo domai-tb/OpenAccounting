@@ -98,9 +98,9 @@ class WindowStateService {
 
   final WindowStateStore _store;
 
-  static const double minWidth = 1024;
-  static const double minHeight = 768;
-  static const double defaultWidth = 1200;
+  static const double minWidth = 960;
+  static const double minHeight = 640;
+  static const double defaultWidth = 1280;
   static const double defaultHeight = 800;
 
   /// True when window is completely outside [screen].
