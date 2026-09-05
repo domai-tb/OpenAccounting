@@ -1,6 +1,10 @@
 # OpenInvoices — PDF Generation Specification
 
-## ADDED Requirements
+## Purpose
+
+Define supported document types, rendering behavior, and compliance requirements for generated PDFs.
+
+## Requirements
 
 ### Requirement: Document Type Coverage
 
@@ -236,6 +240,18 @@ The system SHALL render a payment block containing Betreff, IBAN, BIC, Kontoinha
 - WHEN a document PDF is rendered
 - THEN the payment block SHALL render without IBAN/BIC fields and SHALL NOT produce a QR code
 
+#### Scenario: Custom payment terms
+
+- GIVEN a company with zahlungsbedingung (payment terms text) configured
+- WHEN a document PDF is rendered
+- THEN the payment block SHALL display the custom zahlungsbedingung text instead of the default terms
+
+#### Scenario: Default payment terms
+
+- GIVEN a company with zahlungsbedingung = NULL or empty
+- WHEN a document PDF is rendered
+- THEN the payment block SHALL use the default payment terms text
+
 ### Requirement: Einleitungstext and Schlusstext
 
 The system SHALL support per-document-type Einleitungstext (introductory text) and Schlusstext (closing text). Each document type (Rechnung, Angebot, Auftrag, Proforma, Lieferschein) SHALL have independent text fields with no cross-fallback to other document types.
@@ -364,6 +380,24 @@ The system SHALL generate dunning letter PDFs (Mahnung) with configurable conten
 - GIVEN a Mahnung generated for a customer with outstanding invoices and Mahnstufe designation
 - WHEN the Mahnung PDF is rendered
 - THEN the system SHALL produce a PDF containing the customer address, outstanding invoices, Mahnstufe designation, Betreff, Einleitungstext, and payment block
+
+#### Scenario: Dunning level display
+
+- GIVEN a Mahnung with Mahnstufe = 1, 2, or 3
+- WHEN the Mahnung PDF is rendered
+- THEN the system SHALL display the dunning level in the document heading as "1. Mahnung", "2. Mahnung", or "3. Mahnung"
+
+#### Scenario: Original invoice reference
+
+- GIVEN a Mahnung referencing an original invoice with urspr_rechnungsnummer, urspr_rechnungsdatum, and urspr_faelligkeitsdatum
+- WHEN the Mahnung PDF is rendered
+- THEN the system SHALL display "Ursprüngliche Rechnung", "Rechnungsdatum", and "Fällig seit" with the referenced invoice data
+
+#### Scenario: Mahnung validation
+
+- GIVEN a Mahnung with dunning level outside valid range (not 1, 2, or 3)
+- WHEN the Mahnung PDF is rendered
+- THEN the system SHALL reject generation with an error indicating invalid dunning level
 
 #### Scenario: Mahnung with attachments
 
