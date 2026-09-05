@@ -155,24 +155,24 @@
 
 ## 16. Receivables & Inventory
 
-- [ ] 16.1 Write failing test: `test/features/einkommen/forderungen_test.dart` — Überzahlung creates Forderung
-- [ ] 16.2 Implement: Forderungen table, Überzahlungs-Protokoll, Forderungsausgang
-- [ ] 16.3 Write failing test: `test/features/inventory/lager_test.dart` — stock decrements on finalization
-- [ ] 16.4 Implement: Lagerführung with stock decrement/restore, Mindestbestand warnings
-- [ ] 16.5 Refactor; full suite stays green
+- [x] 16.1 Write failing test: `test/features/einkommen/forderungen_test.dart` — Überzahlung creates Forderung
+- [x] 16.2 Implement: Forderungen table, Überzahlungs-Protokoll, Forderungsausgang
+- [x] 16.3 Write failing test: `test/features/inventory/lager_test.dart` — stock decrements on finalization
+- [x] 16.4 Implement: Lagerführung with stock decrement/restore, Mindestbestand warnings
+- [x] 16.5 Refactor; full suite stays green
 
 ## 17. Setup Wizard
 
-- [ ] 17.1 Write failing test: `test/features/setup/wizard_test.dart` — 4-step wizard completes
-- [ ] 17.2 Implement: 4-step wizard (Stammdaten → Konten → Kategorien → Abschluss)
-- [ ] 17.3 Write failing test: `test/features/setup/kassenbestand_test.dart` — initial cash balance set
-- [ ] 17.4 Implement: Kassenbestand initialization
-- [ ] 17.5 Refactor; full suite stays green
+- [x] 17.1 Write failing test: `test/features/setup/wizard_test.dart` — 4-step wizard completes
+- [x] 17.2 Implement: 4-step wizard (Stammdaten → Konten → Kategorien → Abschluss)
+- [x] 17.3 Write failing test: `test/features/setup/kassenbestand_test.dart` — initial cash balance set
+- [x] 17.4 Implement: Kassenbestand initialization
+- [x] 17.5 Refactor; full suite stays green
 
 ## 18. Recurring Templates
 
-- [ ] 18.1 Write failing test: `test/features/recurring/rechnungsvorlagen_test.dart` — template creates invoice on schedule
-- [ ] 18.2 Implement: Rechnungsvorlagen with interval, positionen, Artikelverknüpfung
-- [ ] 18.3 Write failing test: `test/features/recurring/buchungsvorlagen_test.dart` — booking template auto-generates
-- [ ] 18.4 Implement: Buchungsvorlagen with direkt/beleg modus
-- [ ] 18.5 Refactor; full suite stays green
+- [x] 18.1 Write failing test: `test/features/recurring/rechnungsvorlagen_test.dart` — template creates invoice on schedule
+- [x] 18.2 Implement: Rechnungsvorlagen with interval, positionen, Artikelverknüpfung
+- [x] 18.3 Write failing test: `test/features/recurring/buchungsvorlagen_test.dart` — booking template auto-generates
+- [x] 18.4 Implement: Buchungsvorlagen with direkt/beleg modus
+- [x] 18.5 Refactor; full suite stays green

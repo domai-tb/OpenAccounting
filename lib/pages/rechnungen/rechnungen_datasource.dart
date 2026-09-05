@@ -325,17 +325,21 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         final artikelId = p['artikel_id'];
         if (artikelId == null) continue;
         final rows = await transaction.runSelect(
-          'SELECT lager_aktiv, bestand_aktuell, minusbestand_erlaubt, bezeichnung FROM artikel WHERE id = ?',
+          'SELECT lager_aktiv, bestand, bestand_aktuell, minusbestand_erlaubt, bezeichnung FROM artikel WHERE id = ?',
           <Object?>[artikelId],
         );
         if (rows.isEmpty) continue;
-        final lagerAktiv = _asInt(rows.single['lager_aktiv']) == 1;
+        final lagerRaw = _asInt(rows.single['lager_aktiv']) == 1;
+        final bestandLegacy = _asNum(rows.single['bestand']);
+        final bestandAktuell = _asNum(rows.single['bestand_aktuell']);
+        final isLegacy = !lagerRaw && bestandAktuell == 0 && bestandLegacy != 0;
+        final lagerAktiv = lagerRaw || isLegacy;
         if (!lagerAktiv) continue;
-        lagerItems.add(p);
-        final bestand = _asNum(rows.single['bestand_aktuell']);
+        final effBestand = bestandAktuell != 0 ? bestandAktuell : bestandLegacy;
+        lagerItems.add({...p, '_eff': effBestand, '_isLegacy': isLegacy});
         final minusErlaubt = _asInt(rows.single['minusbestand_erlaubt']) == 1;
         final menge = _asNum(p['menge']);
-        if (!minusErlaubt && bestand - menge < -0.0001) {
+        if (!minusErlaubt && effBestand - menge < -0.0001) {
           insufficient.add(rows.single['bezeichnung'].toString());
         }
       }
@@ -345,10 +349,20 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
       for (final p in lagerItems) {
         final artikelId = p['artikel_id'];
         final menge = _asNum(p['menge']);
-        await transaction.runUpdate(
-          'UPDATE artikel SET bestand_aktuell = bestand_aktuell - ?, bestand = bestand - ? WHERE id = ?',
-          <Object?>[menge, menge, artikelId],
-        );
+        final eff = p['_eff'] as num;
+        final isLegacy = p['_isLegacy'] == true;
+        final newStock = eff - menge;
+        if (isLegacy) {
+          await transaction.runUpdate(
+            'UPDATE artikel SET bestand_aktuell = ?, bestand = ?, lager_aktiv = 1 WHERE id = ?',
+            <Object?>[newStock, newStock, artikelId],
+          );
+        } else {
+          await transaction.runUpdate(
+            'UPDATE artikel SET bestand_aktuell = bestand_aktuell - ?, bestand = bestand - ? WHERE id = ?',
+            <Object?>[menge, menge, artikelId],
+          );
+        }
         await transaction.runInsert(
           'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
           'VALUES (?, ?, ?, ?, ?, ?)',
@@ -510,14 +524,31 @@ WHERE id = ? AND ist_entwurf = 1
       for (final r in posRows) {
         if (r['artikel_id'] == null) continue;
         final aid = r['artikel_id'];
-        final lagerRows = await transaction.runSelect('SELECT lager_aktiv FROM artikel WHERE id = ?', <Object?>[aid]);
-        if (lagerRows.isEmpty) continue;
-        if (_asInt(lagerRows.single['lager_aktiv']) != 1) continue;
-        final menge = _asNum(r['menge']);
-        await transaction.runUpdate(
-          'UPDATE artikel SET bestand_aktuell = bestand_aktuell + ?, bestand = bestand + ? WHERE id = ?',
-          <Object?>[menge, menge, aid],
+        final lagerRows = await transaction.runSelect(
+          'SELECT lager_aktiv, bestand, bestand_aktuell FROM artikel WHERE id = ?',
+          <Object?>[aid],
         );
+        if (lagerRows.isEmpty) continue;
+        final lagerRaw = _asInt(lagerRows.single['lager_aktiv']) == 1;
+        final bLegacy = _asNum(lagerRows.single['bestand']);
+        final bAktuell = _asNum(lagerRows.single['bestand_aktuell']);
+        final isLegacy = !lagerRaw && bAktuell == 0 && bLegacy != 0;
+        final lagerAktiv = lagerRaw || isLegacy;
+        if (!lagerAktiv) continue;
+        final menge = _asNum(r['menge']);
+        final eff = bAktuell != 0 ? bAktuell : bLegacy;
+        final newStock = eff + menge;
+        if (isLegacy) {
+          await transaction.runUpdate(
+            'UPDATE artikel SET bestand_aktuell = ?, bestand = ?, lager_aktiv = 1 WHERE id = ?',
+            <Object?>[newStock, newStock, aid],
+          );
+        } else {
+          await transaction.runUpdate(
+            'UPDATE artikel SET bestand_aktuell = bestand_aktuell + ?, bestand = bestand + ? WHERE id = ?',
+            <Object?>[menge, menge, aid],
+          );
+        }
         await transaction.runInsert(
           'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
           'VALUES (?, ?, ?, ?, ?, ?)',
