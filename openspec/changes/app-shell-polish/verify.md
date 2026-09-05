@@ -25,7 +25,7 @@
 - [x] All findings fixed — no dedicated feature, tests use general shell suite
 
 ### Change Delivery
-- Commit range: pending — removal of placeholder implementation/tests and artifact correction
+- Commit range: `cef237c` — removal of placeholder implementation/tests and artifact correction
 
 ### Unrelated Working-Tree Change
 
