@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 class Forderung {
   const Forderung({
@@ -74,13 +75,24 @@ class ForderungenRepository {
     ]) {
       try {
         await executor.runCustom('ALTER TABLE forderungen ADD COLUMN $col');
-      } catch (_) {}
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('duplicate column name') || msg.contains('already exists')) {
+          debugPrint('Forderungen ensureSchema skip duplicate: $msg');
+          continue;
+        }
+        debugPrint('Forderungen ensureSchema failed: $e');
+        rethrow;
+      }
     }
     try {
       await executor.runCustom(
         "UPDATE forderungen SET partner_id = kunde_id WHERE (partner_id IS NULL OR partner_id = 0) AND kunde_id IS NOT NULL",
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Forderungen ensureSchema migrate failed: $e');
+      rethrow;
+    }
   }
 
   Future<Forderung> create({
@@ -195,53 +207,61 @@ class ForderungenRepository {
   }
 
   /// Payment posting with overpayment split. Creates payment journal + optional overpayment journal.
+  /// Atomic via drift transaction — orphan journal never persists without forderung update.
   Future<Forderung> zahlungBuchen({required int forderungId, required num betrag, String? datum}) async {
     if (betrag.isNaN || !betrag.isFinite || betrag <= 0) throw const ForderungenException('Zahlbetrag ungültig');
     final f = await findById(forderungId);
     if (f == null) throw const ForderungenException('Forderung nicht gefunden');
-    if (f.status == 'bezahlt' || f.status == 'ausgebucht')
+    if (f.status == 'bezahlt' || f.status == 'ausgebucht') {
       throw const ForderungenException('Forderung bereits ausgeglichen');
+    }
 
     final centsBetrag = _toCents(betrag);
     final centsOffen = _toCents(f.betrag);
     final now = datum ?? DateTime.now().toIso8601String().substring(0, 10);
 
-    // Payment journal entry (GoBD immutable, trigger protects delete/update)
-    final payJournalId = await executor.runInsert(
-      'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-      [now, 'Zahlung Forderung #$forderungId', _fmt(betrag > f.betrag ? f.betrag : betrag), 'Einnahme', f.rechnungId],
-    );
-
-    if (centsBetrag < centsOffen) {
-      // partial
-      final remaining = _fromCents(centsOffen - centsBetrag);
-      await executor.runUpdate(
-        'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-        [_fmt(remaining), 'teilbezahlt', payJournalId, forderungId],
-      );
-    } else if (centsBetrag == centsOffen) {
-      await executor.runUpdate(
-        'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-        ['0.00', 'bezahlt', payJournalId, forderungId],
-      );
-    } else {
-      // overpayment split
-      final excess = _fromCents(centsBetrag - centsOffen);
-      // overpayment journal as credit
-      await executor.runInsert(
+    final transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      final payJournalId = await transaction.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [now, 'Überzahlung Forderung #$forderungId', _fmt(excess), 'Einnahme', f.rechnungId],
+        [now, 'Zahlung Forderung #$forderungId', _fmt(betrag > f.betrag ? f.betrag : betrag), 'Einnahme', f.rechnungId],
       );
-      await executor.runUpdate(
-        'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-        ['0.00', 'bezahlt', payJournalId, forderungId],
-      );
+
+      if (centsBetrag < centsOffen) {
+        final remaining = _fromCents(centsOffen - centsBetrag);
+        await transaction.runUpdate(
+          'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
+          [_fmt(remaining), 'teilbezahlt', payJournalId, forderungId],
+        );
+      } else if (centsBetrag == centsOffen) {
+        await transaction.runUpdate(
+          'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
+          ['0.00', 'bezahlt', payJournalId, forderungId],
+        );
+      } else {
+        final excess = _fromCents(centsBetrag - centsOffen);
+        await transaction.runInsert(
+          'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+          [now, 'Überzahlung Forderung #$forderungId', _fmt(excess), 'Einnahme', f.rechnungId],
+        );
+        await transaction.runUpdate(
+          'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
+          ['0.00', 'bezahlt', payJournalId, forderungId],
+        );
+      }
+      await transaction.send();
+    } catch (e, st) {
+      try {
+        await transaction.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(e, st);
     }
     final updated = await findById(forderungId);
     return updated!;
   }
 
-  /// Write-off (Forderungsausfall) with Grund required.
+  /// Write-off (Forderungsausfall) with Grund required. Atomic via drift transaction.
   Future<Forderung> ausbuchen({required int forderungId, required String grund}) async {
     if (grund.trim().isEmpty) throw const ForderungenException('Grund ist Pflicht');
     final f = await findById(forderungId);
@@ -251,14 +271,24 @@ class ForderungenRepository {
     if (_toCents(f.betrag) == 0) throw const ForderungenException('Forderung bereits ausgeglichen');
 
     final now = DateTime.now().toIso8601String().substring(0, 10);
-    final journalId = await executor.runInsert(
-      'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-      [now, 'Forderungsausfall: ${grund.trim()}', _fmt(f.betrag), 'Ausgabe', f.rechnungId],
-    );
-    await executor.runUpdate(
-      'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-      ['0.00', 'ausgebucht', journalId, forderungId],
-    );
+    final transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      final journalId = await transaction.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+        [now, 'Forderungsausfall: ${grund.trim()}', _fmt(f.betrag), 'Ausgabe', f.rechnungId],
+      );
+      await transaction.runUpdate(
+        'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
+        ['0.00', 'ausgebucht', journalId, forderungId],
+      );
+      await transaction.send();
+    } catch (e, st) {
+      try {
+        await transaction.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(e, st);
+    }
     return (await findById(forderungId))!;
   }
 
@@ -385,4 +415,12 @@ class _RawEntry {
   final String typ;
   final num betrag;
   final String? beschreibung;
+}
+
+class _NoopTransactionUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
 }
