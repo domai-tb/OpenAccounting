@@ -26,7 +26,7 @@ class AccountingTaxPolishService {
     if (raw.trim().isEmpty) return _kEmptyInput;
     try {
       return money.formatBetrag(raw);
-    } catch (_) {
+    } on FormatException {
       return _kNotANumber;
     }
   }
