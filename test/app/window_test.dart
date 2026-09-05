@@ -91,7 +91,7 @@ void main() {
 
     test('window_state sanitize guards off-screen and too-small', () {
       const Size screen = Size(1920, 1080);
-      const WindowState offScreen = WindowState(width: 1280, height: 800, x: 3000, y: 3000);
+      const WindowState offScreen = WindowState(width: 1280, x: 3000, y: 3000);
       expect(WindowStateService.isOffScreen(offScreen, screen), isTrue);
       final sanitized = WindowStateService.sanitize(offScreen, screen);
       expect(sanitized.width, 1280);

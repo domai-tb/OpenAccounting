@@ -49,7 +49,7 @@ void main() {
       final row = rows.single;
       expect(row['beschreibung'], 'Testbuchung Einnahme');
       expect(row['kategorie_id'], 1);
-      expect((row['betrag'] as num).toStringAsFixed(2), '1234.56');
+      expect((row['betrag'] as num?)?.toStringAsFixed(2), '1234.56');
       expect(row['immutable'], 0);
       expect(row['konto_skr03_snapshot'], '8400');
       expect(row['ust_satz_id'], 2);
@@ -59,7 +59,7 @@ void main() {
         "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'protect_journal%'",
         const <Object?>[],
       );
-      final names = triggers.map((r) => r['name'] as String).toList();
+      final names = triggers.map((r) => r['name']?.toString() ?? '').toList();
       expect(names, contains('protect_journal_update'));
       expect(names, contains('protect_journal_delete'));
     });
@@ -176,7 +176,7 @@ void main() {
         storno.id,
       ]);
       expect(rows.single['storno_von'], original.id);
-      expect((rows.single['betrag'] as num).toStringAsFixed(2), '-500.00');
+      expect((rows.single['betrag'] as num?)?.toStringAsFixed(2), '-500.00');
     });
   });
 }

@@ -134,6 +134,10 @@ FROM artikel
     }
     // derive missing price
     final rate = await _resolveUstSatz(ustSatzId, ustSatz);
+    final int differenzbesteuerungInt = differenzbesteuerung ? 1 : 0;
+    final int lagerAktivInt = lagerAktiv ? 1 : 0;
+    final int minusbestandErlaubtInt = minusbestandErlaubt ? 1 : 0;
+    final int aktivInt = aktiv ? 1 : 0;
     late final num finalNetto;
     late final num finalBrutto;
     if (vkEingabe == 'brutto') {
@@ -167,17 +171,17 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         vkEingabe,
         ustSatzId,
         ustSatz ?? rate,
-        differenzbesteuerung ? 1 : 0,
+        differenzbesteuerungInt,
         ekNetto,
-        lagerAktiv ? 1 : 0,
+        lagerAktivInt,
         bestandAktuell,
         mindestbestand,
-        minusbestandErlaubt ? 1 : 0,
+        minusbestandErlaubtInt,
         resolvedLieferantId,
         resolvedLieferantenArtikelnr,
         gruppeId,
         artikelnummer,
-        aktiv ? 1 : 0,
+        aktivInt,
         bestandAktuell.toInt(),
       ],
     );
@@ -270,7 +274,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     );
     // ponytail: simple template check via LIKE, strict FK not available
     if (tmpl.isNotEmpty) {
-      throw ArtikelException('Artikel wird von Vorlage verwendet');
+      throw const ArtikelException('Artikel wird von Vorlage verwendet');
     }
     final deleted = await executor.runDelete('DELETE FROM artikel WHERE id = ?', <Object?>[id]);
     if (deleted == 0) throw const ArtikelException('Artikel nicht gefunden');
@@ -302,9 +306,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     bool aktiv = true,
   }) async {
     await ensureSchema();
+    final int aktivInt = aktiv ? 1 : 0;
     final id = await executor.runInsert(
       'INSERT INTO artikel_gruppen (name, beschreibung, typ, aktiv) VALUES (?, ?, ?, ?)',
-      <Object?>[name, beschreibung, typ, aktiv ? 1 : 0],
+      <Object?>[name, beschreibung, typ, aktivInt],
     );
     await executor.runSelect('SELECT * FROM artikel_gruppen WHERE id = ?', <Object?>[id]);
     return ArtikelGruppe(id: id, name: name, beschreibung: beschreibung, typ: typ, aktiv: aktiv);
@@ -364,16 +369,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   }
 
   Future<void> _ensureInventarTable(QueryExecutor ex) async {
-    await ex.runCustom(
-      'CREATE TABLE IF NOT EXISTS inventarbewegungen ('
-      'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-      'artikel_id INTEGER NOT NULL REFERENCES artikel(id), '
-      'datum TEXT NOT NULL, '
-      'diff NUMERIC(10,3) NOT NULL, '
-      'grund TEXT NOT NULL, '
-      'referenz_typ TEXT, '
-      'referenz_id INTEGER)',
-    );
+    await ex.runCustom('''
+CREATE TABLE IF NOT EXISTS inventarbewegungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikel_id INTEGER NOT NULL REFERENCES artikel(id),
+  datum TEXT NOT NULL,
+  diff NUMERIC(10,3) NOT NULL,
+  grund TEXT NOT NULL,
+  referenz_typ TEXT,
+  referenz_id INTEGER
+)''');
   }
 
   Future<num> _resolveUstSatz(int? id, num? direct) async {

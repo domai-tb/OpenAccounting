@@ -121,7 +121,7 @@ void main() {
     expect(
       parsedPdf.visibleText,
       allOf(
-        contains(r'**outer *inner* outer**'),
+        contains('**outer *inner* outer**'),
         contains('*unmatched'),
         contains(r'\*escaped italic\*'),
         contains(r'\**escaped bold**'),

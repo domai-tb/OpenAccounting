@@ -41,7 +41,7 @@ void main() {
 
     test('dunning creates snapshot and retains after rechnung edit', () async {
       final kundeId = await createKunde();
-      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1001', brutto: '500.00');
+      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1001');
       final levels = await stufenRepo.list();
       final stufe = levels.firstWhere((e) => e.stufe == 1);
       final mahnung = await repo.create(rechnungId: rechnungId, stufeId: stufe.id);
@@ -99,7 +99,7 @@ void main() {
 
     test('Carry-over: level2 open 10+3 → level3 shows carried', () async {
       final kundeId = await createKunde(name: 'Carry Kunde');
-      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1003', brutto: '500.00');
+      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1003');
       final levels = await stufenRepo.list();
       final stufe2 = levels.firstWhere((e) => e.stufe == 2);
       final stufe3 = levels.firstWhere((e) => e.stufe == 3);
@@ -126,7 +126,7 @@ void main() {
 
     test('No carry when fully paid → 0 carried', () async {
       final kundeId = await createKunde(name: 'NoCarry Kunde');
-      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1004', brutto: '500.00');
+      final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-1004');
       final levels = await stufenRepo.list();
       final stufe2 = levels.firstWhere((e) => e.stufe == 2);
       final stufe3 = levels.firstWhere((e) => e.stufe == 3);

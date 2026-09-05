@@ -22,8 +22,11 @@ Future<AppDatabase> _configuredDb() async {
   return db;
 }
 
-Widget _wrap(GoRouter router) {
-  return ProviderScope(child: MaterialApp.router(routerConfig: router));
+Widget _wrap(GoRouter router, AppDatabase db) {
+  return ProviderScope(
+    overrides: [appDatabaseProvider.overrideWithValue(db)],
+    child: MaterialApp.router(routerConfig: router),
+  );
 }
 
 void main() {
@@ -36,7 +39,7 @@ void main() {
       addTearDown(() => tester.view.resetPhysicalSize());
       addTearDown(() async => db.close());
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // Primary routes per spec: '/', '/invoices', '/receipts', '/taxes', '/settings'.
@@ -118,7 +121,7 @@ void main() {
       addTearDown(() => tester.view.resetPhysicalSize());
       addTearDown(() async => db.close());
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       expect(
@@ -192,7 +195,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // 240 px expanded at >=1200 per DESIGN §4, §34
@@ -303,7 +306,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // 72 px rail at 900–1199 per DESIGN §4
@@ -375,7 +378,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // Drawer overlay at <900 per DESIGN §4, §34 — AppShell should return Scaffold with drawer
@@ -445,7 +448,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // Initially expanded at 1400 (>=1200) with pref true -> 240
@@ -492,7 +495,7 @@ void main() {
       final db2 = await _configuredDb();
       final router2 = createRouter(db2);
       addTearDown(() async => db2.close());
-      await tester.pumpWidget(_wrap(router2));
+      await tester.pumpWidget(_wrap(router2, db2));
       await tester.pumpAndSettle();
       final sizedBoxesPersisted = tester.widgetList<SizedBox>(find.byType(SizedBox)).toList();
       final has72Persisted = sizedBoxesPersisted.any((SizedBox s) => s.width == 72.0);
@@ -516,7 +519,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       router.go('/invoices?status=offen');
@@ -581,7 +584,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // New taxonomy groups must exist.
@@ -626,7 +629,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // Old splitter minima 240/480 must not be assumed — shell is AppShell with sidebar/header/canvas,
@@ -649,7 +652,7 @@ void main() {
       addTearDown(() async => db.close());
       addTearDown(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
 
       // Deep link with query param — GESCHÄFT → Rechnungen highlighted (DESIGN §4, delta spec scenario).

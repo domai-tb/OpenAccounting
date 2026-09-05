@@ -35,7 +35,6 @@ void main() {
       customer: base.customer,
       positions: base.positions,
       totals: base.totals,
-      copyState: PdfCopyState.original,
     );
     final pdfBytes = await const PdfGenerator().generate(snapshot);
     final parsed = parsePdf(pdfBytes);

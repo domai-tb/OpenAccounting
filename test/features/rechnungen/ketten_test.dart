@@ -22,7 +22,7 @@ void main() {
       datum: '2026-08-30',
       eingabemodus: 'brutto',
       positionen: const [
-        RechnungPositionItem(bezeichnung: 'Design', menge: 10, einzelpreis: 150, gesamt: 1500, ustSatz: 19),
+        RechnungPositionItem(bezeichnung: 'Design', menge: 10, einzelpreis: 150, gesamt: 1500),
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 2, einzelpreis: 100, gesamt: 200, ustSatz: 7),
       ],
     );
@@ -51,13 +51,13 @@ void main() {
       "INSERT INTO kunden (name, strasse, plz, ort) VALUES ('Muster', 'Str 1', '10115', 'Berlin')",
     );
     final kunden = await db.executor.runSelect('SELECT id FROM kunden LIMIT 1', const <Object?>[]);
-    final kundenId = kunden.single['id'] as int;
+    final int kundenId = (kunden.single['id'] as num?)?.toInt() ?? 0;
     await db.executor.runCustom(
       'INSERT INTO kunden_lieferadressen (kunde_id, bezeichnung, strasse, plz, ort) VALUES (?, ?, ?, ?, ?)',
       [kundenId, 'Werkstatt Hamburg', 'Hafen 1', '20095', 'Hamburg'],
     );
     final adr = await db.executor.runSelect('SELECT id FROM kunden_lieferadressen LIMIT 1', const <Object?>[]);
-    final adrId = adr.single['id'] as int;
+    final int adrId = (adr.single['id'] as num?)?.toInt() ?? 0;
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'LS-YY####', naechste_nummer = 1 WHERE typ = 'lieferschein'",
     );
@@ -133,7 +133,7 @@ void main() {
       typ: 'angebot',
       datum: '2026-08-30',
       positionen: const [
-        RechnungPositionItem(bezeichnung: 'Website-Design', menge: 10, einzelpreis: 150, gesamt: 1500, ustSatz: 19),
+        RechnungPositionItem(bezeichnung: 'Website-Design', menge: 10, einzelpreis: 150, gesamt: 1500),
       ],
     );
     final fin = await uc.finalizeRechnung(rechnungId: ang.id);

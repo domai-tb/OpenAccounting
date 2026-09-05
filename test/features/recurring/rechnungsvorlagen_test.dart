@@ -84,7 +84,7 @@ void main() {
       final RechnungsVorlage beendet = await repo.beenden(v.id);
       expect(beendet.status, 'beendet');
       expect(beendet.aktiv, isFalse);
-      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 2, 1));
+      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 2));
       expect(gen, isEmpty);
       final RechnungsVorlage? still = await repo.findById(v.id);
       expect(still, isNotNull);
@@ -100,7 +100,7 @@ void main() {
           <String, dynamic>{'bezeichnung': 'Miete', 'menge': 1, 'einzelpreis': 100.00, 'kategorie_id': 1},
         ],
       );
-      expect(repo.isDue(v, DateTime(2026, 3, 1)), isTrue);
+      expect(repo.isDue(v, DateTime(2026, 3)), isTrue);
       expect(repo.isDue(v, DateTime(2026, 3, 2)), isTrue);
       expect(repo.isDue(v, DateTime(2026, 2, 28)), isFalse);
     });
@@ -123,7 +123,7 @@ void main() {
         naechsteFaelligkeit: '2026-04-01',
         positionen: <Map<String, dynamic>>[],
       );
-      expect(repo.isDue(v2, DateTime(2026, 2, 1)), isFalse);
+      expect(repo.isDue(v2, DateTime(2026, 2)), isFalse);
     });
 
     test('Yearly generation — matches creation month/day', () async {
@@ -181,10 +181,10 @@ void main() {
         'SELECT vorlage_daten FROM rechnungsvorlagen WHERE id = ?',
         <Object?>[v.id],
       );
-      final String jsonStr = raw.single['vorlage_daten'] as String;
+      final String jsonStr = raw.single['vorlage_daten']! as String;
       expect(jsonStr.contains('Pos1'), isTrue);
       expect(jsonStr.contains('Pos2'), isTrue);
-      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026));
       expect(gen.length, 1);
       final List<Map<String, Object?>> pos = await db.executor.runSelect(
         'SELECT bezeichnung FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position',
@@ -206,7 +206,7 @@ void main() {
         'SELECT vorlage_daten FROM rechnungsvorlagen WHERE id = ?',
         <Object?>[v.id],
       );
-      expect(raw.single['vorlage_daten'] as String, '[]');
+      expect(raw.single['vorlage_daten']! as String, '[]');
     });
 
     test('Price mismatch warning — 10€ vs 12€', () async {
@@ -258,7 +258,7 @@ void main() {
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum) VALUES (?, ?, ?, ?, ?, ?)',
         <Object?>['A-2026-001', 'auftrag', 'laufend', 0, 'netto', '2026-01-01'],
       );
-      final RechnungsVorlage v = await repo.create(
+      await repo.create(
         name: 'Auftrag linked',
         kundeId: 1,
         intervall: 'monatlich',
@@ -268,7 +268,7 @@ void main() {
         ],
         auftragId: auftragId,
       );
-      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026));
       expect(gen.length, 1);
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT storno_von FROM rechnungen WHERE id = ?',
@@ -288,7 +288,7 @@ void main() {
           <String, dynamic>{'bezeichnung': 'Abo', 'menge': 1, 'einzelpreis': 10.00, 'kategorie_id': 1},
         ],
       );
-      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026));
       expect(gen.length, 1);
       final List<Map<String, Object?>> re = await db.executor.runSelect(
         'SELECT vorlage_id FROM rechnungen WHERE id = ?',
@@ -310,7 +310,7 @@ void main() {
       // Pausieren 3 Monate, dann reaktivieren + generieren sollte 4 Rechnungen erstellen (Jan-Apr)
       await repo.pause(v.id);
       await repo.resume(v.id);
-      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 4, 01));
+      final List<int> gen = await repo.generateFaellig(heute: DateTime(2026, 4));
       expect(gen.length, 4);
       final RechnungsVorlage? updated = await repo.findById(v.id);
       expect(updated!.naechsteFaelligkeit, '2026-05-01');
@@ -328,7 +328,7 @@ void main() {
       );
       List<Map<String, Object?>> list = await repo.listGeneratedInvoices(v.id);
       expect(list, isEmpty);
-      await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      await repo.generateFaellig(heute: DateTime(2026));
       list = await repo.listGeneratedInvoices(v.id);
       expect(list.length, 1);
       expect(list.single['vorlage_id'], v.id);
@@ -344,30 +344,30 @@ void main() {
           <String, dynamic>{'artikel_id': 1, 'bezeichnung': 'Pos', 'menge': 1, 'einzelpreis': 10.00, 'kategorie_id': 1},
         ],
       );
-      await repo.generateFaellig(heute: DateTime(2026, 1, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 2, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 3, 1));
+      await repo.generateFaellig(heute: DateTime(2026));
+      await repo.generateFaellig(heute: DateTime(2026, 2));
+      await repo.generateFaellig(heute: DateTime(2026, 3));
       final List<Map<String, Object?>> before = await db.executor.runSelect(
         'SELECT einzelpreis FROM rechnungspositionen WHERE rechnung_id IN '
         '(SELECT id FROM rechnungen WHERE vorlage_id = ?) ORDER BY id',
         <Object?>[v.id],
       );
-      expect(before.every((Map<String, Object?> r) => (r['einzelpreis'] as num).toDouble() == 10.00), isTrue);
+      expect(before.every((Map<String, Object?> r) => (r['einzelpreis']! as num).toDouble() == 10.00), isTrue);
       await repo.update(
         v.id,
         positionen: <Map<String, dynamic>>[
           <String, dynamic>{'artikel_id': 1, 'bezeichnung': 'Pos', 'menge': 1, 'einzelpreis': 15.00, 'kategorie_id': 1},
         ],
       );
-      await repo.generateFaellig(heute: DateTime(2026, 4, 1));
+      await repo.generateFaellig(heute: DateTime(2026, 4));
       final List<Map<String, Object?>> after = await db.executor.runSelect(
         'SELECT einzelpreis FROM rechnungspositionen WHERE rechnung_id IN '
         '(SELECT id FROM rechnungen WHERE vorlage_id = ?) ORDER BY id',
         <Object?>[v.id],
       );
       expect(after.length, 4);
-      expect((after.last['einzelpreis'] as num).toDouble(), 15.00);
-      expect((after.first['einzelpreis'] as num).toDouble(), 10.00);
+      expect((after.last['einzelpreis']! as num).toDouble(), 15.00);
+      expect((after.first['einzelpreis']! as num).toDouble(), 10.00);
     });
 
     test('Edit template interval — future follows new interval', () async {
@@ -382,7 +382,7 @@ void main() {
       final RechnungsVorlage? updated = await repo.findById(v.id);
       expect(updated!.intervall, 'quartalsweise');
       // Bestehende Rechnungen unverändert — hier keine erzeugt, prüfen dass nächste Generierung quartalsweise advance
-      await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      await repo.generateFaellig(heute: DateTime(2026));
       final RechnungsVorlage? afterGen = await repo.findById(v.id);
       expect(afterGen!.naechsteFaelligkeit, '2026-04-01');
     });
@@ -397,11 +397,11 @@ void main() {
           <String, dynamic>{'bezeichnung': 'Pos', 'menge': 1, 'einzelpreis': 10.00, 'kategorie_id': 1},
         ],
       );
-      await repo.generateFaellig(heute: DateTime(2026, 1, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 2, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 3, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 4, 1));
-      await repo.generateFaellig(heute: DateTime(2026, 5, 1));
+      await repo.generateFaellig(heute: DateTime(2026));
+      await repo.generateFaellig(heute: DateTime(2026, 2));
+      await repo.generateFaellig(heute: DateTime(2026, 3));
+      await repo.generateFaellig(heute: DateTime(2026, 4));
+      await repo.generateFaellig(heute: DateTime(2026, 5));
       await expectLater(repo.delete(v.id), throwsA(isA<RechnungsVorlagenException>()));
       try {
         await repo.delete(v.id);
@@ -427,8 +427,8 @@ void main() {
       expect(repo.nextDue(DateTime(2026, 1, 15), 'monatlich'), DateTime(2026, 2, 15));
       expect(repo.nextDue(DateTime(2026, 12, 15), 'monatlich'), DateTime(2027, 1, 15));
       expect(repo.nextDue(DateTime(2026, 1, 31), 'monatlich'), DateTime(2026, 2, 28));
-      expect(repo.nextDue(DateTime(2026, 1, 1), 'quartalsweise'), DateTime(2026, 4, 1));
-      expect(repo.nextDue(DateTime(2026, 1, 1), 'jährlich'), DateTime(2027, 1, 1));
+      expect(repo.nextDue(DateTime(2026), 'quartalsweise'), DateTime(2026, 4));
+      expect(repo.nextDue(DateTime(2026), 'jährlich'), DateTime(2027));
     });
   });
 }

@@ -63,7 +63,7 @@ class DioClient {
               return handler.resolve(resp);
             } catch (e) {
               if (e is DioException) return handler.reject(e);
-              return handler.reject(DioException(requestOptions: opts, error: e, type: DioExceptionType.unknown));
+              return handler.reject(DioException(requestOptions: opts, error: e));
             }
           }
 

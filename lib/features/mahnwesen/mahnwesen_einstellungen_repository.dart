@@ -172,7 +172,6 @@ class MahnwesenEinstellungenRepository {
         schwelleSperrung: _asInt(r['schwelle_sperrung']) ?? 3,
         aktiv: _asBool(r['aktiv']),
         unternehmenId: _asInt(r['unternehmen_id']),
-        graceTage: 0,
       );
     }
     return _fromRow(rows.single);

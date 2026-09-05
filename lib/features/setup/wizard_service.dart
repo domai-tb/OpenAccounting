@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,15 +40,17 @@ class WizardService {
   final SetupRepository? _repository;
   final SharedPreferences? _prefsOverride;
 
-  WizardStep _current = WizardStep.stammdaten;
-  WizardStep get currentStep => _current;
+  WizardStep currentStep = WizardStep.stammdaten;
 
   // Stammdaten Felder
   String _stammdatenName = '';
   String get stammdatenName => _stammdatenName;
   String _stammdatenStrasse = '';
+  String get stammdatenStrasse => _stammdatenStrasse;
   String _stammdatenPlz = '';
+  String get stammdatenPlz => _stammdatenPlz;
   String _stammdatenOrt = '';
+  String get stammdatenOrt => _stammdatenOrt;
 
   void updateStammdaten({required String name, String? strasse, String? plz, String? ort}) {
     _stammdatenName = name;
@@ -55,18 +59,18 @@ class WizardService {
     if (ort != null) _stammdatenOrt = ort;
   }
 
-  void goTo(WizardStep step) {
-    _current = step;
-  }
+  // Compatibility method retained for callers that do not use the public state field.
+  // ignore: use_setters_to_change_properties
+  void goTo(WizardStep step) => currentStep = step;
 
   void next() {
-    final int idx = WizardStep.values.indexOf(_current);
-    if (idx < WizardStep.values.length - 1) _current = WizardStep.values[idx + 1];
+    final int idx = WizardStep.values.indexOf(currentStep);
+    if (idx < WizardStep.values.length - 1) currentStep = WizardStep.values[idx + 1];
   }
 
   void back() {
-    final int idx = WizardStep.values.indexOf(_current);
-    if (idx > 0) _current = WizardStep.values[idx - 1];
+    final int idx = WizardStep.values.indexOf(currentStep);
+    if (idx > 0) currentStep = WizardStep.values[idx - 1];
   }
 
   // ---------------------------------------------------------------------------
@@ -110,7 +114,7 @@ class WizardService {
   // ---------------------------------------------------------------------------
 
   Future<SharedPreferences> _prefs() async {
-    if (_prefsOverride != null) return _prefsOverride!;
+    if (_prefsOverride != null) return _prefsOverride;
     return SharedPreferences.getInstance();
   }
 
@@ -203,7 +207,7 @@ class ProfileSelectionService {
   final SharedPreferences? _prefsOverride;
 
   Future<SharedPreferences> _prefs() async {
-    if (_prefsOverride != null) return _prefsOverride!;
+    if (_prefsOverride != null) return _prefsOverride;
     return SharedPreferences.getInstance();
   }
 
@@ -220,15 +224,15 @@ class ProfileSelectionService {
   /// Ob Auswahl nötig: >1 Profile.
   Future<bool> needsSelection() async {
     // ponytail: ohne FS-Scan im Test via baseDir == /tmp/test-single-* → false
-    if (_baseDir != null && _baseDir!.contains('test-single')) return false;
-    if (_baseDir != null && _baseDir!.contains('test-multi')) return true;
+    if (_baseDir != null && _baseDir.contains('test-single')) return false;
+    if (_baseDir != null && _baseDir.contains('test-multi')) return true;
     // default: single profile → no selection
     return false;
   }
 
   Future<List<String>> listProfiles() async {
-    if (_baseDir != null && _baseDir!.contains('test-multi')) return <String>['Firma A', 'Firma B'];
-    if (_baseDir != null && _baseDir!.contains('test-single')) return <String>['Default'];
+    if (_baseDir != null && _baseDir.contains('test-multi')) return <String>['Firma A', 'Firma B'];
+    if (_baseDir != null && _baseDir.contains('test-single')) return <String>['Default'];
     return <String>['Default'];
   }
 }

@@ -67,9 +67,9 @@ class ValidationException extends ApiException {
           if (k == 'message' || k == 'error' || k == 'statusCode') return;
           hasField = true;
           if (v is List) {
-            fields[k.toString()] = v.map((e) => e.toString()).toList();
+            fields[k] = v.map((e) => e.toString()).toList();
           } else {
-            fields[k.toString()] = <String>[v.toString()];
+            fields[k] = <String>[v.toString()];
           }
         });
         if (!hasField) {

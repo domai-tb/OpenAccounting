@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/features/pdf/pdf_generator.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
@@ -11,7 +13,7 @@ void main() {
         documentType: PdfDocumentType.rechnung,
         template: PdfTemplate.standard,
         documentNumber: 'RE-2026-002',
-        documentDate: DateTime(2026, 9, 1),
+        documentDate: DateTime(2026, 9),
         company: const PdfCompanySnapshot(
           name: 'Muster Studio',
           street: 'Musterstraße 1',
@@ -98,7 +100,7 @@ void main() {
         totals: const PdfTotalsSnapshot(netAmount: 1000, taxAmount: 190, grossAmount: 1190),
         mahnung: PdfMahnungSnapshot(
           originalInvoiceNumber: 'RE-2026-001',
-          originalInvoiceDate: DateTime(2026, 8, 1),
+          originalInvoiceDate: DateTime(2026, 8),
           dueDate: DateTime(2026, 8, 15),
           dunningLevel: 1,
         ),

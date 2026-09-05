@@ -229,7 +229,7 @@ WHERE id = ?
       final positionen = posRows
           .map(
             (r) => RechnungPositionItem(
-              bezeichnung: r['bezeichnung'] as String,
+              bezeichnung: r['bezeichnung']?.toString() ?? '',
               menge: _asNum(r['menge']),
               einzelpreis: _asNum(r['einzelpreis']),
               gesamt: _asNum(r['gesamt']),
@@ -349,7 +349,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
       for (final p in lagerItems) {
         final artikelId = p['artikel_id'];
         final menge = _asNum(p['menge']);
-        final eff = p['_eff'] as num;
+        final num eff = _asNum(p['_eff']);
         final isLegacy = p['_isLegacy'] == true;
         final newStock = eff - menge;
         if (isLegacy) {
@@ -438,7 +438,7 @@ WHERE id = ? AND ist_entwurf = 1
         throw StateError('Rechnung ist bereits storniert');
       }
       final datum = DateTime.now().toIso8601String().substring(0, 10);
-      final kreisTyp = 'stornorechnung';
+      const String kreisTyp = 'stornorechnung';
       final rangeRows = await transaction.runSelect(
         'SELECT id, format, naechste_nummer FROM nummernkreise WHERE typ = ? AND aktiv = 1 ORDER BY id LIMIT 1',
         <Object?>[kreisTyp],
@@ -447,8 +447,9 @@ WHERE id = ? AND ist_entwurf = 1
       final range = rangeRows.single;
       final format = range['format'].toString();
       final seq = _sequenceMatchesForFormat(format);
-      if (seq == null || seq.length != 1)
+      if (seq == null || seq.length != 1) {
         throw StateError('Stornorechnung-Nummernkreis-Format muss genau ein Sequenz-Token enthalten');
+      }
       final stored = _asInt(range['naechste_nummer']) ?? 1;
       final invDate = DateTime.tryParse(orig['datum'].toString()) ?? DateTime.now();
       final latestRows = await transaction.runSelect(
@@ -591,8 +592,9 @@ WHERE id = ? AND ist_entwurf = 1
           <Object?>[vonRechnungId],
         );
         if (orig.isEmpty) throw StateError('Rechnung nicht gefunden');
-        if (_asInt(orig.single['ist_entwurf']) == 1)
+        if (_asInt(orig.single['ist_entwurf']) == 1) {
           throw StateError('Nur finalisierte Rechnung kann gutgeschrieben werden');
+        }
         useDatum = orig.single['datum'].toString();
         linkId = vonRechnungId;
         posRows = await transaction.runSelect(
@@ -602,7 +604,7 @@ WHERE id = ? AND ist_entwurf = 1
         usePos = posRows
             .map(
               (r) => RechnungPositionItem(
-                bezeichnung: r['bezeichnung'] as String,
+                bezeichnung: r['bezeichnung']?.toString() ?? '',
                 menge: _asNum(r['menge']),
                 einzelpreis: _asNum(r['einzelpreis']),
                 gesamt: _asNum(r['gesamt']),
@@ -615,7 +617,7 @@ WHERE id = ? AND ist_entwurf = 1
       } else {
         if (usePos.isEmpty) throw StateError('Positionen erforderlich');
       }
-      final kreisTyp = 'gutschrift';
+      const String kreisTyp = 'gutschrift';
       final rangeRows = await transaction.runSelect(
         'SELECT id, format, naechste_nummer FROM nummernkreise WHERE typ = ? AND aktiv = 1 ORDER BY id LIMIT 1',
         <Object?>[kreisTyp],
@@ -624,8 +626,9 @@ WHERE id = ? AND ist_entwurf = 1
       final range = rangeRows.single;
       final format = range['format'].toString();
       final seq = _sequenceMatchesForFormat(format);
-      if (seq == null || seq.length != 1)
+      if (seq == null || seq.length != 1) {
         throw StateError('Gutschrift-Nummernkreis-Format muss genau ein Sequenz-Token enthalten');
+      }
       final stored = _asInt(range['naechste_nummer']) ?? 1;
       final invDate = DateTime.tryParse(useDatum) ?? DateTime.now();
       final latestRows = await transaction.runSelect(
@@ -644,7 +647,9 @@ WHERE id = ? AND ist_entwurf = 1
         <Object?>[nextNo + 1, range['id'], stored],
       );
       var sum = 0.0;
-      for (final p in usePos) sum += -p.gesamt.abs();
+      for (final p in usePos) {
+        sum += -p.gesamt.abs();
+      }
       final gsId = await transaction.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, gutschrift_von, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
@@ -824,7 +829,7 @@ WHERE id = ? AND ist_entwurf = 1
           positionen: posRows
               .map(
                 (r) => RechnungPositionItem(
-                  bezeichnung: r['bezeichnung'] as String,
+                  bezeichnung: r['bezeichnung']?.toString() ?? '',
                   menge: _asNum(r['menge']),
                   einzelpreis: _asNum(r['einzelpreis']),
                   gesamt: _asNum(r['gesamt']),
@@ -949,8 +954,9 @@ ORDER BY position, id
     final range = rangeRows.single;
     final format = range['format'].toString().trim();
     final seq = _sequenceMatchesForFormat(format);
-    if (seq == null || seq.length != 1)
+    if (seq == null || seq.length != 1) {
       throw StateError('$kreisTyp-Nummernkreis-Format muss genau ein Sequenz-Token enthalten');
+    }
     final stored = _asInt(range['naechste_nummer']) ?? 1;
     final invDate = DateTime.tryParse(datum) ?? DateTime.now();
     final latestRows = await transaction.runSelect(
@@ -966,20 +972,20 @@ ORDER BY position, id
     final width = _sequenceWidth(seq.single);
     if (width > 9 || nextNo > _maximumForWidth(width)) throw StateError('$kreisTyp-Nummernkreis ist erschöpft');
     final nummer = _formatNumber(format, invDate.year, nextNo);
-    return _AllocatedNumber(nummer: nummer, kreisId: range['id'] as int, nextNo: nextNo, stored: stored);
+    return _AllocatedNumber(nummer: nummer, kreisId: _asInt(range['id']) ?? 0, nextNo: nextNo, stored: stored);
   }
 
   Future<void> _ensureInventarTable(QueryExecutor ex) async {
-    await ex.runCustom(
-      'CREATE TABLE IF NOT EXISTS inventarbewegungen ('
-      'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-      'artikel_id INTEGER NOT NULL REFERENCES artikel(id), '
-      'datum TEXT NOT NULL, '
-      'diff NUMERIC(10,3) NOT NULL, '
-      'grund TEXT NOT NULL, '
-      'referenz_typ TEXT, '
-      'referenz_id INTEGER)',
-    );
+    await ex.runCustom('''
+CREATE TABLE IF NOT EXISTS inventarbewegungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikel_id INTEGER NOT NULL REFERENCES artikel(id),
+  datum TEXT NOT NULL,
+  diff NUMERIC(10,3) NOT NULL,
+  grund TEXT NOT NULL,
+  referenz_typ TEXT,
+  referenz_id INTEGER
+)''');
   }
 
   Future<void> _reserveNumber(TransactionExecutor transaction, _AllocatedNumber alloc) async {

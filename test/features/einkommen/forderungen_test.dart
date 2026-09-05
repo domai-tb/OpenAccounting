@@ -85,7 +85,7 @@ void main() {
 
     test('Doppelte Forderung für gleiche Rechnung wird verhindert', () async {
       final kundeId = await seedKunde();
-      final rechnungId = await seedRechnung(kundeId: kundeId, brutto: 100.00);
+      final rechnungId = await seedRechnung(kundeId: kundeId);
       final first = await usecases.forderungFuerRechnung(rechnungId);
       expect(first, isNotNull);
       final second = await usecases.forderungFuerRechnung(rechnungId);
@@ -111,7 +111,7 @@ void main() {
         const [],
       );
       expect(journals, hasLength(1));
-      expect((journals.single['betrag'] as num).toStringAsFixed(2), '20.00');
+      expect((journals.single['betrag']! as num).toStringAsFixed(2), '20.00');
     });
 
     test('Überzahlung erscheint im Kontokorrent als ueberzahlung mit Saldo', () async {
@@ -150,7 +150,7 @@ void main() {
         done.ausgleichJournalId,
       ]);
       expect(j.single['beschreibung'], contains('Kunde zahlungsunfähig'));
-      expect((j.single['betrag'] as num).toStringAsFixed(2), '75.00');
+      expect((j.single['betrag']! as num).toStringAsFixed(2), '75.00');
     });
 
     test('Ausbuchen ohne Grund wird abgewiesen (deutsche Validierung)', () async {
@@ -226,7 +226,7 @@ void main() {
     test('Verbindlichkeit: Lieferant Rechnungseingang + Zahlung + Überzahlung Gutschrift', () async {
       final lieferantId = await seedLieferant();
       // Simulate incoming invoice
-      final rechnungId = await seedEingangsRechnung(lieferantId: lieferantId, brutto: 200.00);
+      final rechnungId = await seedEingangsRechnung(lieferantId: lieferantId);
       final verbindlichkeit = await usecases.forderungFuerRechnung(rechnungId);
       expect(verbindlichkeit, isNotNull);
       expect(verbindlichkeit!.typ, 'rechnung_eingang');

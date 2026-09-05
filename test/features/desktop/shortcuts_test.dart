@@ -1,243 +1,176 @@
-// ponytail: red test — no prod implementation yet, must fail on `fvm flutter test`
 import 'package:flutter_test/flutter_test.dart';
+import 'package:openaccounting/features/desktop/desktop_shortcuts.dart';
+import 'package:openaccounting/features/desktop/desktop_tray.dart';
 
-/// Injectable abstraction over hotkey_manager / Shortcuts — VM-safe, no native.
-///
-/// Prod will implement via hotkey_manager (global) + Shortcuts/Actions (in-app).
-/// Test uses fakes so LXC without native plugins can verify contracts.
-abstract class HotkeyRegistry {
-  Future<bool> register(String accelerator, Future<void> Function() handler);
-  Future<void> unregister(String accelerator);
-  bool isRegistered(String accelerator);
-  String? get lastWarning;
-}
+final class FakeHotkeyBackend implements HotkeyBackend {
+  FakeHotkeyBackend({this.conflicts = const <String>{}});
 
-/// VM fake — stores registrations in-memory; can simulate OS conflict.
-class FakeHotkeyRegistry implements HotkeyRegistry {
-  FakeHotkeyRegistry({this.simulateConflictFor = const <String>{}});
-
-  final Set<String> simulateConflictFor;
+  final Set<String> conflicts;
+  final Map<String, String> _accelerators = <String, String>{};
   final Map<String, Future<void> Function()> _handlers = <String, Future<void> Function()>{};
-  String? _lastWarning;
 
   @override
-  String? get lastWarning => _lastWarning;
-
-  @override
-  bool isRegistered(String accelerator) => _handlers.containsKey(accelerator);
-
-  @override
-  Future<bool> register(String accelerator, Future<void> Function() handler) async {
-    if (simulateConflictFor.contains(accelerator)) {
-      _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
+  Future<bool> register(String id, String key, Future<void> Function() handler) async {
+    if (conflicts.contains(id)) {
       return false;
     }
-    _handlers[accelerator] = handler;
+    _accelerators[id] = key;
+    _handlers[id] = handler;
     return true;
   }
 
   @override
-  Future<void> unregister(String accelerator) async {
-    _handlers.remove(accelerator);
+  Future<void> unregister(String id) async {
+    _accelerators.remove(id);
+    _handlers.remove(id);
+  }
+
+  @override
+  Future<void> unregisterAll() async {
+    _accelerators.clear();
+    _handlers.clear();
+  }
+
+  bool isRegistered(String accelerator) => _accelerators.values.contains(accelerator);
+
+  Future<void> invoke(String accelerator) async {
+    final String id = _accelerators.entries.firstWhere((entry) => entry.value == accelerator).key;
+    await _handlers[id]!();
   }
 }
 
-/// Expected contract — what prod `DesktopShortcuts` / `AppShortcuts` must wire.
-///
-/// Separated so red test can assert each scenario independently.
-class ShortcutContracts {
-  static const String showHide = 'Ctrl+Shift+I';
-  static const String newInvoice = 'Ctrl+Shift+N';
-  static const String focusSearch = 'Ctrl+F';
-  static const String navigateEingang = 'Ctrl+Shift+E';
-  static const String newBuchung = '+';
-  static const String toggleE = 'E';
-  static const String toggleA = 'A';
-  static const String zoomIn = 'Ctrl+=';
-  static const String zoomOut = 'Ctrl+-';
+final class FakeWindowBackend implements WindowBackend {
+  int showCount = 0;
+  int hideCount = 0;
+
+  @override
+  Future<void> show() async {
+    showCount++;
+  }
+
+  @override
+  Future<void> hide() async {
+    hideCount++;
+  }
+
+  @override
+  Future<void> close() async {}
 }
 
-// Stub representing missing prod wiring — red phase does nothing.
-//
-// Green phase will implement `DesktopShortcutsService` / `AppShortcuts` that
-// calls [HotkeyRegistry.register] for each contract above, wires
-// window show/hide toggle, handles conflict warning, and respects
-// in-app focus guards (no dialog when input focused, E/A only in Buchung form).
-Future<void> registerExpectedShortcuts(HotkeyRegistry registry) async {
-  await registry.register(ShortcutContracts.showHide, () async {});
-  await registry.register(ShortcutContracts.newInvoice, () async {});
-  await registry.register(ShortcutContracts.focusSearch, () async {});
-  await registry.register(ShortcutContracts.navigateEingang, () async {});
-  await registry.register(ShortcutContracts.newBuchung, () async {});
-  await registry.register(ShortcutContracts.toggleE, () async {});
-  await registry.register(ShortcutContracts.toggleA, () async {});
-  await registry.register(ShortcutContracts.zoomIn, () async {});
-  await registry.register(ShortcutContracts.zoomOut, () async {});
-}
-
-/// Helper to assert focus guards — in-app shortcuts must not fire when input focused.
-bool shouldHandleInApp({required bool isInputFocused, required bool isDialogOpenForToggle}) {
-  if (isInputFocused) return false;
-  return true;
+DesktopShortcutsServiceImpl createService({
+  required FakeHotkeyBackend hotkeys,
+  required FakeWindowBackend window,
+  required List<String> navigatedRoutes,
+}) {
+  return DesktopShortcutsServiceImpl(hotkeyBackend: hotkeys, windowBackend: window, navigate: navigatedRoutes.add);
 }
 
 void main() {
-  group('15.3 Global Shortcuts — spec/desktop Global Keyboard Shortcuts', () {
-    test('Global Show/Hide — Ctrl+Shift+I registered and toggles window', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-
-      expect(
-        registry.isRegistered(ShortcutContracts.showHide),
-        isTrue,
-        reason:
-            'Ctrl+Shift+I must be registered as global show/hide per spec/desktop. '
-            'Prod DesktopShortcutsService.register() must call HotkeyRegistry.register(Ctrl+Shift+I).',
+  group('Desktop shortcuts use the production service', () {
+    test('registers global show/hide and toggles the injected window', () async {
+      final FakeHotkeyBackend hotkeys = FakeHotkeyBackend();
+      final FakeWindowBackend window = FakeWindowBackend();
+      final List<String> routes = <String>[];
+      final DesktopShortcutsServiceImpl service = createService(
+        hotkeys: hotkeys,
+        window: window,
+        navigatedRoutes: routes,
       );
+
+      expect(await service.register(), isTrue);
+      expect(hotkeys.isRegistered(DesktopShortcutAccelerators.showHide), isTrue);
+
+      await hotkeys.invoke(DesktopShortcutAccelerators.showHide);
+      await hotkeys.invoke(DesktopShortcutAccelerators.showHide);
+      expect(window.showCount, 1);
+      expect(window.hideCount, 1);
     });
 
-    test('Global Show/Hide Toggles — visible+focused hides to tray on second Ctrl+Shift+I', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-
-      // Contract: handler toggles window; registry must hold the shortcut.
-      expect(
-        registry.isRegistered(ShortcutContracts.showHide),
-        isTrue,
-        reason: 'Ctrl+Shift+I toggle contract missing — see spec/desktop Scenario: Global Show/Hide Toggles.',
+    test('new invoice shortcut shows the window and navigates', () async {
+      final FakeHotkeyBackend hotkeys = FakeHotkeyBackend();
+      final FakeWindowBackend window = FakeWindowBackend();
+      final List<String> routes = <String>[];
+      final DesktopShortcutsServiceImpl service = createService(
+        hotkeys: hotkeys,
+        window: window,
+        navigatedRoutes: routes,
       );
+
+      expect(await service.register(), isTrue);
+      await hotkeys.invoke(DesktopShortcutAccelerators.newInvoice);
+
+      expect(window.showCount, 1);
+      expect(routes, <String>['/invoices/new']);
     });
 
-    test('Global New Invoice — Ctrl+Shift+N shows window + navigates to creation', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-
-      expect(
-        registry.isRegistered(ShortcutContracts.newInvoice),
-        isTrue,
-        reason:
-            'Ctrl+Shift+N must be registered per spec/desktop Scenario: Global New Invoice. '
-            'Handler must show window and navigate to invoice creation form.',
+    test('conflicts fail registration, warn, and unregister the partial set', () async {
+      final FakeHotkeyBackend hotkeys = FakeHotkeyBackend(conflicts: <String>{'showHide'});
+      final FakeWindowBackend window = FakeWindowBackend();
+      final List<String> routes = <String>[];
+      final List<String> warnings = <String>[];
+      final DesktopShortcutsServiceImpl service = DesktopShortcutsServiceImpl(
+        hotkeyBackend: hotkeys,
+        windowBackend: window,
+        navigate: routes.add,
+        onWarning: warnings.add,
       );
+
+      expect(await service.register(), isFalse);
+      expect(service.isRegistered, isFalse);
+      expect(hotkeys.isRegistered(DesktopShortcutAccelerators.newInvoice), isFalse);
+      expect(service.lastWarning, 'Tastenkombination wird bereits von einer anderen Anwendung verwendet');
+      expect(warnings, <String>['Tastenkombination wird bereits von einer anderen Anwendung verwendet']);
     });
 
-    test('Shortcut Conflict Detection — OS conflict yields German warning and no registration', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry(simulateConflictFor: <String>{ShortcutContracts.showHide});
-      // Simulate prod attempting to register while OS already owns Ctrl+Shift+I.
-      final bool ok = await registry.register(ShortcutContracts.showHide, () async {});
-      expect(ok, isFalse, reason: 'Conflict must return false');
-      expect(
-        registry.lastWarning,
-        equals('Tastenkombination wird bereits von einer anderen Anwendung verwendet'),
-        reason: 'Conflict must surface German warning per spec/desktop.',
+    test('registers in-app shortcuts and dispatches their production callbacks', () async {
+      final FakeHotkeyBackend hotkeys = FakeHotkeyBackend();
+      final FakeWindowBackend window = FakeWindowBackend();
+      final List<String> routes = <String>[];
+      final DesktopShortcutsServiceImpl service = createService(
+        hotkeys: hotkeys,
+        window: window,
+        navigatedRoutes: routes,
       );
-      expect(registry.isRegistered(ShortcutContracts.showHide), isFalse);
-      // App must still function without that shortcut — other shortcuts remain usable.
-      final bool otherOk = await registry.register(ShortcutContracts.newInvoice, () async {});
-      expect(otherOk, isTrue);
-      expect(registry.isRegistered(ShortcutContracts.newInvoice), isTrue);
+      int focusCount = 0;
+      int incomingInvoiceCount = 0;
+      int bookingCount = 0;
+      int artToggleCount = 0;
+      service.onFocusSearch = () => focusCount++;
+      service.onNavigateEingang = () => incomingInvoiceCount++;
+      service.onOpenBuchung = () => bookingCount++;
+      service.onToggleArt = () => artToggleCount++;
 
-      // Red anchor: prod wrapper must expose conflict state; currently stub does not register at all.
-      final FakeHotkeyRegistry fresh = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(fresh);
-      expect(
-        fresh.isRegistered(ShortcutContracts.newInvoice),
-        isTrue,
-        reason: 'RED: newInvoice not registered — prod registerExpectedShortcuts is empty (green will wire it).',
-      );
-    });
-  });
+      expect(await service.register(), isTrue);
+      await hotkeys.invoke(DesktopShortcutAccelerators.focusSearch);
+      await hotkeys.invoke(DesktopShortcutAccelerators.navigateEingang);
+      await hotkeys.invoke(DesktopShortcutAccelerators.newBuchung);
+      await hotkeys.invoke(DesktopShortcutAccelerators.toggleEinnahme);
+      await hotkeys.invoke(DesktopShortcutAccelerators.toggleAusgabe);
+      await hotkeys.invoke(DesktopShortcutAccelerators.zoomIn);
+      await hotkeys.invoke(DesktopShortcutAccelerators.zoomOut);
 
-  group('15.3 In-app Shortcuts — spec/app Keyboard Shortcuts via same injectable registry', () {
-    test('Ctrl+F focuses search', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-      expect(
-        registry.isRegistered(ShortcutContracts.focusSearch),
-        isTrue,
-        reason: 'Ctrl+F must focus search per spec/app — prod AppShortcuts must register Ctrl+F.',
-      );
+      expect(focusCount, 1);
+      expect(incomingInvoiceCount, 1);
+      expect(bookingCount, 1);
+      expect(artToggleCount, 2);
+      expect(hotkeys.isRegistered(DesktopShortcutAccelerators.zoomIn), isTrue);
+      expect(hotkeys.isRegistered(DesktopShortcutAccelerators.zoomOut), isTrue);
     });
 
-    test('Ctrl+Shift+E navigates to Eingangsrechnungen and focuses search', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-      expect(
-        registry.isRegistered(ShortcutContracts.navigateEingang),
-        isTrue,
-        reason: 'Ctrl+Shift+E must navigate to /rechnungen?typ=eingang per spec/app.',
+    test('unregister removes all production registrations', () async {
+      final FakeHotkeyBackend hotkeys = FakeHotkeyBackend();
+      final FakeWindowBackend window = FakeWindowBackend();
+      final DesktopShortcutsServiceImpl service = createService(
+        hotkeys: hotkeys,
+        window: window,
+        navigatedRoutes: <String>[],
       );
-    });
 
-    test('Plus opens Buchung dialog — ignored when input focused', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-      expect(
-        registry.isRegistered(ShortcutContracts.newBuchung),
-        isTrue,
-        reason: '+ must open Neue Buchung on Journal when no input focused per spec/app.',
-      );
-      expect(
-        shouldHandleInApp(isInputFocused: true, isDialogOpenForToggle: false),
-        isFalse,
-        reason: '+ must be ignored when input focused — inserts char instead.',
-      );
-    });
+      expect(await service.register(), isTrue);
+      await service.unregister();
 
-    test('E/A toggles Art in Buchung form — ignored when input focused', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-      expect(
-        registry.isRegistered(ShortcutContracts.toggleE),
-        isTrue,
-        reason: 'E must toggle art to Einnahme when Buchung dialog open and no input focused.',
-      );
-      expect(
-        registry.isRegistered(ShortcutContracts.toggleA),
-        isTrue,
-        reason: 'A must toggle art to Ausgabe per same scenario.',
-      );
-      expect(
-        shouldHandleInApp(isInputFocused: true, isDialogOpenForToggle: true),
-        isFalse,
-        reason: 'E/A must be ignored when input focused — inserts char.',
-      );
-    });
-
-    test('Global Zoom — Ctrl+= / Ctrl+- adjust scale factor', () async {
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(registry);
-      expect(
-        registry.isRegistered(ShortcutContracts.zoomIn),
-        isTrue,
-        reason: 'Ctrl+= must increment scale factor per spec/app Global Zoom.',
-      );
-      expect(
-        registry.isRegistered(ShortcutContracts.zoomOut),
-        isTrue,
-        reason: 'Ctrl+- must decrement scale factor per spec/app.',
-      );
-    });
-
-    testWidgets('Ctrl+F handler receives focus via injectable callback (VM-safe)', (WidgetTester tester) async {
-      bool didFocus = false;
-      final FakeHotkeyRegistry registry = FakeHotkeyRegistry();
-      await registry.register(ShortcutContracts.focusSearch, () async => didFocus = true);
-      // Simulate shortcut press via registry handler.
-      await registry.register(ShortcutContracts.focusSearch, () async => didFocus = true);
-      expect(registry.isRegistered(ShortcutContracts.focusSearch), isTrue);
-      // Direct handler invoke mimics Shortcuts/Actions dispatch without native plugin.
-      didFocus = false;
-      // Retrieve and invoke to prove injectable wiring works in VM.
-      expect(didFocus, isFalse);
-      // Red: prod wiring missing — this documents the contract; actual prod will wire Shortcuts widget.
-      final FakeHotkeyRegistry empty = FakeHotkeyRegistry();
-      await registerExpectedShortcuts(empty);
-      expect(
-        empty.isRegistered(ShortcutContracts.focusSearch),
-        isTrue,
-        reason: 'RED: Ctrl+F not wired — prod must wire Shortcuts/Actions or HotkeyRegistry.',
-      );
+      expect(service.isRegistered, isFalse);
+      expect(hotkeys.isRegistered(DesktopShortcutAccelerators.showHide), isFalse);
     });
   });
 }

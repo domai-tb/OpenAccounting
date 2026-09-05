@@ -30,7 +30,7 @@ void main() {
           <Object?>['Test Firma', berater, mandant, kontoBank],
         );
       } else {
-        final int id = (rows.first['id'] as num).toInt();
+        final int id = (rows.first['id'] as num?)?.toInt() ?? 0;
         await db.executor.runCustom(
           'UPDATE unternehmen SET datev_beraternummer=?, datev_mandantennummer=?, datev_konto_bank=? WHERE id=?',
           <Object?>[berater, mandant, kontoBank, id],
@@ -102,16 +102,9 @@ void main() {
         betrag: '1234.56',
         datum: '2025-06-15',
         bezeichnung: 'Rechnung 1',
-        art: 'Einnahme',
         belegNr: 'RE001',
       );
-      await insertJournal(
-        kategorieId: 903,
-        betrag: '100.00',
-        datum: '2025-06-20',
-        bezeichnung: 'Rechnung 2',
-        art: 'Einnahme',
-      );
+      await insertJournal(kategorieId: 903, betrag: '100.00', datum: '2025-06-20', bezeichnung: 'Rechnung 2');
 
       final String csv = await service.exportCsv(jahr: 2025);
       final List<String> lines = csv.split('\r\n').expand((String l) => l.split('\n')).toList();
@@ -146,7 +139,7 @@ void main() {
       await upsertUnternehmen(berater: '999', mandant: '111', kontoBank: '1200');
       await insertKategorie(id: 910, skr03: '8400', bezeichnung: 'Erlös');
       final int kontoMit = await insertKonto(name: 'Bank A', datevKontonummer: '1800');
-      final int kontoLeer = await insertKonto(name: 'Bank B', datevKontonummer: null);
+      final int kontoLeer = await insertKonto(name: 'Bank B');
 
       // Entry with per-konto override 1800
       await insertJournal(
@@ -195,7 +188,7 @@ void main() {
     });
 
     test('kategorie SKR fallback when global bank missing', () async {
-      await upsertUnternehmen(berater: '555', mandant: '777', kontoBank: null);
+      await upsertUnternehmen(berater: '555', mandant: '777');
       await insertKategorie(id: 911, skr03: '8910', bezeichnung: 'Fallback Kategorie');
       await insertJournal(kategorieId: 911, betrag: '50.00', datum: '2025-05-01', bezeichnung: 'Kategorie Fallback');
 
@@ -219,7 +212,7 @@ void main() {
       expect(csvJahr.contains('Vorjahr'), isFalse);
       expect(csvJahr.contains('999,00'), isFalse);
 
-      final String csvRange = await service.exportCsv(von: DateTime(2025, 6, 1), bis: DateTime(2025, 6, 30));
+      final String csvRange = await service.exportCsv(von: DateTime(2025, 6), bis: DateTime(2025, 6, 30));
       expect(csvRange.contains('Jun'), isTrue);
       expect(csvRange.contains('Jan'), isFalse);
       expect(csvRange.contains('Dez'), isFalse);
@@ -229,7 +222,7 @@ void main() {
 
     test('missing berater/mandant throws DatevException not crash', () async {
       // No unternehmen or empty berater/mandant
-      await upsertUnternehmen(berater: null, mandant: null, kontoBank: '1200');
+      await upsertUnternehmen(kontoBank: '1200');
       await insertKategorie(id: 930, skr03: '8400');
       await insertJournal(kategorieId: 930, betrag: '10.00', datum: '2025-07-01', bezeichnung: 'Test');
 
@@ -290,7 +283,7 @@ void main() {
       );
       expect(logs.isNotEmpty, isTrue);
       final Map<String, Object?> last = logs.last;
-      expect((last['anzahl_buchungen'] as num).toInt(), greaterThanOrEqualTo(1));
+      expect((last['anzahl_buchungen']! as num).toInt(), greaterThanOrEqualTo(1));
       expect(last['status'], 'erfolg');
     });
 

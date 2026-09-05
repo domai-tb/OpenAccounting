@@ -331,9 +331,9 @@ class JournalRepository {
   }
 
   JournalEntry _fromRow(Map<String, Object?> row) {
-    final int id = (row['id'] as num).toInt();
+    final int id = ((row['id'] as num?) ?? 0).toInt();
     final String datumRaw = row['datum'] as String? ?? '';
-    final DateTime datum = DateTime.tryParse(datumRaw) ?? DateTime(1970, 1, 1);
+    final DateTime datum = DateTime.tryParse(datumRaw) ?? DateTime(1970);
     final String beschreibung = row['beschreibung'] as String? ?? '';
     final int kategorieId = (row['kategorie_id'] as num?)?.toInt() ?? 0;
     // ponytail: keep string directly — no num→toStringAsFixed, preserves NUMERIC(12,2) precision

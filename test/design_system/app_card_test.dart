@@ -38,9 +38,9 @@ void main() {
             }
             shadows = d.boxShadow;
             if (d.border is Border) {
-              borderSide = (d.border as Border).top;
+              borderSide = (d.border! as Border).top;
             } else if (d.border is BorderSide) {
-              borderSide = d.border as BorderSide;
+              borderSide = d.border! as BorderSide;
             }
             if (radius != null) break;
           }
@@ -50,7 +50,7 @@ void main() {
         final Card card = tester.widget<Card>(cardWidget.first);
         final ShapeBorder? shape = card.shape;
         if (shape is RoundedRectangleBorder) {
-          final BorderRadiusGeometry? br = shape.borderRadius;
+          final BorderRadiusGeometry br = shape.borderRadius;
           if (br is BorderRadius) radius = br;
           borderSide = shape.side;
         }
@@ -61,10 +61,10 @@ void main() {
         for (final Element e in materialWidget.evaluate()) {
           final Material m = e.widget as Material;
           if (m.shape is RoundedRectangleBorder) {
-            final BorderRadiusGeometry? br = (m.shape as RoundedRectangleBorder).borderRadius;
-            if (br is BorderRadius) radius = br as BorderRadius?;
+            final BorderRadiusGeometry br = (m.shape! as RoundedRectangleBorder).borderRadius;
+            if (br is BorderRadius) radius = br;
           }
-          if (m.elevation != null) elevation = m.elevation;
+          elevation = m.elevation;
           if (radius != null) break;
         }
       }

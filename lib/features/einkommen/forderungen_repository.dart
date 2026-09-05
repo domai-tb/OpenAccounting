@@ -87,7 +87,7 @@ class ForderungenRepository {
     }
     try {
       await executor.runCustom(
-        "UPDATE forderungen SET partner_id = kunde_id WHERE (partner_id IS NULL OR partner_id = 0) AND kunde_id IS NOT NULL",
+        '''UPDATE forderungen SET partner_id = kunde_id WHERE (partner_id IS NULL OR partner_id = 0) AND kunde_id IS NOT NULL''',
       );
     } catch (e) {
       debugPrint('Forderungen ensureSchema migrate failed: $e');
@@ -122,20 +122,10 @@ class ForderungenRepository {
     }
 
     final now = DateTime.now().toIso8601String();
+    final int? kundeId = partnerTyp == 'kunde' ? partnerId : null;
     final id = await executor.runInsert(
       'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        typ,
-        status,
-        _fmt(betrag),
-        partnerTyp,
-        partnerId,
-        rechnungId,
-        journalId,
-        now,
-        now,
-        partnerTyp == 'kunde' ? partnerId : null,
-      ],
+      [typ, status, _fmt(betrag), partnerTyp, partnerId, rechnungId, journalId, now, now, kundeId],
     );
     final f = await findById(id);
     if (f == null) throw const ForderungenException('Forderung konnte nicht gespeichert werden');
@@ -162,7 +152,7 @@ class ForderungenRepository {
       "SELECT id FROM forderungen WHERE rechnung_id = ? AND status IN ('offen','teilbezahlt') LIMIT 1",
       [rechnungId],
     );
-    if (existing.isNotEmpty) return findById(existing.single['id'] as int);
+    if (existing.isNotEmpty) return findById(_asNum(existing.single['id'])?.toInt() ?? 0);
     return create(typ: typ, betrag: brutto, partnerTyp: partnerTyp, partnerId: partnerId, rechnungId: rechnungId);
   }
 

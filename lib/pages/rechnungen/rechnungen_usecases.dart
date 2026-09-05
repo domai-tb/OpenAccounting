@@ -88,7 +88,7 @@ class RechnungenUseCases {
       if (datum == null || positionen == null || positionen.isEmpty) {
         throw ArgumentError('datum und positionen erforderlich für standalone Gutschrift');
       }
-      _validateDraftInput(datum: datum, positionen: positionen, eingabemodus: 'netto');
+      _validateDraftInput(datum: datum, positionen: positionen);
     }
     return repository.createGutschrift(
       vonRechnungId: vonRechnungId,
@@ -132,8 +132,9 @@ void _validateDraftInput({
     _strictCurrency(p.menge, 'menge');
     if (!p.ustSatz.isFinite) throw ArgumentError.value(p.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
     final ustCents = _fixedPointCents(p.ustSatz, 'ustSatz');
-    if (ustCents < 0 || ustCents > 10000)
+    if (ustCents < 0 || ustCents > 10000) {
       throw ArgumentError.value(p.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
+    }
   }
   // preview validation for logic consistency (allow rounding)
   try {

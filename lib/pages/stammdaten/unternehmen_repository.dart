@@ -36,7 +36,7 @@ class Unternehmen {
   String? get pdfVorlage => data['pdf_vorlage'] as String?;
   bool get profilmanagerAktiv => _asBool(data['profilmanager_aktiv']);
   String? get smtpHost => data['smtp_host'] as String?;
-  int? get smtpPort => data['smtp_port'] is int ? data['smtp_port'] as int : int.tryParse('${data['smtp_port']}');
+  int? get smtpPort => data['smtp_port'] is int ? data['smtp_port'] as int? : int.tryParse('${data['smtp_port']}');
   String? get dashboardConfig => data['dashboard_config'] as String?;
 
   String? get einleitungstextRechnung => data['einleitungstext_rechnung'] as String?;
@@ -154,7 +154,7 @@ class UnternehmenRepository {
     final assignments = <String, Object?>{};
     for (final e in values.entries) {
       final col = _normalizeColumn(e.key);
-      if (col.isEmpty || col.contains(RegExp(r'[^a-z0-9_]'))) continue;
+      if (col.isEmpty || col.contains(RegExp('[^a-z0-9_]'))) continue;
       if (!existing.contains(col)) continue;
 
       // special handling for pdf_vorlage

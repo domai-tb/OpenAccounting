@@ -10,7 +10,7 @@ void main() {
   test('netto mode position totals', () {
     final preview = VorschauService.calculate(
       eingabemodus: 'netto',
-      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 100, gesamt: 300, ustSatz: 19)],
+      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 100, gesamt: 300)],
     );
     expect(preview.nettoBetrag, 300.00);
     expect(preview.ustBetrag, 57.00);
@@ -20,7 +20,7 @@ void main() {
   test('brutto mode derives netto correctly', () {
     final preview = VorschauService.calculate(
       eingabemodus: 'brutto',
-      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 119, gesamt: 357, ustSatz: 19)],
+      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 119, gesamt: 357)],
     );
     expect(preview.bruttoBetrag, 357.00);
     expect(preview.nettoBetrag, 300.00);
@@ -30,9 +30,7 @@ void main() {
   test('position-level rounding', () {
     final preview = VorschauService.calculate(
       eingabemodus: 'netto',
-      positionen: const [
-        RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 33.333, gesamt: 100, ustSatz: 19),
-      ],
+      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 33.333, gesamt: 100)],
     );
     // einzelpreis 33.333 *3 = 99.999 -> rounded 100.00, ust 19.00
     expect(preview.nettoBetrag, closeTo(100.00, 0.01));
@@ -54,7 +52,7 @@ void main() {
     final preview = VorschauService.calculate(
       eingabemodus: 'netto',
       positionen: const [
-        RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 200, gesamt: 360, ustSatz: 19, rabattProzent: 10),
+        RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 200, gesamt: 360, rabattProzent: 10),
       ],
     );
     expect(preview.nettoBetrag, 360.00);
@@ -79,8 +77,7 @@ void main() {
     final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
-      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 100, gesamt: 200, ustSatz: 19)],
-      eingabemodus: 'netto',
+      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 100, gesamt: 200)],
     );
     final fin = await uc.finalizeRechnung(rechnungId: draft.id);
     final rows = await db.executor.runSelect(
@@ -107,7 +104,7 @@ void main() {
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       eingabemodus: 'brutto',
-      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 119, gesamt: 357, ustSatz: 19)],
+      positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 119, gesamt: 357)],
     );
     final fin = await uc.finalizeRechnung(rechnungId: draft.id);
     final rows = await db.executor.runSelect('SELECT netto_betrag, brutto_betrag FROM rechnungen WHERE id = ?', [

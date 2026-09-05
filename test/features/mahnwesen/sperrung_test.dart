@@ -145,31 +145,27 @@ void main() {
       expect(rows.single['mahngesperrt_grund'], 'Streitfall');
       expect(rows.single['mahngesperrt_bis'], '2026-12-31');
       // isMahngesperrt true at 2026-06-01.
-      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2026, 6, 1)), isTrue);
+      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2026, 6)), isTrue);
       expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2026, 12, 31)), isTrue);
       // auto expiry after date.
-      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2027, 1, 1)), isFalse);
-      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2027, 6, 1)), isFalse);
+      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2027)), isFalse);
+      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2027, 6)), isFalse);
       // canCreateInvoice respects Mahnsperre.
-      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2026, 6, 1)), isFalse);
-      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2027, 1, 1)), isTrue);
+      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2026, 6)), isFalse);
+      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2027)), isTrue);
       await expectLater(
-        service.assertCanCreateInvoice(kundeId, asOf: DateTime(2026, 6, 1)),
+        service.assertCanCreateInvoice(kundeId, asOf: DateTime(2026, 6)),
         throwsA(isA<KundenSperrungException>().having((e) => e.message, 'message', contains('mahngesperrt'))),
       );
       // After expiry, can create.
-      await service.assertCanCreateInvoice(kundeId, asOf: DateTime(2027, 1, 1));
+      await service.assertCanCreateInvoice(kundeId, asOf: DateTime(2027));
     });
 
     test('Manual Mahnsperre without date → persists, manual remove clears', () async {
       final kundeId = await createKunde(name: 'Persist Kunde');
       await service.setMahnsperre(kundeId, 'Streitfall');
       expect(await service.isMahngesperrt(kundeId), isTrue);
-      expect(
-        await service.isMahngesperrt(kundeId, asOf: DateTime(2030, 1, 1)),
-        isTrue,
-        reason: 'without date persists',
-      );
+      expect(await service.isMahngesperrt(kundeId, asOf: DateTime(2030)), isTrue, reason: 'without date persists');
       expect(await service.canCreateInvoice(kundeId), isFalse);
       // Manual remove clears.
       await service.removeMahnsperre(kundeId);
@@ -213,7 +209,7 @@ void main() {
       final kundeId = await createKunde(name: 'Combined Kunde');
       // Set Mahnsperre → blocked even without dunning level.
       await service.setMahnsperre(kundeId, 'Streitfall', bis: '2026-12-31');
-      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2026, 6, 1)), isFalse);
+      expect(await service.canCreateInvoice(kundeId, asOf: DateTime(2026, 6)), isFalse);
       // Remove Mahnsperre but add sperrung level.
       await service.removeMahnsperre(kundeId);
       final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-COMB-1');

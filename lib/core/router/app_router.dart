@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
@@ -74,6 +75,10 @@ GoRouter createRouter(AppDatabase db) {
             },
             routes: <RouteBase>[
               GoRoute(
+                path: 'new',
+                builder: (context, state) => const ProductionRoutePage(title: 'Neue Rechnung', table: 'rechnungen'),
+              ),
+              GoRoute(
                 path: ':id',
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
@@ -136,127 +141,191 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return createRouter(db);
 });
 
-// Minimal placeholder pages — real feature pages replace in later batches.
-
-class InvoicesPage extends StatelessWidget {
+class InvoicesPage extends ConsumerWidget {
   const InvoicesPage({this.filterTyp, this.filterStatus, super.key});
+
   final String? filterTyp;
   final String? filterStatus;
 
   @override
-  Widget build(BuildContext context) {
-    final String label;
-    if (filterTyp != null || filterStatus != null) {
-      label = 'Rechnungen typ=$filterTyp status=$filterStatus';
-    } else {
-      label = 'Rechnungen';
-    }
-    return Scaffold(
-      appBar: AppPageHeader(title: label),
-      body: Center(child: Text('Liste: $label')),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<String> filters = <String>[
+      if (filterTyp != null) 'Typ: $filterTyp',
+      if (filterStatus != null) 'Status: $filterStatus',
+    ];
+    return ProductionRoutePage(
+      title: 'Rechnungen',
+      table: 'rechnungen',
+      subtitle: filters.isEmpty ? null : filters.join(' · '),
     );
   }
 }
 
 class InvoiceDetailPage extends StatelessWidget {
   const InvoiceDetailPage({required this.id, super.key});
+
   final String id;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppPageHeader(title: 'Rechnung $id'),
-      body: Center(child: Text('Detail: Rechnung $id')),
-    );
+    return ProductionRecordDetailPage(table: 'rechnungen', title: 'Rechnung $id', id: id);
   }
 }
 
-class ReceiptsPage extends StatelessWidget {
+class ReceiptsPage extends ConsumerWidget {
   const ReceiptsPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Belege'),
-      body: Center(child: Text('Belege – Übersicht')),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Belege', table: 'belege');
   }
 }
 
-class BankingPage extends StatelessWidget {
+class BankingPage extends ConsumerWidget {
   const BankingPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Bank & Zahlungen'),
-      body: Center(child: Text('Bank – Übersicht')),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Bank & Zahlungen', table: 'bank_transaktionen');
   }
 }
 
-class ContactsPage extends StatelessWidget {
+class ContactsPage extends ConsumerWidget {
   const ContactsPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Kontakte'),
-      body: Center(child: Text('Kontakte – Liste')),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Kontakte', table: 'kunden');
   }
 }
 
 class ContactDetailPage extends StatelessWidget {
   const ContactDetailPage({required this.id, super.key});
+
   final String id;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppPageHeader(title: 'Kontakt $id'),
-      body: Center(child: Text('Detail: Kontakt $id')),
-    );
+    return ProductionRecordDetailPage(table: 'kunden', title: 'Kontakt $id', id: id);
   }
 }
 
-class TaxesPage extends StatelessWidget {
+class TaxesPage extends ConsumerWidget {
   const TaxesPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Steuern'),
-      body: Center(child: Text('Steuern – Übersicht')),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Steuern', table: 'ustva_exporte');
   }
 }
 
-class ReportsPage extends StatelessWidget {
+class ReportsPage extends ConsumerWidget {
   const ReportsPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Auswertungen'),
-      body: Center(child: Text('Auswertungen – Übersicht')),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Auswertungen', table: 'journal');
   }
 }
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Einstellungen'),
-      body: Center(child: Text('Einstellungen – Bereich')),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Einstellungen', table: 'unternehmen');
+  }
+}
+
+class HelpPage extends ConsumerWidget {
+  const HelpPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ProductionRoutePage(title: 'Hilfe', table: 'unternehmen');
+  }
+}
+
+class ProductionRoutePage extends ConsumerWidget {
+  const ProductionRoutePage({required this.title, required this.table, this.subtitle, super.key});
+
+  final String title;
+  final String table;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<int> count = ref.watch(routeRecordCountProvider(table));
+    return AppPage(
+      maxWidth: 1100,
+      header: AppPageHeader(title: title, subtitle: subtitle, showFilterToolbar: false),
+      child: count.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (Object error, StackTrace stackTrace) => _routeError(table, error, stackTrace),
+        data: (int value) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(Icons.check_circle_outline, size: 40),
+            const SizedBox(height: 12),
+            const Text('Datenbankabfrage abgeschlossen'),
+            const SizedBox(height: 8),
+            Text('Datensätze: $value'),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class HelpPage extends StatelessWidget {
-  const HelpPage({super.key});
+class ProductionRecordDetailPage extends ConsumerWidget {
+  const ProductionRecordDetailPage({required this.table, required this.title, required this.id, super.key});
+
+  final String table;
+  final String title;
+  final String id;
+
   @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: AppPageHeader(title: 'Hilfe'),
-      body: Center(child: Text('Hilfe – Übersicht')),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int? recordId = int.tryParse(id);
+    if (recordId == null) {
+      return const NotFoundPage();
+    }
+    final AsyncValue<bool> exists = ref.watch(routeRecordExistsProvider(RouteRecordKey(table: table, id: recordId)));
+    return exists.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (Object error, StackTrace stackTrace) => _routeError('$table/$id', error, stackTrace),
+      data: (bool found) {
+        if (!found) {
+          return const NotFoundPage();
+        }
+        return AppPage(
+          header: AppPageHeader(title: title, showFilterToolbar: false),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.check_circle_outline, size: 40),
+              const SizedBox(height: 12),
+              const Text('Datensatz geladen'),
+              const SizedBox(height: 8),
+              Text('Datensatz-ID: $id'),
+            ],
+          ),
+        );
+      },
     );
   }
+}
+
+Widget _routeError(String source, Object error, StackTrace stackTrace) {
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: error,
+      stack: stackTrace,
+      library: 'OpenAccounting route data',
+      context: ErrorDescription('while loading $source'),
+    ),
+  );
+  return const Center(child: Text('Daten konnten nicht geladen werden'));
 }
 
 class SetupPage extends ConsumerWidget {

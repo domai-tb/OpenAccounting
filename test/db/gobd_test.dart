@@ -20,7 +20,7 @@ void main() {
         "INSERT INTO journal (id, datum, betrag, immutable, beschreibung) VALUES (1, '2026-01-01', 10, 1, 'Original')",
       );
 
-      final errorMessage = 'GoBD: Dieser Journaleintrag ist unveränderlich';
+      const String errorMessage = 'GoBD: Dieser Journaleintrag ist unveränderlich';
       await expectLater(
         db.executor.runCustom("UPDATE journal SET beschreibung = 'Geändert' WHERE id = 1"),
         throwsA(predicate<Object>((error) => error.toString().contains(errorMessage))),

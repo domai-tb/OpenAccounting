@@ -11,6 +11,18 @@ abstract class HotkeyBackend {
   Future<void> unregisterAll();
 }
 
+abstract final class DesktopShortcutAccelerators {
+  static const String showHide = 'Ctrl+Shift+I';
+  static const String newInvoice = 'Ctrl+Shift+N';
+  static const String focusSearch = 'Ctrl+F';
+  static const String navigateEingang = 'Ctrl+Shift+E';
+  static const String newBuchung = '+';
+  static const String toggleEinnahme = 'E';
+  static const String toggleAusgabe = 'A';
+  static const String zoomIn = 'Ctrl+=';
+  static const String zoomOut = 'Ctrl+-';
+}
+
 class HotkeyManagerBackend implements HotkeyBackend {
   final Map<String, HotKey> _keys = <String, HotKey>{};
 
@@ -36,9 +48,18 @@ class HotkeyManagerBackend implements HotkeyBackend {
       case 'e':
         k = LogicalKeyboardKey.keyE;
         break;
+      case 'a':
+        k = LogicalKeyboardKey.keyA;
+        break;
       case '+':
       case 'add':
         k = LogicalKeyboardKey.add;
+        break;
+      case '=':
+        k = LogicalKeyboardKey.equal;
+        break;
+      case '-':
+        k = LogicalKeyboardKey.minus;
         break;
       default:
         k = LogicalKeyboardKey.keyI;
@@ -221,9 +242,42 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
       return false;
     }
     try {
-      final bool a = await _hotkeys.register('showHide', 'Ctrl+Shift+I', () async => _onShowHide?.call());
-      final bool b = await _hotkeys.register('newInvoice', 'Ctrl+Shift+N', () async => _onNewInvoice?.call());
-      if (!a || !b) {
+      final List<bool> registrations = <bool>[
+        await _hotkeys.register('showHide', DesktopShortcutAccelerators.showHide, () async => _onShowHide?.call()),
+        await _hotkeys.register(
+          'newInvoice',
+          DesktopShortcutAccelerators.newInvoice,
+          () async => _onNewInvoice?.call(),
+        ),
+        await _hotkeys.register(
+          'focusSearch',
+          DesktopShortcutAccelerators.focusSearch,
+          () async => _onFocusSearch?.call(),
+        ),
+        await _hotkeys.register(
+          'navigateEingang',
+          DesktopShortcutAccelerators.navigateEingang,
+          () async => _onNavigateEingang?.call(),
+        ),
+        await _hotkeys.register(
+          'newBuchung',
+          DesktopShortcutAccelerators.newBuchung,
+          () async => _onOpenBuchung?.call(),
+        ),
+        await _hotkeys.register(
+          'toggleEinnahme',
+          DesktopShortcutAccelerators.toggleEinnahme,
+          () async => _onToggleArt?.call(),
+        ),
+        await _hotkeys.register(
+          'toggleAusgabe',
+          DesktopShortcutAccelerators.toggleAusgabe,
+          () async => _onToggleArt?.call(),
+        ),
+        await _hotkeys.register('zoomIn', DesktopShortcutAccelerators.zoomIn, () async {}),
+        await _hotkeys.register('zoomOut', DesktopShortcutAccelerators.zoomOut, () async {}),
+      ];
+      if (registrations.any((bool registered) => !registered)) {
         _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
         _onWarning?.call(_lastWarning!);
         await _hotkeys.unregisterAll();

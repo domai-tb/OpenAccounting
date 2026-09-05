@@ -66,7 +66,7 @@ void main() {
         const <Object?>[],
       );
       expect(rows, hasLength(1));
-      final String storedHash = rows.first['dedupe_hash'] as String;
+      final String storedHash = rows.first['dedupe_hash']! as String;
       expect(storedHash.length, 64);
       final String expectedHash = service.computeDedupeHash(DateTime(2026, 3, 15), '100.00', 'Netflix', 'Netflix Abo');
       expect(storedHash, expectedHash);
@@ -79,14 +79,14 @@ void main() {
         'SELECT count(*) as c FROM bank_transaktionen WHERE konto_id = 1',
         const <Object?>[],
       );
-      expect((after.first['c'] as num).toInt(), 1);
+      expect((after.first['c']! as num).toInt(), 1);
 
       // history rows inserted
       final List<Map<String, Object?>> hist = await db.executor.runSelect(
         'SELECT count(*) as c FROM bank_imports',
         const <Object?>[],
       );
-      expect((hist.first['c'] as num).toInt(), greaterThanOrEqualTo(2));
+      expect((hist.first['c']! as num).toInt(), greaterThanOrEqualTo(2));
     });
 
     test('same hash different konto is not duplicate', () async {
@@ -153,8 +153,8 @@ void main() {
         const <Object?>[],
       );
       expect(rows, hasLength(2));
-      final String h1 = rows[0]['dedupe_hash'] as String;
-      final String h2 = rows[1]['dedupe_hash'] as String;
+      final String h1 = rows[0]['dedupe_hash']! as String;
+      final String h2 = rows[1]['dedupe_hash']! as String;
       expect(h1, isNot(equals(h2)));
       expect(h2.startsWith(h1), isTrue);
       expect(h2, contains('-'));
@@ -183,7 +183,7 @@ void main() {
       expect(highScore, greaterThanOrEqualTo(90));
 
       final RawTx txLow = RawTx(
-        datum: DateTime(2026, 1, 1),
+        datum: DateTime(2026),
         betrag: '999.99',
         verwendungszweck: 'Unrelated',
         partner: 'Unbekannt Partner XYZ',
@@ -201,11 +201,7 @@ void main() {
       // manual mode -> journal_id stays null even with high score
       await db.executor.runCustom('DELETE FROM bank_transaktionen');
       await db.executor.runCustom('DELETE FROM bank_imports');
-      final ImportResult manual = await service.importTransactions(
-        kontoId: 1,
-        rawTxs: <RawTx>[txForImport],
-        mode: 'manuell',
-      );
+      final ImportResult manual = await service.importTransactions(kontoId: 1, rawTxs: <RawTx>[txForImport]);
       expect(manual.imported, 1);
       final List<Map<String, Object?>> manualRows = await db.executor.runSelect(
         'SELECT journal_id FROM bank_transaktionen',

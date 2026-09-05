@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,7 +42,7 @@ void main() {
       expect(AppRadius.control, 8);
       expect(AppRadius.card, 12);
       expect(AppRadius.dialog, 14);
-      final lightCard = AppTheme.light.cardTheme.shape as RoundedRectangleBorder;
+      final RoundedRectangleBorder lightCard = AppTheme.light.cardTheme.shape! as RoundedRectangleBorder;
       expect((lightCard.borderRadius as BorderRadius).topLeft.x, 12);
     });
 
@@ -71,8 +69,8 @@ void main() {
     });
 
     test('lerp and copyWith work', () {
-      final a = AccountingColors.light;
-      final b = AccountingColors.dark;
+      const AccountingColors a = AccountingColors.light;
+      const AccountingColors b = AccountingColors.dark;
       final lerped = a.lerp(b, 0.5);
       expect(lerped, isA<AccountingColors>());
       final copied = a.copyWith(paid: const Color(0xFF000000));

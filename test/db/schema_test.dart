@@ -19,7 +19,7 @@ void main() {
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
         const [],
       );
-      final names = rows.map((r) => r['name'] as String).toList()..sort();
+      final names = rows.map((r) => r['name']?.toString() ?? '').toList()..sort();
       expect(names.length, 38, reason: 'Expected 38 tables, got ${names.length}: $names');
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t), reason: 'Missing table $t');
@@ -48,19 +48,19 @@ void main() {
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='artikel'",
         const [],
       );
-      expect(artikelRows.first['sql'] as String, contains('vk_netto NUMERIC(12,4)'));
+      expect(artikelRows.first['sql']?.toString() ?? '', contains('vk_netto NUMERIC(12,4)'));
 
       final rechnungRows = await db.executor.runSelect(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='rechnungen'",
         const [],
       );
-      expect(rechnungRows.first['sql'] as String, contains('NUMERIC(12,2)'));
+      expect(rechnungRows.first['sql']?.toString() ?? '', contains('NUMERIC(12,2)'));
 
       final journalRows = await db.executor.runSelect(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='journal'",
         const [],
       );
-      expect(journalRows.first['sql'] as String, contains('NUMERIC(12,2)'));
+      expect(journalRows.first['sql']?.toString() ?? '', contains('NUMERIC(12,2)'));
     });
 
     test('FKs correct — rechnungspositionen, journal, bank_transaktionen', () async {
@@ -83,7 +83,7 @@ void main() {
 
     test('WAL mode and FK enforcement active', () async {
       final jm = await db.executor.runSelect('PRAGMA journal_mode', const []);
-      final journalMode = (jm.first.values.first as String).toLowerCase();
+      final String journalMode = jm.first.values.first.toString().toLowerCase();
       expect(journalMode, anyOf(['wal', 'memory']), reason: 'Journal mode should be wal or memory');
       final fk = await db.executor.runSelect('PRAGMA foreign_keys', const []);
       final val = fk.first.values.first;
@@ -95,7 +95,7 @@ void main() {
         "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL",
         const [],
       );
-      final sqls = rows.map((r) => r['sql'] as String).join('\n');
+      final sqls = rows.map((r) => r['sql']?.toString() ?? '').join('\n');
       expect(sqls, contains('idx_kunden_kundennummer_unique'));
       expect(sqls, contains('idx_lieferanten_lieferantennummer_unique'));
       expect(sqls, contains('idx_bank_transaktionen_dedupe'));
@@ -121,17 +121,17 @@ void main() {
       await db.executor.runCustom("INSERT INTO konten (id, name, saldo) VALUES (2, 'MoneyTest', 123456789.12)");
       final rows = await db.executor.runSelect('SELECT saldo FROM konten WHERE id=2', const []);
       final v = rows.first['saldo'];
-      expect((v as num).toStringAsFixed(2), '123456789.12');
+      expect((num.tryParse(v?.toString() ?? '') ?? 0).toStringAsFixed(2), '123456789.12');
     });
 
     test('vk_netto precision 2.9412 *100 =294.12', () async {
       await db.executor.runCustom("INSERT INTO artikel (id, bezeichnung, vk_netto) VALUES (1, 'Test', 2.9412)");
       final rows = await db.executor.runSelect('SELECT vk_netto FROM artikel WHERE id=1', const []);
-      final v = (rows.first['vk_netto'] as num).toDouble();
+      final double v = (num.tryParse(rows.first['vk_netto']?.toString() ?? '') ?? 0).toDouble();
       expect((v * 100).toStringAsFixed(2), '294.12');
       await db.executor.runCustom("INSERT INTO artikel (id, bezeichnung, vk_netto) VALUES (2, 'Zero', 0.0000)");
       final rows2 = await db.executor.runSelect('SELECT vk_netto FROM artikel WHERE id=2', const []);
-      expect((rows2.first['vk_netto'] as num).toDouble(), 0.0);
+      expect((num.tryParse(rows2.first['vk_netto']?.toString() ?? '') ?? 0).toDouble(), 0.0);
     });
   });
 }

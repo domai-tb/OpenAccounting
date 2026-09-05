@@ -1,4 +1,3 @@
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/database.dart';
@@ -25,13 +24,13 @@ void main() {
       expect(service.validateKonten(accounts: const <BankAccount>[]), isNotNull);
       expect(
         service.validateKonten(
-          accounts: <BankAccount>[BankAccount(name: 'Giro', iban: 'INVALID', bic: '')],
+          accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'INVALID', bic: '')],
         ),
         isNotNull,
       );
       expect(
         service.validateKonten(
-          accounts: <BankAccount>[BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
+          accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         ),
         isNull,
       );
@@ -86,8 +85,7 @@ void main() {
         strasse: 'Hauptstr. 1',
         plz: '10115',
         ort: 'Berlin',
-        accounts: <BankAccount>[BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
-        kassenbestand: '0.00',
+        accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         kategorieIds: <int>[1, 2],
       );
 

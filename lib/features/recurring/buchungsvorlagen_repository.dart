@@ -275,6 +275,7 @@ class BuchungsVorlagenRepository {
     if (vorlage.modus == 'direkt') {
       // USt-Richtung: Ausgabe => Vorsteuer (KZ 66), Einnahme => Umsatzsteuer (KZ 81)
       final bool isAusgabe = vorlage.art == 'Ausgabe';
+      final String? vorsteuerBetrag = isAusgabe ? vorlage.betrag : null;
       final String belegTyp = vorlage.art;
       final String beschreibung = vorlage.beschreibung ?? vorlage.name;
       // Lieferant/Konto werden vererbt — journal.konto_id = vorlage.konto_id, lieferant via rechnung_id null.
@@ -291,7 +292,7 @@ class BuchungsVorlagenRepository {
             belegTyp,
             vorlage.kontoId,
             vorlage.id,
-            isAusgabe ? vorlage.betrag : null,
+            vorsteuerBetrag,
           ],
         );
         await executor.runCustom('COMMIT');
@@ -334,8 +335,8 @@ class BuchungsVorlagenRepository {
   }
 
   BuchungsVorlage _fromRow(Map<String, Object?> r) {
-    final int id = (r['id'] as num).toInt();
-    final String name = r['name'] as String;
+    final int id = ((r['id'] as num?) ?? 0).toInt();
+    final String name = r['name'] as String? ?? '';
     final int? kategorieId = (r['kategorie_id'] as num?)?.toInt();
     final int? kontoId = (r['konto_id'] as num?)?.toInt();
     final String? betrag = r['betrag']?.toString();

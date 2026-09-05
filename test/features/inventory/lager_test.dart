@@ -42,16 +42,16 @@ void main() {
     }
 
     Future<void> ensureInventar() async {
-      await db.executor.runCustom(
-        'CREATE TABLE IF NOT EXISTS inventarbewegungen ('
-        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-        'artikel_id INTEGER NOT NULL REFERENCES artikel(id), '
-        'datum TEXT NOT NULL, '
-        'diff NUMERIC(10,3) NOT NULL, '
-        'grund TEXT NOT NULL, '
-        'referenz_typ TEXT, '
-        'referenz_id INTEGER)',
-      );
+      await db.executor.runCustom('''
+CREATE TABLE IF NOT EXISTS inventarbewegungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikel_id INTEGER NOT NULL REFERENCES artikel(id),
+  datum TEXT NOT NULL,
+  diff NUMERIC(10,3) NOT NULL,
+  grund TEXT NOT NULL,
+  referenz_typ TEXT,
+  referenz_id INTEGER
+)''');
     }
 
     Future<List<Map<String, Object?>>> bewegungen(int artikelId) async {
@@ -94,7 +94,7 @@ void main() {
     });
 
     test('Minusbestand blockiert wenn nicht erlaubt', () async {
-      final id = await createArtikel(bezeichnung: 'Knapp', bestandAktuell: 2, minusErlaubt: false);
+      final id = await createArtikel(bezeichnung: 'Knapp', bestandAktuell: 2);
       final rechnungId = await rechnungen.createDraftRechnung(
         datum: '2026-03-01',
         positionen: <RechnungPositionItem>[
@@ -152,7 +152,7 @@ void main() {
 
     test('Atomar: bei Minusbestand-Fehler wird kein Artikel gebucht', () async {
       final a = await createArtikel(bezeichnung: 'A OK', bestandAktuell: 100);
-      final b = await createArtikel(bezeichnung: 'B Knapp', bestandAktuell: 2, minusErlaubt: false);
+      final b = await createArtikel(bezeichnung: 'B Knapp', bestandAktuell: 2);
       final rechnungId = await rechnungen.createDraftRechnung(
         datum: '2026-03-01',
         positionen: <RechnungPositionItem>[
@@ -221,7 +221,7 @@ void main() {
       await createArtikel(bezeichnung: 'OK Y', bestandAktuell: 20, mindestbestand: 10);
       await createArtikel(bezeichnung: 'Gleich', bestandAktuell: 10, mindestbestand: 10);
       final rows = await warnungen();
-      final namen = rows.map((r) => r['bezeichnung'] as String).toList();
+      final namen = rows.map((r) => r['bezeichnung']?.toString() ?? '').toList();
       expect(namen, contains('Warn X'));
       expect(namen, contains('Gleich'));
       expect(namen, isNot(contains('OK Y')));
@@ -296,7 +296,7 @@ void main() {
     test('inventarbewegungen Tabelle existiert mit Pflichtspalten', () async {
       await ensureInventar();
       final cols = await db.executor.runSelect('PRAGMA table_info(inventarbewegungen)', const <Object?>[]);
-      final names = cols.map((c) => c['name'] as String).toList();
+      final names = cols.map((c) => c['name']?.toString() ?? '').toList();
       expect(names, contains('id'));
       expect(names, contains('artikel_id'));
       expect(names, contains('datum'));

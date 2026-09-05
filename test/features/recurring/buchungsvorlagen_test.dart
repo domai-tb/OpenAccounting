@@ -32,7 +32,6 @@ void main() {
         kontoId: 1,
         betrag: '800.00',
         beschreibung: 'Monatliche Miete',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
@@ -42,7 +41,7 @@ void main() {
       expect(v.modus, 'direkt');
       expect(v.intervall, 'monatlich');
       expect(v.aktiv, isTrue);
-      expect(repo.isDue(v, DateTime(2026, 1, 1)), isTrue);
+      expect(repo.isDue(v, DateTime(2026)), isTrue);
     });
 
     test('Delete booking template without entries succeeds', () async {
@@ -51,7 +50,6 @@ void main() {
         kategorieId: 1,
         art: 'Ausgabe',
         intervall: 'monatlich',
-        modus: 'direkt',
         betrag: '10.00',
       );
       await repo.delete(v.id);
@@ -65,12 +63,11 @@ void main() {
         kontoId: 1,
         betrag: '100.00',
         beschreibung: 'Direkt Buchung',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-02-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 2, 1));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 2));
       expect(ids.length, 1);
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT beleg_typ, betrag, vorlage_id FROM journal WHERE id = ?',
@@ -92,7 +89,7 @@ void main() {
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-02-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 2, 1));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 2));
       expect(ids.length, 1);
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT typ, lieferant_id, vorlage_id FROM rechnungen WHERE id = ?',
@@ -108,12 +105,11 @@ void main() {
         name: 'Ausgabe USt',
         kategorieId: 1,
         betrag: '119.00',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026));
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT beleg_typ, vorsteuer_betrag FROM journal WHERE id = ?',
         <Object?>[ids.single],
@@ -124,16 +120,15 @@ void main() {
     });
 
     test('Einnahme direction — Umsatzsteuer KZ 81', () async {
-      final BuchungsVorlage v = await repo.create(
+      await repo.create(
         name: 'Einnahme USt',
         kategorieId: 1,
         betrag: '119.00',
-        modus: 'direkt',
         art: 'Einnahme',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 1, 1));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026));
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT beleg_typ, vorsteuer_betrag FROM journal WHERE id = ?',
         <Object?>[ids.single],
@@ -148,13 +143,12 @@ void main() {
         name: 'Auto',
         kategorieId: 1,
         betrag: '50.00',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-03-01',
       );
-      expect(repo.isDue(v, DateTime(2026, 3, 01)), isTrue);
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 03, 01));
+      expect(repo.isDue(v, DateTime(2026, 3)), isTrue);
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 03));
       expect(ids.length, 1);
     });
 
@@ -163,18 +157,17 @@ void main() {
         name: 'Inactive',
         kategorieId: 1,
         betrag: '50.00',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
       );
       await repo.pause(v.id);
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 01, 01));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026));
       expect(ids, isEmpty);
     });
 
     test('Linked supplier — inherits supplier reference', () async {
-      final BuchungsVorlage v = await repo.create(
+      await repo.create(
         name: 'Supplier Link',
         kategorieId: 1,
         lieferantId: 1,
@@ -184,7 +177,7 @@ void main() {
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 01, 01));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026));
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT lieferant_id FROM rechnungen WHERE id = ?',
         <Object?>[ids.single],
@@ -193,17 +186,16 @@ void main() {
     });
 
     test('Linked account — uses specified bank account for DATEV export', () async {
-      final BuchungsVorlage v = await repo.create(
+      await repo.create(
         name: 'Konto Link',
         kategorieId: 1,
         kontoId: 1,
         betrag: '400.00',
-        modus: 'direkt',
         art: 'Ausgabe',
         intervall: 'monatlich',
         naechsteFaelligkeit: '2026-01-01',
       );
-      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 01, 01));
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026));
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT konto_id FROM journal WHERE id = ?',
         <Object?>[ids.single],
@@ -213,7 +205,7 @@ void main() {
 
     test('Invalid intervall rejected', () async {
       await expectLater(
-        repo.create(name: 'Bad', kategorieId: 1, art: 'Ausgabe', intervall: 'wöchentlich', modus: 'direkt'),
+        repo.create(name: 'Bad', kategorieId: 1, art: 'Ausgabe', intervall: 'wöchentlich'),
         throwsA(isA<BuchungsVorlagenException>()),
       );
     });
@@ -227,14 +219,14 @@ void main() {
 
     test('Invalid art rejected', () async {
       await expectLater(
-        repo.create(name: 'Bad Art', kategorieId: 1, art: 'Unbekannt', intervall: 'monatlich', modus: 'direkt'),
+        repo.create(name: 'Bad Art', kategorieId: 1, art: 'Unbekannt', intervall: 'monatlich'),
         throwsA(isA<BuchungsVorlagenException>()),
       );
     });
 
     test('Next due advance — monatlich/quartalsweise/jährlich', () async {
       expect(repo.nextDue(DateTime(2026, 1, 15), 'monatlich'), DateTime(2026, 02, 15));
-      expect(repo.nextDue(DateTime(2026, 01, 01), 'quartalsweise'), DateTime(2026, 04, 01));
+      expect(repo.nextDue(DateTime(2026), 'quartalsweise'), DateTime(2026, 04));
       expect(repo.nextDue(DateTime(2026, 06, 15), 'jährlich'), DateTime(2027, 06, 15));
     });
   });

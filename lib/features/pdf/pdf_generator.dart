@@ -385,7 +385,7 @@ pw.Widget _markdownText(String value) {
 
 bool _isEscaped(String value, int markerIndex) {
   var backslashCount = 0;
-  for (var index = markerIndex - 1; index >= 0 && value[index] == '\\'; index--) {
+  for (var index = markerIndex - 1; index >= 0 && value[index] == r'\'; index--) {
     backslashCount++;
   }
   return backslashCount.isOdd;

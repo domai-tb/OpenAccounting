@@ -116,7 +116,7 @@ void main() {
 
       await svc.completeWizard(
         companyName: 'Test GmbH',
-        accounts: <BankAccount>[BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: '')],
+        accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: '')],
         kassenbestand: '150.00',
         kategorieIds: <int>[1],
       );

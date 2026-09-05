@@ -181,13 +181,13 @@ class AppDatabase {
     } catch (_) {}
     // recurring: rechnungsvorlagen status/auftrag_id, buchungsvorlagen intervall etc., vorlage_id links
     for (final String sql in <String>[
-      'ALTER TABLE rechnungsvorlagen ADD COLUMN status TEXT DEFAULT \'aktiv\'',
+      "ALTER TABLE rechnungsvorlagen ADD COLUMN status TEXT DEFAULT 'aktiv'",
       'ALTER TABLE rechnungsvorlagen ADD COLUMN auftrag_id INTEGER REFERENCES rechnungen(id)',
       'ALTER TABLE buchungsvorlagen ADD COLUMN intervall TEXT',
       'ALTER TABLE buchungsvorlagen ADD COLUMN naechste_faelligkeit TEXT',
       'ALTER TABLE buchungsvorlagen ADD COLUMN art TEXT',
       'ALTER TABLE buchungsvorlagen ADD COLUMN lieferant_id INTEGER REFERENCES lieferanten(id)',
-      'ALTER TABLE buchungsvorlagen ADD COLUMN status TEXT DEFAULT \'aktiv\'',
+      "ALTER TABLE buchungsvorlagen ADD COLUMN status TEXT DEFAULT 'aktiv'",
       'ALTER TABLE rechnungen ADD COLUMN vorlage_id INTEGER REFERENCES rechnungsvorlagen(id)',
       'ALTER TABLE journal ADD COLUMN vorlage_id INTEGER REFERENCES buchungsvorlagen(id)',
     ]) {
@@ -221,9 +221,8 @@ class AppDatabase {
   }
 
   /// Helper for VM tests creating in-memory instance with full schema.
-  static AppDatabase createTestDatabase({String? profileDir}) {
-    return AppDatabase.forTesting(drift_native.NativeDatabase.memory(), profileDir: profileDir);
-  }
+  AppDatabase.createTestDatabase({String? profileDir})
+    : this.forTesting(drift_native.NativeDatabase.memory(), profileDir: profileDir);
 
   // ponytail: WAL lock ceiling — global checkpoint before backup, per-DB if concurrency matters.
 }

@@ -24,7 +24,7 @@ class FakeAdapter implements HttpClientAdapter {
   ) async {
     callCount++;
     if (queue.isEmpty) {
-      throw DioException(requestOptions: options, type: DioExceptionType.unknown, error: 'queue empty');
+      throw DioException(requestOptions: options, error: 'queue empty');
     }
     final next = queue.removeAt(0);
     if (next is DioException) throw next;
@@ -89,7 +89,7 @@ void main() {
   group('Retry on 5xx / timeout', () {
     test('retries 3 times then succeeds on 5xx', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
+      final DioClient client = DioClient(dio: dio);
       // Queue: 500, 500, then 200.
       final adapter = FakeAdapter(<dynamic>[
         500,
@@ -98,21 +98,21 @@ void main() {
       ]);
       dio.httpClientAdapter = adapter;
 
-      final resp = await dio.get<dynamic>('http://localhost/test');
+      final resp = await client.dio.get<dynamic>('http://localhost/test');
       expect(resp.statusCode, 200);
       expect(adapter.callCount, 3);
     });
 
     test('retries exhausted after 3 attempts stops', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
+      final DioClient client = DioClient(dio: dio);
       final adapter = FakeAdapter(<dynamic>[500, 500, 500, 500]);
       dio.httpClientAdapter = adapter;
 
       // DioClient validateStatus treats 500 as not validated, so error triggers retry chain.
       // After 3 retries, final error should be 500.
       try {
-        await dio.get<dynamic>('http://localhost/test');
+        await client.dio.get<dynamic>('http://localhost/test');
         fail('should throw');
       } on DioException catch (e) {
         expect(e.response?.statusCode, 500);
@@ -123,16 +123,10 @@ void main() {
 
     test('retries on timeout', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
-      DioException timeoutEx(RequestOptions opts) => DioException(
-        requestOptions: opts,
-        type: DioExceptionType.connectionTimeout,
-        error: TimeoutException('connect timeout'),
-      );
+      DioClient(dio: dio);
       // We simulate timeout via adapter throwing DioException with timeout type.
       // Need custom adapter that throws appropriate type — use queue of DioException.
       // Create a manual fake.
-      var attempts = 0;
       dio.httpClientAdapter = FakeAdapter(<dynamic>[]);
       // Replace fetch via interceptor instead — simpler: use interceptors to throw.
       dio.interceptors.clear();
@@ -140,7 +134,7 @@ void main() {
       // Reset client interceptors order: retry first, then mock.
       // Instead we recreate: inject mock via adapter throwing timeout directly.
       final mockDio = Dio();
-      final mockClient = DioClient(dio: mockDio, maxRetries: 3);
+      final DioClient mockClient = DioClient(dio: mockDio);
       var call = 0;
       mockDio.httpClientAdapter = _TimeoutFakeAdapter(() {
         call++;
@@ -160,7 +154,7 @@ void main() {
         );
       });
 
-      final resp = await mockDio.get<dynamic>('http://localhost/test');
+      final resp = await mockClient.dio.get<dynamic>('http://localhost/test');
       expect(resp.statusCode, 200);
       expect(call, 3);
     });
@@ -225,7 +219,7 @@ void main() {
 
     test('422 interceptor wraps into ValidationException error', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
+      final DioClient client = DioClient(dio: dio);
       dio.httpClientAdapter = FakeAdapter(<dynamic>[
         ResponseBody.fromString(
           jsonEncode(<String, dynamic>{
@@ -245,11 +239,11 @@ void main() {
       ]);
 
       try {
-        await dio.get<dynamic>('http://localhost/test');
+        await client.dio.get<dynamic>('http://localhost/test');
         fail('should throw');
       } on DioException catch (e) {
         expect(e.error, isA<ValidationException>());
-        final ve = e.error as ValidationException;
+        final ValidationException ve = e.error! as ValidationException;
         expect(ve.fieldErrors['betrag'], contains('Betrag darf maximal 2 Dezimalstellen haben'));
         expect(e.message, contains('Betrag'));
       }
@@ -260,7 +254,6 @@ void main() {
     test('detects SocketException connection refused', () {
       final ex = DioException(
         requestOptions: RequestOptions(path: 'http://localhost:8002/test'),
-        type: DioExceptionType.unknown,
         error: const SocketException('Connection refused'),
         message: 'SocketException: Connection refused',
       );
@@ -278,7 +271,7 @@ void main() {
 
     test('interceptor maps connection refused to Backend nicht erreichbar', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
+      final DioClient client = DioClient(dio: dio);
       dio.httpClientAdapter = _ThrowingAdapter(
         DioException(
           requestOptions: RequestOptions(path: 'http://localhost:8002/test'),
@@ -287,21 +280,21 @@ void main() {
         ),
       );
       try {
-        await dio.get<dynamic>('http://localhost:8002/test');
+        await client.dio.get<dynamic>('http://localhost:8002/test');
         fail('should throw');
       } on DioException catch (e) {
         expect(e.error, isA<BackendUnreachableException>());
-        expect((e.error as BackendUnreachableException).message, 'Backend nicht erreichbar');
+        expect((e.error! as BackendUnreachableException).message, 'Backend nicht erreichbar');
         expect(e.message, 'Backend nicht erreichbar');
       }
     });
 
     test('port detection returns null when all ports fail', () async {
       final dio = Dio();
-      final client = DioClient(dio: dio);
+      final DioClient client = DioClient(dio: dio);
       // We test detectBackendPort by passing ports that are not open — it should return null quickly.
       // Use localhost with unlikely ports 1,2,3 mocked via passing list.
-      final result = await client.detectBackendPort(host: '127.0.0.1', ports: const <int>[1, 2, 3]);
+      final Uri? result = await client.detectBackendPort(host: '127.0.0.1', ports: const <int>[1, 2, 3]);
       expect(result, isNull);
     });
 

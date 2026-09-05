@@ -16,11 +16,17 @@ Future<AppDatabase> _configuredDb() async {
   await db.ensureOpen();
   await db.executor.runCustom('CREATE TABLE IF NOT EXISTS unternehmen (id INTEGER PRIMARY KEY, name TEXT)');
   await db.executor.runCustom("INSERT INTO unternehmen (name) VALUES ('Test GmbH')");
+  await db.executor.runCustom('''
+INSERT INTO rechnungen (id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum)
+VALUES (123, 'RE-123', 'rechnung', 'offen', 0, 'netto', '2026-01-01')''');
   return db;
 }
 
-Widget _wrap(GoRouter router) {
-  return ProviderScope(child: MaterialApp.router(routerConfig: router));
+Widget _wrap(GoRouter router, AppDatabase db) {
+  return ProviderScope(
+    overrides: [appDatabaseProvider.overrideWithValue(db)],
+    child: MaterialApp.router(routerConfig: router),
+  );
 }
 
 void main() {
@@ -29,7 +35,7 @@ void main() {
       final db = _emptyDb();
       await db.ensureOpen();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       expect(router.state.matchedLocation, '/setup');
       expect(find.text('Setup Wizard'), findsOneWidget);
@@ -39,7 +45,7 @@ void main() {
     testWidgets('setup guard does not intercept when Unternehmen exists', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       // Should stay at '/' not /setup.
       expect(router.state.matchedLocation, '/');
@@ -52,7 +58,7 @@ void main() {
       await db.ensureOpen();
       final router = createRouter(db);
       router.go('/setup');
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       expect(router.state.matchedLocation, '/setup');
       await db.close();
@@ -61,7 +67,7 @@ void main() {
     testWidgets('nested navigation within sections highlights sidebar', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       router.go('/invoices/123');
       await tester.pumpAndSettle();
@@ -74,7 +80,7 @@ void main() {
     testWidgets('nested navigation with invalid ID shows not found', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       router.go('/invoices/99999');
       await tester.pumpAndSettle();
@@ -85,12 +91,12 @@ void main() {
     testWidgets('deep link with query parameters filters list', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       router.go('/invoices?typ=eingang&status=offen');
       await tester.pumpAndSettle();
-      expect(find.textContaining('typ=eingang'), findsWidgets);
-      expect(find.textContaining('status=offen'), findsWidgets);
+      expect(find.textContaining('Typ: eingang'), findsWidgets);
+      expect(find.textContaining('Status: offen'), findsWidgets);
       await db.close();
     });
 
@@ -100,7 +106,7 @@ void main() {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       // Sidebar shell should be present via Row + SizedBox 240.
       expect(find.text('Rechnungen'), findsWidgets);
@@ -113,7 +119,7 @@ void main() {
       tester.view.physicalSize = const Size(1000, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       // At 1000px, compact mode shows icons — sidebar uses icon-only rail with tooltip.
       expect(find.byIcon(Icons.receipt_long), findsWidgets);
@@ -124,7 +130,7 @@ void main() {
     testWidgets('unknown route shows not found', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);
-      await tester.pumpWidget(_wrap(router));
+      await tester.pumpWidget(_wrap(router, db));
       await tester.pumpAndSettle();
       router.go('/does-not-exist-xyz');
       await tester.pumpAndSettle();
@@ -143,12 +149,12 @@ void main() {
     });
 
     test('port scan helper ports 8000-8010 defined', () {
-      expect(DioClientProbePorts, contains(8000));
-      expect(DioClientProbePorts, contains(8010));
-      expect(DioClientProbePorts.length, 11);
+      expect(dioClientProbePorts, contains(8000));
+      expect(dioClientProbePorts, contains(8010));
+      expect(dioClientProbePorts.length, 11);
     });
   });
 }
 
 /// Expose probe ports for test without importing dio_client.
-const List<int> DioClientProbePorts = <int>[8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010];
+const List<int> dioClientProbePorts = <int>[8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010];

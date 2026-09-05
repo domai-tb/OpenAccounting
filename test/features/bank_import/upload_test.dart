@@ -78,7 +78,7 @@ void main() {
         'SELECT count(*) as c FROM bank_transaktionen',
         const <Object?>[],
       );
-      final int count = (dbRows.first['c'] as num).toInt();
+      final int count = (dbRows.first['c']! as num).toInt();
       expect(count, 0, reason: 'upload step only parses, no DB import');
     });
 
@@ -97,13 +97,13 @@ void main() {
           '4;5;6\n';
       // No valid datum/betrag header — should prompt template selection.
       expect(
-        () => service.parseCsv(csv: csv, template: null),
+        () => service.parseCsv(csv: csv),
         throwsA(predicate<Object>((e) => e is BankImportException && e.message.toLowerCase().contains('template'))),
       );
     });
 
     test('predefined templates contain 7 banks', () {
-      final List<BankTemplate> templates = BankTemplate.predefined;
+      const List<BankTemplate> templates = BankTemplate.predefined;
       expect(templates.length, greaterThanOrEqualTo(7));
       final Set<String> typs = templates.map((t) => t.typ).toSet();
       expect(typs, containsAll(<String>['sparkasse', 'paypal', 'n26', 'vivid', 'ing', 'dkb', 'commerzbank']));

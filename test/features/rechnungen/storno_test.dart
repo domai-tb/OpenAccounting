@@ -96,7 +96,7 @@ void main() {
     );
     await db.executor.runCustom("INSERT INTO artikel (bezeichnung, vk_netto, bestand) VALUES ('Widget', 10, 20)");
     final art = await db.executor.runSelect('SELECT id FROM artikel WHERE bezeichnung = ?', ['Widget']);
-    final artikelId = art.single['id'] as int;
+    final int artikelId = (art.single['id'] as num?)?.toInt() ?? 0;
     final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',

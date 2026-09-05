@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -132,10 +133,10 @@ Future<bool> _tryRestore(WindowOptions windowOptions) async {
 Size _currentScreenSize() {
   try {
     final WidgetsBinding binding = WidgetsBinding.instance;
-    final dynamic view = binding.platformDispatcher.views.firstOrNull;
+    final ui.FlutterView? view = binding.platformDispatcher.views.firstOrNull;
     if (view != null) {
-      final Size phys = view.physicalSize as Size;
-      final double dpr = view.devicePixelRatio as double;
+      final Size phys = view.physicalSize;
+      final double dpr = view.devicePixelRatio;
       if (phys.width > 0 && phys.height > 0 && dpr > 0) {
         return Size(phys.width / dpr, phys.height / dpr);
       }

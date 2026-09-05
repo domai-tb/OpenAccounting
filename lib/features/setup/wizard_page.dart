@@ -34,7 +34,7 @@ class _WizardPageState extends State<WizardPage> {
   String? _ibanError;
   String? _kategorieError;
   String? _kasseError;
-  Set<int> _selectedKategorien = <int>{1};
+  final Set<int> _selectedKategorien = <int>{1};
 
   @override
   void dispose() {
@@ -112,7 +112,7 @@ class _WizardPageState extends State<WizardPage> {
     try {
       final String iban = _ibanCtrl.text.trim();
       final List<BankAccount> accounts = iban.isEmpty
-          ? <BankAccount>[BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')]
+          ? <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')]
           : <BankAccount>[BankAccount(name: 'Giro', iban: iban, bic: _bicCtrl.text.trim())];
       await _service.completeWizard(
         companyName: _nameCtrl.text.trim().isEmpty ? 'Meine Firma' : _nameCtrl.text.trim(),

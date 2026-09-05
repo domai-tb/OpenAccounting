@@ -73,6 +73,7 @@ FROM kategorien
   }) async {
     if (bezeichnung.trim().isEmpty) throw const KategorieException('Bezeichnung ist Pflicht');
     await ensureSchema();
+    final int aktivInt = aktiv ? 1 : 0;
     final id = await executor.runInsert(
       'INSERT INTO kategorien (bezeichnung, beschreibung, art, typ, konto_skr03, konto_skr04, konto_ust_skr03, konto_ust_skr04, euer_zeile, eks_kategorie, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
@@ -86,7 +87,7 @@ FROM kategorien
         kontoUstSkr04,
         euerZeile,
         eksKategorie,
-        aktiv ? 1 : 0,
+        aktivInt,
       ],
     );
     final stored = await findById(id);

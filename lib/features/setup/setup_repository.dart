@@ -101,7 +101,7 @@ class SetupRepository {
         const [],
       );
     } else {
-      kasseId = (existing.single['id'] as num).toInt();
+      kasseId = ((existing.single['id'] as num?) ?? 0).toInt();
     }
 
     // idempotent journal: if already one journal for this konto, reuse/update
@@ -115,7 +115,7 @@ class SetupRepository {
       int kategorieId = 1;
       try {
         final List<Map<String, Object?>> kats = await executor.runSelect('SELECT id FROM kategorien LIMIT 1', const []);
-        if (kats.isNotEmpty) kategorieId = (kats.single['id'] as num).toInt();
+        if (kats.isNotEmpty) kategorieId = ((kats.single['id'] as num?) ?? 0).toInt();
       } catch (_) {}
       await executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable) '
@@ -123,7 +123,7 @@ class SetupRepository {
         <Object?>[datum, 'Eröffnung Kasse', kategorieId, formatted, 'Einnahme', kasseId],
       );
     } else {
-      final int jid = (journals.single['id'] as num).toInt();
+      final int jid = ((journals.single['id'] as num?) ?? 0).toInt();
       await executor.runUpdate('UPDATE journal SET betrag = ?, datum = ? WHERE id = ?', <Object?>[
         formatted,
         datum,

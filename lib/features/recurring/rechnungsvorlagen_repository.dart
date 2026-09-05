@@ -350,8 +350,8 @@ class RechnungsVorlagenRepository {
   }
 
   RechnungsVorlage _fromRow(Map<String, Object?> row) {
-    final int id = (row['id'] as num).toInt();
-    final String name = row['name'] as String;
+    final int id = ((row['id'] as num?) ?? 0).toInt();
+    final String name = row['name'] as String? ?? '';
     final int? kundeId = (row['kunde_id'] as num?)?.toInt();
     final String intervall = (row['intervall'] as String?) ?? '';
     final String? next = row['naechste_faelligkeit'] as String?;
@@ -362,7 +362,7 @@ class RechnungsVorlagenRepository {
     try {
       final Object? decoded = jsonDecode(raw);
       if (decoded is List) {
-        pos = decoded.whereType<Map>().map((Map<dynamic, dynamic> e) => Map<String, dynamic>.from(e)).toList();
+        pos = decoded.whereType<Map>().map(Map<String, dynamic>.from).toList();
       }
     } catch (_) {
       pos = <Map<String, dynamic>>[];

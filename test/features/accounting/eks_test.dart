@@ -71,7 +71,7 @@ void main() {
           <Object?>['Test Firma', berufsbezeichnung, kammer, geburtsdatum, bgNummer, jobcenter],
         );
       } else {
-        final int id = (rows.first['id'] as num).toInt();
+        final int id = (rows.first['id'] as num?)?.toInt() ?? 0;
         await db.executor.runCustom(
           'UPDATE unternehmen SET berufsbezeichnung=?, kammer_mitgliedschaft=?, geburtsdatum=?, bg_nummer=?, jobcenter_name=? WHERE id=?',
           <Object?>[berufsbezeichnung, kammer, geburtsdatum, bgNummer, jobcenter, id],
@@ -106,12 +106,12 @@ void main() {
       await insertKategorie(id: 703, eksKategorie: 'F41', bezeichnung: 'Sonstiges F41');
       await insertKategorie(id: 704, eksKategorie: 'B6_5', bezeichnung: 'Travel B6_5');
       // Only F23,F30,F41 should be in sectionF (23-41), B6_5 is separate but still via eks_kategorie
-      await insertJournal(kategorieId: 701, betrag: '1000.00', datum: '2025-02-10', art: 'Einnahme');
-      await insertJournal(kategorieId: 701, betrag: '500.00', datum: '2025-03-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 701, betrag: '1000.00', datum: '2025-02-10');
+      await insertJournal(kategorieId: 701, betrag: '500.00', datum: '2025-03-10');
       await insertJournal(kategorieId: 702, betrag: '200.00', datum: '2025-04-10', art: 'Ausgabe');
       await insertJournal(kategorieId: 703, betrag: '300.00', datum: '2025-05-10', art: 'Ausgabe');
       // Different year must be ignored
-      await insertJournal(kategorieId: 701, betrag: '9999.00', datum: '2024-06-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 701, betrag: '9999.00', datum: '2024-06-10');
 
       final EksResult result = await service.generate(jahr: 2025);
 
@@ -131,7 +131,7 @@ void main() {
       // 100km =>10.00, 50km=>5.00 total 15.00
       await insertJournal(kategorieId: 710, betrag: '0.00', datum: '2025-06-10', art: 'Ausgabe', kmAnzahl: '100');
       await insertJournal(kategorieId: 710, betrag: '0.00', datum: '2025-06-15', art: 'Ausgabe', kmAnzahl: '50');
-      await insertJournal(kategorieId: 711, betrag: '1000.00', datum: '2025-06-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 711, betrag: '1000.00', datum: '2025-06-10');
       // Different year ignored
       await insertJournal(kategorieId: 710, betrag: '0.00', datum: '2024-06-10', art: 'Ausgabe', kmAnzahl: '999');
 
@@ -160,8 +160,8 @@ void main() {
       await insertKategorie(id: 720, eksKategorie: 'F23', bezeichnung: 'Einnahmen');
       await insertKategorie(id: 721, eksKategorie: 'F30', bezeichnung: 'Kosten');
       await insertKategorie(id: 722, eksKategorie: 'B6_5', bezeichnung: 'Travel');
-      await insertJournal(kategorieId: 720, betrag: '2000.00', datum: '2025-03-10', art: 'Einnahme');
-      await insertJournal(kategorieId: 720, betrag: '500.00', datum: '2025-04-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 720, betrag: '2000.00', datum: '2025-03-10');
+      await insertJournal(kategorieId: 720, betrag: '500.00', datum: '2025-04-10');
       await insertJournal(kategorieId: 721, betrag: '800.00', datum: '2025-05-10', art: 'Ausgabe');
       // Travel 100km =>10.00
       await insertJournal(kategorieId: 722, betrag: '0.00', datum: '2025-06-10', art: 'Ausgabe', kmAnzahl: '100');
@@ -187,15 +187,9 @@ void main() {
 
     test('Missing bg_nummer/jobcenter → empty + warn log not fail', () async {
       // Unternehmen without bg/jobcenter
-      await upsertUnternehmen(
-        berufsbezeichnung: 'Freiberufler',
-        kammer: null,
-        geburtsdatum: null,
-        bgNummer: null,
-        jobcenter: null,
-      );
+      await upsertUnternehmen(berufsbezeichnung: 'Freiberufler');
       await insertKategorie(id: 730, eksKategorie: 'F23', bezeichnung: 'Einnahmen');
-      await insertJournal(kategorieId: 730, betrag: '100.00', datum: '2025-07-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 730, betrag: '100.00', datum: '2025-07-10');
 
       final List<String> prints = <String>[];
       final EksResult result = await _capturePrints(() => service.generate(jahr: 2025), prints);
@@ -229,7 +223,7 @@ void main() {
     test('kundeId filter does not break generation', () async {
       await upsertUnternehmen(bgNummer: 'BG1', jobcenter: 'JC1');
       await insertKategorie(id: 740, eksKategorie: 'F23', bezeichnung: 'Einnahmen');
-      await insertJournal(kategorieId: 740, betrag: '300.00', datum: '2025-08-10', art: 'Einnahme');
+      await insertJournal(kategorieId: 740, betrag: '300.00', datum: '2025-08-10');
       // Should accept kundeId optional
       final EksResult result = await service.generate(jahr: 2025, kundeId: 999);
       expect(result.sectionF['F23'], '300.00');
@@ -285,7 +279,7 @@ Future<void> _ensureEksColumns(AppDatabase db) async {
 }
 
 Future<T> _capturePrints<T>(Future<T> Function() fn, List<String> out) async {
-  final DebugPrintCallback? old = debugPrint;
+  final DebugPrintCallback old = debugPrint;
   debugPrint = (String? message, {int? wrapWidth}) {
     if (message != null) {
       out.add(message);
@@ -303,6 +297,6 @@ Future<T> _capturePrints<T>(Future<T> Function() fn, List<String> out) async {
     );
     return result;
   } finally {
-    debugPrint = old!;
+    debugPrint = old;
   }
 }

@@ -124,13 +124,7 @@ class WindowStateService {
     if (tooSmall || isOffScreen(s, screen)) {
       final double cx = (screen.width - defaultWidth) / 2;
       final double cy = (screen.height - defaultHeight) / 2;
-      return WindowState(
-        width: defaultWidth,
-        height: defaultHeight,
-        x: cx < 0 ? 0 : cx,
-        y: cy < 0 ? 0 : cy,
-        isMaximized: false,
-      );
+      return WindowState(width: defaultWidth, x: cx < 0 ? 0 : cx, y: cy < 0 ? 0 : cy);
     }
     return s;
   }

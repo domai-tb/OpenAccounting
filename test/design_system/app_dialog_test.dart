@@ -44,7 +44,7 @@ void main() {
         final Card c = tester.widget<Card>(card.first);
         final ShapeBorder? shape = c.shape;
         if (shape is RoundedRectangleBorder) {
-          final BorderRadiusGeometry? br = shape.borderRadius;
+          final BorderRadiusGeometry br = shape.borderRadius;
           if (br is BorderRadius) radius = br;
         }
         elevation = c.elevation;
@@ -53,7 +53,7 @@ void main() {
         final Dialog d = tester.widget<Dialog>(dialogWidget.first);
         final ShapeBorder? shape = d.shape;
         if (shape is RoundedRectangleBorder) {
-          final BorderRadiusGeometry? br = shape.borderRadius;
+          final BorderRadiusGeometry br = shape.borderRadius;
           if (br is BorderRadius) radius = br;
         }
         if (d.elevation != null) elevation = d.elevation;
@@ -66,13 +66,13 @@ void main() {
         for (final Element e in material.evaluate()) {
           final Material m = e.widget as Material;
           if (m.shape is RoundedRectangleBorder) {
-            final BorderRadiusGeometry? br = (m.shape as RoundedRectangleBorder).borderRadius;
-            if (br is BorderRadius) radius = br as BorderRadius?;
+            final BorderRadiusGeometry br = (m.shape! as RoundedRectangleBorder).borderRadius;
+            if (br is BorderRadius) radius = br;
           }
           if (m.borderRadius is BorderRadius) {
             radius ??= m.borderRadius as BorderRadius?;
           }
-          if (m.elevation != null && m.elevation! > 0) elevation = m.elevation;
+          if (m.elevation > 0) elevation = m.elevation;
           if (radius != null) break;
         }
       }

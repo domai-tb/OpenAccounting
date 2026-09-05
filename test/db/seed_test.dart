@@ -47,8 +47,8 @@ void main() {
 
       expect(rows.length, greaterThanOrEqualTo(80));
       expect(rows.every((row) => row['konto_skr03'] != null && row['konto_skr04'] != null), isTrue);
-      expect(rows.every((row) => (row['bezeichnung'] as String).contains('Du')), isTrue);
-      expect(rows.every((row) => (row['beschreibung'] as String).contains('deinen')), isTrue);
+      expect(rows.every((row) => (row['bezeichnung']?.toString() ?? '').contains('Du')), isTrue);
+      expect(rows.every((row) => (row['beschreibung']?.toString() ?? '').contains('deinen')), isTrue);
     });
 
     test('is idempotent and preserves existing seed values', () async {

@@ -22,10 +22,7 @@ void main() {
       );
       expect(light.cardTheme.color, const Color(0xFFFFFFFF), reason: 'light cardColor must be #FFFFFF per spec');
       expect(AppTheme.seed, const Color(0xFF4F46E5), reason: 'seed must be #4F46E5');
-      final ColorScheme expectedLight = ColorScheme.fromSeed(
-        seedColor: const Color(0xFF4F46E5),
-        brightness: Brightness.light,
-      );
+      final ColorScheme expectedLight = ColorScheme.fromSeed(seedColor: const Color(0xFF4F46E5));
       expect(
         light.colorScheme.primary,
         expectedLight.primary,
@@ -183,11 +180,4 @@ void main() {
       );
     });
   });
-}
-
-extension on ProviderContainer {
-  // Allow awaiting microtasks in tests — pump equivalent for ProviderContainer.
-  Future<void> pump() async {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
 }
