@@ -3,6 +3,9 @@
 /// VM-safe, pure logic, no DB. Reuses money helpers to avoid double drift.
 import 'package:openaccounting/features/accounting/money.dart' as money;
 
+const String _kEmptyInput = 'ungültig: leere Eingabe';
+const String _kNotANumber = 'ungültig: keine Zahl';
+
 class AccountingTaxPolishService {
   /// Trigger happy path — polierter Betrag via money helpers.
   String trigger(String eingabe) {
@@ -13,22 +16,18 @@ class AccountingTaxPolishService {
 
   /// Validiert Eingabe — null wenn gültig, 'ungültig:...' wenn ungültig.
   String? validate(String? eingabe) {
-    if (eingabe == null || eingabe.trim().isEmpty) {
-      return 'ungültig: leere Eingabe';
-    }
+    if (eingabe == null || eingabe.trim().isEmpty) return _kEmptyInput;
     return null;
   }
 
   /// Poliert Betrag-String nach deutschem Finanzformat (2 Dezimalstellen).
   /// Leerer Input liefert Fehlersignal statt still '0.00'.
   String polishBetrag(String raw) {
-    if (raw.trim().isEmpty) {
-      return 'ungültig: leere Eingabe';
-    }
+    if (raw.trim().isEmpty) return _kEmptyInput;
     try {
       return money.formatBetrag(raw);
     } catch (_) {
-      return 'ungültig: keine Zahl';
+      return _kNotANumber;
     }
   }
 }
