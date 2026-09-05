@@ -4,13 +4,13 @@
 
 ### Requirement: System Tray
 
-The application SHALL display a system tray icon with a context menu providing: Show/Hide window, Restart Backend, Check for Updates, Quit. The tray icon SHALL remain visible when the window is minimized (not closed).
+The application SHALL display a system tray icon with a context menu providing: Show/Hide window, Refresh data, Check for Updates, Quit. The tray icon SHALL remain visible when the window is minimized (not closed).
 
 #### Scenario: Tray Context Menu Actions
 
 GIVEN the app is running and the tray icon is visible
 WHEN the user right-clicks the system tray icon
-THEN a context menu SHALL appear with "Fenster anzeigen", "Backend neu starten", "Nach Updates suchen", and "Beenden"
+THEN a context menu SHALL appear with "Fenster anzeigen", "Daten aktualisieren", "Nach Updates suchen", and "Beenden"
 AND clicking "Fenster anzeigen" SHALL restore the window to its last position and size
 
 #### Scenario: Close to Tray
@@ -32,7 +32,6 @@ GIVEN the system does not support system tray (e.g., certain Linux WMs)
 WHEN the app launches
 THEN the app SHALL function normally without a tray icon
 AND no error SHALL be displayed
-
 ### Requirement: Global Keyboard Shortcuts
 
 The application SHALL register global keyboard shortcuts that function even when the window is not focused. The default shortcuts SHALL be: Ctrl+Shift+I (show/hide window), Ctrl+Shift+N (new invoice).

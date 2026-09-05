@@ -306,3 +306,14 @@ GIVEN a bank transaction exists with dedupe_hash = null
 WHEN another transaction with dedupe_hash = null and the same konto_id is inserted
 THEN the insert SHALL succeed
 AND the partial index SHALL not apply to null hashes
+
+### Requirement: Explicit feature-table migrations
+
+Feature migrations SHALL declare every table they add, including its columns, constraints, and schema-version change. The inventory feature SHALL add the named `inventarbewegungen` table defined in the inventory specification; no unspecified movement or log table SHALL be created.
+
+#### Scenario: Named inventory table migration
+
+GIVEN the inventory feature migration is enabled
+WHEN the migration completes
+THEN the `inventarbewegungen` table SHALL exist with the columns and constraints specified by the inventory feature
+AND the 38 base tables SHALL remain present.

@@ -178,3 +178,21 @@ AND stock warnings SHALL NOT appear in the invoice form.
 GIVEN `unternehmen.lagerführung_aktiv = true`
 WHEN the application loads
 THEN all inventory-related UI elements SHALL be visible.
+
+### Requirement: Inventory movement storage
+
+The inventory feature migration SHALL add exactly one named table, `inventarbewegungen`, with `id`, `artikel_id` (foreign key to `artikel`), `datum`, `diff` (NUMERIC(10,3)), `grund`, and nullable `referenz_typ` and `referenz_id` fields. Invoice decrements, Storno restores, and manual adjustments SHALL each write one movement row in the same transaction as the stock change. `referenz_typ` and `referenz_id` SHALL identify the originating document when applicable.
+
+#### Scenario: Automatic movement recorded
+
+GIVEN an inventory-enabled article is included in a finalized invoice
+WHEN stock is decremented
+THEN `inventarbewegungen` SHALL contain the negative quantity with the invoice reference
+AND the movement row and stock update SHALL commit or roll back together.
+
+#### Scenario: Storno movement recorded
+
+GIVEN an inventory-enabled invoice is storniert
+WHEN stock is restored
+THEN `inventarbewegungen` SHALL contain the positive restored quantity with the Storno reference
+AND the movement row and stock update SHALL commit or roll back together.

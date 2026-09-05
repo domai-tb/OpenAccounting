@@ -222,3 +222,35 @@ THEN it SHALL resolve to `~/Library/Application Support/OpenInvoices/profiles/Ge
 GIVEN the application runs on Windows AND the active profile is "Geschäft"
 WHEN `APP_DATA_DIR` is resolved
 THEN it SHALL resolve to `%LOCALAPPDATA%/OpenInvoices/profiles/Geschäft/`.
+
+### Requirement: Safe profile names and canonical local paths
+
+Profile names MUST be non-empty single path components. The system SHALL reject `.` and `..` path segments, `/`, `\\`, NUL/control characters, and any name that would normalize to a different path component. Names SHALL remain unique case-insensitively. Before creating, renaming, or writing a profile, the system SHALL resolve the base data directory and candidate profile directory to canonical paths and SHALL reject any candidate that is not beneath the canonical base directory, including paths that escape through symlinks. Local profile content writes SHALL be resolved canonically and remain beneath the active profile's canonical `APP_DATA_DIR`; the `profile.json` management pointer is written only at the canonical data-directory root.
+
+#### Scenario: Profile name traversal rejected
+
+GIVEN the Profile Manager is open
+WHEN the user enters `../Geschäft`, `Privat/Geschäft`, or `Privat\\Geschäft` as a profile name
+THEN the system SHALL reject the name before any directory or `profile.json` write
+AND SHALL display a profile-name validation error.
+
+#### Scenario: Symlink escape rejected
+
+GIVEN a profile directory or parent path resolves through a symlink outside the canonical profile base
+WHEN the application resolves the profile's `APP_DATA_DIR`
+THEN the system SHALL reject the profile
+AND SHALL NOT read or write files through the escaped path.
+
+#### Scenario: Local write stays within active profile
+
+GIVEN the active profile's canonical `APP_DATA_DIR` is resolved
+WHEN a local upload, logo, database, or backup path is constructed
+THEN the canonical target SHALL remain beneath `APP_DATA_DIR`
+AND a target outside it SHALL be rejected before writing.
+
+#### Scenario: Corrupted profile.json falls back to default
+
+GIVEN `profile.json` contains invalid JSON
+WHEN the application starts
+THEN the system SHALL display a warning
+AND SHALL fall back to the first available profile directory.

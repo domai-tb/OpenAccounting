@@ -181,3 +181,27 @@ THEN it SHALL be stored under `~/Library/Application Support/OpenInvoices/profil
 GIVEN the application runs on Windows
 WHEN a profile database is created
 THEN it SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/profiles/<name>/`.
+
+### Requirement: Cash account initialization
+
+The setup wizard SHALL create a cash account in the existing `konten` table with `kontoart = Kasse` and an opening balance of 0.00 on completion. The user SHALL be able to optionally set an initial cash balance during step 2 (Konten). The opening balance SHALL be recorded through the standard opening journal mechanism linked to that cash account; no separate `kassenbestand` table SHALL be created.
+
+#### Scenario: Default cash balance
+
+GIVEN the user completes the setup wizard without entering a cash balance
+WHEN the wizard finishes
+THEN a `konten` row with `kontoart = Kasse` SHALL exist
+AND its opening journal entry SHALL record betrag=0.00 on the current date.
+
+#### Scenario: Custom cash balance
+
+GIVEN the user enters an initial cash balance of 150.00 during the wizard
+WHEN the wizard finishes
+THEN a `konten` row with `kontoart = Kasse` SHALL exist
+AND its opening journal entry SHALL record betrag=150.00 on the current date.
+
+#### Scenario: Negative cash balance rejected
+
+GIVEN the user is on step 2 (Konten)
+WHEN the user enters a negative cash balance
+THEN an inline error message SHALL appear indicating the balance must be non-negative.

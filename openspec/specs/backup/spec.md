@@ -4,13 +4,13 @@
 
 ### Requirement: Local WAL-safe backup with rotation
 
-The system SHALL perform WAL-safe local backups using SQLite's `.backup()` API, producing a consistent snapshot even during concurrent writes. Backups SHALL be stored in `~/.local/share/OpenInvoices/backups/`. The system SHALL retain a maximum of 5 backups, automatically deleting the oldest when the limit is exceeded.
+The system SHALL perform WAL-safe local backups using SQLite's `.backup()` API, producing a consistent snapshot even during concurrent writes. Local backups SHALL be stored below the active profile's `APP_DATA_DIR` at `${APP_DATA_DIR}/backups/`. The system SHALL retain a maximum of 5 backups, automatically deleting the oldest when the limit is exceeded.
 
 #### Scenario: Local backup creation
 
 GIVEN the application is running with an active database
 WHEN a local backup is triggered (manually or automatically)
-THEN the system SHALL create a new file named `openinvoices_YYYYMMDD_HHMMSS.db` in the backup directory
+THEN the system SHALL create a new file named `openinvoices_YYYYMMDD_HHMMSS.db` in `${APP_DATA_DIR}/backups/`
 AND the backup SHALL be WAL-safe (consistent snapshot, not corrupted by in-flight writes)
 AND if more than 5 backups exist, the oldest SHALL be deleted.
 
@@ -20,7 +20,6 @@ GIVEN the backup directory exists on a filesystem with insufficient space
 WHEN a local backup is triggered
 THEN the system SHALL NOT corrupt the existing database
 AND SHALL display an error message indicating insufficient disk space.
-
 ### Requirement: Backup before schema migration
 
 The system SHALL automatically create a local backup before executing any migration statements when a schema version mismatch is detected. The backup SHALL complete before the first `PRAGMA user_version` write.
@@ -168,3 +167,30 @@ THEN backups SHALL be stored under `~/Library/Application Support/OpenInvoices/b
 GIVEN the application runs on Windows
 WHEN a local backup is created
 THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/backups/`.
+
+### Requirement: Backup target boundaries
+
+Backup destinations SHALL be classified as either local profile backups or external targets. Local backups MUST remain below the active profile's canonical `APP_DATA_DIR`. USB, NAS, SMB, and user-selected local-folder destinations SHALL require an explicit user opt-in and SHALL be validated by their own target-specific path or protocol rules. An approved external destination SHALL NOT be represented as or claimed to be inside `APP_DATA_DIR`.
+
+#### Scenario: External target requires explicit opt-in
+
+GIVEN the user has selected a USB, NAS, SMB, or external local-folder destination
+WHEN the destination is configured
+THEN the system SHALL require explicit confirmation of that external target
+AND SHALL validate it separately from the local `APP_DATA_DIR` backup path.
+
+### Requirement: External local-path protection with opt-in override
+
+The system SHALL reject explicitly configured external local-folder backup targets on system drives (root partition, boot partition) by default. The user SHALL be able to override this protection per-path with an explicit opt-in boolean (`backup_extern_pfad_lokal_ok`). This rule SHALL NOT change the fixed local backup location below `APP_DATA_DIR`.
+
+#### Scenario: System drive backup rejected
+
+GIVEN the user has not set the external local-path override flag
+WHEN the user configures a backup path on a system drive (e.g., `/`, `/boot`, `C:\`)
+THEN the system SHALL reject the path with a clear error message.
+
+#### Scenario: System drive override accepted
+
+GIVEN the user has set `backup_extern_pfad_lokal_ok` to true for the external local path
+WHEN the user configures a backup path on a system drive
+THEN the system SHALL accept the path and proceed with backup.

@@ -124,7 +124,7 @@ The system SHALL generate Anlage EÜR 2025 with 60+ line items (Zeilen 12–107)
 
 ### Requirement: UStVA (Umsatzsteuer-Voranmeldung)
 
-The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Kennzahlen (KZ) 1–22, configurable by Voranmeldungsrhythmus (monatlich/quartal).
+The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with every statutory Kennzahl required by the configured scenarios, including KZ 12, 61, 66, 81, 83, 89, and 93, configurable by Voranmeldungsrhythmus (monatlich/quartal). The output SHALL not be limited to KZ 1–22.
 
 #### Scenario: KZ 1 — Gesamtumsatz steuerpflichtig
 
@@ -148,7 +148,7 @@ The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Ken
 
 - GIVEN a UStVA period including Differenzbesteuerung entries
 - WHEN the UStVA is computed
-- THEN KZ 18 SHALL show the margin-based USt (marge_25a_brutto × ust_satz_25a / (100 + ust_satz_25a))
+- THEN KZ 18 SHALL show the USt on the taxable margin base `max(marge_25a_brutto, 0)` using `base × ust_satz_25a / (100 + ust_satz_25a)`
 
 #### Scenario: KZ 61 — Vorsteuerabzug ig Erwerb
 
@@ -156,11 +156,26 @@ The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Ken
 - WHEN the UStVA is computed
 - THEN KZ 61 SHALL show the Vorsteuer from those entries (not KZ 66)
 
+#### Scenario: KZ 66 — Allgemeiner Vorsteuerabzug
+
+- GIVEN domestic input-tax claims in `vorsteuer_ansprueche` for a filing period
+- WHEN the UStVA is computed
+- THEN KZ 66 SHALL show the eligible Vorsteuer from those claims
+- AND KZ 66 SHALL exclude claims belonging to the ig Erwerb KZ 61 scenario
+
+#### Scenario: KZ 89/93 — Reverse Charge
+
+- GIVEN journal entries with `ust_sonderfall` set to a configured §13b or other Reverse-Charge case in a filing period
+- WHEN the UStVA is computed
+- THEN the applicable tax base and tax SHALL be reported in KZ 89 and KZ 93
+- AND the same entries SHALL NOT be reported as ordinary domestic turnover
+
 #### Scenario: KZ 81/83 — Differenzbetrag §25a
 
 - GIVEN a UStVA period including §25a entries
 - WHEN the UStVA is computed
-- THEN KZ 81 SHALL show the margin (marge_25a_brutto) and KZ 83 SHALL show the USt on the margin
+- THEN KZ 81 SHALL show the sum of `max(marge_25a_brutto, 0)`
+- AND KZ 83 SHALL show `KZ 81 × ust_satz_25a / (100 + ust_satz_25a)`
 
 #### Scenario: Quarterly filing
 
@@ -173,7 +188,6 @@ The system SHALL compute monthly or quarterly Umsatzsteuer-Voranmeldung with Ken
 - GIVEN a filing period with no journal entries
 - WHEN the UStVA is computed
 - THEN all Kennzahlen SHALL show 0 and the filing SHALL be a zero-returns
-
 ### Requirement: EKS (Anlage EKS — Einnahmen-Kostenübersicht)
 
 The system SHALL generate a 9-page Anlage EKS for Jobcenter Transferleistungen, populating sections A–I from company, customer, and journal data.

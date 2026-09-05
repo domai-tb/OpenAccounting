@@ -417,11 +417,11 @@ The system SHALL generate a daily cash close PDF (Tagesabschluss) with counted a
 
 ### Requirement: Content-Disposition Inline
 
-All PDF endpoints returning documents for webview display SHALL use `Content-Disposition: inline` with a filename parameter. `attachment` disposition SHALL NOT be used for PDFs displayed via openUrl().
+All PDF responses consumed by the in-app Flutter viewer SHALL use `Content-Disposition: inline` with a filename parameter. `attachment` disposition SHALL NOT be used for PDFs displayed in that viewer.
 
-#### Scenario: PDF via webview
+#### Scenario: PDF via Flutter viewer
 
-- GIVEN a PDF endpoint returning a document for display in the app webview
+- GIVEN a PDF response returning a document for display in the app's Flutter viewer
 - WHEN the HTTP response is sent
 - THEN the response SHALL have `Content-Disposition: inline; filename="<dateiname>"`
 
@@ -434,9 +434,8 @@ All PDF endpoints returning documents for webview display SHALL use `Content-Dis
 #### Scenario: PDF with attachment disposition (forbidden)
 
 - GIVEN a PDF endpoint using `Content-Disposition: attachment`
-- WHEN the response is sent to the webview
-- THEN the webview SHALL display a black window (failed download) — this is incorrect behavior and SHALL be prevented by the system
-
+- WHEN the response is sent to the Flutter viewer
+- THEN the viewer SHALL display the PDF inline rather than treating it as a download
 ### Requirement: Footer with Page Numbers
 
 The system SHALL render a footer on every page containing the company name, page number, and total page count.
@@ -590,3 +589,24 @@ The system SHALL embed the company logo as an image in the PDF header. Supported
 - GIVEN a logo file in an unsupported format (e.g., BMP, TIFF)
 - WHEN the document PDF is rendered
 - THEN the system SHALL skip logo embedding and render the header without the logo, logging a warning
+
+### Requirement: GoBD Integrity Hashes
+
+The system SHALL generate GoBD-compliant tamper-evident integrity hashes for finalized documents. An unkeyed SHA-256 hash SHALL NOT be described or treated as a digital signature.
+
+#### Scenario: Document finalization integrity hash
+
+- WHEN a document is finalized
+- THEN the system SHALL compute a SHA-256 hash of the document content and store it as the document's GoBD integrity hash in the database
+
+#### Scenario: Integrity hash verification
+
+- GIVEN a finalized document with a stored GoBD integrity hash
+- WHEN the integrity hash is verified
+- THEN the system SHALL recompute the hash and compare it against the stored hash, returning valid or invalid
+
+#### Scenario: Tampered document detection
+
+- GIVEN a finalized document whose PDF content has been modified after finalization
+- WHEN the integrity hash is verified
+- THEN the system SHALL return invalid and flag the document as tampered
