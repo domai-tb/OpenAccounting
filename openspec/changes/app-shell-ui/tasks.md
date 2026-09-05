@@ -18,14 +18,14 @@
 
 ## 4. Content Canvas and Layout Constraints
 
-- [ ] 4.1 Write failing test: `test/design_system/app_page_test.dart` — form width 720–900 cap at 1920, padding 32/24/16, table full width (assert fails)
-- [ ] 4.2 Implement: `lib/design_system/components/app_page.dart` with `ConstrainedBox` + `LayoutBuilder` + `AppSpacing` tokens, 4px grid, responsive padding
+- [x] 4.1 Write failing test: `test/design_system/app_page_test.dart` — form width 720–900 cap at 1920, padding 32/24/16, table full width (assert fails)
+- [x] 4.2 Implement: `lib/design_system/components/app_page.dart` with `ConstrainedBox` + `LayoutBuilder` + `AppSpacing` tokens, 4px grid, responsive padding
 - [x] 4.3 Refactor; full suite stays green
 
 ## 5. Optional Inspector
 
-- [ ] 5.1 Write failing test: `test/design_system/app_inspector_test.dart` — inspector opens on selection 400px, adapts to overlay at 900, closes on Esc (assert fails)
-- [ ] 5.2 Implement: `lib/design_system/components/app_inspector.dart` 360–440 px, `AnimatedContainer` 200ms, focus trap, overlay <900
+- [x] 5.1 Write failing test: `test/design_system/app_inspector_test.dart` — inspector opens on selection 400px, adapts to overlay at 900, closes on Esc (assert fails)
+- [x] 5.2 Implement: `lib/design_system/components/app_inspector.dart` 360–440 px, `AnimatedContainer` 200ms, focus trap, overlay <900
 - [x] 5.3 Refactor; full suite stays green
 
 ## 6. Window Behavior
