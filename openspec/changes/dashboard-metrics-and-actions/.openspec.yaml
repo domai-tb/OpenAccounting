@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Align KPI queries with document state and booking direction, and make
+  every card/quick link open the corresponding workflow.

@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Connect imported bank/receipt events to review, matching, payment
+  allocation, and truthful receivable settlement.

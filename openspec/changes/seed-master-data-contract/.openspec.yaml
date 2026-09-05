@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Seed valid chart-of-accounts EÜR/EKS mappings and the supported
+  bank-template catalog deterministically.

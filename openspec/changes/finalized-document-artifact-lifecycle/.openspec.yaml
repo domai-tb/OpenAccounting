@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Generate and persist invoice and dunning PDFs, then support reopening and
+  desktop print/save actions from recorded paths.

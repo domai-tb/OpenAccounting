@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Enforce finalized-source rules, persist group links, and resolve the
+  account/tax context needed for audit-stable journal history.

@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Preserve VAT and gross/net invariants, immutable audit links, and
+  duplicate-replacement protection for correction documents.

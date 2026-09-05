@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Make the repository's maintained specifications parseable, internally
+  consistent, and actionable under strict Anvil validation.

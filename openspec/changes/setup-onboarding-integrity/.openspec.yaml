@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Ensure skip/finish leave setup, persist a consistent opening state without
+  demo fallbacks, and cover the concepts required by the design.

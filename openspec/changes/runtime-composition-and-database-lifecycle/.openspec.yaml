@@ -1,0 +1,5 @@
+schema: anvil
+created: 2026-09-05
+goal: Ensure every production page resolves shared services through the
+  documented composition boundary and never queries an unopened default
+  database.

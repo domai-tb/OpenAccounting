@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Make customer/supplier operations, credit-limit audit, and dunning letters
+  persistent, artifact-backed, and reachable.

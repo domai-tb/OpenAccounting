@@ -1,0 +1,3 @@
+schema: anvil
+created: 2026-09-05
+goal: Prevent legacy integer synchronization from losing valid decimal stock.

@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Provide Upload → Review → Import with truthful row-level failures,
+  transactional persistence, and history status/error reporting.

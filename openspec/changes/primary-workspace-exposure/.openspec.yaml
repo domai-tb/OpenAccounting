@@ -1,0 +1,5 @@
+schema: anvil
+created: 2026-09-05
+goal: Make the capabilities already present in services reachable from the
+  primary navigation with real loading, empty, error, list, detail, and action
+  states.

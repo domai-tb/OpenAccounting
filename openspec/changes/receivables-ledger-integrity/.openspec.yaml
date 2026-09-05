@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Account for every payment exactly once across partial, full, overpaid, and
+  opening-balance views.

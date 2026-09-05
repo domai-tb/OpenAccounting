@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Wire runtime locale/theme/privacy/backup/integration controls to the
+  production shell and make backup failures visible and recoverable.

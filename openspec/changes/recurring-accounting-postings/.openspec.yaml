@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Calculate recurring documents per position rate and derive gross-expense
+  input tax without overstating claims.

@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Fix responsive sidebar/header behavior, actionable states, financial
+  display/privacy, focus traversal, status semantics, and destructive dialogs.

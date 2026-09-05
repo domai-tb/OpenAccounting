@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Make select, create, switch, rename, delete, and active-profile
+  persistence real while preserving profile isolation.

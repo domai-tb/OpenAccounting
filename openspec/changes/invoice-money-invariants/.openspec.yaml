@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-05
+goal: Reject invalid money inputs and persist totals derived from validated
+  discounted lines rather than trusting inconsistent caller totals.
