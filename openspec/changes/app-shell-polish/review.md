@@ -1,10 +1,10 @@
 ## Review Metadata
 
-- **Review round**: 1
-- **Prior round**: none
+- **Review round**: 4
+- **Prior round**: 3
 - **Reviewer context**: fresh-context subagent
 - **Tool restrictions**: read-only
-- **Artifacts reviewed**: proposal.md, design.md, specs/
+- **Artifacts reviewed**: proposal.md, design.md, specs/app-shell/spec.md, tasks.md, test-plan.md, verify.md
 
 ## Findings
 
