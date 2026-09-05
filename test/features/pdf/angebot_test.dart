@@ -35,6 +35,7 @@ void main() {
     PdfDocumentType.auftrag: 'Auftrag',
     PdfDocumentType.proforma: 'Proforma-Rechnung',
     PdfDocumentType.lieferschein: 'Lieferschein',
+    PdfDocumentType.mahnung: 'Mahnung',
   };
   const rawDocumentTypes = <String, PdfDocumentType>{
     'rechnung': PdfDocumentType.rechnung,
@@ -44,10 +45,11 @@ void main() {
     'auftrag': PdfDocumentType.auftrag,
     'proforma': PdfDocumentType.proforma,
     'lieferschein': PdfDocumentType.lieferschein,
+    'mahnung': PdfDocumentType.mahnung,
   };
 
-  test('document type boundary supports exactly seven values and rejects unknown raw values', () {
-    expect(PdfDocumentType.values, hasLength(7));
+  test('document type boundary supports exactly eight values and rejects unknown raw values', () {
+    expect(PdfDocumentType.values, hasLength(8));
     expect(PdfDocumentType.values, unorderedEquals(documentLabels.keys));
 
     for (final entry in rawDocumentTypes.entries) {
@@ -190,6 +192,14 @@ PdfDocumentSnapshot _snapshotFor({
     serviceTo: serviceTo,
     validUntil: validUntil,
     orderStatus: orderStatus,
+    mahnung: documentType == PdfDocumentType.mahnung
+        ? PdfMahnungSnapshot(
+            originalInvoiceNumber: 'RE-2026-001',
+            originalInvoiceDate: DateTime(2026, 8, 15),
+            dueDate: DateTime(2026, 8, 30),
+            dunningLevel: 1,
+          )
+        : null,
   );
 }
 

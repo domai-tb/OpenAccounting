@@ -25,6 +25,7 @@ final class PdfGenerator {
 List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
   final showTax = snapshot.template == PdfTemplate.standard;
   final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
+  final isMahnung = snapshot.documentType == PdfDocumentType.mahnung;
   final textSnapshot = snapshot.texts.forType(snapshot.documentType);
 
   return <pw.Widget>[
@@ -36,6 +37,12 @@ List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
     if (snapshot.documentDate != null) ...[
       pw.SizedBox(height: 12),
       pw.Text('Datum: ${_formatDate(snapshot.documentDate!)}'),
+    ],
+    if (isMahnung && snapshot.mahnung != null) ...[
+      pw.SizedBox(height: 6),
+      pw.Text('Ursprüngliche Rechnung: ${snapshot.mahnung!.originalInvoiceNumber}'),
+      pw.Text('Rechnungsdatum: ${_formatDate(snapshot.mahnung!.originalInvoiceDate)}'),
+      pw.Text('Fällig seit: ${_formatDate(snapshot.mahnung!.dueDate)}'),
     ],
     if (snapshot.documentType == PdfDocumentType.angebot && snapshot.validUntil != null) ...[
       pw.SizedBox(height: 6),
@@ -56,6 +63,7 @@ List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
     pw.SizedBox(height: 18),
     _positionTable(snapshot),
     if (!isDeliveryNote) ...[pw.SizedBox(height: 16), _totals(snapshot.totals, showTax: showTax)],
+    if (snapshot.paymentBlock != null) ...[pw.SizedBox(height: 18), _paymentBlock(snapshot.paymentBlock!)],
     if (_hasText(textSnapshot.schlusstext)) ...[pw.SizedBox(height: 18), _markdownText(textSnapshot.schlusstext!)],
   ];
 }
@@ -88,10 +96,13 @@ pw.Widget _companyHeader(PdfCompanySnapshot company, String documentLabel) {
 }
 
 pw.Widget _documentHeading(PdfDocumentSnapshot snapshot) {
+  final title = snapshot.documentType == PdfDocumentType.mahnung && snapshot.mahnung != null
+      ? snapshot.mahnung!.dunningLevelLabel
+      : snapshot.documentType.label;
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
-      pw.Text(snapshot.documentType.label, style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+      pw.Text(title, style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
       pw.Text('Rechnungsnummer: ${snapshot.documentNumber}'),
     ],
   );
@@ -242,6 +253,20 @@ pw.Widget _totals(PdfTotalsSnapshot totals, {required bool showTax}) {
         ],
       ),
     ),
+  );
+}
+
+pw.Widget _paymentBlock(PdfPaymentBlockSnapshot payment) {
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: <pw.Widget>[
+      pw.Text('Zahlungsdaten', style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 6),
+      pw.Text('IBAN: ${payment.iban}'),
+      if (_hasText(payment.bic)) pw.Text('BIC: ${payment.bic}'),
+      if (_hasText(payment.bankName)) pw.Text('Bank: ${payment.bankName}'),
+      if (_hasText(payment.paymentTerms)) ...[pw.SizedBox(height: 6), _markdownText(payment.paymentTerms!)],
+    ],
   );
 }
 

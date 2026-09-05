@@ -7,7 +7,8 @@ enum PdfDocumentType {
   angebot,
   auftrag,
   proforma,
-  lieferschein;
+  lieferschein,
+  mahnung;
 
   static PdfDocumentType fromRaw(String? raw) {
     switch (raw) {
@@ -25,6 +26,8 @@ enum PdfDocumentType {
         return proforma;
       case 'lieferschein':
         return lieferschein;
+      case 'mahnung':
+        return mahnung;
       default:
         throw ArgumentError.value(raw, 'raw', 'Unbekannter Dokumenttyp: $raw');
     }
@@ -38,6 +41,7 @@ enum PdfDocumentType {
     auftrag => 'Auftrag',
     proforma => 'Proforma-Rechnung',
     lieferschein => 'Lieferschein',
+    mahnung => 'Mahnung',
   };
 }
 
@@ -227,6 +231,36 @@ final class PdfTotalsSnapshot {
   final num? marginTaxableBase;
 }
 
+final class PdfPaymentBlockSnapshot {
+  const PdfPaymentBlockSnapshot({required this.iban, this.bic, this.bankName, this.paymentTerms});
+
+  final String iban;
+  final String? bic;
+  final String? bankName;
+  final String? paymentTerms;
+}
+
+final class PdfMahnungSnapshot {
+  const PdfMahnungSnapshot({
+    required this.originalInvoiceNumber,
+    required this.originalInvoiceDate,
+    required this.dueDate,
+    required this.dunningLevel,
+  });
+
+  final String originalInvoiceNumber;
+  final DateTime originalInvoiceDate;
+  final DateTime dueDate;
+  final int dunningLevel;
+
+  String get dunningLevelLabel => switch (dunningLevel) {
+    1 => '1. Mahnung',
+    2 => '2. Mahnung',
+    3 => '3. Mahnung',
+    _ => '$dunningLevel. Mahnung',
+  };
+}
+
 final class PdfTypeTextSnapshot {
   const PdfTypeTextSnapshot({this.einleitungstext, this.schlusstext});
 
@@ -261,6 +295,7 @@ final class PdfDocumentTextsSnapshot {
     PdfDocumentType.auftrag => auftrag,
     PdfDocumentType.proforma => proforma,
     PdfDocumentType.lieferschein => lieferschein,
+    PdfDocumentType.mahnung => const PdfTypeTextSnapshot(),
   };
 }
 
@@ -281,6 +316,8 @@ final class PdfDocumentSnapshot {
     this.serviceTo,
     this.validUntil,
     this.orderStatus,
+    this.paymentBlock,
+    this.mahnung,
   });
 
   /// Copies position inputs before exposing them through the immutable snapshot.
@@ -299,7 +336,12 @@ final class PdfDocumentSnapshot {
     DateTime? serviceTo,
     DateTime? validUntil,
     String? orderStatus,
+    PdfPaymentBlockSnapshot? paymentBlock,
+    PdfMahnungSnapshot? mahnung,
   }) {
+    if (documentType == PdfDocumentType.mahnung && mahnung == null) {
+      throw ArgumentError('Mahnung erfordert ein PdfMahnungSnapshot.');
+    }
     return PdfDocumentSnapshot(
       documentType: documentType,
       template: template,
@@ -315,6 +357,8 @@ final class PdfDocumentSnapshot {
       serviceTo: serviceTo,
       validUntil: validUntil,
       orderStatus: orderStatus,
+      paymentBlock: paymentBlock,
+      mahnung: mahnung,
     );
   }
 
@@ -332,6 +376,8 @@ final class PdfDocumentSnapshot {
   final DateTime? serviceTo;
   final DateTime? validUntil;
   final String? orderStatus;
+  final PdfPaymentBlockSnapshot? paymentBlock;
+  final PdfMahnungSnapshot? mahnung;
 }
 
 List<int>? _immutableBytes(List<int>? bytes) => bytes == null ? null : List<int>.unmodifiable(bytes);

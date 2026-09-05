@@ -20,7 +20,7 @@ class ValidationException extends ApiException {
   final Map<String, List<String>> fieldErrors;
 
   /// Parse FastAPI-style or generic 422 body into fieldErrors.
-  static ValidationException fromResponse(Response<dynamic> response) {
+  factory ValidationException.fromResponse(Response<dynamic> response) {
     final data = response.data;
     final Map<String, List<String>> fields = <String, List<String>>{};
 
