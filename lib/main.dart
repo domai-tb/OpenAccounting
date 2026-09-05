@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/app.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
 import 'package:openaccounting/features/desktop/window_state.dart';
@@ -43,6 +44,13 @@ Future<void> main() async {
   await Directory(profileDirectory).create(recursive: true);
   final db = AppDatabase.forProfile(profileDirectory);
   await db.ensureOpen();
+  // Preload theme before runApp to avoid flash — DESIGN §7 System persist.
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final String? savedTheme = prefs.getString('openaccounting.theme_mode');
+  final ThemeMode initialTheme = ThemeMode.values.firstWhere(
+    (ThemeMode e) => e.name == savedTheme,
+    orElse: () => ThemeMode.system,
+  );
   runApp(
     ProviderScope(
       overrides: [
@@ -52,10 +60,18 @@ Future<void> main() async {
           });
           return db;
         }),
+        themeModeProvider.overrideWith(() => _PreloadedThemeModeNotifier(initialTheme)),
       ],
       child: const OpenAccountingApp(),
     ),
   );
+}
+
+class _PreloadedThemeModeNotifier extends ThemeModeNotifier {
+  _PreloadedThemeModeNotifier(this._initial);
+  final ThemeMode _initial;
+  @override
+  ThemeMode build() => _initial;
 }
 
 Future<void> _setupWindow() async {

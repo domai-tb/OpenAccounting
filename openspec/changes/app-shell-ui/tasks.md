@@ -36,9 +36,9 @@
 
 ## 7. Material 3 Theming (seed #4F46E5)
 
-- [ ] 7.1 Write failing test: `test/app/app_theme_test.dart` — light seed surfaces #F7F8FA/#FFFFFF, dark #101217/#171A21, system follows platform, toggle persists, invalid falls back to system (assert fails)
-- [ ] 7.2 Implement: `lib/core/theme/app_theme.dart` `ColorScheme.fromSeed(seedColor: #4F46E5, brightness: light/dark)` + `useMaterial3:true` + `lib/app/app.dart` `MaterialApp(theme/darkTheme/themeMode)` + `lib/main.dart` preload `await SharedPreferences.getInstance()` before `runApp` and override `themeModeProvider` with namespaced key `openaccounting.theme_mode`
-- [ ] 7.3 Refactor; full suite stays green
+- [x] 7.1 Write failing test: `test/app/app_theme_test.dart` — light seed surfaces #F7F8FA/#FFFFFF, dark #101217/#171A21, system follows platform, toggle persists, invalid falls back to system (assert fails)
+- [x] 7.2 Implement: `lib/core/theme/app_theme.dart` `ColorScheme.fromSeed(seedColor: #4F46E5, brightness: light/dark)` + `useMaterial3:true` + `lib/app/app.dart` `MaterialApp(theme/darkTheme/themeMode)` + `lib/main.dart` preload `await SharedPreferences.getInstance()` before `runApp` and override `themeModeProvider` with namespaced key `openaccounting.theme_mode`
+- [x] 7.3 Refactor; full suite stays green
 
 ## 8. Typography and Locale (Inter + de-DE)
 

@@ -110,7 +110,7 @@ abstract final class AppDuration {
 /// ThemeMode persistence via SharedPreferences.
 /// Immediate apply (state update) + async persistence; tolerates prefs failure.
 class ThemeModeNotifier extends Notifier<ThemeMode> {
-  static const _key = 'themeMode';
+  static const _key = 'openaccounting.theme_mode';
 
   @override
   ThemeMode build() {
