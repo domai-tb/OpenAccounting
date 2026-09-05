@@ -75,6 +75,13 @@ void main() {
       expect(router.state.matchedLocation, route.path, reason: 'Route ${route.path} must be reachable');
       if (route == AppRoute.dashboard) {
         expect(find.text('Offene Rechnungen'), findsOneWidget);
+      } else if (route == AppRoute.banking) {
+        expect(
+          find.text('Dateiimport mit Prüfung vor dem Speichern'),
+          findsOneWidget,
+          reason: 'Route ${route.path} must expose the reviewable bank-import workflow',
+        );
+        expect(find.byKey(const ValueKey<String>('bank-import-workflow')), findsOneWidget);
       } else {
         expect(
           find.text('Datenbankabfrage abgeschlossen'),

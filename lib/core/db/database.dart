@@ -146,13 +146,36 @@ class AppDatabase {
     await _artikelRepository.ensureSchema();
     await _unternehmenRepository.ensureSchema();
     await _kategorienRepository.ensureSchema();
-    // ponytail: bank_imports history completeness — add columns lazily for pre-existing DBs
-    try {
-      await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN duplikate INTEGER DEFAULT 0');
-    } catch (_) {}
-    try {
-      await _executor.runCustom('ALTER TABLE bank_imports ADD COLUMN template_typ TEXT');
-    } catch (_) {}
+    // Bank import history is additive so existing profiles keep their current columns and rows.
+    // `fehler_details` stores a JSON array of per-row diagnostics when a partial import is allowed.
+    final List<Map<String, Object?>> bankImportColumns = await _executor.runSelect(
+      'PRAGMA table_info(bank_imports)',
+      const <Object?>[],
+    );
+    final bool hadPersistedCount = bankImportColumns.any((row) => row['name'] == 'anzahl_importiert');
+    for (final String sql in <String>[
+      'ALTER TABLE bank_imports ADD COLUMN duplikate INTEGER DEFAULT 0',
+      'ALTER TABLE bank_imports ADD COLUMN template_typ TEXT',
+      'ALTER TABLE bank_imports ADD COLUMN anzahl_importiert INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE bank_imports ADD COLUMN anzahl_auto_kategorisiert INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE bank_imports ADD COLUMN anzahl_manuelle_pruefung INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE bank_imports ADD COLUMN anzahl_fehlgeschlagen INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE bank_imports ADD COLUMN fehler_details TEXT',
+    ]) {
+      try {
+        await _executor.runCustom(sql);
+      } catch (_) {}
+    }
+    // Before these fields existed, anzahl_transaktionen was the persisted-row count written by the service.
+    // Preserve that historical meaning for upgraded databases without changing the legacy column.
+    if (!hadPersistedCount) {
+      try {
+        await _executor.runCustom(
+          'UPDATE bank_imports SET anzahl_importiert = anzahl_transaktionen '
+          'WHERE anzahl_importiert = 0 AND anzahl_transaktionen > 0',
+        );
+      } catch (_) {}
+    }
     try {
       await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
     } catch (_) {}
@@ -598,6 +621,11 @@ CREATE TABLE IF NOT EXISTS bank_imports (
   anzahl_transaktionen INTEGER DEFAULT 0,
   duplikate INTEGER DEFAULT 0,
   template_typ TEXT,
+  anzahl_importiert INTEGER NOT NULL DEFAULT 0,
+  anzahl_auto_kategorisiert INTEGER NOT NULL DEFAULT 0,
+  anzahl_manuelle_pruefung INTEGER NOT NULL DEFAULT 0,
+  anzahl_fehlgeschlagen INTEGER NOT NULL DEFAULT 0,
+  fehler_details TEXT,
   status TEXT DEFAULT 'importiert'
 )''',
   // 17 bank_transaktionen

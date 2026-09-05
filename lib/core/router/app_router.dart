@@ -6,6 +6,7 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
@@ -90,7 +91,7 @@ GoRouter createRouter(AppDatabase db) {
             ],
           ),
           GoRoute(path: '/receipts', builder: (context, state) => const ReceiptsPage()),
-          GoRoute(path: '/banking', builder: (context, state) => const BankingPage()),
+          GoRoute(path: '/banking', builder: (context, state) => const BankImportPage()),
           GoRoute(
             path: '/contacts',
             builder: (context, state) => const ContactsPage(),
@@ -178,15 +179,6 @@ class ReceiptsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const ProductionRoutePage(title: 'Belege', table: 'belege');
-  }
-}
-
-class BankingPage extends ConsumerWidget {
-  const BankingPage({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(title: 'Bank & Zahlungen', table: 'bank_transaktionen');
   }
 }
 

@@ -202,10 +202,18 @@ class BankImportService {
 
   // ── Import ─────────────────────────────────────────────────────────
 
+  static const String _historyInProgressStatus = 'in_bearbeitung';
+  static const String _historyImportedStatus = 'importiert';
+  static const String _historyPartialStatus = 'teilweise';
+  static const String _historyFailedStatus = 'fehlgeschlagen';
+
   /// Import [rawTxs] for [kontoId] with dedup + auto-rules + score.
   /// [mode] = 'manuell' | 'automatisch' — automatisch auto-books high-score matches.
   /// When [allowDuplicateOverride] true, duplicate hash is suffixed to make unique.
-  /// History row inserted first to obtain `importId` for FK on bank_transaktionen.
+  ///
+  /// The service deliberately uses an explicit partial-import policy: every
+  /// valid row is attempted independently, failed rows are returned with
+  /// diagnostics, and history is finalized with the persisted counts.
   Future<ImportResult> importTransactions({
     required int kontoId,
     required List<RawTx> rawTxs,
@@ -214,38 +222,17 @@ class BankImportService {
     String dateiname = 'import.csv',
     BankTemplate? template,
   }) async {
+    _validateImport(kontoId: kontoId, rawTxs: rawTxs);
+
     int imported = 0;
     int duplicates = 0;
     int autoCat = 0;
+    int manualReview = 0;
+    final List<ImportRowFailure> failures = <ImportRowFailure>[];
 
-    // History first: obtain importId before child rows (review L312).
-    int? importId;
-    try {
-      try {
-        importId = await executor.runInsert(
-          'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, '
-          'template_typ, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          <Object?>[
-            kontoId,
-            dateiname,
-            DateTime.now().toIso8601String(),
-            rawTxs.length,
-            0,
-            template?.typ,
-            'importiert',
-          ],
-        );
-      } catch (_) {
-        importId = await executor.runInsert(
-          'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) '
-          'VALUES (?, ?, ?, ?, ?)',
-          <Object?>[kontoId, dateiname, DateTime.now().toIso8601String(), rawTxs.length, 'importiert'],
-        );
-      }
-    } catch (e) {
-      debugPrint('bank_import history insert failed: $e');
-      importId = null;
-    }
+    // History first: obtain importId before child rows so every persisted row
+    // remains linked to an auditable import. Do not import without history.
+    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template);
 
     // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters)
     List<Map<String, Object?>> journals = <Map<String, Object?>>[];
@@ -255,85 +242,53 @@ class BankImportService {
       journals = <Map<String, Object?>>[];
     }
 
-    for (final RawTx tx in rawTxs) {
-      // String money: normalize betrag via money helper to 2 decimals for hash + storage
-      final String normBetrag = _normalizeBetragForStorage(tx.betrag);
-      String hash = computeDedupeHash(tx.datum, normBetrag, tx.partner, tx.verwendungszweck);
+    for (int index = 0; index < rawTxs.length; index++) {
+      final RawTx tx = rawTxs[index];
+      final int rowNumber = index + 1;
 
-      // Check duplicate per konto_id+dedupe_hash (review L225: don't swallow DB error)
-      bool isDuplicate = false;
       try {
-        final List<Map<String, Object?>> existing = await executor.runSelect(
-          'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
-          <Object?>[kontoId, hash],
-        );
-        isDuplicate = existing.isNotEmpty;
-      } catch (e, st) {
-        debugPrint('bank_import isDuplicate check failed: $e');
-        Error.throwWithStackTrace(e, st);
-      }
+        // String money: normalize betrag via money helper to 2 decimals for hash + storage.
+        final String normBetrag = _normalizeBetragForStorage(tx.betrag);
+        String hash = _hashFor(tx, normBetrag);
 
-      if (isDuplicate && !allowDuplicateOverride) {
-        duplicates++;
-        continue;
-      }
+        final bool isDuplicate = await _hasDuplicate(kontoId: kontoId, hash: hash);
+        if (isDuplicate && !allowDuplicateOverride) {
+          duplicates++;
+          continue;
+        }
 
-      if (isDuplicate && allowDuplicateOverride) {
-        // suffix hash until unique: original-hash-1, -2, ... graceful cap at 100 (L243)
-        bool foundUnique = false;
-        String candidate = hash;
-        for (int suffix = 1; suffix <= 100; suffix++) {
-          candidate = '$hash-$suffix';
-          try {
-            final List<Map<String, Object?>> chk = await executor.runSelect(
-              'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
-              <Object?>[kontoId, candidate],
-            );
-            if (chk.isEmpty) {
-              foundUnique = true;
-              break;
+        if (isDuplicate && allowDuplicateOverride) {
+          hash = await _uniqueOverrideHash(kontoId: kontoId, hash: hash);
+        }
+
+        // A reviewed category is authoritative. Only a rule result contributes
+        // to auto-categorized counts; both counts are updated after insertion.
+        final bool hasReviewedCategory = tx.kategorieId != null;
+        final int? kategorieId = tx.kategorieId ?? await applyRules(tx.verwendungszweck);
+        final bool wasAutoCategorized = !hasReviewedCategory && kategorieId != null;
+
+        // Score match against journals — pick best >=90 (requires all three 40+30+30).
+        int? matchedJournalId = tx.journalId;
+        if (matchedJournalId == null && journals.isNotEmpty) {
+          int bestScore = -1;
+          int? bestId;
+          for (final j in journals) {
+            final int score = computeScore(tx, j);
+            if (score > bestScore) {
+              bestScore = score;
+              final Object? journalId = j['id'];
+              bestId = journalId == null ? null : (journalId as num).toInt();
             }
-          } catch (e, st) {
-            debugPrint('bank_import override dup check failed: $e');
-            Error.throwWithStackTrace(e, st);
           }
-        }
-        if (!foundUnique) {
-          // ponytail: cap 100 — graceful fallback: throw rather than colliding unique constraint
-          throw const BankImportException('Duplicate override limit reached (100) — manual cleanup required');
-        }
-        hash = candidate;
-      }
-
-      // Apply auto rules
-      final int? kategorieId = await applyRules(tx.verwendungszweck);
-      if (kategorieId != null) autoCat++;
-
-      // Score match against journals — pick best >=90 (requires all three 40+30+30)
-      int? matchedJournalId;
-      if (journals.isNotEmpty) {
-        int bestScore = -1;
-        int? bestId;
-        for (final j in journals) {
-          final int s = computeScore(tx, j);
-          if (s > bestScore) {
-            bestScore = s;
-            final Object? jid = j['id'];
-            bestId = jid == null ? null : (jid as num).toInt();
+          if (bestScore < 90 || mode.toLowerCase() != 'automatisch') {
+            bestId = null;
           }
-        }
-        if (bestScore >= 90 && mode.toLowerCase() == 'automatisch' && bestId != null) {
           matchedJournalId = bestId;
         }
-      }
 
-      final String datumStr =
-          '${tx.datum.year.toString().padLeft(4, '0')}-'
-          '${tx.datum.month.toString().padLeft(2, '0')}-'
-          '${tx.datum.day.toString().padLeft(2, '0')}';
-      final String status = matchedJournalId != null ? 'gebucht' : 'neu';
+        final String datumStr = _formatDate(tx.datum);
+        final String status = matchedJournalId != null ? 'gebucht' : 'neu';
 
-      try {
         await executor.runInsert(
           'INSERT INTO bank_transaktionen (konto_id, import_id, datum, betrag, verwendungszweck, '
           'gegenkonto, gegenkonto_name, kategorie_id, journal_id, dedupe_hash, status) '
@@ -353,70 +308,310 @@ class BankImportService {
           ],
         );
         imported++;
-      } catch (_) {
-        // ponytail: ignore insert error (FK etc) — counts as not imported
+        if (wasAutoCategorized) {
+          autoCat++;
+        } else {
+          manualReview++;
+        }
+      } catch (error, stackTrace) {
+        // A unique-index race is a duplicate outcome, not a failed row.
+        bool becameDuplicate = false;
+        try {
+          final String normalized = _normalizeBetragForStorage(tx.betrag);
+          becameDuplicate = await _hasDuplicate(kontoId: kontoId, hash: _hashFor(tx, normalized));
+        } catch (_) {
+          // Keep the original insert failure as the actionable diagnostic.
+        }
+        if (becameDuplicate && !allowDuplicateOverride) {
+          duplicates++;
+          continue;
+        }
+
+        final ImportRowFailure failure = ImportRowFailure(
+          rowNumber: rowNumber,
+          transaction: tx,
+          error: _errorMessage(error),
+        );
+        failures.add(failure);
+        debugPrint('bank_import row ${failure.rowNumber} insert failed: ${failure.error}');
+        // Preserve the original stack in logs while allowing other rows to be
+        // persisted and the caller to retry this row.
+        debugPrint('$stackTrace');
       }
     }
 
-    // Update history with final counts (imported, duplicates, template)
-    if (importId != null) {
-      try {
-        try {
-          await executor.runUpdate(
-            'UPDATE bank_imports SET anzahl_transaktionen = ?, duplikate = ?, template_typ = ? WHERE id = ?',
-            <Object?>[imported, duplicates, template?.typ, importId],
-          );
-        } catch (_) {
-          await executor.runUpdate('UPDATE bank_imports SET anzahl_transaktionen = ? WHERE id = ?', <Object?>[
-            imported,
-            importId,
-          ]);
-        }
-      } catch (e) {
-        debugPrint('bank_import history update failed: $e');
-      }
-    } else {
-      // Fallback if initial insert failed — create history now
-      try {
-        try {
-          await executor.runInsert(
-            'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, '
-            'template_typ, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            <Object?>[
-              kontoId,
-              dateiname,
-              DateTime.now().toIso8601String(),
-              imported,
-              duplicates,
-              template?.typ,
-              'importiert',
-            ],
-          );
-        } catch (_) {
-          await executor.runInsert(
-            'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) '
-            'VALUES (?, ?, ?, ?, ?)',
-            <Object?>[kontoId, dateiname, DateTime.now().toIso8601String(), imported, 'importiert'],
-          );
-        }
-      } catch (_) {}
+    final String status = _statusFor(imported: imported, failed: failures.length);
+    final List<String> diagnostics = failures.map((failure) => failure.toDiagnostic()).toList();
+    final bool historyUpdated = await _finalizeHistory(
+      importId: importId,
+      imported: imported,
+      duplicates: duplicates,
+      autoCategorized: autoCat,
+      manualReview: manualReview,
+      failures: failures,
+      template: template,
+      status: status,
+    );
+    if (!historyUpdated) {
+      diagnostics.add('Importhistorie konnte nicht abschließend gespeichert werden.');
     }
 
-    final int manualReview = imported - autoCat;
     return ImportResult(
       imported: imported,
       duplicatesSkipped: duplicates,
       autoCategorized: autoCat,
-      manualReview: manualReview < 0 ? 0 : manualReview,
+      manualReview: manualReview,
+      failed: failures.length,
+      status: status,
+      diagnostics: diagnostics,
+      failedRows: failures,
+      importId: importId,
+      historyUpdated: historyUpdated,
     );
   }
 
-  String _normalizeBetragForStorage(String raw) {
-    try {
-      return money.fromCents(money.toCents(raw));
-    } catch (_) {
-      return raw.trim();
+  /// Records a rejected file without creating a bank transaction row.
+  ///
+  /// This is useful when the upload/parser step has a source filename and
+  /// account context available. It leaves an auditable failed history entry
+  /// while keeping unsupported or malformed input out of persistence.
+  Future<ImportResult> recordRejectedImport({
+    required int kontoId,
+    required String diagnostic,
+    String dateiname = 'import.csv',
+    BankTemplate? template,
+  }) async {
+    final String message = diagnostic.trim();
+    if (message.isEmpty) {
+      throw const BankImportException(
+        'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.',
+        recoveryAction: 'Prüfen Sie Datei und Template und versuchen Sie es erneut.',
+      );
     }
+    if (kontoId <= 0) {
+      throw const BankImportException(
+        'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.',
+        recoveryAction: 'Wählen Sie ein gültiges Bankkonto und versuchen Sie es erneut.',
+      );
+    }
+
+    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template);
+    final List<ImportRowFailure> noFailedRows = <ImportRowFailure>[];
+    final List<String> diagnostics = <String>[message];
+    final bool historyUpdated = await _finalizeHistory(
+      importId: importId,
+      imported: 0,
+      duplicates: 0,
+      autoCategorized: 0,
+      manualReview: 0,
+      failures: noFailedRows,
+      template: template,
+      status: _historyFailedStatus,
+      diagnosticsOverride: diagnostics,
+    );
+    if (!historyUpdated) {
+      diagnostics.add('Importhistorie konnte nicht abschließend gespeichert werden.');
+    }
+    return ImportResult(
+      imported: 0,
+      duplicatesSkipped: 0,
+      autoCategorized: 0,
+      manualReview: 0,
+      status: _historyFailedStatus,
+      diagnostics: diagnostics,
+      importId: importId,
+      historyUpdated: historyUpdated,
+    );
+  }
+
+  void _validateImport({required int kontoId, required List<RawTx> rawTxs}) {
+    if (kontoId <= 0) {
+      throw const BankImportException(
+        'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.',
+        recoveryAction: 'Wählen Sie ein gültiges Bankkonto und versuchen Sie es erneut.',
+      );
+    }
+    if (rawTxs.isEmpty) {
+      throw const BankImportException(
+        'Keine Transaktionen zum Importieren.',
+        recoveryAction: 'Wählen Sie eine unterstützte Datei mit mindestens einer Transaktion.',
+      );
+    }
+    for (int index = 0; index < rawTxs.length; index++) {
+      final RawTx tx = rawTxs[index];
+      final int rowNumber = index + 1;
+      if (!_isValidDate(tx.datum)) {
+        throw BankImportException(
+          'Zeile $rowNumber: Datum ungültig.',
+          rowNumber: rowNumber,
+          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
+        );
+      }
+      try {
+        _normalizeBetragForStorage(tx.betrag);
+      } catch (error) {
+        throw BankImportException(
+          'Zeile $rowNumber: ${_errorMessage(error)}',
+          rowNumber: rowNumber,
+          recoveryAction: 'Korrigieren Sie den Betrag und versuchen Sie den Import erneut.',
+        );
+      }
+    }
+  }
+
+  Future<int> _createHistory({required int kontoId, required String dateiname, required BankTemplate? template}) async {
+    final String now = DateTime.now().toIso8601String();
+    try {
+      return await executor.runInsert(
+        'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, template_typ, '
+        'anzahl_importiert, anzahl_auto_kategorisiert, anzahl_manuelle_pruefung, anzahl_fehlgeschlagen, '
+        'fehler_details, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[kontoId, dateiname, now, 0, 0, template?.typ, 0, 0, 0, 0, null, _historyInProgressStatus],
+      );
+    } catch (error) {
+      debugPrint('bank_import extended history insert unavailable: $error');
+      try {
+        return await executor.runInsert(
+          'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, duplikate, '
+          'template_typ, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[kontoId, dateiname, now, 0, 0, template?.typ, _historyInProgressStatus],
+        );
+      } catch (legacyError) {
+        debugPrint('bank_import history insert failed: $legacyError');
+        try {
+          return await executor.runInsert(
+            'INSERT INTO bank_imports (konto_id, dateiname, datum, anzahl_transaktionen, status) '
+            'VALUES (?, ?, ?, ?, ?)',
+            <Object?>[kontoId, dateiname, now, 0, _historyInProgressStatus],
+          );
+        } catch (minimalError, minimalStackTrace) {
+          Error.throwWithStackTrace(
+            BankImportException(
+              'Importhistorie konnte nicht angelegt werden: ${_errorMessage(minimalError)}',
+              recoveryAction: 'Beheben Sie das Datenbankproblem und versuchen Sie es erneut.',
+            ),
+            minimalStackTrace,
+          );
+        }
+      }
+    }
+  }
+
+  Future<bool> _finalizeHistory({
+    required int importId,
+    required int imported,
+    required int duplicates,
+    required int autoCategorized,
+    required int manualReview,
+    required List<ImportRowFailure> failures,
+    required BankTemplate? template,
+    required String status,
+    List<String>? diagnosticsOverride,
+  }) async {
+    final List<String> diagnostics =
+        diagnosticsOverride ?? failures.map((failure) => failure.toDiagnostic()).toList(growable: false);
+    final String? details = diagnostics.isEmpty
+        ? null
+        : jsonEncode(diagnostics.map((diagnostic) => <String, Object?>{'message': diagnostic}).toList(growable: false));
+    try {
+      await executor.runUpdate(
+        'UPDATE bank_imports SET anzahl_transaktionen = ?, duplikate = ?, template_typ = ?, '
+        'anzahl_importiert = ?, anzahl_auto_kategorisiert = ?, anzahl_manuelle_pruefung = ?, '
+        'anzahl_fehlgeschlagen = ?, fehler_details = ?, status = ? WHERE id = ?',
+        <Object?>[
+          imported,
+          duplicates,
+          template?.typ,
+          imported,
+          autoCategorized,
+          manualReview,
+          failures.length,
+          details,
+          status,
+          importId,
+        ],
+      );
+      return true;
+    } catch (error) {
+      debugPrint('bank_import extended history update unavailable: $error');
+    }
+
+    final String legacyStatus = _historyStatusWithDiagnostics(status, diagnostics);
+    try {
+      await executor.runUpdate(
+        'UPDATE bank_imports SET anzahl_transaktionen = ?, duplikate = ?, template_typ = ?, status = ? WHERE id = ?',
+        <Object?>[imported, duplicates, template?.typ, legacyStatus, importId],
+      );
+      return true;
+    } catch (error) {
+      debugPrint('bank_import history compatibility update unavailable: $error');
+    }
+
+    try {
+      await executor.runUpdate('UPDATE bank_imports SET anzahl_transaktionen = ?, status = ? WHERE id = ?', <Object?>[
+        imported,
+        legacyStatus,
+        importId,
+      ]);
+      return true;
+    } catch (error) {
+      debugPrint('bank_import minimal history update failed: $error');
+      return false;
+    }
+  }
+
+  Future<bool> _hasDuplicate({required int kontoId, required String hash}) async {
+    final List<Map<String, Object?>> existing = await executor.runSelect(
+      'SELECT id FROM bank_transaktionen WHERE konto_id = ? AND dedupe_hash = ? LIMIT 1',
+      <Object?>[kontoId, hash],
+    );
+    return existing.isNotEmpty;
+  }
+
+  Future<String> _uniqueOverrideHash({required int kontoId, required String hash}) async {
+    for (int suffix = 1; suffix <= 100; suffix++) {
+      final String candidate = '$hash-$suffix';
+      if (!await _hasDuplicate(kontoId: kontoId, hash: candidate)) return candidate;
+    }
+    throw const BankImportException(
+      'Duplicate override limit reached (100) — manual cleanup required',
+      recoveryAction: 'Prüfen Sie die vorhandenen Duplikate und versuchen Sie es erneut.',
+    );
+  }
+
+  String _hashFor(RawTx tx, String normalizedAmount) {
+    final String? supplied = tx.dedupeHash?.trim();
+    if (supplied != null && supplied.isNotEmpty) return supplied;
+    return computeDedupeHash(tx.datum, normalizedAmount, tx.partner, tx.verwendungszweck);
+  }
+
+  String _statusFor({required int imported, required int failed}) {
+    if (failed == 0) return _historyImportedStatus;
+    return imported == 0 ? _historyFailedStatus : _historyPartialStatus;
+  }
+
+  String _historyStatusWithDiagnostics(String status, List<String> diagnostics) {
+    if (diagnostics.isEmpty) return status;
+    return '$status: ${diagnostics.join(' | ')}';
+  }
+
+  String _errorMessage(Object error) {
+    final String message = error.toString().trim();
+    return message.isEmpty ? 'Unbekannter Fehler' : message;
+  }
+
+  bool _isValidDate(DateTime value) {
+    final DateTime dateOnly = DateTime(value.year, value.month, value.day);
+    return dateOnly.year == value.year && dateOnly.month == value.month && dateOnly.day == value.day;
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  String _normalizeBetragForStorage(String raw) {
+    return _parseBetrag(raw);
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.
@@ -473,7 +668,7 @@ class BankImportService {
     for (int i = headerIdx + 1; i < rawLines.length; i++) {
       final String line = rawLines[i];
       if (line.trim().isEmpty) continue;
-      final List<String> cols = _splitCsvLine(line, delimiter);
+      final List<String> cols = _splitCsvLine(line, delimiter, rowNumber: i + 1);
       // Skip rows where all cols empty.
       if (cols.every((c) => c.trim().isEmpty)) continue;
       // If row has fewer columns than header, pad with empty.
@@ -482,13 +677,39 @@ class BankImportService {
       final String betragRaw = idxBetrag < cols.length ? cols[idxBetrag].trim() : '';
       if (datumRaw.isEmpty && betragRaw.isEmpty) continue;
       if (datumRaw.isEmpty) {
-        throw BankImportException('Datum fehlt in Zeile ${i + 1}');
+        throw BankImportException(
+          'Datum fehlt in Zeile ${i + 1}',
+          rowNumber: i + 1,
+          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
+        );
       }
       if (betragRaw.isEmpty) {
-        throw BankImportException('Betrag fehlt in Zeile ${i + 1}');
+        throw BankImportException(
+          'Betrag fehlt in Zeile ${i + 1}',
+          rowNumber: i + 1,
+          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
+        );
       }
-      final DateTime datum = _parseDate(datumRaw, template?.dateFormat);
-      final String betrag = _parseBetrag(betragRaw);
+      late final DateTime datum;
+      try {
+        datum = _parseDate(datumRaw, template?.dateFormat);
+      } catch (error) {
+        throw BankImportException(
+          'Datum ungültig in Zeile ${i + 1}: ${_errorMessage(error)}',
+          rowNumber: i + 1,
+          recoveryAction: 'Korrigieren Sie das Datum und versuchen Sie den Import erneut.',
+        );
+      }
+      late final String betrag;
+      try {
+        betrag = _parseBetrag(betragRaw);
+      } catch (error) {
+        throw BankImportException(
+          'Betrag ungültig in Zeile ${i + 1}: ${_errorMessage(error)}',
+          rowNumber: i + 1,
+          recoveryAction: 'Korrigieren Sie den Betrag und versuchen Sie den Import erneut.',
+        );
+      }
 
       String verwendungszweck = '';
       if (idxVerwend != null && idxVerwend < cols.length) {
@@ -565,6 +786,12 @@ class BankImportService {
       dotAll: true,
       caseSensitive: false,
     );
+    final int openingNtries = RegExp(r'<\s*(?:\w+:)?Ntry\b[^>]*>', caseSensitive: false).allMatches(trimmed).length;
+    final int closingNtries = RegExp(r'</\s*(?:\w+:)?Ntry\s*>', caseSensitive: false).allMatches(trimmed).length;
+    if (openingNtries != closingNtries) {
+      throw const BankImportException('Ungültiges XML: Ntry nicht geschlossen (invalid)');
+    }
+
     final Iterable<RegExpMatch> matches = ntryReg.allMatches(trimmed);
     if (matches.isEmpty) {
       if (trimmed.contains('<Ntry') || trimmed.contains(':Ntry')) {
@@ -788,7 +1015,7 @@ class BankImportService {
     return null;
   }
 
-  List<String> _splitCsvLine(String line, String delimiter) {
+  List<String> _splitCsvLine(String line, String delimiter, {int? rowNumber}) {
     final List<String> result = <String>[];
     final StringBuffer cur = StringBuffer();
     bool inQuotes = false;
@@ -807,6 +1034,14 @@ class BankImportService {
       } else {
         cur.write(ch);
       }
+    }
+    if (inQuotes) {
+      final String suffix = rowNumber == null ? '' : ' in Zeile $rowNumber';
+      throw BankImportException(
+        'Ungültige CSV: Anführungszeichen nicht geschlossen$suffix',
+        rowNumber: rowNumber,
+        recoveryAction: 'Korrigieren Sie die CSV-Zeile und versuchen Sie den Import erneut.',
+      );
     }
     result.add(_unquote(cur.toString()));
     return result;
@@ -845,9 +1080,13 @@ class BankImportService {
     if (d != null) return d;
     d = _trySlash(t);
     if (d != null) return d;
-    // Last resort: DateTime.tryParse handles yyyy-mm-dd
-    final DateTime? parsed = DateTime.tryParse(t);
-    if (parsed != null) return DateTime(parsed.year, parsed.month, parsed.day);
+    // Last resort is limited to formats without a separator. Known date
+    // formats are parsed above with component checks so DateTime cannot
+    // silently normalize an invalid day such as 31 February.
+    if (!t.contains(RegExp(r'[.\-/]'))) {
+      final DateTime? parsed = DateTime.tryParse(t);
+      if (parsed != null) return DateTime(parsed.year, parsed.month, parsed.day);
+    }
     throw BankImportException('Datum ungültig: $raw');
   }
 
@@ -867,12 +1106,7 @@ class BankImportService {
     if (y < 100) y += 2000;
     if (y < 1000 || y > 9999) return null;
     if (m < 1 || m > 12) return null;
-    if (d < 1 || d > 31) return null;
-    try {
-      return DateTime(y, m, d);
-    } catch (_) {
-      return null;
-    }
+    return _exactDate(y, m, d);
   }
 
   DateTime? _tryIso(String t) {
@@ -880,17 +1114,12 @@ class BankImportService {
     final List<String> parts = t.split('-');
     if (parts.length != 3) return null;
     // Heuristic: first part 4 digits => yyyy-mm-dd
-    if (parts[0].length != 4) return null;
+    if (parts[0].trim().length != 4) return null;
     final int? y = int.tryParse(parts[0].trim());
     final int? m = int.tryParse(parts[1].trim());
     final int? d = int.tryParse(parts[2].trim());
     if (y == null || m == null || d == null) return null;
-    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
-    try {
-      return DateTime(y, m, d);
-    } catch (_) {
-      return null;
-    }
+    return _exactDate(y, m, d);
   }
 
   DateTime? _trySlash(String t) {
@@ -913,11 +1142,14 @@ class BankImportService {
     }
     int yy = y;
     if (yy < 100) yy += 2000;
-    try {
-      return DateTime(yy, m, d);
-    } catch (_) {
-      return null;
-    }
+    return _exactDate(yy, m, d);
+  }
+
+  DateTime? _exactDate(int year, int month, int day) {
+    if (year < 1 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+    final DateTime value = DateTime(year, month, day);
+    if (value.year != year || value.month != month || value.day != day) return null;
+    return value;
   }
 
   String _parseBetrag(String raw) {

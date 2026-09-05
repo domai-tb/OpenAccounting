@@ -257,3 +257,41 @@ THEN the summary shows counts per status (imported, duplicate, auto-categorized,
 GIVEN an uploaded file contains zero valid transactions
 WHEN import completes
 THEN the summary shows 0 imported, 0 duplicates, and a message that no transactions were found.
+
+### Requirement: Banking exposes a reviewable import lifecycle
+
+The banking workspace MUST support file selection/template selection, parse preview, row review/edit/manual categorization, explicit confirmation, and an import history showing source, time, template, counts, and status.
+
+#### Scenario: User reviews before import
+
+GIVEN a supported bank file is selected
+WHEN parsing completes
+THEN the user sees transaction rows and can confirm, edit, skip, or categorize them before persistence.
+
+#### Scenario: Unsupported input remains safe
+
+GIVEN the file format is unknown or malformed
+WHEN the user attempts import
+THEN no transaction is persisted and the history/result identifies the unsupported input with a recovery action.
+
+### Requirement: Import outcomes are truthful and recoverable
+
+Import persistence MUST either commit the confirmed batch atomically or record each failed row and a partial status; imported, duplicate, auto-categorized, manual-review, and failed counts MUST describe rows actually persisted.
+
+#### Scenario: Successful batch counts persisted rows
+
+GIVEN a confirmed batch contains new, duplicate, and categorized rows
+WHEN import completes
+THEN history counts match database rows and duplicates are not inserted twice.
+
+#### Scenario: A row failure is surfaced
+
+GIVEN one confirmed row violates a constraint or cannot be inserted
+WHEN the batch imports
+THEN the failure is visible with row/error context, history is partial/failed according to policy, and the result does not claim the row was imported.
+
+#### Scenario: Retry does not duplicate rows
+
+GIVEN a partial import is retried after correction
+WHEN the user retries the failed rows
+THEN already persisted rows remain deduplicated and only corrected failures are added.
