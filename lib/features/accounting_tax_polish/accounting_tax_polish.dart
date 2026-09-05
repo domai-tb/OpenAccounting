@@ -1,11 +1,15 @@
 // ignore_for_file: dangling_library_doc_comments
 /// Accounting-tax-polish — additive polish für USt/EÜR/EKS (German finance).
 /// VM-safe, pure logic, no DB. Reuses money helpers to avoid double drift.
-import 'package:openaccounting/features/accounting/money.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 class AccountingTaxPolishService {
   /// Trigger happy path — polierter Betrag via money helpers.
-  String trigger(String eingabe) => polishBetrag(eingabe);
+  String trigger(String eingabe) {
+    final String? err = validate(eingabe);
+    if (err != null) throw FormatException(err);
+    return polishBetrag(eingabe);
+  }
 
   /// Validiert Eingabe — null wenn gültig, 'ungültig:...' wenn ungültig.
   String? validate(String? eingabe) {
@@ -19,8 +23,12 @@ class AccountingTaxPolishService {
   /// Leerer Input liefert Fehlersignal statt still '0.00'.
   String polishBetrag(String raw) {
     if (raw.trim().isEmpty) {
-      return 'ungültig';
+      return 'ungültig: leere Eingabe';
     }
-    return formatBetrag(raw);
+    try {
+      return money.formatBetrag(raw);
+    } catch (_) {
+      return 'ungültig: keine Zahl';
+    }
   }
 }
