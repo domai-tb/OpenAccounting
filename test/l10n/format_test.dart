@@ -1,6 +1,5 @@
 // DESIGN §9 Typography + Locale — TDD red phase for 8.1.
 // Must fail before MoneyText/formatting impl if incorrect.
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -41,8 +40,8 @@ void main() {
 
     testWidgets('test_money_text_widget_right_aligned_tabular', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('de', 'DE'),
+        const MaterialApp(
+          locale: Locale('de', 'DE'),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: Scaffold(body: MoneyText(1284.32)),
@@ -84,8 +83,8 @@ void main() {
 
     testWidgets('test_money_text_privacy_masking', (WidgetTester tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('de', 'DE'),
+        const MaterialApp(
+          locale: Locale('de', 'DE'),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: Scaffold(body: MoneyText(1284.32, obscured: true)),
@@ -130,7 +129,7 @@ void main() {
       final GoRouter router = GoRouter(
         initialLocation: '/invoices?status=offen',
         routes: <RouteBase>[
-          GoRoute(path: '/', builder: (_, __) => const Text('home')),
+          GoRoute(path: '/', builder: (_, _) => const Text('home')),
           GoRoute(
             path: '/invoices',
             builder: (_, GoRouterState s) => Text('invoices ${s.uri.queryParameters['status']}'),
@@ -198,7 +197,7 @@ void main() {
       expect(loc.localeName.startsWith('en'), isTrue, reason: 'locale switch must update AppLocalizations to en');
 
       // Date/Money formatting still works after switch — business logic not tied to widget locale assumption.
-      expect(formatMoney(1284.32, locale: 'de_DE').replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '), '1.284,32 €');
+      expect(formatMoney(1284.32).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '), '1.284,32 €');
       expect(
         formatMoney(1284.32, locale: 'en_US').contains('1,284.32'),
         isTrue,
