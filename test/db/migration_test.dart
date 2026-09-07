@@ -105,7 +105,10 @@ CREATE TABLE rechnungen (
   notiz TEXT,
   unternehmen_id INTEGER,
   nummernkreis_id INTEGER,
-  storno_von INTEGER
+  storno_von INTEGER,
+  absender_snapshot TEXT,
+  ausgegeben_am TEXT,
+  mahnstufe_aktuell INTEGER DEFAULT 0
 )''');
       await db.executor.runCustom('''
 INSERT INTO rechnungen (rechnungsnummer, typ, status, datum)

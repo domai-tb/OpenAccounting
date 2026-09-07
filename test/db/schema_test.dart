@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 
 void main() {
-  group('Schema — 38 tables', () {
+  group('Schema — 39 tables', () {
     late AppDatabase db;
 
     setUp(() async {
@@ -14,19 +14,19 @@ void main() {
       await db.close();
     });
 
-    test('all 38 tables exist after creation', () async {
+    test('all 39 tables exist after creation', () async {
       final rows = await db.executor.runSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
         const [],
       );
       final names = rows.map((r) => r['name']?.toString() ?? '').toList()..sort();
-      expect(names.length, 38, reason: 'Expected 38 tables, got ${names.length}: $names');
+      expect(names.length, 39, reason: 'Expected 38 tables, got ${names.length}: $names');
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t), reason: 'Missing table $t');
       }
     });
 
-    test('table count remains 38 after second open', () async {
+    test('table count remains 39 after second open', () async {
       await db.close();
       final db2 = AppDatabase.createTestDatabase();
       await db2.ensureOpen();
@@ -34,7 +34,7 @@ void main() {
         "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
         const [],
       );
-      expect(rows.first['c'], 38);
+      expect(rows.first['c'], 39);
       await db2.close();
     });
 
