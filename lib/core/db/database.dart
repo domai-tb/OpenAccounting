@@ -19,7 +19,7 @@ import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 
-/// Drift-backed app database with 38 tables per spec §Table Definitions.
+/// Drift-backed app database with 39 tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
 /// Handles WAL, FK, schema versioning, GoBD triggers, seed, profiles.
 class AppDatabase {
@@ -85,6 +85,7 @@ class AppDatabase {
     'schnellbuchungen',
     'auto_filter_regeln',
     'import_mapping_vorlagen',
+    'inventarbewegungen',
   ];
 
   QueryExecutor get executor => _executor;
@@ -337,7 +338,7 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   );
 });
 
-/// Raw DDL for 38 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
+/// Raw DDL for 39 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
 const List<String> _schemaSql = <String>[
   // 1 unternehmen
   '''
@@ -883,6 +884,17 @@ CREATE TABLE IF NOT EXISTS import_mapping_vorlagen (
   template_id INTEGER REFERENCES bank_templates(id),
   mapping TEXT,
   aktiv INTEGER DEFAULT 1
+)''',
+  // 39 inventarbewegungen
+  '''
+CREATE TABLE IF NOT EXISTS inventarbewegungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikel_id INTEGER NOT NULL REFERENCES artikel(id),
+  datum TEXT NOT NULL,
+  diff NUMERIC(10,3) NOT NULL,
+  grund TEXT NOT NULL,
+  referenz_typ TEXT,
+  referenz_id INTEGER
 )''',
 ];
 

@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 5;
+  static const int currentVersion = 6;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -46,7 +46,10 @@ class MigrationRunner {
     }
 
     if (version > currentVersion) {
-      return false;
+      throw StateError(
+        'Database schema version $version is newer than application version $currentVersion. '
+        'Downgrade not supported.',
+      );
     }
 
     if (version == 0 && !hasTables) {
@@ -147,6 +150,12 @@ class MigrationRunner {
       await createSchema();
       await _migrateRechnungen();
       await _migrateMahnwesen();
+    }
+    if (version == 6) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
     }
   }
 
@@ -265,6 +274,25 @@ class MigrationRunner {
     }
   }
 
+  Future<void> _migrateInventarbewegungen() async {
+    final rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='inventarbewegungen'",
+      const <Object?>[],
+    );
+    if (rows.isEmpty) {
+      await executor.runCustom('''
+CREATE TABLE IF NOT EXISTS inventarbewegungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  artikel_id INTEGER NOT NULL REFERENCES artikel(id),
+  datum TEXT NOT NULL,
+  diff NUMERIC(10,3) NOT NULL,
+  grund TEXT NOT NULL,
+  referenz_typ TEXT,
+  referenz_id INTEGER
+)''');
+    }
+  }
+
   Future<void> _rebuildRechnungen() async {
     await executor.runCustom('ALTER TABLE rechnungen RENAME TO rechnungen_v1');
     await executor.runCustom(_rechnungenTableSql);
@@ -272,7 +300,8 @@ class MigrationRunner {
 INSERT INTO rechnungen (
   id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, faelligkeit,
   netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
-  notiz, unternehmen_id, nummernkreis_id, storno_von
+  notiz, unternehmen_id, nummernkreis_id, storno_von,
+  absender_snapshot, ausgegeben_am, mahnstufe_aktuell
 )
 SELECT
   id, rechnungsnummer, typ, status,
@@ -280,7 +309,8 @@ SELECT
   'netto',
   kunde_id, lieferant_id, datum, faelligkeit,
   netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
-  notiz, unternehmen_id, nummernkreis_id, storno_von
+  notiz, unternehmen_id, nummernkreis_id, storno_von,
+  absender_snapshot, ausgegeben_am, mahnstufe_aktuell
 FROM rechnungen_v1
 ''');
     await executor.runCustom('DROP TABLE rechnungen_v1');
