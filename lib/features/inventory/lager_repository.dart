@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
   static void _validatePrecision(num value) {
     final scaled = (value * 1000).round();
     if ((value * 1000 - scaled).abs() > 1e-9) {
-      throw StateError('Precision exceeds configured limit for quantity: $value');
+      throw ArtikelException('Precision exceeds configured limit for quantity: $value');
     }
   }
 
