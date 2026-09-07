@@ -328,11 +328,13 @@ class _InvoiceErrorMappingExecutor extends QueryExecutor {
 }
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase();
-  ref.onDispose(() {
-    unawaited(db.close());
-  });
-  return db;
+  // ponytail: throw-by-default enforces spec §One opened application graph.
+  // main.dart overrides with the profile DB after ensureOpen.
+  // Tests override via overrideWithValue or overrideWith.
+  throw StateError(
+    'appDatabaseProvider has no database. '
+    'Override it in ProviderScope before reading.',
+  );
 });
 
 /// Raw DDL for 38 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
