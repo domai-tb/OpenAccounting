@@ -1,6 +1,10 @@
 # OpenInvoices — Desktop Platform Specification
 
-## ADDED Requirements
+## Purpose
+Desktop platform integration including system tray, window management, file associations, and OS-specific behaviors.
+
+
+## Requirements
 
 ### Requirement: System Tray
 

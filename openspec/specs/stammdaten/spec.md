@@ -1,6 +1,10 @@
 # Stammdaten — OpenInvoices Spec
 
-## ADDED Requirements
+## Purpose
+Master data management for customers (Kunden), suppliers (Lieferanten), articles (Artikel), and groups.
+
+
+## Requirements
 
 ### Requirement: Kunden — CRUD
 
@@ -158,7 +162,7 @@ Each article MAY have differenzbesteuerung (margin scheme, §25a UStG) set to tr
 
 ### Requirement: Artikel — Lagerführung
 
-Each article MAY have lager_aktiv (boolean). When true, the system MUST track bestand_aktuell (current stock, NUMERIC(10,3)), mindestbestand (minimum stock, NUMERIC(10,3)), and minusbestand_erlaubt (allow negative stock, boolean, default false). On invoice finalization, stock MUST be decremented by the ordered quantity. On storno, stock MUST be restored. If stock would go below mindestbestand, the system MUST display a warning. If minusbestand_erlaubt is false and stock would go below zero, the system MUST block finalization.
+Each article MAY have lager_aktiv (boolean). When true, the system MUST track bestand_aktuell (NUMERIC(10,3)), mindestbestand (NUMERIC(10,3)), and minusbestand_erlaubt (boolean, default false). Stock MUST be decremented on invoice finalization and restored on storno. The system MUST warn when stock falls below mindestbestand and MUST block finalization when minusbestand_erlaubt is false and stock would go below zero.
 
 #### Scenario: Stock decrement on finalization
 - GIVEN an article has bestand_aktuell = 20 and lager_aktiv = true
@@ -186,7 +190,7 @@ Each Artikel of type Artikel or Fremdleistung MAY be linked to a supplier (liefe
 
 ### Requirement: Artikelgruppen
 
-Articles MAY be assigned to Artikelgruppen (article groups). Artikelgruppen have id, typ (string), name, and aktiv flag. Articles reference groups via gruppe_id FK. Groups are used for categorization and filtering in reports and invoice forms.
+Articles MAY be assigned to Artikelgruppen (article groups). The system SHALL maintain groups with id, typ (string), name, and aktiv flag. Articles SHALL reference groups via gruppe_id FK. Groups SHALL be used for categorization and filtering in reports and invoice forms.
 
 #### Scenario: Inactive group hidden from selection
 - GIVEN an article group "Büromaterial" exists with aktiv = false
@@ -381,7 +385,7 @@ Each category MUST have euer_zeile (INTEGER, nullable). When set, journal entrie
 
 ### Requirement: Kategorien — eks_kategorie
 
-Each category MAY have eks_kategorie (VARCHAR, nullable). When set, journal entries are included in the EKS (Einnahmen-Kosten-Spiegel) report under the specified section. The EKS section identifier maps to the Anlage EKS form sections (e.g., B6_5 for Fahrtkosten).
+Each category MAY have eks_kategorie (VARCHAR, nullable). When set, journal entries SHALL be included in the EKS (Einnahmen-Kosten-Spiegel) report under the specified section. The EKS section identifier SHALL map to the Anlage EKS form sections (e.g., B6_5 for Fahrtkosten).
 
 #### Scenario: EKS section assignment
 - GIVEN the category "Fahrtkosten" has eks_kategorie = "B6_5"

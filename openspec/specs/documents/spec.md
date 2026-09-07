@@ -1,6 +1,10 @@
 # Documents — OpenInvoices Spec
 
-## ADDED Requirements
+## Purpose
+Document type management for invoices, receipts, corrections, and outgoing correspondence.
+
+
+## Requirements
 
 ### Requirement: Document Types
 

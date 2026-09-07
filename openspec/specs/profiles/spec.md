@@ -1,6 +1,10 @@
 # Multi-Profile Management
 
-## ADDED Requirements
+## Purpose
+Multi-profile management with separate databases, profile switching, and workspace isolation.
+
+
+## Requirements
 
 ### Requirement: Separate databases per profile
 

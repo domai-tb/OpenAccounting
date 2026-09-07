@@ -1,29 +1,27 @@
-# Design: Restore the maintained OpenSpec validation contract
+# Design: Restore strict validation contract
 
 ## Context
 
-Strict Anvil validation currently rejects 15 of 23 maintained specifications because they lack the required Purpose and Requirements structure. This leaves the repository's planning source of truth non-parseable even though several feature specs are treated as authoritative.
+Fifteen maintained specifications fail `openspec validate --specs --strict` because they lack `## Purpose` sections and use `## ADDED Requirements` instead of `## Requirements`. One spec (`stammdaten`) also has RFC 2119 keyword gaps and an over-long requirement.
 
-## Goals
+## Goals / Non-Goals
 
-A parseable, internally consistent spec baseline that can be used by subsequent implementation changes.
+**Goals:** All 25 maintained specs pass strict validation.
 
-## Non-Goals
-
-Implementing any product behavior; rewriting historical archive records; adding a new validation tool.
+**Non-Goals:** Semantic reconciliation of conflicting specs (owned by other changes). Runtime behavior changes.
 
 ## Decisions
 
-Use the configured Anvil schema as the contract. Keep capability-specific changes in active proposals and use mechanical validation for this documentation-only boundary.
+Edit each failing spec in-place: add a brief `## Purpose` section derived from the spec title and first requirement, replace `## ADDED Requirements` with `## Requirements`, and fix structural issues in `stammdaten`.
 
 ## Risks / Trade-offs
 
-Normalizing specs may expose additional inconsistencies; resolving them in one baseline change can create a large review surface.
+Purpose text is derived, not product-reviewed. It can be refined later without breaking validation.
 
 ## Migration Plan
 
-Inventory all main specs, repair structure and duplicates, run strict validation, then use the repaired baseline as the dependency for future changes.
+Mechanical spec edits. No data migration, no code changes.
 
 ## Open Questions
 
-Are any archived documents intentionally exempt from strict validation? If so, the exemption must be explicit rather than implicit.
+None.

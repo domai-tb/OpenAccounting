@@ -1,6 +1,10 @@
 # Setup Wizard
 
-## ADDED Requirements
+## Purpose
+First-run setup wizard with empty database detection, company creation, and initial configuration.
+
+
+## Requirements
 
 ### Requirement: Empty database detection triggers wizard
 

@@ -1,23 +1,35 @@
-# Proposal: Restore the maintained OpenSpec validation contract
-
 ## Why
 
-Strict Anvil validation currently rejects 15 of 23 maintained specifications because they lack the required Purpose and Requirements structure. This leaves the repository's planning source of truth non-parseable even though several feature specs are treated as authoritative.
-
-Evidence: openspec validation reported 15 failures; the invalid files include openspec/specs/accounting/spec.md, setup/spec.md, and profiles/spec.md.
+Strict validation (`openspec validate --specs --strict`) reports 15 failing maintained specifications. All fail because they lack a `## Purpose` section and use `## ADDED Requirements` instead of `## Requirements`. This blocks the release gate and prevents downstream changes from depending on validated specs.
 
 ## What Changes
 
-- Normalize every maintained main specification to the configured Anvil structure.
-- Reconcile duplicate or conflicting requirements instead of preserving parallel normative text.
-- Make strict OpenSpec validation a mechanical acceptance gate for the maintained spec set.
+Add `## Purpose` sections and fix `## Requirements` headers across all 15 failing maintained specifications. Also fix RFC 2119 keyword gaps and long-requirement splitting in `stammdaten`.
 
 ## Capabilities
 
-- Restore the maintained OpenSpec validation contract
-- Priority: Medium
-- Dependencies: None.
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `accounting`: Add Purpose section, fix Requirements header
+- `app`: Add Purpose section, fix Requirements header
+- `backup`: Add Purpose section, fix Requirements header
+- `bank-import`: Add Purpose section, fix Requirements header
+- `dashboard`: Add Purpose section, fix Requirements header
+- `db`: Add Purpose section, fix Requirements header
+- `desktop`: Add Purpose section, fix Requirements header
+- `documents`: Add Purpose section, fix Requirements header
+- `einkommen`: Add Purpose section, fix Requirements header
+- `inventory`: Add Purpose section, fix Requirements header
+- `mahnwesen`: Add Purpose section, fix Requirements header
+- `profiles`: Add Purpose section, fix Requirements header
+- `recurring`: Add Purpose section, fix Requirements header
+- `setup`: Add Purpose section, fix Requirements header
+- `stammdaten`: Add Purpose section, fix Requirements header, add SHALL/MUST keywords, shorten long requirement
 
 ## Impact
 
-Documentation and planning artifacts only; no production runtime behavior is changed by this proposal.
+`openspec/specs/*/spec.md` — 15 spec files edited. No code, no tests, no runtime behavior changes.

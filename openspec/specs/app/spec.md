@@ -1,6 +1,10 @@
 # OpenInvoices — Core Application Specification
 
-## ADDED Requirements
+## Purpose
+Core application routing, provider wiring, database lifecycle, and top-level page structure.
+
+
+## Requirements
 
 ### Requirement: Application Routing
 

@@ -1,6 +1,10 @@
 # Bank Import
 
-## ADDED Requirements
+## Purpose
+Bank statement import with 3-step workflow, duplicate detection, and booking reconciliation.
+
+
+## Requirements
 
 ### Requirement: 3-Step Import Workflow
 

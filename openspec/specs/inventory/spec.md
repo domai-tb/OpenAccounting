@@ -1,6 +1,10 @@
 # Light Inventory Management
 
-## ADDED Requirements
+## Purpose
+Per-article inventory activation, stock tracking, movement logging, and low-stock warnings.
+
+
+## Requirements
 
 ### Requirement: Per-article inventory activation
 

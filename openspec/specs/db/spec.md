@@ -1,6 +1,10 @@
 # OpenInvoices — Database Layer Specification
 
-## ADDED Requirements
+## Purpose
+SQLite engine configuration, Drift schema management, migration strategy, and connection lifecycle.
+
+
+## Requirements
 
 ### Requirement: SQLite Engine Configuration
 

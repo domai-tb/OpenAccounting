@@ -1,6 +1,10 @@
 # Receivables and Income Monitoring
 
-## ADDED Requirements
+## Purpose
+Receivables tracking with Forderungen table, dunning integration, and income monitoring.
+
+
+## Requirements
 
 ### Requirement: Forderungen table for open items
 

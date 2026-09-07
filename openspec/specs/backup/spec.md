@@ -1,6 +1,10 @@
 # Backup System
 
-## ADDED Requirements
+## Purpose
+WAL-safe local backup with rotation, profile-scoped paths, and restore validation.
+
+
+## Requirements
 
 ### Requirement: Local WAL-safe backup with rotation
 

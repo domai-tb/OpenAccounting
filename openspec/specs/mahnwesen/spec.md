@@ -1,6 +1,10 @@
 # Mahnwesen
 
-## ADDED Requirements
+## Purpose
+Four-level dunning process with automated escalation, blocking rules, and Mahnung generation.
+
+
+## Requirements
 
 ### Requirement: Four Dunning Levels
 

@@ -1,6 +1,10 @@
 # Recurring
 
-## ADDED Requirements
+## Purpose
+Rechnungsvorlagen lifecycle for recurring invoice generation with scheduling and draft automation.
+
+
+## Requirements
 
 ### Requirement: Rechnungsvorlagen Lifecycle
 

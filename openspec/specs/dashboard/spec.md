@@ -1,6 +1,10 @@
 # Configurable Dashboard
 
-## ADDED Requirements
+## Purpose
+Widget-based configurable dashboard with KPI metrics, charts, and quick-action tiles.
+
+
+## Requirements
 
 ### Requirement: Widget-based layout
 
