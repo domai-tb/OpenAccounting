@@ -45,9 +45,10 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
       final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
       final diff = neuerBestand - old;
+      _validatePrecision(neuerBestand);
       await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         neuerBestand,
-        neuerBestand.toInt(),
+        neuerBestand,
         artikelId,
       ]);
       await t.runInsert(
@@ -102,6 +103,14 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       artikelnummer: r['artikelnummer'] as String?,
       aktiv: _asBool(r['aktiv']),
     );
+  }
+
+  /// Validate that quantity does not exceed 3 decimal places (NUMERIC(10,3)).
+  static void _validatePrecision(num value) {
+    final scaled = (value * 1000).round();
+    if ((value * 1000 - scaled).abs() > 1e-9) {
+      throw StateError('Precision exceeds configured limit for quantity: $value');
+    }
   }
 
   static num? _asNum(Object? v) => v is num

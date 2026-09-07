@@ -182,7 +182,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         gruppeId,
         artikelnummer,
         aktivInt,
-        bestandAktuell.toInt(),
+        bestandAktuell,
       ],
     );
     final stored = await findById(id);
@@ -341,9 +341,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       if (cur.isEmpty) throw const ArtikelException('Artikel nicht gefunden');
       final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
       final diff = neuerBestand - old;
+      _validatePrecision(neuerBestand);
       await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         neuerBestand,
-        neuerBestand.toInt(),
+        neuerBestand,
         id,
       ]);
       await t.runInsert(
@@ -445,6 +446,14 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       if (!existing.contains(d.name)) {
         await ex.runCustom('ALTER TABLE $table ADD COLUMN ${d.name} ${d.definition}');
       }
+    }
+  }
+
+  /// Validate that quantity does not exceed 3 decimal places (NUMERIC(10,3)).
+  static void _validatePrecision(num value) {
+    final scaled = (value * 1000).round();
+    if ((value * 1000 - scaled).abs() > 1e-9) {
+      throw ArtikelException('Precision exceeds configured limit for quantity: $value');
     }
   }
 
