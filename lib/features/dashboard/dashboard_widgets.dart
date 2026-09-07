@@ -49,7 +49,7 @@ const Map<String, IconData> dashboardWidgetIcons = <String, IconData>{
 const Map<String, String> dashboardWidgetRoutes = <String, String>{
   'offene_rechnungen': '/invoices?status=offen',
   'zahlungseingaenge': '/banking',
-  'lagerwarnung': '/contacts',
+  'lagerwarnung': '/inventory',
   'mahnung_warnung': '/invoices?status=ueberfaellig',
   'fristen': '/taxes',
   'ustva_frist': '/taxes',
@@ -59,7 +59,7 @@ const Map<String, String> dashboardWidgetRoutes = <String, String>{
   'offene_verbindlichkeiten': '/invoices?typ=eingangsrechnung',
   'kontostand': '/banking',
   'aktivitaets_log': '/reports',
-  'lagerbestand': '/contacts',
+  'lagerbestand': '/inventory',
 };
 
 /// Reusable dashboard card — title/icon/content, loading/error/empty, onTap.
