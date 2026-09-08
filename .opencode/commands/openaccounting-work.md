@@ -1,12 +1,28 @@
 ---
-description: Implement OpenAccounting OpenSpec changes with anvil TDD gates, desktop-aware checks, and scoped commits.
+description: Continuously implement OpenAccounting OpenSpec changes with anvil TDD gates and reviewable commits.
 ---
 
 # OpenAccounting OpenSpec work loop
 
-Implement one active OpenAccounting change at a time. Discover the repository state and the complete change contract
-before editing. This repository uses the local `anvil` schema; its artifact gates and test-first ordering are part of
-the implementation contract.
+Run as a persistent worker. Implement one active OpenAccounting change at a time, publish a reviewable handoff, rebuild
+the queue, and immediately continue with the next eligible change. Discover the repository state and the complete
+change contract before editing. This repository uses the local `anvil` schema; its artifact gates and test-first
+ordering are part of the implementation contract.
+
+## Persistent loop contract
+
+- Repeat the discover → select → implement → verify → archive → commit → publish cycle until the user
+  manually interrupts the command. Do not ask for confirmation between changes.
+- Work on exactly one OpenSpec change per cycle. After publishing its handoff commit, discard all assumptions about the
+  queue, refresh repository/OpenSpec state, and select the next eligible change.
+- When no change is currently eligible, do not terminate. Report the queue/blockers once, wait 30 seconds without busy
+  polling, refresh Git and OpenSpec state, and try again. Use the environment's native wait facility when available;
+  otherwise use a bounded `sleep 30`.
+- A transient fetch, tool, or test failure does not end the loop. Diagnose it, preserve a clean/scoped worktree, apply
+  safe recovery, then retry with backoff. If recovery needs human authority or would risk unrelated work, quarantine
+  that change, keep it incomplete, and continue monitoring the queue.
+- Emit a concise cycle update when a change is selected, handed off, blocked, or the queue state changes. A terminal
+  summary is produced only when the user interrupts the command.
 
 ## Project contract
 
@@ -44,8 +60,9 @@ the implementation contract.
 
 ## Discover the queue and gates
 
-1. Verify the branch and capture the initial worktree status. If the worktree is clean, fetch and fast-forward the
-   development branch only when that is part of the requested workflow; never pull over user changes.
+1. At the start of every cycle, verify the branch and capture the worktree status. If the worktree is clean, fetch and
+   fast-forward `dev`; never pull over user changes. If another process owns a dirty worktree, wait and retry rather
+   than editing concurrently.
 2. Resolve the local OpenSpec context and active queue:
 
    ```text
@@ -57,8 +74,9 @@ the implementation contract.
 3. For the selected change, read the complete `proposal.md`, every delta spec, `design.md`, `review.md`,
    `test-plan.md`, and `tasks.md` that exists. A `REVISE` review blocks implementation until the artifacts are fixed
    and re-reviewed. A missing or placeholder gate is not approval.
-4. Select only a change whose dependencies and review gate are satisfied. Prefer the oldest eligible change, then a
-   partially implemented change that can be completed without carrying unrelated work.
+4. Select only a change whose dependencies and review gate are satisfied. Prefer a safe finalization of partially
+   completed work, then the oldest dependency-ready change by `lastModified` and name. Do not pause for a human choice
+   when this deterministic rule identifies the next change.
 5. Announce the exact change, schema, task progress, gate status, context files, and selected scope before editing.
 
 ## Implement with anvil TDD ordering
@@ -100,17 +118,34 @@ result. Do not archive a change with a red test-plan row, incomplete tasks, a fa
 
 ## Complete and publish a change
 
+If a change becomes genuinely blocked after safe local options are exhausted, do not archive it. Preserve only coherent,
+verified partial work in a scoped checkpoint commit with `OpenSpec-Status: partial`, publish that handoff, leave the
+worktree clean, and quarantine the change until its prerequisite or reviewer state changes. Never carry failing or
+uncommitted partial work into another specification.
+
 Completion requires all tasks done, an approving `review.md`, passing `verify.md`, successful OpenSpec validation, clean
 scoped diff review, and no unresolved red/yellow correctness findings. Inspect the archive command's effect before
 using it; archive only after verification and only with the repository's actual CLI syntax. This schema may update main
 specs during archive, so inspect those changes too.
 
 Create one focused Conventional Commit containing only the change's implementation, tests, documentation, generated
-localization, and OpenSpec lifecycle files. Push only when explicitly requested or when the repository workflow calls
-for publication; never force-push. Rebuild the OpenSpec queue after archiving or publishing.
+localization, and OpenSpec lifecycle files. Every worker handoff commit, complete or partial, MUST end with:
 
-## Terminal report
+```text
+OpenSpec-Change: <change-name>
+OpenSpec-Schema: anvil
+OpenSpec-Status: partial|complete
+OpenSpec-Tasks: <complete>/<total>
+```
 
-Report completed or partial changes, task progress, review/verify gates, validations actually run, commits and
-publication status, remaining active changes, exact blockers, and confirmation that no external or human evidence was
+This persistent command explicitly calls for publication: fetch `origin/dev`, integrate only by a safe fast-forward or
+rebase of the scoped worker commit, rerun affected checks if the base changed, and push with
+`git push origin HEAD:dev`. Never force-push. Confirm the full worker SHA is reachable from `origin/dev`; that SHA and
+the trailers are the reviewer handoff. Then return to the top of the loop immediately.
+
+## Loop reporting and manual stop
+
+After every cycle, report the selected/completed or partial change, task progress, review/verify gates, validations
+actually run, commit SHA, publication status, remaining queue, and exact blockers. Keep running after that update. Only
+when manually interrupted, produce the aggregate terminal report and confirm that no external or human evidence was
 fabricated and no incomplete change was archived.
