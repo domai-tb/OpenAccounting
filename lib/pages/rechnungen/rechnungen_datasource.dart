@@ -586,9 +586,10 @@ WHERE id = ? AND ist_entwurf = 1
       String useDatum = datum ?? DateTime.now().toIso8601String().substring(0, 10);
       List<RechnungPositionItem> usePos = positionen ?? [];
       int? linkId;
+      String useEingabemodus = 'netto';
       if (vonRechnungId != null) {
         final orig = await transaction.runSelect(
-          'SELECT id, ist_entwurf, datum FROM rechnungen WHERE id = ?',
+          'SELECT id, ist_entwurf, datum, eingabemodus FROM rechnungen WHERE id = ?',
           <Object?>[vonRechnungId],
         );
         if (orig.isEmpty) throw StateError('Rechnung nicht gefunden');
@@ -596,6 +597,7 @@ WHERE id = ? AND ist_entwurf = 1
           throw StateError('Nur finalisierte Rechnung kann gutgeschrieben werden');
         }
         useDatum = orig.single['datum'].toString();
+        useEingabemodus = orig.single['eingabemodus']?.toString() ?? 'netto';
         linkId = vonRechnungId;
         posRows = await transaction.runSelect(
           'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
@@ -646,9 +648,28 @@ WHERE id = ? AND ist_entwurf = 1
         'UPDATE nummernkreise SET naechste_nummer = ? WHERE id = ? AND naechste_nummer = ?',
         <Object?>[nextNo + 1, range['id'], stored],
       );
-      var sum = 0.0;
+      // ponytail: per-position VAT calc — O(n), one pass; move to VorschauService if reused.
+      var sumNetto = 0.0;
+      var sumUst = 0.0;
+      var sumBrutto = 0.0;
       for (final p in usePos) {
-        sum += -p.gesamt.abs();
+        final line = p.gesamt;
+        final ustSatz = p.ustSatz;
+        if (useEingabemodus == 'brutto') {
+          // gesamt is brutto: derive netto
+          final brutto = -line.abs();
+          final netto = ustSatz == 0 ? brutto : brutto / (1 + ustSatz / 100);
+          sumNetto += netto;
+          sumUst += brutto - netto;
+          sumBrutto += brutto;
+        } else {
+          // gesamt is netto: derive brutto
+          final netto = -line.abs();
+          final ust = netto * ustSatz / 100;
+          sumNetto += netto;
+          sumUst += ust;
+          sumBrutto += netto + ust;
+        }
       }
       final gsId = await transaction.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, gutschrift_von, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -661,9 +682,9 @@ WHERE id = ? AND ist_entwurf = 1
           'netto',
           range['id'],
           linkId,
-          sum.toStringAsFixed(2),
-          sum.toStringAsFixed(2),
-          '0.00',
+          sumNetto.toStringAsFixed(2),
+          sumBrutto.toStringAsFixed(2),
+          sumUst.toStringAsFixed(2),
           DateTime.now().toUtc().toIso8601String(),
           'pdfs/$docNo.pdf',
         ],
@@ -727,7 +748,7 @@ WHERE id = ? AND ist_entwurf = 1
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
       final origRows = await transaction.runSelect(
-        'SELECT id, status, storno_datum FROM rechnungen WHERE id = ?',
+        'SELECT id, status, storno_datum, ersatzrechnung_id FROM rechnungen WHERE id = ?',
         <Object?>[vonRechnungId],
       );
       if (origRows.isEmpty) throw StateError('Rechnung nicht gefunden');
