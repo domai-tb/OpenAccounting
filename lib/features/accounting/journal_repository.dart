@@ -5,8 +5,6 @@ import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// Journal repository — raw SQL via drift executor, GoBD via DB triggers.
 /// ponytail: global executor lock ceiling — per-journal if throughput matters.
-/// ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe
-/// without extra table/FK; add column + FK if multi-entry groups required.
 class JournalRepository {
   JournalRepository(this.executor);
 

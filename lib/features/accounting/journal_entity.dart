@@ -1,8 +1,5 @@
 /// Immutable journal entry per spec §Journal Entries.
 /// ponytail: minimal fields, String betrag keeps NUMERIC(12,2) precision.
-/// ponytail: gruppe_id deferred — storno_von chain covers Buchungsgruppe
-/// (Original→Storno) without extra table/FK; add `gruppe_id INTEGER
-/// REFERENCES journal(id)` + population if multi-entry groups required.
 class JournalEntry {
   const JournalEntry({
     required this.id,

@@ -335,6 +335,7 @@ FROM rechnungen_v1
     if (!hasGruppeId) {
       await executor.runCustom('ALTER TABLE journal ADD COLUMN gruppe_id INTEGER REFERENCES journal(id)');
     }
+    await executor.runCustom('UPDATE journal SET gruppe_id = id WHERE gruppe_id IS NULL');
   }
 
   Future<void> _postHooks() async {
