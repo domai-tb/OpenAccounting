@@ -604,7 +604,8 @@ CREATE TABLE IF NOT EXISTS journal (
   ist_eu_lieferung INTEGER DEFAULT 0,
   vorsteuer_betrag NUMERIC(12,2),
   km_anzahl NUMERIC(12,2),
-  vorlage_id INTEGER REFERENCES buchungsvorlagen(id)
+  vorlage_id INTEGER REFERENCES buchungsvorlagen(id),
+  gruppe_id INTEGER REFERENCES journal(id)
 )''',
   // 15 bank_templates
   '''

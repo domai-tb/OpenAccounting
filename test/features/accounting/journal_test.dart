@@ -170,7 +170,7 @@ void main() {
 
       expect(storno.stornoVon, original.id);
       expect(storno.betrag, '-500.00');
-      expect(storno.immutable, isFalse);
+      expect(storno.immutable, isTrue);
 
       final rows = await db.executor.runSelect('SELECT storno_von, betrag FROM journal WHERE id = ?', <Object?>[
         storno.id,

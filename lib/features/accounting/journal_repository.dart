@@ -154,6 +154,23 @@ class JournalRepository {
 
     final int? istEuInt = istEuLieferung == null ? null : (istEuLieferung ? 1 : 0);
 
+    // Resolve snapshots from category if not explicitly provided (spec §Audit snapshots).
+    String? resolvedKontoSkr03 = kontoSkr03;
+    String? resolvedKontoSkr04 = kontoSkr04;
+    if (resolvedKontoSkr03 == null || resolvedKontoSkr04 == null) {
+      try {
+        final List<Map<String, Object?>> catRows = await executor.runSelect(
+          'SELECT konto_skr03, konto_skr04 FROM kategorien WHERE id = ?',
+          <Object?>[kategorieId],
+        );
+        if (catRows.isNotEmpty) {
+          final Map<String, Object?> cat = catRows.single;
+          resolvedKontoSkr03 ??= cat['konto_skr03'] as String?;
+          resolvedKontoSkr04 ??= cat['konto_skr04'] as String?;
+        }
+      } catch (_) {}
+    }
+
     final String datumStr = _formatDate(datum);
     final int id = await executor.runInsert(
       'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
@@ -166,8 +183,8 @@ class JournalRepository {
         kategorieId,
         cleanBetrag,
         art,
-        kontoSkr03,
-        kontoSkr04,
+        resolvedKontoSkr03,
+        resolvedKontoSkr04,
         ustSatzId,
         belegNr,
         stornoVon,
@@ -180,6 +197,11 @@ class JournalRepository {
         cleanVorsteuer,
       ],
     );
+
+    // Set gruppe_id to own id for new entries (self-referencing booking group root).
+    if (stornoVon == null) {
+      await executor.runCustom('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[id, id]);
+    }
 
     final JournalEntry? entry = await findById(id);
     if (entry == null) {
@@ -225,6 +247,11 @@ class JournalRepository {
     final JournalEntry? original = await findById(originalId);
     if (original == null) {
       throw const JournalException('Original-Eintrag nicht gefunden');
+    }
+
+    // Spec §Storno: only immutable finalized sources may be reversed.
+    if (!original.immutable) {
+      throw const JournalException('Original-Eintrag nicht finalisiert');
     }
 
     // Prevent duplicate storno per spec §Storno correction.
@@ -278,8 +305,8 @@ class JournalRepository {
     final int id = await executor.runInsert(
       'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
       'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, storno_von, konto_id, '
-      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag, gruppe_id) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         datumStr,
         stornoBezeichnung,
@@ -297,6 +324,7 @@ class JournalRepository {
         origSatz25a,
         origEu,
         negVorsteuer,
+        original.gruppeId ?? originalId,
       ],
     );
 
@@ -311,7 +339,8 @@ class JournalRepository {
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, '
       'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
-      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag, '
+      'gruppe_id '
       'FROM journal WHERE id = ?',
       <Object?>[id],
     );
@@ -323,7 +352,8 @@ class JournalRepository {
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, '
       'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
-      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag '
+      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag, '
+      'gruppe_id '
       'FROM journal ORDER BY id',
       const <Object?>[],
     );

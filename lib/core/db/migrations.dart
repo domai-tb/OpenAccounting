@@ -10,7 +10,7 @@ class MigrationRunner {
   final QueryExecutor executor;
   final String profileDir;
 
-  static const int currentVersion = 6;
+  static const int currentVersion = 7;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -156,6 +156,13 @@ class MigrationRunner {
       await _migrateRechnungen();
       await _migrateMahnwesen();
       await _migrateInventarbewegungen();
+    }
+    if (version == 7) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
     }
   }
 
@@ -314,6 +321,20 @@ SELECT
 FROM rechnungen_v1
 ''');
     await executor.runCustom('DROP TABLE rechnungen_v1');
+  }
+
+  Future<void> _migrateJournalGruppeId() async {
+    final columns = await executor.runSelect('PRAGMA table_info(journal)', const <Object?>[]);
+    bool hasGruppeId = false;
+    for (final column in columns) {
+      if (column['name'] == 'gruppe_id') {
+        hasGruppeId = true;
+        break;
+      }
+    }
+    if (!hasGruppeId) {
+      await executor.runCustom('ALTER TABLE journal ADD COLUMN gruppe_id INTEGER REFERENCES journal(id)');
+    }
   }
 
   Future<void> _postHooks() async {
