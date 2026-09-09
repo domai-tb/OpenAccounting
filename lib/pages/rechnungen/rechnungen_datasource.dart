@@ -6,9 +6,10 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
 class RechnungenDataSource {
-  const RechnungenDataSource(this.executor);
+  const RechnungenDataSource(this.executor, {this.profileDir});
 
   final QueryExecutor executor;
+  final String? profileDir;
 
   Future<void> _ensureExtraColumns() async {
     final alters = <String>[
@@ -198,6 +199,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
   Future<int> finalizeRechnung({required int rechnungId, Directory? profileDir}) async {
     await _ensureExtraColumns();
+    File? createdPdfFile;
     final transaction = executor.beginTransaction();
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
@@ -378,13 +380,25 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         );
       }
 
-      // Generate and write PDF artifact under the active profile.
-      final pdfDir = profileDir != null ? Directory('${profileDir.path}/pdfs') : null;
+      // Generate and write PDF artifact under the active profile — atomic via temp+rename.
+      final effectiveProfileDir = profileDir?.path ?? this.profileDir;
+      final pdfDir = effectiveProfileDir != null ? Directory('$effectiveProfileDir/pdfs') : null;
       String pdfPath;
+      File? tmpFile;
       if (pdfDir != null) {
         pdfDir.createSync(recursive: true);
         final pdfFile = File('${pdfDir.path}/$documentNumber.pdf');
-        pdfFile.writeAsBytesSync(_minimalPdf());
+        createdPdfFile = pdfFile;
+        tmpFile = File('${pdfDir.path}/$documentNumber.pdf.tmp');
+        try {
+          tmpFile.writeAsBytesSync(_minimalPdf());
+          tmpFile.renameSync(pdfFile.path);
+        } catch (e) {
+          try {
+            if (tmpFile.existsSync()) tmpFile.deleteSync();
+          } catch (_) {}
+          rethrow;
+        }
         pdfPath = pdfFile.path;
       } else {
         pdfPath = 'pdfs/$documentNumber.pdf';
@@ -415,6 +429,11 @@ WHERE id = ? AND ist_entwurf = 1
       await transaction.send();
       return rechnungId;
     } catch (error, stackTrace) {
+      if (createdPdfFile != null) {
+        try {
+          if (createdPdfFile.existsSync()) createdPdfFile.deleteSync();
+        } catch (_) {}
+      }
       try {
         await transaction.rollback();
       } catch (rollbackError, rollbackStackTrace) {

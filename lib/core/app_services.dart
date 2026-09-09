@@ -20,7 +20,7 @@ class AppServices {
   final AppDatabase _db;
 
   late final RechnungenUseCases rechnungen = RechnungenUseCases(
-    RechnungenRepository(RechnungenDataSource(_db.executor)),
+    RechnungenRepository(RechnungenDataSource(_db.executor, profileDir: _db.profileDir)),
   );
 
   late final ForderungenUseCases forderungen = ForderungenUseCases(ForderungenRepository(_db.executor));
