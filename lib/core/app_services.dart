@@ -29,7 +29,7 @@ class AppServices {
 
   late final RechnungsVorlagenRepository rechnungsVorlagen = RechnungsVorlagenRepository(_db.executor);
 
-  late final MahnungenRepository mahnungen = MahnungenRepository(_db.executor);
+  late final MahnungenRepository mahnungen = MahnungenRepository(_db.executor, profileDir: _db.profileDir);
   late final MahnstufenRepository mahnstufen = MahnstufenRepository(_db.executor);
   late final MahnwesenEinstellungenRepository mahnwesenEinstellungen = MahnwesenEinstellungenRepository(_db.executor);
   late final SperrungService sperrung = SperrungService(_db.executor);
