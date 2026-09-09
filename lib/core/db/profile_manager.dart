@@ -113,7 +113,8 @@ class ProfileManager {
     await databaseInitializer(databasePath(profileName));
   }
 
-  /// Delete profile entry — does NOT delete directory for data safety.
+  /// Delete profile — removes directory and all data.
+  /// Cannot delete the active profile or the last remaining profile.
   Future<void> deleteProfile(String name) async {
     final active = await getActiveProfile();
     if (active.toLowerCase() == name.toLowerCase()) {
@@ -121,8 +122,10 @@ class ProfileManager {
     }
     final profiles = await listProfiles();
     if (profiles.length <= 1) throw StateError('Mindestens ein Profil muss existieren');
-    // spec: remove entry but keep directory — here we just ensure active not pointing
-    // and leave directory on disk.
+    final dir = Directory(profileDir(name));
+    if (dir.existsSync()) {
+      await dir.delete(recursive: true);
+    }
   }
 
   Future<void> renameProfile(String oldName, String newName) async {
