@@ -426,7 +426,7 @@ WHERE id = ? AND ist_entwurf = 1
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
       final origRows = await transaction.runSelect(
-        'SELECT id, ist_entwurf, typ, status, datum, storno_datum, storno_grund FROM rechnungen WHERE id = ?',
+        'SELECT id, ist_entwurf, typ, status, datum, storno_datum, storno_grund, eingabemodus FROM rechnungen WHERE id = ?',
         <Object?>[rechnungId],
       );
       if (origRows.isEmpty) throw StateError('Rechnung nicht gefunden');
@@ -474,10 +474,27 @@ WHERE id = ? AND ist_entwurf = 1
       );
       final origTyp = orig['typ'].toString();
       final isGutschrift = origTyp == 'gutschrift';
-      var nettoSum = 0.0;
+      final eingabemodus = orig['eingabemodus']?.toString() ?? 'netto';
+      var sumNetto = 0.0;
+      var sumUst = 0.0;
+      var sumBrutto = 0.0;
       for (final r in posRows) {
         final gesamt = _asNum(r['gesamt']);
-        nettoSum += isGutschrift ? gesamt.abs() : -gesamt.abs();
+        final ustSatz = _asNum(r['ust_satz']);
+        final sign = isGutschrift ? 1.0 : -1.0;
+        if (eingabemodus == 'brutto') {
+          final brutto = sign * gesamt.abs();
+          final netto = ustSatz == 0 ? brutto : brutto / (1 + ustSatz / 100);
+          sumNetto += netto;
+          sumUst += brutto - netto;
+          sumBrutto += brutto;
+        } else {
+          final netto = sign * gesamt.abs();
+          final ust = netto * ustSatz / 100;
+          sumNetto += netto;
+          sumUst += ust;
+          sumBrutto += netto + ust;
+        }
       }
       final stornoId = await transaction.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, storno_von, storno_grund, storno_datum, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -492,9 +509,9 @@ WHERE id = ? AND ist_entwurf = 1
           rechnungId,
           trimmed,
           datum,
-          nettoSum.toStringAsFixed(2),
-          nettoSum.toStringAsFixed(2),
-          '0.00',
+          sumNetto.toStringAsFixed(2),
+          sumBrutto.toStringAsFixed(2),
+          sumUst.toStringAsFixed(2),
           DateTime.now().toUtc().toIso8601String(),
           'pdfs/$docNo.pdf',
         ],
