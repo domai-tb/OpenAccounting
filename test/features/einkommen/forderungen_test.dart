@@ -121,7 +121,7 @@ void main() {
       final kk = await usecases.kontokorrent(partnerTyp: 'kunde', partnerId: kundeId);
       expect(kk.any((e) => e.typ == 'ueberzahlung'), isTrue);
       final ue = kk.firstWhere((e) => e.typ == 'ueberzahlung');
-      expect(ue.betrag.toStringAsFixed(2), '20.00');
+      expect(ue.betrag.toStringAsFixed(2), '-20.00');
       // Running balance reflects credit
       expect(kk.last.saldo, isA<num>());
     });

@@ -776,7 +776,14 @@ CREATE TABLE IF NOT EXISTS forderungen (
   betrag NUMERIC(12,2) NOT NULL,
   status TEXT DEFAULT 'offen',
   faelligkeit TEXT,
-  beschreibung TEXT
+  beschreibung TEXT,
+  typ TEXT NOT NULL DEFAULT 'rechnung' CHECK (typ IN ('rechnung','rechnung_eingang','journal')),
+  partner_typ TEXT NOT NULL DEFAULT 'kunde' CHECK (partner_typ IN ('kunde','lieferant')),
+  partner_id INTEGER NOT NULL DEFAULT 0,
+  journal_id INTEGER REFERENCES journal(id),
+  ausgleich_journal_id INTEGER REFERENCES journal(id),
+  erstellt_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  aktualisiert_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )''',
   // 29 tagesabschluesse
   '''

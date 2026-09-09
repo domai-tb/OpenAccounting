@@ -296,15 +296,28 @@ class ForderungenRepository {
       const [],
     );
 
+    // Lookup original brutto_betrag for forderungen linked to rechnungen.
+    final origAmounts = <int, num>{};
+    for (final f in forderungen) {
+      if (f.rechnungId != null && !origAmounts.containsKey(f.rechnungId)) {
+        final rows = await executor.runSelect('SELECT brutto_betrag FROM rechnungen WHERE id = ?', [f.rechnungId]);
+        if (rows.isNotEmpty) {
+          origAmounts[f.rechnungId!] = _asNum(rows.first['brutto_betrag']) ?? f.betrag;
+        }
+      }
+    }
+
     // Build entries: forderungen as Soll, payments as Haben
     final entries = <_RawEntry>[];
     for (final f in forderungen) {
       if (!_inRange(f.erstelltAm.substring(0, 10), von, bis)) continue;
+      // Use original invoice amount (from rechnungen table) instead of current betrag.
+      final originalBetrag = f.rechnungId != null ? (origAmounts[f.rechnungId] ?? f.betrag) : f.betrag;
       entries.add(
         _RawEntry(
           datum: f.erstelltAm.substring(0, 10),
           typ: f.typ,
-          betrag: f.betrag,
+          betrag: originalBetrag,
           beschreibung: 'Rechnung ${f.rechnungId ?? f.id}',
         ),
       );
@@ -315,7 +328,7 @@ class ForderungenRepository {
           final d = (j['datum'] as String?) ?? f.erstelltAm.substring(0, 10);
           if (!_inRange(d, von, bis)) continue;
           final b = _asNum(j['betrag']) ?? 0;
-          entries.add(_RawEntry(datum: d, typ: 'ueberzahlung', betrag: b, beschreibung: desc));
+          entries.add(_RawEntry(datum: d, typ: 'ueberzahlung', betrag: -b, beschreibung: desc));
         }
       }
     }
@@ -334,18 +347,46 @@ class ForderungenRepository {
       }
     }
 
+    // Custom order: rechnung (Soll) first, then zahlung (Haben), then ueberzahlung (excess Haben).
+    const typOrder = {'rechnung': 0, 'zahlung': 1, 'ueberzahlung': 2};
     entries.sort((a, b) {
       final c = a.datum.compareTo(b.datum);
-      return c != 0 ? c : a.typ.compareTo(b.typ);
+      if (c != 0) return c;
+      return (typOrder[a.typ] ?? 99).compareTo(typOrder[b.typ] ?? 99);
     });
 
     // Running saldo
     var saldoCents = 0;
-    // Opening balance from entries outside range not included — compute from all forderungen/journals before von
+    // Opening balance from entries outside range — use original amounts and subtract prior payments.
     if (von != null) {
       for (final f in forderungen) {
         final d = f.erstelltAm.substring(0, 10);
-        if (d.compareTo(von) < 0) saldoCents += _toCents(f.betrag);
+        if (d.compareTo(von) < 0) {
+          // Use original invoice amount (from rechnungen table) for opening balance.
+          final origBetrag = f.rechnungId != null ? (origAmounts[f.rechnungId] ?? f.betrag) : f.betrag;
+          saldoCents += _toCents(origBetrag);
+          // Subtract payments made before von.
+          if (f.ausgleichJournalId != null) {
+            for (final j in journalRows) {
+              if (j['id'] == f.ausgleichJournalId) {
+                final jDatum = (j['datum'] as String?) ?? '';
+                if (jDatum.compareTo(von) < 0) {
+                  saldoCents -= _toCents(_asNum(j['betrag']) ?? 0);
+                }
+              }
+            }
+          }
+          // Subtract overpayment journals before von.
+          for (final j in journalRows) {
+            final desc = (j['beschreibung'] as String?) ?? '';
+            if (desc.contains('Überzahlung Forderung #${f.id}')) {
+              final jDatum = (j['datum'] as String?) ?? '';
+              if (jDatum.compareTo(von) < 0) {
+                saldoCents -= _toCents(_asNum(j['betrag']) ?? 0);
+              }
+            }
+          }
+        }
       }
     }
 
