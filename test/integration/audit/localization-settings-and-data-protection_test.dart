@@ -86,7 +86,12 @@ void main() {
       await db.close();
 
       // Create backup using BackupService.
-      final backupService = BackupService(profileDir: tmpDir.path, databasePath: dbPath);
+      final backupService = BackupService(
+        profileDir: tmpDir.path,
+        databasePath: dbPath,
+        allowAlternateRestoreDestination: true,
+        restoreReadinessCheck: () async => true,
+      );
       final backupPath = await backupService.createLocalBackup();
 
       // Verify backup file exists.
