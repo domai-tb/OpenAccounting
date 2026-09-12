@@ -364,9 +364,36 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   }
 
   Future<Artikel> adjustBestand(int id, num delta, {String grund = 'Manuelle Korrektur'}) async {
-    final cur = await findById(id);
-    if (cur == null) throw const ArtikelException('Artikel nicht gefunden');
-    return setBestand(id, cur.bestandAktuell + delta, grund: grund);
+    _validatePrecision(delta);
+    await ensureSchema();
+    await _ensureInventarTable(executor);
+    final t = executor.beginTransaction();
+    try {
+      await t.ensureOpen(_NoopUser());
+      final cur = await t.runSelect('SELECT bestand_aktuell FROM artikel WHERE id = ?', <Object?>[id]);
+      if (cur.isEmpty) throw const ArtikelException('Artikel nicht gefunden');
+      final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
+      final neuerBestand = old + delta;
+      _validatePrecision(neuerBestand);
+      await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
+        neuerBestand,
+        neuerBestand,
+        id,
+      ]);
+      await t.runInsert(
+        'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund) VALUES (?, ?, ?, ?)',
+        <Object?>[id, DateTime.now().toIso8601String().substring(0, 10), delta, grund],
+      );
+      await t.send();
+      final updated = await findById(id);
+      if (updated == null) throw const ArtikelException('Artikel nicht gefunden');
+      return updated;
+    } catch (e, s) {
+      try {
+        await t.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(e, s);
+    }
   }
 
   Future<void> _ensureInventarTable(QueryExecutor ex) async {
@@ -451,8 +478,15 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
 
   /// Validate that quantity does not exceed 3 decimal places (NUMERIC(10,3)).
   static void _validatePrecision(num value) {
-    final scaled = (value * 1000).round();
-    if ((value * 1000 - scaled).abs() > 1e-9) {
+    if (!value.isFinite) {
+      throw ArtikelException('Precision quantity must be finite: $value');
+    }
+    final scaledValue = value * 1000;
+    if (!scaledValue.isFinite) {
+      throw ArtikelException('Quantity is outside the supported range: $value');
+    }
+    final scaled = scaledValue.round();
+    if ((scaledValue - scaled).abs() > 1e-9) {
       throw ArtikelException('Precision exceeds configured limit for quantity: $value');
     }
   }

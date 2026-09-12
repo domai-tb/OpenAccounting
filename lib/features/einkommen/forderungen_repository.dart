@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 class Forderung {
   const Forderung({
@@ -12,6 +12,7 @@ class Forderung {
     this.rechnungId,
     this.journalId,
     this.ausgleichJournalId,
+    this.ursprungsBetrag,
     required this.erstelltAm,
     required this.aktualisiertAm,
   });
@@ -25,6 +26,7 @@ class Forderung {
   final int? rechnungId;
   final int? journalId;
   final int? ausgleichJournalId;
+  final num? ursprungsBetrag;
   final String erstelltAm;
   final String aktualisiertAm;
 }
@@ -59,40 +61,64 @@ class ForderungenRepository {
 
   final QueryExecutor executor;
 
+  Future<void>? _schemaReady;
+
   static const Set<String> _typSet = {'rechnung', 'rechnung_eingang', 'journal'};
   static const Set<String> _statusSet = {'offen', 'teilbezahlt', 'bezahlt', 'ausgebucht'};
   static const Set<String> _partnerSet = {'kunde', 'lieferant'};
 
-  Future<void> ensureSchema() async {
-    for (final col in <String>[
-      "typ TEXT NOT NULL DEFAULT 'rechnung' CHECK (typ IN ('rechnung','rechnung_eingang','journal'))",
-      "partner_typ TEXT NOT NULL DEFAULT 'kunde' CHECK (partner_typ IN ('kunde','lieferant'))",
-      'partner_id INTEGER NOT NULL DEFAULT 0',
-      'journal_id INTEGER REFERENCES journal(id)',
-      'ausgleich_journal_id INTEGER REFERENCES journal(id)',
-      'erstellt_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP',
-      'aktualisiert_am TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP',
-    ]) {
-      try {
-        await executor.runCustom('ALTER TABLE forderungen ADD COLUMN $col');
-      } catch (e) {
-        final msg = e.toString();
-        if (msg.contains('duplicate column name') || msg.contains('already exists')) {
-          debugPrint('Forderungen ensureSchema skip duplicate: $msg');
-          continue;
-        }
-        debugPrint('Forderungen ensureSchema failed: $e');
-        rethrow;
+  Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
+
+  Future<void> _ensureSchema() async {
+    final List<Map<String, Object?>> columnRows = await executor.runSelect(
+      'PRAGMA table_info(forderungen)',
+      const <Object?>[],
+    );
+    final Set<String> columns = <String>{
+      for (final Map<String, Object?> row in columnRows)
+        if (row['name'] is String) row['name']! as String,
+    };
+    const Map<String, String> requiredColumns = <String, String>{
+      'typ': "TEXT NOT NULL DEFAULT 'rechnung' CHECK (typ IN ('rechnung','rechnung_eingang','journal'))",
+      'partner_typ': "TEXT NOT NULL DEFAULT 'kunde' CHECK (partner_typ IN ('kunde','lieferant'))",
+      'partner_id': 'INTEGER NOT NULL DEFAULT 0',
+      'journal_id': 'INTEGER REFERENCES journal(id)',
+      'ausgleich_journal_id': 'INTEGER REFERENCES journal(id)',
+      'erstellt_am': 'TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP',
+      'aktualisiert_am': 'TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP',
+      'anfangsbetrag': 'NUMERIC(12,2)',
+    };
+    for (final MapEntry<String, String> entry in requiredColumns.entries) {
+      if (columns.contains(entry.key)) {
+        continue;
       }
-    }
-    try {
-      await executor.runCustom(
-        '''UPDATE forderungen SET partner_id = kunde_id WHERE (partner_id IS NULL OR partner_id = 0) AND kunde_id IS NOT NULL''',
+      await executor.runCustom('ALTER TABLE forderungen ADD COLUMN ${entry.key} ${entry.value}');
+      final List<Map<String, Object?>> verifiedRows = await executor.runSelect(
+        'PRAGMA table_info(forderungen)',
+        const <Object?>[],
       );
-    } catch (e) {
-      debugPrint('Forderungen ensureSchema migrate failed: $e');
-      rethrow;
+      if (!verifiedRows.any((Map<String, Object?> row) => row['name'] == entry.key)) {
+        throw StateError('Forderungen-Schema konnte Spalte ${entry.key} nicht verifizieren');
+      }
+      columns.add(entry.key);
     }
+    await executor.runCustom(
+      'UPDATE forderungen SET partner_id = kunde_id WHERE (partner_id IS NULL OR partner_id = 0) AND kunde_id IS NOT NULL',
+    );
+    await executor.runCustom('''
+CREATE TABLE IF NOT EXISTS forderung_zahlungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  forderung_id INTEGER NOT NULL REFERENCES forderungen(id),
+  journal_id INTEGER NOT NULL UNIQUE REFERENCES journal(id),
+  betrag NUMERIC(12,2) NOT NULL,
+  typ TEXT NOT NULL CHECK (typ IN ('zahlung','ueberzahlung','ausbuchen')),
+  datum TEXT NOT NULL,
+  idempotency_key TEXT UNIQUE
+)''');
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX IF NOT EXISTS forderungen_rechnung_unique ON forderungen(rechnung_id) WHERE rechnung_id IS NOT NULL',
+    );
+    await executor.runCustom('UPDATE forderungen SET anfangsbetrag = betrag WHERE anfangsbetrag IS NULL');
   }
 
   Future<Forderung> create({
@@ -104,29 +130,50 @@ class ForderungenRepository {
     int? journalId,
     String status = 'offen',
   }) async {
+    await ensureSchema();
     if (!_typSet.contains(typ)) throw const ForderungenException('Ungültiger Typ');
     if (!_statusSet.contains(status)) throw const ForderungenException('Ungültiger Status');
     if (!_partnerSet.contains(partnerTyp)) throw const ForderungenException('Ungültiger Partner-Typ');
     if (partnerId <= 0) throw const ForderungenException('Partner-ID ist Pflicht');
     if (betrag.isNaN || !betrag.isFinite) throw const ForderungenException('Betrag ungültig');
-    final cents = _toCents(betrag);
+    final int cents = _toCents(betrag);
     if (cents < 0) throw const ForderungenException('Betrag darf nicht negativ sein');
 
     // Duplicate guard for rechnung-linked forderungen
     if (rechnungId != null) {
-      final dup = await executor.runSelect(
-        "SELECT id FROM forderungen WHERE rechnung_id = ? AND status IN ('offen','teilbezahlt') LIMIT 1",
-        [rechnungId],
-      );
+      final dup = await executor.runSelect('SELECT id FROM forderungen WHERE rechnung_id = ? LIMIT 1', [rechnungId]);
       if (dup.isNotEmpty) throw const ForderungenException('Forderung für diese Rechnung existiert bereits');
     }
 
     final now = DateTime.now().toIso8601String();
     final int? kundeId = partnerTyp == 'kunde' ? partnerId : null;
-    final id = await executor.runInsert(
-      'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [typ, status, _fmt(betrag), partnerTyp, partnerId, rechnungId, journalId, now, now, kundeId],
-    );
+    late final int id;
+    try {
+      id = await executor.runInsert(
+        'INSERT INTO forderungen (typ, status, betrag, anfangsbetrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          typ,
+          status,
+          _fmtCents(cents),
+          _fmtCents(cents),
+          partnerTyp,
+          partnerId,
+          rechnungId,
+          journalId,
+          now,
+          now,
+          kundeId,
+        ],
+      );
+    } catch (error, stackTrace) {
+      if (rechnungId != null && error.toString().toUpperCase().contains('UNIQUE')) {
+        Error.throwWithStackTrace(
+          const ForderungenException('Forderung für diese Rechnung existiert bereits'),
+          stackTrace,
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
     final f = await findById(id);
     if (f == null) throw const ForderungenException('Forderung konnte nicht gespeichert werden');
     return f;
@@ -134,12 +181,16 @@ class ForderungenRepository {
 
   /// Auto-create on invoice finalization per spec. Idempotent.
   Future<Forderung?> createForRechnung(int rechnungId) async {
+    await ensureSchema();
     final rows = await executor.runSelect(
-      'SELECT id, typ, kunde_id, lieferant_id, brutto_betrag FROM rechnungen WHERE id = ?',
+      'SELECT id, typ, kunde_id, lieferant_id, brutto_betrag, ist_entwurf FROM rechnungen WHERE id = ?',
       [rechnungId],
     );
     if (rows.isEmpty) throw const ForderungenException('Rechnung nicht gefunden');
     final r = rows.single;
+    if (((r['ist_entwurf'] as num?) ?? 1).toInt() != 0) {
+      throw const ForderungenException('Nur finalisierte Rechnungen erzeugen eine Forderung');
+    }
     final typRaw = (r['typ'] as String?) ?? 'rechnung';
     final brutto = _asNum(r['brutto_betrag']) ?? 0;
     final isEingang = typRaw == 'rechnung_eingang' || r['lieferant_id'] != null;
@@ -148,20 +199,19 @@ class ForderungenRepository {
     final partnerId = isEingang ? (r['lieferant_id'] as int?) : (r['kunde_id'] as int?);
     if (partnerId == null) return null;
 
-    final existing = await executor.runSelect(
-      "SELECT id FROM forderungen WHERE rechnung_id = ? AND status IN ('offen','teilbezahlt') LIMIT 1",
-      [rechnungId],
-    );
+    final existing = await executor.runSelect('SELECT id FROM forderungen WHERE rechnung_id = ? LIMIT 1', [rechnungId]);
     if (existing.isNotEmpty) return findById(_asNum(existing.single['id'])?.toInt() ?? 0);
     return create(typ: typ, betrag: brutto, partnerTyp: partnerTyp, partnerId: partnerId, rechnungId: rechnungId);
   }
 
   Future<Forderung?> findById(int id) async {
+    await ensureSchema();
     final rows = await executor.runSelect('SELECT * FROM forderungen WHERE id = ?', [id]);
     return rows.isEmpty ? null : _fromRow(rows.single);
   }
 
   Future<Forderung?> findByRechnungId(int rechnungId) async {
+    await ensureSchema();
     final rows = await executor.runSelect('SELECT * FROM forderungen WHERE rechnung_id = ? ORDER BY id DESC LIMIT 1', [
       rechnungId,
     ]);
@@ -169,6 +219,7 @@ class ForderungenRepository {
   }
 
   Future<List<Forderung>> list({String? partnerTyp, int? partnerId, String? status}) async {
+    await ensureSchema();
     final where = <String>[];
     final args = <Object?>[];
     if (partnerTyp != null) {
@@ -189,6 +240,7 @@ class ForderungenRepository {
   }
 
   Future<List<Forderung>> listOffene() async {
+    await ensureSchema();
     final rows = await executor.runSelect(
       "SELECT * FROM forderungen WHERE status IN ('offen','teilbezahlt') ORDER BY id",
       const [],
@@ -198,61 +250,124 @@ class ForderungenRepository {
 
   /// Payment posting with overpayment split. Creates payment journal + optional overpayment journal.
   /// Atomic via drift transaction — orphan journal never persists without forderung update.
-  Future<Forderung> zahlungBuchen({required int forderungId, required num betrag, String? datum}) async {
-    if (betrag.isNaN || !betrag.isFinite || betrag <= 0) throw const ForderungenException('Zahlbetrag ungültig');
-    final f = await findById(forderungId);
-    if (f == null) throw const ForderungenException('Forderung nicht gefunden');
-    if (f.status == 'bezahlt' || f.status == 'ausgebucht') {
-      throw const ForderungenException('Forderung bereits ausgeglichen');
+  Future<Forderung> zahlungBuchen({
+    required int forderungId,
+    required num betrag,
+    String? datum,
+    String? idempotencyKey,
+  }) async {
+    await ensureSchema();
+    if (betrag.isNaN || !betrag.isFinite || betrag <= 0) {
+      throw const ForderungenException('Zahlbetrag ungültig');
+    }
+    final String? key = idempotencyKey?.trim();
+    if (idempotencyKey != null && key!.isEmpty) {
+      throw const ForderungenException('Idempotency-Key darf nicht leer sein');
+    }
+    if (key != null) {
+      final List<Map<String, Object?>> existing = await executor.runSelect(
+        'SELECT forderung_id FROM forderung_zahlungen WHERE idempotency_key = ? LIMIT 1',
+        <Object?>[key],
+      );
+      if (existing.isNotEmpty) {
+        final int previousId = (existing.single['forderung_id'] as num?)?.toInt() ?? 0;
+        final Forderung? previous = await findById(previousId);
+        if (previous != null) {
+          return previous;
+        }
+      }
     }
 
-    final centsBetrag = _toCents(betrag);
-    final centsOffen = _toCents(f.betrag);
-    final now = datum ?? DateTime.now().toIso8601String().substring(0, 10);
-
-    final transaction = executor.beginTransaction();
+    final int centsBetrag = _toCents(betrag);
+    if (centsBetrag <= 0) {
+      throw const ForderungenException('Zahlbetrag muss mindestens einen Cent betragen');
+    }
+    final String now = datum ?? DateTime.now().toIso8601String().substring(0, 10);
+    final TransactionExecutor transaction = executor.beginTransaction();
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
-      final payJournalId = await transaction.runInsert(
+      final List<Map<String, Object?>> fRows = await transaction.runSelect(
+        'SELECT * FROM forderungen WHERE id = ? LIMIT 1',
+        <Object?>[forderungId],
+      );
+      if (fRows.isEmpty) {
+        throw const ForderungenException('Forderung nicht gefunden');
+      }
+      final Forderung f = _fromRow(fRows.single);
+      if (f.status == 'bezahlt' || f.status == 'ausgebucht') {
+        throw const ForderungenException('Forderung bereits ausgeglichen');
+      }
+      final int centsOffen = _toCents(f.betrag);
+      if (centsOffen <= 0) {
+        throw const ForderungenException('Forderung bereits ausgeglichen');
+      }
+      final int paymentCents = centsBetrag < centsOffen ? centsBetrag : centsOffen;
+      final int payJournalId = await transaction.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [now, 'Zahlung Forderung #$forderungId', _fmt(betrag > f.betrag ? f.betrag : betrag), 'Einnahme', f.rechnungId],
+        <Object?>[now, 'Zahlung Forderung #$forderungId', _fmtCents(paymentCents), 'Einnahme', f.rechnungId],
+      );
+      await transaction.runInsert(
+        'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>[forderungId, payJournalId, _fmtCents(paymentCents), 'zahlung', now, key],
       );
 
       if (centsBetrag < centsOffen) {
-        final remaining = _fromCents(centsOffen - centsBetrag);
         await transaction.runUpdate(
           'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-          [_fmt(remaining), 'teilbezahlt', payJournalId, forderungId],
+          <Object?>[_fmtCents(centsOffen - centsBetrag), 'teilbezahlt', payJournalId, forderungId],
         );
       } else if (centsBetrag == centsOffen) {
         await transaction.runUpdate(
           'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-          ['0.00', 'bezahlt', payJournalId, forderungId],
+          <Object?>['0.00', 'bezahlt', payJournalId, forderungId],
         );
       } else {
-        final excess = _fromCents(centsBetrag - centsOffen);
-        await transaction.runInsert(
+        final int excessCents = centsBetrag - centsOffen;
+        final int excessJournalId = await transaction.runInsert(
           'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          [now, 'Überzahlung Forderung #$forderungId', _fmt(excess), 'Einnahme', f.rechnungId],
+          <Object?>[now, 'Überzahlung Forderung #$forderungId', _fmtCents(excessCents), 'Einnahme', f.rechnungId],
+        );
+        await transaction.runInsert(
+          'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum) VALUES (?, ?, ?, ?, ?)',
+          <Object?>[forderungId, excessJournalId, _fmtCents(excessCents), 'ueberzahlung', now],
         );
         await transaction.runUpdate(
           'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
-          ['0.00', 'bezahlt', payJournalId, forderungId],
+          <Object?>['0.00', 'bezahlt', payJournalId, forderungId],
         );
       }
       await transaction.send();
-    } catch (e, st) {
+    } catch (error, stackTrace) {
       try {
         await transaction.rollback();
-      } catch (_) {}
-      Error.throwWithStackTrace(e, st);
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      if (key != null && error.toString().toUpperCase().contains('UNIQUE')) {
+        final List<Map<String, Object?>> existing = await executor.runSelect(
+          'SELECT forderung_id FROM forderung_zahlungen WHERE idempotency_key = ? LIMIT 1',
+          <Object?>[key],
+        );
+        if (existing.isNotEmpty) {
+          final int previousId = (existing.single['forderung_id'] as num?)?.toInt() ?? 0;
+          final Forderung? previous = await findById(previousId);
+          if (previous != null) {
+            return previous;
+          }
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
     }
-    final updated = await findById(forderungId);
-    return updated!;
+    final Forderung? updated = await findById(forderungId);
+    if (updated == null) {
+      throw const ForderungenException('Forderung konnte nach Zahlung nicht gelesen werden');
+    }
+    return updated;
   }
 
   /// Write-off (Forderungsausfall) with Grund required. Atomic via drift transaction.
   Future<Forderung> ausbuchen({required int forderungId, required String grund}) async {
+    await ensureSchema();
     if (grund.trim().isEmpty) throw const ForderungenException('Grund ist Pflicht');
     final f = await findById(forderungId);
     if (f == null) throw const ForderungenException('Forderung nicht gefunden');
@@ -266,7 +381,11 @@ class ForderungenRepository {
       await transaction.ensureOpen(_NoopTransactionUser());
       final journalId = await transaction.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [now, 'Forderungsausfall: ${grund.trim()}', _fmt(f.betrag), 'Ausgabe', f.rechnungId],
+        <Object?>[now, 'Forderungsausfall: ${grund.trim()}', _fmtCents(_toCents(f.betrag)), 'Ausgabe', f.rechnungId],
+      );
+      await transaction.runInsert(
+        'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum) VALUES (?, ?, ?, ?, ?)',
+        <Object?>[forderungId, journalId, _fmtCents(_toCents(f.betrag)), 'ausbuchen', now],
       );
       await transaction.runUpdate(
         'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP WHERE id = ?',
@@ -289,117 +408,86 @@ class ForderungenRepository {
     String? von,
     String? bis,
   }) async {
+    await ensureSchema();
     final forderungen = await list(partnerTyp: partnerTyp, partnerId: partnerId);
-    // Collect payment/overpayment journals linked via ausgleich_journal_id or rechnung_id
-    final journalRows = await executor.runSelect(
-      'SELECT id, datum, beschreibung, betrag, beleg_typ FROM journal ORDER BY datum, id',
-      const [],
-    );
-
-    // Lookup original brutto_betrag for forderungen linked to rechnungen.
-    final origAmounts = <int, num>{};
-    for (final f in forderungen) {
-      if (f.rechnungId != null && !origAmounts.containsKey(f.rechnungId)) {
-        final rows = await executor.runSelect('SELECT brutto_betrag FROM rechnungen WHERE id = ?', [f.rechnungId]);
-        if (rows.isNotEmpty) {
-          origAmounts[f.rechnungId!] = _asNum(rows.first['brutto_betrag']) ?? f.betrag;
-        }
-      }
+    if (forderungen.isEmpty) {
+      return const <KontokorrentEintrag>[];
     }
 
-    // Build entries: forderungen as Soll, payments as Haben
-    final entries = <_RawEntry>[];
-    for (final f in forderungen) {
-      if (!_inRange(f.erstelltAm.substring(0, 10), von, bis)) continue;
-      // Use original invoice amount (from rechnungen table) instead of current betrag.
-      final originalBetrag = f.rechnungId != null ? (origAmounts[f.rechnungId] ?? f.betrag) : f.betrag;
-      entries.add(
+    final String placeholders = List<String>.filled(forderungen.length, '?').join(', ');
+    final List<Object?> ids = forderungen.map((Forderung f) => f.id).toList(growable: false);
+    final List<Map<String, Object?>> paymentRows = await executor.runSelect(
+      'SELECT forderung_id, betrag, typ, datum, journal_id FROM forderung_zahlungen '
+      'WHERE forderung_id IN ($placeholders) ORDER BY datum, id',
+      ids,
+    );
+
+    // Build one immutable invoice event and one event for every payment. The
+    // relation table is the source of truth; descriptions and latest-link
+    // columns are only compatibility fields.
+    final List<_RawEntry> allEntries = <_RawEntry>[];
+    for (final Forderung f in forderungen) {
+      final int originalCents = _toCents(f.ursprungsBetrag ?? f.betrag);
+      final String invoiceDate = _dateOnly(f.erstelltAm);
+      allEntries.add(
         _RawEntry(
-          datum: f.erstelltAm.substring(0, 10),
+          datum: invoiceDate,
           typ: f.typ,
-          betrag: originalBetrag,
+          betragCents: originalCents,
           beschreibung: 'Rechnung ${f.rechnungId ?? f.id}',
         ),
       );
-      // Find overpayment journals for this forderung (beschreibung contains Forderung #id)
-      for (final j in journalRows) {
-        final desc = (j['beschreibung'] as String?) ?? '';
-        if (desc.contains('Überzahlung Forderung #${f.id}')) {
-          final d = (j['datum'] as String?) ?? f.erstelltAm.substring(0, 10);
-          if (!_inRange(d, von, bis)) continue;
-          final b = _asNum(j['betrag']) ?? 0;
-          entries.add(_RawEntry(datum: d, typ: 'ueberzahlung', betrag: -b, beschreibung: desc));
+      for (final Map<String, Object?> row in paymentRows) {
+        if ((row['forderung_id'] as num?)?.toInt() != f.id) {
+          continue;
         }
-      }
-    }
-    // Also include payment journals via ausgleich
-    for (final f in forderungen) {
-      if (f.ausgleichJournalId == null) continue;
-      for (final j in journalRows) {
-        if (j['id'] == f.ausgleichJournalId) {
-          final d = (j['datum'] as String?) ?? f.erstelltAm.substring(0, 10);
-          if (!_inRange(d, von, bis)) continue;
-          // Avoid double-adding overpayment already added
-          final desc = (j['beschreibung'] as String?) ?? '';
-          if (desc.contains('Überzahlung')) continue;
-          entries.add(_RawEntry(datum: d, typ: 'zahlung', betrag: -(_asNum(j['betrag']) ?? 0), beschreibung: desc));
-        }
+        final int amount = _toCents(row['betrag']);
+        final String typ = row['typ']?.toString() ?? 'zahlung';
+        allEntries.add(
+          _RawEntry(
+            datum: _dateOnly(row['datum']?.toString() ?? invoiceDate),
+            typ: typ,
+            betragCents: -amount,
+            beschreibung: typ == 'zahlung' ? 'Zahlung Forderung #${f.id}' : '$typ Forderung #${f.id}',
+          ),
+        );
       }
     }
 
-    // Custom order: rechnung (Soll) first, then zahlung (Haben), then ueberzahlung (excess Haben).
-    const typOrder = {'rechnung': 0, 'zahlung': 1, 'ueberzahlung': 2};
-    entries.sort((a, b) {
-      final c = a.datum.compareTo(b.datum);
-      if (c != 0) return c;
-      return (typOrder[a.typ] ?? 99).compareTo(typOrder[b.typ] ?? 99);
+    const Map<String, int> typOrder = <String, int>{
+      'rechnung': 0,
+      'rechnung_eingang': 0,
+      'journal': 0,
+      'zahlung': 1,
+      'ueberzahlung': 2,
+      'ausbuchen': 3,
+    };
+    allEntries.sort((_RawEntry a, _RawEntry b) {
+      final int dateOrder = a.datum.compareTo(b.datum);
+      return dateOrder == 0 ? (typOrder[a.typ] ?? 99).compareTo(typOrder[b.typ] ?? 99) : dateOrder;
     });
 
-    // Running saldo
-    var saldoCents = 0;
-    // Opening balance from entries outside range — use original amounts and subtract prior payments.
-    if (von != null) {
-      for (final f in forderungen) {
-        final d = f.erstelltAm.substring(0, 10);
-        if (d.compareTo(von) < 0) {
-          // Use original invoice amount (from rechnungen table) for opening balance.
-          final origBetrag = f.rechnungId != null ? (origAmounts[f.rechnungId] ?? f.betrag) : f.betrag;
-          saldoCents += _toCents(origBetrag);
-          // Subtract payments made before von.
-          if (f.ausgleichJournalId != null) {
-            for (final j in journalRows) {
-              if (j['id'] == f.ausgleichJournalId) {
-                final jDatum = (j['datum'] as String?) ?? '';
-                if (jDatum.compareTo(von) < 0) {
-                  saldoCents -= _toCents(_asNum(j['betrag']) ?? 0);
-                }
-              }
-            }
-          }
-          // Subtract overpayment journals before von.
-          for (final j in journalRows) {
-            final desc = (j['beschreibung'] as String?) ?? '';
-            if (desc.contains('Überzahlung Forderung #${f.id}')) {
-              final jDatum = (j['datum'] as String?) ?? '';
-              if (jDatum.compareTo(von) < 0) {
-                saldoCents -= _toCents(_asNum(j['betrag']) ?? 0);
-              }
-            }
-          }
-        }
+    int openingCents = 0;
+    final List<_RawEntry> inPeriod = <_RawEntry>[];
+    for (final _RawEntry entry in allEntries) {
+      if (von != null && entry.datum.compareTo(von) < 0) {
+        openingCents += entry.betragCents;
+      } else if (_inRange(entry.datum, von, bis)) {
+        inPeriod.add(entry);
       }
     }
 
-    final result = <KontokorrentEintrag>[];
-    for (final e in entries) {
-      saldoCents += _toCents(e.betrag);
+    var saldoCents = openingCents;
+    final List<KontokorrentEintrag> result = <KontokorrentEintrag>[];
+    for (final _RawEntry entry in inPeriod) {
+      saldoCents += entry.betragCents;
       result.add(
         KontokorrentEintrag(
-          datum: e.datum,
-          typ: e.typ,
-          betrag: e.betrag,
+          datum: entry.datum,
+          typ: entry.typ,
+          betrag: _fromCents(entry.betragCents),
           saldo: _fromCents(saldoCents),
-          beschreibung: e.beschreibung,
+          beschreibung: entry.beschreibung,
         ),
       );
     }
@@ -417,6 +505,7 @@ class ForderungenRepository {
       rechnungId: r['rechnung_id'] as int?,
       journalId: r['journal_id'] as int?,
       ausgleichJournalId: r['ausgleich_journal_id'] as int?,
+      ursprungsBetrag: _asNum(r['anfangsbetrag']),
       erstelltAm:
           (r['erstellt_am'] as String?) ?? (r['erstellungsdatum'] as String?) ?? DateTime.now().toIso8601String(),
       aktualisiertAm: (r['aktualisiert_am'] as String?) ?? DateTime.now().toIso8601String(),
@@ -435,18 +524,28 @@ class ForderungenRepository {
     return null;
   }
 
-  static int _toCents(num v) => (v * 100).round();
+  static int _toCents(Object? value) {
+    final String raw = value?.toString() ?? '0';
+    try {
+      return money.parseScaled(raw, scale: 2, field: 'amount', roundExcess: true);
+    } on money.MoneyParseException catch (error) {
+      throw ForderungenException(error.message);
+    }
+  }
+
   static num _fromCents(int c) => c / 100.0;
-  static String _fmt(num v) => v.toStringAsFixed(2);
+  static String _fmtCents(int cents) => money.fromCents(cents);
 }
 
 class _RawEntry {
-  _RawEntry({required this.datum, required this.typ, required this.betrag, this.beschreibung});
+  _RawEntry({required this.datum, required this.typ, required this.betragCents, this.beschreibung});
   final String datum;
   final String typ;
-  final num betrag;
+  final int betragCents;
   final String? beschreibung;
 }
+
+String _dateOnly(String raw) => raw.length >= 10 ? raw.substring(0, 10) : raw;
 
 class _NoopTransactionUser extends QueryExecutorUser {
   @override

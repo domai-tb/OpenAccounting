@@ -2,8 +2,6 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
-const int _centsPerUnit = 100;
-
 class RechnungenUseCases {
   const RechnungenUseCases(this.repository);
 
@@ -121,95 +119,12 @@ void _validateDraftInput({
   if (!_isValidIsoDate(datum)) {
     throw ArgumentError.value(datum, 'datum', 'Erwartet ein gültiges ISO-Datum (YYYY-MM-DD).');
   }
-  if (rabattProzent != null && rabattProzent != 0 && rabattBetrag != null && rabattBetrag != 0) {
-    throw ArgumentError('Nur ein Rabatt pro Dokument erlaubt (Prozent ODER Betrag)');
-  }
-  // strict 2-decimal check for money before preview rounding
-  for (final p in positionen) {
-    if (p.bezeichnung.trim().isEmpty) throw ArgumentError.value(p.bezeichnung, 'bezeichnung', 'Darf nicht leer sein.');
-    _strictCurrency(p.einzelpreis, 'einzelpreis');
-    _strictCurrency(p.gesamt.abs(), 'gesamt');
-    _strictCurrency(p.menge, 'menge');
-    if (!p.ustSatz.isFinite) throw ArgumentError.value(p.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
-    final ustCents = _fixedPointCents(p.ustSatz, 'ustSatz');
-    if (ustCents < 0 || ustCents > 10000) {
-      throw ArgumentError.value(p.ustSatz, 'ustSatz', 'Muss zwischen 0 und 100 liegen.');
-    }
-  }
-  // preview validation for logic consistency (allow rounding)
-  try {
-    VorschauService.calculate(
-      eingabemodus: eingabemodus,
-      positionen: positionen,
-      rabattProzent: rabattProzent,
-      rabattBetrag: rabattBetrag,
-    );
-  } catch (e) {
-    if (e.toString().contains('Nur ein Rabatt')) {
-      throw ArgumentError('Nur ein Rabatt pro Dokument erlaubt (Prozent ODER Betrag)');
-    }
-    rethrow;
-  }
-  for (final position in positionen) {
-    if (position.rabattProzent != null && position.rabattProzent != 0) continue; // preview already handled
-    final einzelpreisCents = _currencyCents(position.einzelpreis, 'einzelpreis');
-    final gesamtCents = _currencyCents(position.gesamt.abs(), 'gesamt');
-    final mengeCents = _currencyCents(position.menge, 'menge');
-    final lineTotalCents = (einzelpreisCents * mengeCents + 50) ~/ _centsPerUnit;
-    if (gesamtCents != lineTotalCents) {
-      throw ArgumentError.value(position.gesamt, 'gesamt', 'Muss dem auf Cent gerundeten Positionswert entsprechen.');
-    }
-  }
-}
-
-void _strictCurrency(num v, String name) {
-  if (!v.isFinite) throw ArgumentError.value(v, name, 'Muss endlich sein.');
-  final s = v.toString();
-  final m = RegExp(r'^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$').firstMatch(s);
-  if (m == null) throw ArgumentError.value(v, name, 'Ungültige Zahl');
-  final dec = (m.group(3)?.length ?? 0) - int.parse(m.group(4) ?? '0');
-  if (dec > 2) {
-    final digits = '${m.group(2)}${m.group(3) ?? ''}';
-    final excess = dec - 2;
-    final zeros = ''.padRight(excess, '0');
-    if (!digits.endsWith(zeros)) {
-      throw ArgumentError.value(v, name, 'Darf höchstens zwei Nachkommastellen haben.');
-    }
-  }
-}
-
-bool _isFiniteNonNegative(num value) => value.isFinite && value >= 0;
-
-int _currencyCents(num value, String name) {
-  if (!_isFiniteNonNegative(value.abs())) {
-    throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
-  }
-  return _fixedPointCents(value.abs(), name);
-}
-
-int _fixedPointCents(num value, String name) {
-  if (!value.isFinite) {
-    throw ArgumentError.value(value, name, 'Muss endlich und nicht negativ sein.');
-  }
-  final match = RegExp(r'^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$').firstMatch(value.toString());
-  if (match == null) {
-    throw ArgumentError.value(value, name, 'Darf höchstens zwei Nachkommastellen haben.');
-  }
-  final sign = match.group(1) == '-' ? -1 : 1;
-  final digits = '${match.group(2)}${match.group(3) ?? ''}';
-  final decimalPlaces = (match.group(3)?.length ?? 0) - int.parse(match.group(4) ?? '0');
-  var centDigits = digits;
-  if (decimalPlaces > 2) {
-    final excessPlaces = decimalPlaces - 2;
-    final trailingZeroes = ''.padRight(excessPlaces, '0');
-    if (!centDigits.endsWith(trailingZeroes)) {
-      throw ArgumentError.value(value, name, 'Darf höchstens zwei Nachkommastellen haben.');
-    }
-    centDigits = centDigits.substring(0, centDigits.length - excessPlaces);
-  } else if (decimalPlaces < 2) {
-    centDigits = centDigits.padRight(centDigits.length + 2 - decimalPlaces, '0');
-  }
-  return sign * int.parse(centDigits);
+  VorschauService.calculate(
+    eingabemodus: eingabemodus,
+    positionen: positionen,
+    rabattProzent: rabattProzent,
+    rabattBetrag: rabattBetrag,
+  );
 }
 
 bool _isValidIsoDate(String value) {

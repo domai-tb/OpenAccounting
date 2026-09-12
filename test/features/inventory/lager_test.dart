@@ -305,5 +305,18 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       expect(names, contains('referenz_typ'));
       expect(names, contains('referenz_id'));
     });
+
+    test('AdjustBestand adds to the current value and rejects non-finite quantities', () async {
+      final id = await createArtikel(bezeichnung: 'Atomic adjustment', bestandAktuell: 10);
+
+      await db.artikelRepository.adjustBestand(id, 2.555);
+
+      expect(await bestandOf(id), 12.555);
+      await expectLater(
+        db.artikelRepository.adjustBestand(id, double.infinity),
+        throwsA(isA<Exception>().having((Exception e) => e.toString(), 'message', contains('finite'))),
+      );
+      expect(await bestandOf(id), 12.555);
+    });
   });
 }

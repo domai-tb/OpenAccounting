@@ -14,8 +14,12 @@ class ForderungenUseCases {
 
   Future<Forderung?> forderungFuerRechnung(int rechnungId) => repo.createForRechnung(rechnungId);
 
-  Future<Forderung> zahlungBuchen({required int forderungId, required num betrag, String? datum}) =>
-      repo.zahlungBuchen(forderungId: forderungId, betrag: betrag, datum: datum);
+  Future<Forderung> zahlungBuchen({
+    required int forderungId,
+    required num betrag,
+    String? datum,
+    String? idempotencyKey,
+  }) => repo.zahlungBuchen(forderungId: forderungId, betrag: betrag, datum: datum, idempotencyKey: idempotencyKey);
 
   Future<Forderung> forderungAusbuchen({required int forderungId, required String grund}) =>
       repo.ausbuchen(forderungId: forderungId, grund: grund);

@@ -69,7 +69,25 @@ void main() {
     );
   });
 
-  test('rejects monetary values with more than two decimal places', () async {
+  test('accepts unit prices with four decimal places', () async {
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+
+    final invoice = await useCases.createDraftRechnung(
+      datum: '2026-08-30',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 0.105, gesamt: 0.11),
+      ],
+    );
+
+    expect(invoice.positionen.single.einzelpreis, 0.105);
+    expect(invoice.positionen.single.gesamt, 0.11);
+  });
+
+  test('rejects unit prices beyond four decimal places', () async {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
@@ -80,7 +98,7 @@ void main() {
       useCases.createDraftRechnung(
         datum: '2026-08-30',
         positionen: const <RechnungPositionItem>[
-          RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 0.105, gesamt: 0.11),
+          RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 0.10001, gesamt: 0.10),
         ],
       ),
       throwsA(isA<ArgumentError>()),
@@ -104,7 +122,24 @@ void main() {
     expect(invoice.positionen.single.gesamt, 5000000.02);
   });
 
-  test('rejects quantities with more than two decimal places', () async {
+  test('accepts quantities with three decimal places', () async {
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+
+    final invoice = await useCases.createDraftRechnung(
+      datum: '2026-08-30',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1.005, einzelpreis: 100, gesamt: 100.50),
+      ],
+    );
+
+    expect(invoice.positionen.single.menge, 1.005);
+  });
+
+  test('rejects quantities beyond three decimal places', () async {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
@@ -115,7 +150,7 @@ void main() {
       useCases.createDraftRechnung(
         datum: '2026-08-30',
         positionen: const <RechnungPositionItem>[
-          RechnungPositionItem(bezeichnung: 'Beratung', menge: 1.005, einzelpreis: 100, gesamt: 100.50),
+          RechnungPositionItem(bezeichnung: 'Beratung', menge: 1.0055, einzelpreis: 100, gesamt: 100.55),
         ],
       ),
       throwsA(isA<ArgumentError>()),

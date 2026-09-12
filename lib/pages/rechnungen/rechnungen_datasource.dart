@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
@@ -12,24 +13,32 @@ class RechnungenDataSource {
   final String? profileDir;
 
   Future<void> _ensureExtraColumns() async {
-    final alters = <String>[
-      'ALTER TABLE rechnungen ADD COLUMN storno_grund TEXT',
-      'ALTER TABLE rechnungen ADD COLUMN storno_datum TEXT',
-      'ALTER TABLE rechnungen ADD COLUMN gutschrift_von INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE rechnungen ADD COLUMN ersatz_fuer INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE rechnungen ADD COLUMN ersatzrechnung_id INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE rechnungen ADD COLUMN konvertiert_von INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE rechnungen ADD COLUMN konvertiert_zu INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE rechnungen ADD COLUMN original_pdf_pfad TEXT',
-      'ALTER TABLE rechnungen ADD COLUMN rabatt_prozent NUMERIC(12,2) DEFAULT 0',
-      'ALTER TABLE rechnungen ADD COLUMN rabatt_betrag NUMERIC(12,2) DEFAULT 0',
-      'ALTER TABLE rechnungen ADD COLUMN lieferadresse_id INTEGER REFERENCES kunden_lieferadressen(id)',
-      'ALTER TABLE rechnungspositionen ADD COLUMN rabatt_prozent NUMERIC(12,2) DEFAULT 0',
+    const columns = <({String table, String name, String definition})>[
+      (table: 'rechnungen', name: 'storno_grund', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'storno_datum', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'gutschrift_von', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      (table: 'rechnungen', name: 'ersatz_fuer', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      (table: 'rechnungen', name: 'ersatzrechnung_id', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      (table: 'rechnungen', name: 'konvertiert_von', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      (table: 'rechnungen', name: 'konvertiert_zu', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      (table: 'rechnungen', name: 'original_pdf_pfad', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'rabatt_prozent', definition: 'NUMERIC(12,2) DEFAULT 0'),
+      (table: 'rechnungen', name: 'rabatt_betrag', definition: 'NUMERIC(12,2) DEFAULT 0'),
+      (table: 'rechnungen', name: 'lieferadresse_id', definition: 'INTEGER REFERENCES kunden_lieferadressen(id)'),
+      (table: 'rechnungspositionen', name: 'rabatt_prozent', definition: 'NUMERIC(12,2) DEFAULT 0'),
     ];
-    for (final sql in alters) {
-      try {
-        await executor.runCustom(sql);
-      } catch (_) {}
+    for (final column in columns) {
+      await _ensureColumn(column.table, column.name, column.definition);
+    }
+  }
+
+  Future<void> _ensureColumn(String table, String name, String definition) async {
+    final existing = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (existing.any((row) => row['name'] == name)) return;
+    await executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
+    final verified = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (!verified.any((row) => row['name'] == name)) {
+      throw StateError('Rechnungsschema konnte Spalte $table.$name nicht verifizieren');
     }
   }
 
@@ -64,9 +73,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           datum,
           1,
           eingabemodus,
-          preview.nettoBetrag.toStringAsFixed(2),
-          preview.bruttoBetrag.toStringAsFixed(2),
-          preview.ustBetrag.toStringAsFixed(2),
+          preview.nettoBetragString,
+          preview.bruttoBetragString,
+          preview.ustBetragString,
           (rabattProzent ?? 0).toStringAsFixed(2),
           (rabattBetrag ?? 0).toStringAsFixed(2),
           lieferadresseId,
@@ -86,8 +95,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             invoiceId,
             position.artikelId,
             position.bezeichnung,
-            position.menge.toStringAsFixed(2),
-            position.einzelpreis.toStringAsFixed(2),
+            position.menge.toStringAsFixed(3),
+            position.einzelpreis.toStringAsFixed(4),
             position.gesamt.toStringAsFixed(2),
             position.ustSatz.toStringAsFixed(2),
             position.position ?? index,
@@ -144,9 +153,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             datum,
             1,
             eingabemodus,
-            preview.nettoBetrag.toStringAsFixed(2),
-            preview.bruttoBetrag.toStringAsFixed(2),
-            preview.ustBetrag.toStringAsFixed(2),
+            preview.nettoBetragString,
+            preview.bruttoBetragString,
+            preview.ustBetragString,
             lieferadresseId,
             nummer.kreisId,
             DateTime.now().toUtc().toIso8601String(),
@@ -161,8 +170,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               invoiceId,
               p.artikelId,
               p.bezeichnung,
-              p.menge.toStringAsFixed(2),
-              p.einzelpreis.toStringAsFixed(2),
+              p.menge.toStringAsFixed(3),
+              p.einzelpreis.toStringAsFixed(4),
               p.gesamt.toStringAsFixed(2),
               p.ustSatz.toStringAsFixed(2),
               p.position ?? index,
@@ -415,9 +424,9 @@ WHERE id = ? AND ist_entwurf = 1
           'offen',
           senderSnapshot,
           issuedAt,
-          preview.nettoBetrag.toStringAsFixed(2),
-          preview.ustBetrag.toStringAsFixed(2),
-          preview.bruttoBetrag.toStringAsFixed(2),
+          preview.nettoBetragString,
+          preview.ustBetragString,
+          preview.bruttoBetragString,
           pdfPath,
           rechnungId,
         ],
@@ -505,27 +514,24 @@ WHERE id = ? AND ist_entwurf = 1
       final origTyp = orig['typ'].toString();
       final isGutschrift = origTyp == 'gutschrift';
       final eingabemodus = orig['eingabemodus']?.toString() ?? 'netto';
-      var sumNetto = 0.0;
-      var sumUst = 0.0;
-      var sumBrutto = 0.0;
-      for (final r in posRows) {
-        final gesamt = _asNum(r['gesamt']);
-        final ustSatz = _asNum(r['ust_satz']);
-        final sign = isGutschrift ? 1.0 : -1.0;
-        if (eingabemodus == 'brutto') {
-          final brutto = sign * gesamt.abs();
-          final netto = ustSatz == 0 ? brutto : brutto / (1 + ustSatz / 100);
-          sumNetto += netto;
-          sumUst += brutto - netto;
-          sumBrutto += brutto;
-        } else {
-          final netto = sign * gesamt.abs();
-          final ust = netto * ustSatz / 100;
-          sumNetto += netto;
-          sumUst += ust;
-          sumBrutto += netto + ust;
-        }
-      }
+      final List<RechnungPositionItem> sourcePositions = posRows
+          .map(
+            (r) => RechnungPositionItem(
+              bezeichnung: r['bezeichnung']?.toString() ?? '',
+              menge: _asNum(r['menge']).abs(),
+              einzelpreis: _asNum(r['einzelpreis']).abs(),
+              gesamt: _asNum(r['gesamt']).abs(),
+              ustSatz: _asNum(r['ust_satz']),
+              rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+              artikelId: r['artikel_id'] == null ? null : _asInt(r['artikel_id']),
+            ),
+          )
+          .toList(growable: false);
+      final VorschauResult sourcePreview = VorschauService.calculate(
+        eingabemodus: eingabemodus,
+        positionen: sourcePositions,
+      );
+      final int correctionSign = isGutschrift ? 1 : -1;
       final stornoId = await transaction.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, storno_von, storno_grund, storno_datum, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
@@ -539,16 +545,16 @@ WHERE id = ? AND ist_entwurf = 1
           rechnungId,
           trimmed,
           datum,
-          sumNetto.toStringAsFixed(2),
-          sumBrutto.toStringAsFixed(2),
-          sumUst.toStringAsFixed(2),
+          money.fromCents(correctionSign * sourcePreview.nettoCents),
+          money.fromCents(correctionSign * sourcePreview.bruttoCents),
+          money.fromCents(correctionSign * sourcePreview.ustCents),
           DateTime.now().toUtc().toIso8601String(),
           'pdfs/$docNo.pdf',
         ],
       );
       for (final r in posRows) {
-        final gesamt = _asNum(r['gesamt']);
-        final negGesamt = isGutschrift ? gesamt.abs() : -gesamt.abs();
+        final gesamt = _asNum(r['gesamt']).abs();
+        final correctedGesamt = money.fromCents(correctionSign * money.toCents(gesamt.toString()));
         await transaction.runInsert(
           'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           <Object?>[
@@ -557,7 +563,7 @@ WHERE id = ? AND ist_entwurf = 1
             r['bezeichnung'],
             r['menge'].toString(),
             r['einzelpreis'].toString(),
-            negGesamt.toStringAsFixed(2),
+            correctedGesamt,
             r['ust_satz'].toString(),
             r['position'],
             r['rabatt_prozent']?.toString() ?? '0.00',
@@ -691,33 +697,16 @@ WHERE id = ? AND ist_entwurf = 1
       }
       final nextNo = (latest != null && latest.year < invDate.year) ? 1 : stored;
       final docNo = _formatNumber(format, invDate.year, nextNo);
-      await transaction.runUpdate(
+      final int reserved = await transaction.runUpdate(
         'UPDATE nummernkreise SET naechste_nummer = ? WHERE id = ? AND naechste_nummer = ?',
         <Object?>[nextNo + 1, range['id'], stored],
       );
-      // ponytail: per-position VAT calc — O(n), one pass; move to VorschauService if reused.
-      var sumNetto = 0.0;
-      var sumUst = 0.0;
-      var sumBrutto = 0.0;
-      for (final p in usePos) {
-        final line = p.gesamt;
-        final ustSatz = p.ustSatz;
-        if (useEingabemodus == 'brutto') {
-          // gesamt is brutto: derive netto
-          final brutto = -line.abs();
-          final netto = ustSatz == 0 ? brutto : brutto / (1 + ustSatz / 100);
-          sumNetto += netto;
-          sumUst += brutto - netto;
-          sumBrutto += brutto;
-        } else {
-          // gesamt is netto: derive brutto
-          final netto = -line.abs();
-          final ust = netto * ustSatz / 100;
-          sumNetto += netto;
-          sumUst += ust;
-          sumBrutto += netto + ust;
-        }
+      if (reserved != 1) {
+        throw StateError('Gutschrift-Nummernkreis konnte nicht atomar reserviert werden');
       }
+      // Validate and calculate the unsigned source once. The correction sign
+      // is applied only when persisting the generated header/lines.
+      final VorschauResult sourcePreview = VorschauService.calculate(eingabemodus: useEingabemodus, positionen: usePos);
       final gsId = await transaction.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, gutschrift_von, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
@@ -726,12 +715,12 @@ WHERE id = ? AND ist_entwurf = 1
           'entwurf',
           useDatum,
           1,
-          'netto',
+          useEingabemodus,
           range['id'],
           linkId,
-          sumNetto.toStringAsFixed(2),
-          sumBrutto.toStringAsFixed(2),
-          sumUst.toStringAsFixed(2),
+          money.fromCents(-sourcePreview.nettoCents),
+          money.fromCents(-sourcePreview.bruttoCents),
+          money.fromCents(-sourcePreview.ustCents),
           DateTime.now().toUtc().toIso8601String(),
           'pdfs/$docNo.pdf',
         ],
@@ -747,7 +736,7 @@ WHERE id = ? AND ist_entwurf = 1
               r['bezeichnung'],
               r['menge'].toString(),
               r['einzelpreis'].toString(),
-              (-gesamt.abs()).toStringAsFixed(2),
+              money.fromCents(-money.toCents(gesamt.toString())),
               r['ust_satz'].toString(),
               r['position'],
               r['rabatt_prozent']?.toString() ?? '0.00',
@@ -763,9 +752,9 @@ WHERE id = ? AND ist_entwurf = 1
               gsId,
               p.artikelId,
               p.bezeichnung,
-              p.menge.toStringAsFixed(2),
-              p.einzelpreis.toStringAsFixed(2),
-              (-p.gesamt.abs()).toStringAsFixed(2),
+              p.menge.toStringAsFixed(3),
+              p.einzelpreis.toStringAsFixed(4),
+              money.fromCents(-money.toCents(p.gesamt.toString())),
               p.ustSatz.toStringAsFixed(2),
               p.position ?? i,
               (p.rabattProzent ?? 0).toStringAsFixed(2),
@@ -919,9 +908,9 @@ WHERE id = ? AND ist_entwurf = 1
             kreisId,
             DateTime.now().toUtc().toIso8601String(),
             'pdfs/$nummer.pdf',
-            preview.nettoBetrag.toStringAsFixed(2),
-            preview.bruttoBetrag.toStringAsFixed(2),
-            preview.ustBetrag.toStringAsFixed(2),
+            preview.nettoBetragString,
+            preview.bruttoBetragString,
+            preview.ustBetragString,
             quelleId,
           ],
         );

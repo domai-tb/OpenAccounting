@@ -41,11 +41,20 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     try {
       await t.ensureOpen(_NoopUser());
       await ensureInventarTable(t);
-      final cur = await t.runSelect('SELECT bestand_aktuell FROM artikel WHERE id = ?', <Object?>[artikelId]);
+      final cur = await t.runSelect(
+        'SELECT bestand_aktuell, lager_aktiv, minusbestand_erlaubt FROM artikel WHERE id = ?',
+        <Object?>[artikelId],
+      );
       if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
+      if (!_asBool(cur.single['lager_aktiv'])) {
+        throw ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
+      }
       final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
       final diff = neuerBestand - old;
       _validatePrecision(neuerBestand);
+      if (neuerBestand < 0 && !_asBool(cur.single['minusbestand_erlaubt'])) {
+        throw ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
+      }
       await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         neuerBestand,
         neuerBestand,
@@ -73,10 +82,49 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
   }
 
   Future<Artikel> adjustBestand(int artikelId, num delta, {String grund = 'Manuelle Korrektur'}) async {
-    final cur = await executor.runSelect('SELECT bestand_aktuell FROM artikel WHERE id = ?', <Object?>[artikelId]);
-    if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
-    final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
-    return setBestand(artikelId, old + delta, grund: grund);
+    _validatePrecision(delta);
+    final t = executor.beginTransaction();
+    try {
+      await t.ensureOpen(_NoopUser());
+      await ensureInventarTable(t);
+      final cur = await t.runSelect(
+        'SELECT bestand_aktuell, lager_aktiv, minusbestand_erlaubt FROM artikel WHERE id = ?',
+        <Object?>[artikelId],
+      );
+      if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
+      if (!_asBool(cur.single['lager_aktiv'])) {
+        throw ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
+      }
+      final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
+      final neuerBestand = old + delta;
+      _validatePrecision(neuerBestand);
+      if (neuerBestand < 0 && !_asBool(cur.single['minusbestand_erlaubt'])) {
+        throw ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
+      }
+      await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
+        neuerBestand,
+        neuerBestand,
+        artikelId,
+      ]);
+      await t.runInsert(
+        'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund) VALUES (?, ?, ?, ?)',
+        <Object?>[artikelId, DateTime.now().toIso8601String().substring(0, 10), delta, grund],
+      );
+      await t.send();
+      final rows = await executor.runSelect(
+        'SELECT id, artikelnummer, bezeichnung, beschreibung, einheit, vk_netto, vk_brutto, '
+        'vk_eingabe, ust_satz_id, ust_satz, differenzbesteuerung, ek_netto, lager_aktiv, '
+        'bestand_aktuell, mindestbestand, minusbestand_erlaubt, lieferant_id, '
+        'lieferanten_artikelnr, gruppe_id, aktiv, typ, bestand FROM artikel WHERE id = ?',
+        <Object?>[artikelId],
+      );
+      return _fromRow(rows.single);
+    } catch (e, s) {
+      try {
+        await t.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(e, s);
+    }
   }
 
   Artikel _fromRow(Map<String, Object?> r) {
@@ -107,8 +155,15 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
 
   /// Validate that quantity does not exceed 3 decimal places (NUMERIC(10,3)).
   static void _validatePrecision(num value) {
-    final scaled = (value * 1000).round();
-    if ((value * 1000 - scaled).abs() > 1e-9) {
+    if (!value.isFinite) {
+      throw ArtikelException('Quantity must be finite: $value');
+    }
+    final scaledValue = value * 1000;
+    if (!scaledValue.isFinite) {
+      throw ArtikelException('Quantity is outside the supported range: $value');
+    }
+    final scaled = scaledValue.round();
+    if ((scaledValue - scaled).abs() > 1e-9) {
       throw ArtikelException('Precision exceeds configured limit for quantity: $value');
     }
   }

@@ -83,6 +83,44 @@ void main() {
       expect(closed.ausgleichJournalId, isNotNull);
     });
 
+    test('idempotency key records a payment exactly once', () async {
+      final kundeId = await seedKunde();
+      final f = await repo.create(typ: 'rechnung', betrag: 100.00, partnerTyp: 'kunde', partnerId: kundeId);
+      final first = await usecases.zahlungBuchen(
+        forderungId: f.id,
+        betrag: 40.00,
+        datum: '2026-03-10',
+        idempotencyKey: 'bank-event-1',
+      );
+      final retry = await usecases.zahlungBuchen(
+        forderungId: f.id,
+        betrag: 40.00,
+        datum: '2026-03-10',
+        idempotencyKey: 'bank-event-1',
+      );
+
+      expect(first.betrag.toStringAsFixed(2), '60.00');
+      expect(retry.betrag.toStringAsFixed(2), '60.00');
+      final payments = await db.executor.runSelect(
+        "SELECT journal_id FROM forderung_zahlungen WHERE forderung_id = ? AND typ = 'zahlung'",
+        <Object?>[f.id],
+      );
+      expect(payments, hasLength(1));
+    });
+
+    test('statement includes every partial payment once', () async {
+      final kundeId = await seedKunde();
+      final f = await repo.create(typ: 'rechnung', betrag: 100.00, partnerTyp: 'kunde', partnerId: kundeId);
+      await repo.zahlungBuchen(forderungId: f.id, betrag: 25.00, datum: '2026-03-02');
+      await repo.zahlungBuchen(forderungId: f.id, betrag: 35.00, datum: '2026-03-03');
+
+      final statement = await repo.kontokorrent(partnerTyp: 'kunde', partnerId: kundeId);
+
+      expect(statement.where((entry) => entry.typ == 'rechnung'), hasLength(1));
+      expect(statement.where((entry) => entry.typ == 'zahlung'), hasLength(2));
+      expect(statement.last.saldo.toStringAsFixed(2), '40.00');
+    });
+
     test('Doppelte Forderung für gleiche Rechnung wird verhindert', () async {
       final kundeId = await seedKunde();
       final rechnungId = await seedRechnung(kundeId: kundeId);
