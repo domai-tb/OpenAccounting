@@ -1,6 +1,6 @@
 # Security Policy
 
-We treat security reports at highest priority level. This means that we attempt to fix them as quickly as possible. We will release a beta or hotfix for any major security report found in the most recent stable version of OpenPlants.
+We treat security reports at highest priority level. This means that we attempt to fix them as quickly as possible. We will release a beta or hotfix for any major security report found in the most recent stable version of OpenAccounting.
 
 ## Reporting a Vulnerability
 

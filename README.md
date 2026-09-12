@@ -1,16 +1,21 @@
-# openaccounting
+# OpenAccounting
 
-A new Flutter project.
+OpenAccounting is a local-first Material 3 desktop accounting app for German freelancers. It stores the active profile in a local Drift/SQLite database and supports German and English localization infrastructure.
 
-## Getting Started
+## Getting started
 
-This project is a starting point for a Flutter application.
+Use the pinned Flutter SDK through FVM:
 
 A few resources to get you started if this is your first Flutter project:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+fvm flutter pub get
+fvm flutter analyze
+fvm flutter test --dart-define=platform=vm
+```
+
+Desktop development requires GTK 3. Linux builds also need the native
+dependencies declared by `hotkey_manager_linux` and `system_tray`.
 
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
