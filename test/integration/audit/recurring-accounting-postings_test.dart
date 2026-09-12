@@ -2,85 +2,104 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
+import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
 
 void main() {
-  late AppDatabase db;
-
-  setUp(() async {
-    db = AppDatabase.createTestDatabase();
-    await db.ensureOpen();
-  });
-
-  tearDown(() async {
-    await db.close();
-  });
-
   group('Recurring accounting postings', () {
-    // ── Task 1: Mixed-rate template generates correct totals ──
+    late AppDatabase db;
 
-    test('test_recurring_accounting_postings_1_1_mixed_rate_template_generates_correct_totals', () async {
-      // A template with positions at 19% and 7% should compute correct totals.
-      // Currently hardcoded to 19% — this test documents the gap.
-      const netto19 = 100.00; // 19% position
-      const netto7 = 50.00; // 7% position
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+    });
 
-      // Expected: netto = 150.00, brutto = 100*1.19 + 50*1.07 = 119 + 53.50 = 172.50
-      const expectedBrutto = netto19 * 1.19 + netto7 * 1.07;
+    tearDown(() async {
+      await db.close();
+    });
 
-      // Actual behavior: all positions treated as 19%.
-      const actualBrutto = (netto19 + netto7) * 1.19;
+    test('mixed-rate invoice template generates exact totals through the repository', () async {
+      final RechnungsVorlagenRepository repository = RechnungsVorlagenRepository(db.executor);
+      final RechnungsVorlage template = await repository.create(
+        name: 'Mixed recurring invoice',
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-01-01',
+        positionen: <Map<String, dynamic>>[
+          <String, dynamic>{'bezeichnung': 'Standard', 'menge': 1, 'einzelpreis': 100, 'ust_satz': 19},
+          <String, dynamic>{'bezeichnung': 'Reduced', 'menge': 1, 'einzelpreis': 50, 'ust_satz': 7},
+        ],
+      );
 
-      // This test documents the gap — actual brutto differs from expected.
-      expect(
-        actualBrutto,
-        isNot(expectedBrutto),
-        reason: 'Hardcoded 19% produces wrong total for mixed-rate templates',
+      final List<int> generated = await repository.generateFaellig(heute: DateTime(2026));
+      final List<Map<String, Object?>> rows = await db.executor.runSelect(
+        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+        <Object?>[generated.single],
+      );
+
+      expect(template.positionen, hasLength(2));
+      expect(rows.single['netto_betrag'], 150.00);
+      expect(rows.single['ust_betrag'], 22.50);
+      expect(rows.single['brutto_betrag'], 172.50);
+    });
+
+    test('invalid recurring invoice tax rate fails at the service boundary', () async {
+      final RechnungsVorlagenRepository repository = RechnungsVorlagenRepository(db.executor);
+
+      await expectLater(
+        repository.create(
+          name: 'Invalid rate',
+          intervall: 'monatlich',
+          positionen: <Map<String, dynamic>>[
+            <String, dynamic>{'bezeichnung': 'Bad', 'menge': 1, 'einzelpreis': 10, 'ust_satz': 101},
+          ],
+        ),
+        throwsA(isA<RechnungsVorlagenException>()),
       );
     });
 
-    // ── Task 2: Invalid template rate is handled ──
+    test('gross recurring expense posts only its tax component', () async {
+      final BuchungsVorlagenRepository repository = BuchungsVorlagenRepository(db.executor);
+      await repository.create(
+        name: 'Recurring expense',
+        betrag: '119.00',
+        art: 'Ausgabe',
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-01-01',
+      );
 
-    test('test_recurring_accounting_postings_1_2_invalid_template_rate_is_handled', () async {
-      // A position with an invalid tax rate (e.g., negative or >100%) should be handled.
-      const invalidRate = -19.0;
-      const brutto = 100.00 * (1 + invalidRate / 100);
+      final List<int> generated = await repository.generateFaellig(heute: DateTime(2026));
+      final List<Map<String, Object?>> rows = await db.executor.runSelect(
+        'SELECT betrag, vorsteuer_betrag, ust_satz FROM journal WHERE id = ?',
+        <Object?>[generated.single],
+      );
 
-      // Negative rate produces less than netto — should be rejected or clamped.
-      expect(brutto, lessThan(100.00), reason: 'Invalid rate produces unexpected brutto');
+      expect(rows.single['betrag'], 119.00);
+      expect(rows.single['vorsteuer_betrag'], 19.00);
+      expect(rows.single['ust_satz'], 19.00);
     });
 
-    // ── Task 3: Gross expense yields only its tax component ──
-
-    test('test_recurring_accounting_postings_2_1_gross_expense_yields_only_its_tax_component', () async {
-      // A gross expense of 119.00 at 19% should yield tax = 19.00.
-      const brutto = 119.00;
-      const satz = 19;
-      const netto = brutto / (1 + satz / 100);
-      const ust = brutto - netto;
-
-      expect(ust, closeTo(19.00, 0.01), reason: 'Tax component of 119 brutto at 19% must be 19');
-    });
-
-    // ── Task 4: Retry is idempotent ──
-
-    test('test_recurring_accounting_postings_2_2_retry_is_idempotent', () async {
-      // Running the same recurring booking twice should not duplicate entries.
-      // This is a contract test — idempotency is ensured by dedup hash.
-      const desc = 'Test booking 2026-09';
-
-      // First entry.
-      await db.executor.runInsert('INSERT INTO journal (datum, betrag, beschreibung, beleg_typ) VALUES (?, ?, ?, ?)', [
-        '2026-09-01',
-        100.00,
-        desc,
-        'Ausgabe',
+    test('retrying the same recurring booking occurrence is idempotent', () async {
+      final BuchungsVorlagenRepository repository = BuchungsVorlagenRepository(db.executor);
+      final BuchungsVorlage template = await repository.create(
+        name: 'Retryable expense',
+        betrag: '10.00',
+        art: 'Ausgabe',
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-02-01',
+      );
+      final List<int> first = await repository.generateFaellig(heute: DateTime(2026, 2));
+      await db.executor.runUpdate('UPDATE buchungsvorlagen SET naechste_faelligkeit = ? WHERE id = ?', <Object?>[
+        '2026-02-01',
+        template.id,
       ]);
+      final List<int> retry = await repository.generateFaellig(heute: DateTime(2026, 2));
+      final List<Map<String, Object?>> count = await db.executor.runSelect(
+        'SELECT COUNT(*) AS count FROM journal WHERE vorlage_id = ?',
+        <Object?>[template.id],
+      );
 
-      // Simulate retry — should detect duplicate via beschreibung or hash.
-      final existing = await db.executor.runSelect('SELECT COUNT(*) as cnt FROM journal WHERE beschreibung = ?', [
-        desc,
-      ]);
-      expect(existing.first['cnt'], 1, reason: 'Retry should not duplicate');
+      expect(retry, <int>[first.single]);
+      expect(count.single['count'], 1);
     });
   });
 }

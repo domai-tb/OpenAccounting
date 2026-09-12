@@ -119,6 +119,63 @@ void main() {
       expect(v.art, 'Ausgabe');
     });
 
+    test('Gross expense stores only its tax component as Vorsteuer', () async {
+      final BuchungsVorlage v = await repo.create(
+        name: 'Gross tax',
+        kategorieId: 1,
+        betrag: '119.00',
+        art: 'Ausgabe',
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-04-01',
+      );
+      final List<int> ids = await repo.generateFaellig(heute: DateTime(2026, 4));
+      final List<Map<String, Object?>> rows = await db.executor.runSelect(
+        'SELECT betrag, vorsteuer_betrag, ust_satz FROM journal WHERE id = ?',
+        <Object?>[ids.single],
+      );
+
+      expect(num.tryParse(v.ustSatz), 19);
+      expect(rows.single['betrag'], 119.00);
+      expect(rows.single['vorsteuer_betrag'], 19.00);
+      expect(rows.single['ust_satz'], 19.00);
+    });
+
+    test('Invalid tax rate is rejected and occurrence retry is idempotent', () async {
+      await expectLater(
+        repo.create(
+          name: 'Bad rate',
+          kategorieId: 1,
+          betrag: '10.00',
+          ustSatz: 100.01,
+          art: 'Ausgabe',
+          intervall: 'monatlich',
+        ),
+        throwsA(isA<BuchungsVorlagenException>()),
+      );
+
+      final BuchungsVorlage v = await repo.create(
+        name: 'Retry booking',
+        kategorieId: 1,
+        betrag: '119.00',
+        art: 'Ausgabe',
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-05-01',
+      );
+      final List<int> first = await repo.generateFaellig(heute: DateTime(2026, 5));
+      await db.executor.runUpdate('UPDATE buchungsvorlagen SET naechste_faelligkeit = ? WHERE id = ?', <Object?>[
+        '2026-05-01',
+        v.id,
+      ]);
+      final List<int> retry = await repo.generateFaellig(heute: DateTime(2026, 5));
+      final List<Map<String, Object?>> count = await db.executor.runSelect(
+        'SELECT COUNT(*) AS count FROM journal WHERE vorlage_id = ?',
+        <Object?>[v.id],
+      );
+
+      expect(retry, <int>[first.single]);
+      expect(count.single['count'], 1);
+    });
+
     test('Einnahme direction — Umsatzsteuer KZ 81', () async {
       await repo.create(
         name: 'Einnahme USt',

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 class BuchungsVorlagenException implements Exception {
   const BuchungsVorlagenException(this.message);
@@ -24,6 +25,8 @@ class BuchungsVorlage {
     required this.aktiv,
     required this.status,
     this.lieferantId,
+    required this.ustSatz,
+    required this.eingabemodus,
   });
 
   final int id;
@@ -39,16 +42,45 @@ class BuchungsVorlage {
   final bool aktiv;
   final String status;
   final int? lieferantId;
+  final String ustSatz;
+  final String eingabemodus;
 }
 
 class BuchungsVorlagenRepository {
   BuchungsVorlagenRepository(this.executor);
 
   final QueryExecutor executor;
+  Future<void>? _schemaReady;
 
   static const Set<String> allowedInterval = <String>{'monatlich', 'quartalsweise', 'jährlich'};
   static const Set<String> allowedModus = <String>{'direkt', 'beleg'};
   static const Set<String> allowedArt = <String>{'Einnahme', 'Ausgabe'};
+
+  Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
+
+  Future<void> _ensureSchema() async {
+    for (final ({String name, String definition}) column in <({String name, String definition})>[
+      (name: 'ust_satz', definition: 'NUMERIC(12,2) DEFAULT 19'),
+      (name: 'eingabemodus', definition: "TEXT DEFAULT 'brutto'"),
+    ]) {
+      final columns = await executor.runSelect('PRAGMA table_info(buchungsvorlagen)', const <Object?>[]);
+      if (columns.any((row) => row['name'] == column.name)) continue;
+      await executor.runCustom('ALTER TABLE buchungsvorlagen ADD COLUMN ${column.name} ${column.definition}');
+      final verified = await executor.runSelect('PRAGMA table_info(buchungsvorlagen)', const <Object?>[]);
+      if (!verified.any((row) => row['name'] == column.name)) {
+        throw StateError('Buchungsvorlage konnte Spalte ${column.name} nicht verifizieren');
+      }
+    }
+    await executor.runCustom('''
+CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vorlage_id INTEGER NOT NULL REFERENCES buchungsvorlagen(id),
+  faelligkeit TEXT NOT NULL,
+  journal_id INTEGER REFERENCES journal(id),
+  rechnung_id INTEGER REFERENCES rechnungen(id),
+  UNIQUE(vorlage_id, faelligkeit)
+)''');
+  }
 
   Future<BuchungsVorlage> create({
     required String name,
@@ -62,7 +94,10 @@ class BuchungsVorlagenRepository {
     String? naechsteFaelligkeit,
     int? lieferantId,
     DateTime? bezugsDatum,
+    num ustSatz = 19,
+    String eingabemodus = 'brutto',
   }) async {
+    await ensureSchema();
     final String cleanName = name.trim();
     if (cleanName.isEmpty) {
       throw const BuchungsVorlagenException('Name ist Pflicht');
@@ -73,6 +108,12 @@ class BuchungsVorlagenRepository {
     if (!allowedArt.contains(art)) {
       throw BuchungsVorlagenException('Ungültige art: $art');
     }
+    final String cleanEingabemodus = eingabemodus.trim().toLowerCase();
+    if (cleanEingabemodus != 'netto' && cleanEingabemodus != 'brutto') {
+      throw BuchungsVorlagenException('Ungültiger eingabemodus: $eingabemodus');
+    }
+    final String cleanUstSatz = _validateUstSatz(ustSatz);
+    final String cleanBetrag = _normalizeBetrag(betrag);
     final String cleanIntervall = intervall.trim();
     if (cleanIntervall.isEmpty) {
       throw const BuchungsVorlagenException('Intervall ist Pflicht');
@@ -84,12 +125,12 @@ class BuchungsVorlagenRepository {
         naechsteFaelligkeit ?? _formatDate(_nextDueFrom(bezugsDatum ?? DateTime.now(), cleanIntervall));
     final int id = await executor.runInsert(
       'INSERT INTO buchungsvorlagen (name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, '
-      'naechste_faelligkeit, art, lieferant_id, status) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)',
+      'naechste_faelligkeit, art, lieferant_id, status, ust_satz, eingabemodus) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         cleanName,
         kategorieId,
         kontoId,
-        betrag,
+        cleanBetrag,
         beschreibung,
         modus,
         cleanIntervall,
@@ -97,6 +138,8 @@ class BuchungsVorlagenRepository {
         art,
         lieferantId,
         'aktiv',
+        cleanUstSatz,
+        cleanEingabemodus,
       ],
     );
     final BuchungsVorlage? created = await findById(id);
@@ -105,9 +148,10 @@ class BuchungsVorlagenRepository {
   }
 
   Future<BuchungsVorlage?> findById(int id) async {
+    await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, naechste_faelligkeit, '
-      'art, lieferant_id, status FROM buchungsvorlagen WHERE id = ?',
+      'art, lieferant_id, status, ust_satz, eingabemodus FROM buchungsvorlagen WHERE id = ?',
       <Object?>[id],
     );
     if (rows.isEmpty) return null;
@@ -115,9 +159,10 @@ class BuchungsVorlagenRepository {
   }
 
   Future<List<BuchungsVorlage>> list() async {
+    await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, naechste_faelligkeit, '
-      'art, lieferant_id, status FROM buchungsvorlagen ORDER BY id',
+      'art, lieferant_id, status, ust_satz, eingabemodus FROM buchungsvorlagen ORDER BY id',
       const <Object?>[],
     );
     return rows.map(_fromRow).toList(growable: false);
@@ -133,7 +178,10 @@ class BuchungsVorlagenRepository {
     int? kategorieId,
     int? kontoId,
     int? lieferantId,
+    num? ustSatz,
+    String? eingabemodus,
   }) async {
+    await ensureSchema();
     final BuchungsVorlage? cur = await findById(id);
     if (cur == null) throw const BuchungsVorlagenException('Vorlage nicht gefunden');
     if (modus != null && !allowedModus.contains(modus)) {
@@ -142,6 +190,11 @@ class BuchungsVorlagenRepository {
     if (art != null && !allowedArt.contains(art)) {
       throw BuchungsVorlagenException('Ungültige art: $art');
     }
+    final String? cleanUstSatz = ustSatz == null ? null : _validateUstSatz(ustSatz);
+    final String? cleanEingabemodus = eingabemodus?.trim().toLowerCase();
+    if (cleanEingabemodus != null && cleanEingabemodus != 'netto' && cleanEingabemodus != 'brutto') {
+      throw BuchungsVorlagenException('Ungültiger eingabemodus: $eingabemodus');
+    }
     if (intervall != null) {
       final String t = intervall.trim();
       if (t.isEmpty) throw const BuchungsVorlagenException('Intervall ist Pflicht');
@@ -149,18 +202,21 @@ class BuchungsVorlagenRepository {
     }
     final String newName = name?.trim().isEmpty ?? true ? cur.name : name!.trim();
     if (newName.isEmpty) throw const BuchungsVorlagenException('Name ist Pflicht');
+    final String? cleanBetrag = betrag == null ? null : _normalizeBetrag(betrag);
     await executor.runUpdate(
       'UPDATE buchungsvorlagen SET name = ?, betrag = ?, modus = ?, art = ?, intervall = ?, '
-      'kategorie_id = ?, konto_id = ?, lieferant_id = ? WHERE id = ?',
+      'kategorie_id = ?, konto_id = ?, lieferant_id = ?, ust_satz = ?, eingabemodus = ? WHERE id = ?',
       <Object?>[
         newName,
-        betrag ?? cur.betrag,
+        cleanBetrag ?? cur.betrag,
         modus ?? cur.modus,
         art ?? cur.art,
         intervall ?? cur.intervall,
         kategorieId ?? cur.kategorieId,
         kontoId ?? cur.kontoId,
         lieferantId ?? cur.lieferantId,
+        cleanUstSatz ?? cur.ustSatz,
+        cleanEingabemodus ?? cur.eingabemodus,
         id,
       ],
     );
@@ -250,6 +306,7 @@ class BuchungsVorlagenRepository {
 
   /// Auto-Generation — erzeugt fällige Journal- oder Beleg-Einträge.
   Future<List<int>> generateFaellig({DateTime? heute}) async {
+    await ensureSchema();
     final DateTime now = heute ?? DateTime.now();
     final List<BuchungsVorlage> alle = await list();
     final List<int> created = <int>[];
@@ -275,28 +332,66 @@ class BuchungsVorlagenRepository {
     if (vorlage.modus == 'direkt') {
       // USt-Richtung: Ausgabe => Vorsteuer (KZ 66), Einnahme => Umsatzsteuer (KZ 81)
       final bool isAusgabe = vorlage.art == 'Ausgabe';
-      final String? vorsteuerBetrag = isAusgabe ? vorlage.betrag : null;
+      final int amountCents = _parseCents(vorlage.betrag ?? '0.00');
+      final int rateCents = _parseRateCents(vorlage.ustSatz);
+      final int taxCents = vorlage.eingabemodus == 'brutto'
+          ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
+          : _roundHalfUp(amountCents * rateCents, 10000);
+      final String? vorsteuerBetrag = isAusgabe ? money.fromCents(taxCents) : null;
       final String belegTyp = vorlage.art;
       final String beschreibung = vorlage.beschreibung ?? vorlage.name;
       // Lieferant/Konto werden vererbt — journal.konto_id = vorlage.konto_id, lieferant via rechnung_id null.
       await executor.runCustom('BEGIN');
       try {
+        final List<Map<String, Object?>> prior = await executor.runSelect(
+          'SELECT journal_id FROM buchungsvorlagen_occurrences WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+          <Object?>[vorlage.id, datumStr],
+        );
+        if (prior.isNotEmpty && prior.single['journal_id'] != null) {
+          await executor.runCustom('COMMIT');
+          return (prior.single['journal_id'] as num?)?.toInt() ?? 0;
+        }
         final int jId = await executor.runInsert(
           'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, '
-          'vorlage_id, ist_eu_lieferung, vorsteuer_betrag) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)',
+          'vorlage_id, ist_eu_lieferung, vorsteuer_betrag, ust_satz) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)',
           <Object?>[
             datumStr,
             beschreibung,
             vorlage.kategorieId,
-            vorlage.betrag ?? '0.00',
+            money.fromCents(amountCents),
             belegTyp,
             vorlage.kontoId,
             vorlage.id,
             vorsteuerBetrag,
+            vorlage.ustSatz,
           ],
         );
+        await executor.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[jId, jId]);
+        if (isAusgabe && taxCents > 0) {
+          // UStVA's Soll principle reads the durable input-tax claim table;
+          // journal.vorsteuer_betrag alone is only an audit snapshot.
+          await executor.runInsert(
+            'INSERT INTO vorsteuer_ansprueche (betrag, status, faelligkeit, ust_sonderfall) '
+            'VALUES (?, ?, ?, ?)',
+            <Object?>[money.fromCents(taxCents), 'offen', datumStr, null],
+          );
+        }
+        await executor.runCustom(
+          'INSERT OR IGNORE INTO buchungsvorlagen_occurrences '
+          '(vorlage_id, faelligkeit, journal_id) VALUES (?, ?, ?)',
+          <Object?>[vorlage.id, datumStr, jId],
+        );
+        final List<Map<String, Object?>> occurrence = await executor.runSelect(
+          'SELECT journal_id FROM buchungsvorlagen_occurrences '
+          'WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+          <Object?>[vorlage.id, datumStr],
+        );
+        final int persistedId = (occurrence.single['journal_id'] as num?)?.toInt() ?? jId;
+        if (persistedId != jId) {
+          await executor.runDelete('DELETE FROM journal WHERE id = ?', <Object?>[jId]);
+        }
         await executor.runCustom('COMMIT');
-        return jId;
+        return persistedId;
       } catch (e) {
         try {
           await executor.runCustom('ROLLBACK');
@@ -305,26 +400,56 @@ class BuchungsVorlagenRepository {
       }
     } else {
       // beleg Modus: pre-filled Rechnung Draft (Eingangsrechnung).
+      final int amountCents = _parseCents(vorlage.betrag ?? '0.00');
+      final int rateCents = _parseRateCents(vorlage.ustSatz);
+      final int taxCents = vorlage.eingabemodus == 'brutto'
+          ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
+          : _roundHalfUp(amountCents * rateCents, 10000);
+      final int nettoCents = vorlage.eingabemodus == 'brutto' ? amountCents - taxCents : amountCents;
+      final int bruttoCents = vorlage.eingabemodus == 'brutto' ? amountCents : amountCents + taxCents;
       await executor.runCustom('BEGIN');
       try {
+        final List<Map<String, Object?>> prior = await executor.runSelect(
+          'SELECT rechnung_id FROM buchungsvorlagen_occurrences WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+          <Object?>[vorlage.id, datumStr],
+        );
+        if (prior.isNotEmpty && prior.single['rechnung_id'] != null) {
+          await executor.runCustom('COMMIT');
+          return (prior.single['rechnung_id'] as num?)?.toInt() ?? 0;
+        }
         final int rId = await executor.runInsert(
           'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, lieferant_id, datum, '
-          'netto_betrag, brutto_betrag, vorlage_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'netto_betrag, brutto_betrag, ust_betrag, vorlage_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           <Object?>[
             null,
             'eingangsrechnung',
             'entwurf',
             1,
-            'netto',
+            vorlage.eingabemodus,
             vorlage.lieferantId,
             datumStr,
-            vorlage.betrag ?? '0.00',
-            vorlage.betrag ?? '0.00',
+            money.fromCents(nettoCents),
+            money.fromCents(bruttoCents),
+            money.fromCents(taxCents),
             vorlage.id,
           ],
         );
+        await executor.runCustom(
+          'INSERT OR IGNORE INTO buchungsvorlagen_occurrences '
+          '(vorlage_id, faelligkeit, rechnung_id) VALUES (?, ?, ?)',
+          <Object?>[vorlage.id, datumStr, rId],
+        );
+        final List<Map<String, Object?>> occurrence = await executor.runSelect(
+          'SELECT rechnung_id FROM buchungsvorlagen_occurrences '
+          'WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+          <Object?>[vorlage.id, datumStr],
+        );
+        final int persistedId = (occurrence.single['rechnung_id'] as num?)?.toInt() ?? rId;
+        if (persistedId != rId) {
+          await executor.runDelete('DELETE FROM rechnungen WHERE id = ?', <Object?>[rId]);
+        }
         await executor.runCustom('COMMIT');
-        return rId;
+        return persistedId;
       } catch (e) {
         try {
           await executor.runCustom('ROLLBACK');
@@ -362,6 +487,34 @@ class BuchungsVorlagenRepository {
       aktiv: aktiv,
       status: status,
       lieferantId: lieferantId,
+      ustSatz: r['ust_satz']?.toString() ?? '19.00',
+      eingabemodus: r['eingabemodus']?.toString() ?? 'brutto',
     );
   }
+
+  String _validateUstSatz(num rate) {
+    try {
+      final int cents = money.scaledFromNum(rate, scale: 2, field: 'ustSatz', allowNegative: false);
+      if (cents > 10000) {
+        throw const BuchungsVorlagenException('USt-Satz muss zwischen 0 und 100 liegen');
+      }
+      return money.fromCents(cents);
+    } on money.MoneyParseException catch (error) {
+      throw BuchungsVorlagenException(error.message);
+    }
+  }
+
+  String _normalizeBetrag(String raw) {
+    try {
+      return money.fromCents(money.parseScaled(raw, scale: 2, field: 'betrag', allowNegative: false));
+    } on money.MoneyParseException catch (error) {
+      throw BuchungsVorlagenException(error.message);
+    }
+  }
+
+  int _parseRateCents(String raw) => money.parseScaled(raw, scale: 2, field: 'ustSatz', allowNegative: false);
+
+  int _parseCents(String raw) => money.parseScaled(raw, scale: 2, field: 'betrag', allowNegative: false);
+
+  int _roundHalfUp(int numerator, int denominator) => (numerator + denominator ~/ 2) ~/ denominator;
 }

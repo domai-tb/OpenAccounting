@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// Exception für Rechnungsvorlagen-Validierung — deutsche Meldungen.
 class RechnungsVorlagenException implements Exception {
@@ -53,8 +54,22 @@ class RechnungsVorlagenRepository {
   RechnungsVorlagenRepository(this.executor);
 
   final QueryExecutor executor;
+  Future<void>? _schemaReady;
 
   static const Set<String> allowedInterval = <String>{'monatlich', 'quartalsweise', 'jährlich'};
+
+  Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
+
+  Future<void> _ensureSchema() async {
+    await executor.runCustom('''
+CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vorlage_id INTEGER NOT NULL REFERENCES rechnungsvorlagen(id),
+  faelligkeit TEXT NOT NULL,
+  rechnung_id INTEGER NOT NULL REFERENCES rechnungen(id),
+  UNIQUE(vorlage_id, faelligkeit)
+)''');
+  }
 
   /// Erstellt Vorlage mit Validierung.
   Future<RechnungsVorlage> create({
@@ -66,6 +81,7 @@ class RechnungsVorlagenRepository {
     int? auftragId,
     DateTime? bezugsDatum,
   }) async {
+    await ensureSchema();
     final String cleanName = name.trim();
     if (cleanName.isEmpty) {
       throw const RechnungsVorlagenException('Name ist Pflicht');
@@ -77,14 +93,11 @@ class RechnungsVorlagenRepository {
     if (!allowedInterval.contains(cleanIntervall)) {
       throw RechnungsVorlagenException('Ungültiges Intervall: $cleanIntervall');
     }
-    // Positionen JSON mit Pflichtfeldern validieren.
-    final String jsonStr = jsonEncode(positionen);
-    // Sicherstellen, dass Positionen Felder haben.
-    for (final Map<String, dynamic> p in positionen) {
-      if (p['bezeichnung'] == null || (p['bezeichnung'] as String).trim().isEmpty) {
-        throw const RechnungsVorlagenException('Position bezeichnung ist Pflicht');
-      }
+    for (var index = 0; index < positionen.length; index++) {
+      _validatePosition(positionen[index], index);
     }
+    _documentInputMode(positionen);
+    final String jsonStr = jsonEncode(positionen);
     final String nextDue =
         naechsteFaelligkeit ?? _formatDate(_nextDueFrom(bezugsDatum ?? DateTime.now(), cleanIntervall));
     final int id = await executor.runInsert(
@@ -100,6 +113,7 @@ class RechnungsVorlagenRepository {
   }
 
   Future<RechnungsVorlage?> findById(int id) async {
+    await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kunde_id, intervall, naechste_faelligkeit, aktiv, vorlage_daten, status, auftrag_id '
       'FROM rechnungsvorlagen WHERE id = ?',
@@ -110,6 +124,7 @@ class RechnungsVorlagenRepository {
   }
 
   Future<List<RechnungsVorlage>> list() async {
+    await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kunde_id, intervall, naechste_faelligkeit, aktiv, vorlage_daten, status, auftrag_id '
       'FROM rechnungsvorlagen ORDER BY id',
@@ -127,6 +142,7 @@ class RechnungsVorlagenRepository {
     int? kundeId,
     int? auftragId,
   }) async {
+    await ensureSchema();
     final RechnungsVorlage? cur = await findById(id);
     if (cur == null) throw const RechnungsVorlagenException('Vorlage nicht gefunden');
     String newIntervall = cur.intervall;
@@ -139,6 +155,12 @@ class RechnungsVorlagenRepository {
     final String newName = name?.trim().isEmpty ?? false
         ? throw const RechnungsVorlagenException('Name ist Pflicht')
         : (name?.trim() ?? cur.name);
+    if (positionen != null) {
+      for (var index = 0; index < positionen.length; index++) {
+        _validatePosition(positionen[index], index);
+      }
+      _documentInputMode(positionen);
+    }
     final String newJson = positionen == null ? (cur.vorlageDatenRaw ?? '[]') : jsonEncode(positionen);
     final String? newNext = naechsteFaelligkeit ?? cur.naechsteFaelligkeit;
     await executor.runUpdate(
@@ -264,6 +286,7 @@ class RechnungsVorlagenRepository {
 
   /// Auto-Generation — erzeugt fällige Rechnungen, rückt naechste_faelligkeit vor, nutzt Transaktion.
   Future<List<int>> generateFaellig({DateTime? heute}) async {
+    await ensureSchema();
     final DateTime now = heute ?? DateTime.now();
     final List<RechnungsVorlage> alle = await list();
     final List<int> createdIds = <int>[];
@@ -289,51 +312,83 @@ class RechnungsVorlagenRepository {
 
   /// Einzelne Rechnung aus Vorlage erzeugen — in Transaktion für beide Tabellen.
   Future<int> _generateOne(RechnungsVorlage vorlage, DateTime datum) async {
-    // ponytail: einfache Transaktion via SQL BEGIN/COMMIT — vermeidet Drift-Transaction Typ-Komplexität.
+    // The unique occurrence key makes a retry return the original invoice.
     await executor.runCustom('BEGIN');
     try {
       final String datumStr = _formatDate(datum);
-      num netto = 0;
-      num brutto = 0;
+      final List<_RecurringInvoiceLine> lines = <_RecurringInvoiceLine>[];
+      final String documentInputMode = _documentInputMode(vorlage.positionen);
+      var nettoCents = 0;
+      var ustCents = 0;
+      var bruttoCents = 0;
       for (final Map<String, dynamic> p in vorlage.positionen) {
-        final num menge = (p['menge'] as num?) ?? 1;
-        final num preis = (p['einzelpreis'] as num?) ?? 0;
-        netto += menge * preis;
+        final _RecurringInvoiceLine line = _calculateLine(p, lines.length);
+        lines.add(line);
+        nettoCents += line.nettoCents;
+        ustCents += line.ustCents;
+        bruttoCents += line.bruttoCents;
       }
-      brutto = netto * 1.19;
+      final List<Map<String, Object?>> prior = await executor.runSelect(
+        'SELECT rechnung_id FROM rechnungsvorlagen_occurrences WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+        <Object?>[vorlage.id, datumStr],
+      );
+      if (prior.isNotEmpty) {
+        final int? existingId = (prior.single['rechnung_id'] as num?)?.toInt();
+        if (existingId != null) {
+          await executor.runCustom('COMMIT');
+          return existingId;
+        }
+      }
       final int rechnungId = await executor.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, datum, '
-        'netto_betrag, brutto_betrag, vorlage_id, storno_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'netto_betrag, brutto_betrag, ust_betrag, vorlage_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
           null,
           'rechnung',
           'entwurf',
           1,
-          'netto',
+          documentInputMode,
           vorlage.kundeId,
           datumStr,
-          netto.toStringAsFixed(2),
-          brutto.toStringAsFixed(2),
+          money.fromCents(nettoCents),
+          money.fromCents(bruttoCents),
+          money.fromCents(ustCents),
           vorlage.id,
-          vorlage.auftragId,
         ],
       );
-      int posIndex = 0;
-      for (final Map<String, dynamic> p in vorlage.positionen) {
-        final String bezeichnung = (p['bezeichnung'] as String?) ?? 'Position';
-        final num menge = (p['menge'] as num?) ?? 1;
-        final num einzelpreis = (p['einzelpreis'] as num?) ?? 0;
-        final int? artikelId = (p['artikel_id'] as num?)?.toInt();
-        final num gesamt = menge * einzelpreis;
+      for (var posIndex = 0; posIndex < lines.length; posIndex++) {
+        final _RecurringInvoiceLine line = lines[posIndex];
         await executor.runInsert(
           'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, '
           'ust_satz, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          <Object?>[rechnungId, artikelId, bezeichnung, menge, einzelpreis, gesamt, 19, posIndex],
+          <Object?>[
+            rechnungId,
+            line.artikelId,
+            line.bezeichnung,
+            line.menge,
+            line.einzelpreis,
+            money.fromCents(line.inputMode == 'brutto' ? line.bruttoCents : line.nettoCents),
+            line.rate,
+            posIndex,
+          ],
         );
-        posIndex++;
+      }
+      await executor.runCustom(
+        'INSERT OR IGNORE INTO rechnungsvorlagen_occurrences '
+        '(vorlage_id, faelligkeit, rechnung_id) VALUES (?, ?, ?)',
+        <Object?>[vorlage.id, datumStr, rechnungId],
+      );
+      final List<Map<String, Object?>> occurrence = await executor.runSelect(
+        'SELECT rechnung_id FROM rechnungsvorlagen_occurrences '
+        'WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+        <Object?>[vorlage.id, datumStr],
+      );
+      final int persistedId = (occurrence.single['rechnung_id'] as num?)?.toInt() ?? rechnungId;
+      if (persistedId != rechnungId) {
+        await executor.runDelete('DELETE FROM rechnungen WHERE id = ?', <Object?>[rechnungId]);
       }
       await executor.runCustom('COMMIT');
-      return rechnungId;
+      return persistedId;
     } catch (e) {
       try {
         await executor.runCustom('ROLLBACK');
@@ -343,6 +398,7 @@ class RechnungsVorlagenRepository {
   }
 
   Future<List<Map<String, Object?>>> listGeneratedInvoices(int vorlageId) async {
+    await ensureSchema();
     return executor.runSelect(
       'SELECT id, rechnungsnummer, datum, status, vorlage_id FROM rechnungen WHERE vorlage_id = ? ORDER BY id',
       <Object?>[vorlageId],
@@ -381,4 +437,135 @@ class RechnungsVorlagenRepository {
       vorlageDatenRaw: raw,
     );
   }
+
+  void _validatePosition(Map<String, dynamic> position, int index) {
+    final Object? description = position['bezeichnung'];
+    if (description is! String || description.trim().isEmpty) {
+      throw RechnungsVorlagenException('Position $index: bezeichnung ist Pflicht');
+    }
+    try {
+      _scaled(position['menge'] ?? 1, scale: 3, field: 'Position $index menge', allowNegative: false);
+      _scaled(position['einzelpreis'] ?? 0, scale: 4, field: 'Position $index einzelpreis', allowNegative: false);
+      _rate(position['ust_satz'] ?? position['ustSatz'] ?? 19, index);
+      _inputMode(position, index);
+    } on money.MoneyParseException catch (error) {
+      throw RechnungsVorlagenException(error.message);
+    }
+  }
+
+  _RecurringInvoiceLine _calculateLine(Map<String, dynamic> position, int index) {
+    _validatePosition(position, index);
+    final int menge = _scaled(position['menge'] ?? 1, scale: 3, field: 'Position $index menge', allowNegative: false);
+    final int einzelpreis = _scaled(
+      position['einzelpreis'] ?? 0,
+      scale: 4,
+      field: 'Position $index einzelpreis',
+      allowNegative: false,
+    );
+    final int rateCents = _rate(position['ust_satz'] ?? position['ustSatz'] ?? 19, index);
+    final String mode = _inputMode(position, index);
+    final int amountCents = _roundHalfUp(einzelpreis * menge, 100000);
+    final int nettoCents;
+    final int bruttoCents;
+    final int ustCents;
+    if (mode == 'brutto') {
+      bruttoCents = amountCents;
+      nettoCents = _roundHalfUp(amountCents * 10000, 10000 + rateCents);
+      ustCents = bruttoCents - nettoCents;
+    } else {
+      nettoCents = amountCents;
+      ustCents = _roundHalfUp(nettoCents * rateCents, 10000);
+      bruttoCents = nettoCents + ustCents;
+    }
+    return _RecurringInvoiceLine(
+      bezeichnung: position['bezeichnung'] as String,
+      artikelId: (position['artikel_id'] as num?)?.toInt(),
+      menge: _formatScaled(menge, scale: 3),
+      einzelpreis: _formatScaled(einzelpreis, scale: 4),
+      rate: money.fromCents(rateCents),
+      inputMode: mode,
+      inputCents: amountCents,
+      nettoCents: nettoCents,
+      ustCents: ustCents,
+      bruttoCents: bruttoCents,
+    );
+  }
+
+  String _inputMode(Map<String, dynamic> position, int index) {
+    final String mode = (position['eingabemodus'] ?? 'netto').toString().trim().toLowerCase();
+    if (mode != 'netto' && mode != 'brutto') {
+      throw RechnungsVorlagenException('Position $index: eingabemodus muss netto oder brutto sein');
+    }
+    return mode;
+  }
+
+  String _documentInputMode(List<Map<String, dynamic>> positions) {
+    String? mode;
+    for (var index = 0; index < positions.length; index++) {
+      final String current = _inputMode(positions[index], index);
+      if (mode != null && mode != current) {
+        throw const RechnungsVorlagenException('Eine wiederkehrende Rechnung darf nicht netto und brutto mischen');
+      }
+      mode = current;
+    }
+    return mode ?? 'netto';
+  }
+
+  int _rate(Object raw, int index) {
+    final int value = _scaled(raw, scale: 2, field: 'Position $index ust_satz', allowNegative: false);
+    if (value > 10000) {
+      throw RechnungsVorlagenException('Position $index: USt-Satz muss zwischen 0 und 100 liegen');
+    }
+    return value;
+  }
+
+  int _scaled(Object raw, {required int scale, required String field, required bool allowNegative}) {
+    if (raw is num) {
+      return money.scaledFromNum(raw, scale: scale, field: field, allowNegative: allowNegative);
+    }
+    return money.parseScaled(raw.toString(), scale: scale, field: field, allowNegative: allowNegative);
+  }
+
+  String _formatScaled(int value, {required int scale}) {
+    final bool negative = value < 0;
+    final int absolute = value.abs();
+    var divisor = 1;
+    for (var i = 0; i < scale; i++) {
+      divisor *= 10;
+    }
+    final String integerPart = (absolute ~/ divisor).toString();
+    final String fraction = (absolute % divisor).toString().padLeft(scale, '0');
+    return '${negative ? '-' : ''}$integerPart.$fraction';
+  }
+
+  int _roundHalfUp(int numerator, int denominator) {
+    if (numerator < 0) return -_roundHalfUp(-numerator, denominator);
+    return (numerator + denominator ~/ 2) ~/ denominator;
+  }
+}
+
+class _RecurringInvoiceLine {
+  const _RecurringInvoiceLine({
+    required this.bezeichnung,
+    required this.artikelId,
+    required this.menge,
+    required this.einzelpreis,
+    required this.rate,
+    required this.inputMode,
+    required this.inputCents,
+    required this.nettoCents,
+    required this.ustCents,
+    required this.bruttoCents,
+  });
+
+  final String bezeichnung;
+  final int? artikelId;
+  final String menge;
+  final String einzelpreis;
+  final String rate;
+  final String inputMode;
+  final int inputCents;
+  final int nettoCents;
+  final int ustCents;
+  final int bruttoCents;
 }

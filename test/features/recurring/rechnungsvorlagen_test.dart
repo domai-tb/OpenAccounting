@@ -258,7 +258,7 @@ void main() {
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum) VALUES (?, ?, ?, ?, ?, ?)',
         <Object?>['A-2026-001', 'auftrag', 'laufend', 0, 'netto', '2026-01-01'],
       );
-      await repo.create(
+      final RechnungsVorlage template = await repo.create(
         name: 'Auftrag linked',
         kundeId: 1,
         intervall: 'monatlich',
@@ -274,8 +274,78 @@ void main() {
         'SELECT storno_von FROM rechnungen WHERE id = ?',
         <Object?>[gen.single],
       );
-      // storno_von wird als auftrag_id missbraucht für Verknüpfung im vereinfachten Schema
-      expect(rows.single['storno_von'], auftragId);
+      // An order is a source relation, never a correction relation. The
+      // generated invoice remains linked through its template.
+      expect(rows.single['storno_von'], isNull);
+      expect((await repo.findById(template.id))!.auftragId, auftragId);
+    });
+
+    test('Generation preserves mixed tax rates and exact document totals', () async {
+      final RechnungsVorlage v = await repo.create(
+        name: 'Mixed rates',
+        kundeId: 1,
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-01-01',
+        positionen: <Map<String, dynamic>>[
+          <String, dynamic>{'bezeichnung': 'Standard', 'menge': 1, 'einzelpreis': 100.00, 'ust_satz': 19},
+          <String, dynamic>{'bezeichnung': 'Reduced', 'menge': 1, 'einzelpreis': 50.00, 'ust_satz': 7},
+        ],
+      );
+
+      final List<int> generated = await repo.generateFaellig(heute: DateTime(2026));
+      final List<Map<String, Object?>> invoices = await db.executor.runSelect(
+        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+        <Object?>[generated.single],
+      );
+      final List<Map<String, Object?>> positions = await db.executor.runSelect(
+        'SELECT bezeichnung, ust_satz, gesamt FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position',
+        <Object?>[generated.single],
+      );
+
+      expect(v.positionen, hasLength(2));
+      expect(invoices.single['netto_betrag'], 150.00);
+      expect(invoices.single['ust_betrag'], 22.50);
+      expect(invoices.single['brutto_betrag'], 172.50);
+      expect(positions.map((Map<String, Object?> row) => row['ust_satz']).toList(), <Object?>[19, 7]);
+    });
+
+    test('Invalid recurring tax rate is rejected at template creation', () async {
+      await expectLater(
+        repo.create(
+          name: 'Invalid rate',
+          kundeId: 1,
+          intervall: 'monatlich',
+          positionen: <Map<String, dynamic>>[
+            <String, dynamic>{'bezeichnung': 'Bad', 'menge': 1, 'einzelpreis': 10.00, 'ust_satz': -1},
+          ],
+        ),
+        throwsA(isA<RechnungsVorlagenException>()),
+      );
+    });
+
+    test('Retrying an already generated occurrence returns the same invoice', () async {
+      final RechnungsVorlage v = await repo.create(
+        name: 'Retry',
+        kundeId: 1,
+        intervall: 'monatlich',
+        naechsteFaelligkeit: '2026-01-01',
+        positionen: <Map<String, dynamic>>[
+          <String, dynamic>{'bezeichnung': 'Abo', 'menge': 1, 'einzelpreis': 10.00},
+        ],
+      );
+      final List<int> first = await repo.generateFaellig(heute: DateTime(2026));
+      await db.executor.runUpdate('UPDATE rechnungsvorlagen SET naechste_faelligkeit = ? WHERE id = ?', <Object?>[
+        '2026-01-01',
+        v.id,
+      ]);
+      final List<int> retry = await repo.generateFaellig(heute: DateTime(2026));
+      final List<Map<String, Object?>> count = await db.executor.runSelect(
+        'SELECT COUNT(*) AS count FROM rechnungen WHERE vorlage_id = ?',
+        <Object?>[v.id],
+      );
+
+      expect(retry, <int>[first.single]);
+      expect(count.single['count'], 1);
     });
 
     test('Auto-generate on startup — due today generates', () async {
