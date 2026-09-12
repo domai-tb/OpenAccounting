@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
+import 'package:path/path.dart' as p;
 
 class UnternehmenException implements Exception {
   const UnternehmenException(this.message);
@@ -75,8 +77,15 @@ class Unternehmen {
 }
 
 class UnternehmenRepository {
-  UnternehmenRepository(this.executor);
+  UnternehmenRepository(this.executor, {this.profileDir});
   final QueryExecutor executor;
+  final String? profileDir;
+
+  static bool _asBool(Object? value) => value is bool
+      ? value
+      : value is num
+      ? value != 0
+      : value == '1' || value == 'true';
   Future<void>? _schemaReady;
   Future<void> ensureSchema() => _schemaReady ??= _ensureSchema(executor);
 
@@ -138,10 +147,10 @@ class UnternehmenRepository {
 
   Future<Unternehmen> get() async {
     await ensureSchema();
-    var rows = await executor.runSelect('SELECT * FROM unternehmen WHERE id = 1', const <Object?>[]);
+    var rows = await _selectSafeRows();
     if (rows.isEmpty) {
       await executor.runInsert('INSERT INTO unternehmen (id, name) VALUES (1, ?)', const <Object?>['Meine Firma']);
-      rows = await executor.runSelect('SELECT * FROM unternehmen WHERE id = 1', const <Object?>[]);
+      rows = await _selectSafeRows();
     }
     return Unternehmen(id: 1, data: rows.single);
   }
@@ -155,6 +164,9 @@ class UnternehmenRepository {
     for (final e in values.entries) {
       final col = _normalizeColumn(e.key);
       if (col.isEmpty || col.contains(RegExp('[^a-z0-9_]'))) continue;
+      if (col == 'smtp_passwort') {
+        throw const UnternehmenException('SMTP-Passwörter werden nicht in der Datenbank gespeichert');
+      }
       if (!existing.contains(col)) continue;
 
       // special handling for pdf_vorlage
@@ -174,7 +186,36 @@ class UnternehmenRepository {
   }
 
   Future<void> updateLogo(String path) async {
-    await update(<String, dynamic>{'logo_pfad': path});
+    final String? rootPath = profileDir;
+    if (rootPath == null || rootPath.trim().isEmpty) {
+      throw const UnternehmenException('Logo-Speicher ist für dieses Profil nicht konfiguriert');
+    }
+    final File source = File(path);
+    if (FileSystemEntity.typeSync(path, followLinks: false) != FileSystemEntityType.file) {
+      throw const UnternehmenException('Logo-Datei nicht gefunden');
+    }
+    final String extension = p.extension(path).toLowerCase();
+    if (!<String>{'.png', '.jpg', '.jpeg', '.webp', '.svg'}.contains(extension)) {
+      throw const UnternehmenException('Logo-Format nicht unterstützt');
+    }
+    final int size = await source.length();
+    if (size == 0 || size > 5 * 1024 * 1024) {
+      throw const UnternehmenException('Logo-Datei muss zwischen 1 Byte und 5 MB groß sein');
+    }
+    final Directory destinationDir = Directory(p.join(rootPath, 'assets'));
+    await destinationDir.create(recursive: true);
+    final String destinationPath = p.join(destinationDir.path, 'logo$extension');
+    final String tempPath = '$destinationPath.tmp-${DateTime.now().microsecondsSinceEpoch}';
+    await File(tempPath).writeAsBytes(await source.readAsBytes(), flush: true);
+    try {
+      await File(tempPath).rename(destinationPath);
+    } catch (error) {
+      try {
+        await File(tempPath).delete();
+      } catch (_) {}
+      throw UnternehmenException('Logo konnte nicht gespeichert werden: $error');
+    }
+    await update(<String, dynamic>{'logo_pfad': destinationPath});
   }
 
   Future<String> testSmtp() async {
@@ -182,6 +223,25 @@ class UnternehmenRepository {
     final host = u.smtpHost;
     if (host == null || host.isEmpty || host == 'invalid.local') {
       throw const UnternehmenException('Verbindung fehlgeschlagen: Host nicht erreichbar');
+    }
+    if (host.contains(RegExp(r'[\s/]'))) {
+      throw const UnternehmenException('Verbindung fehlgeschlagen: Host ungültig');
+    }
+    final int port = u.smtpPort ?? 587;
+    if (port < 1 || port > 65535) {
+      throw const UnternehmenException('Verbindung fehlgeschlagen: Port ungültig');
+    }
+    final bool ssl = _asBool(u.data['smtp_ssl']);
+    try {
+      if (ssl) {
+        final SecureSocket socket = await SecureSocket.connect(host, port, timeout: const Duration(seconds: 5));
+        await socket.close();
+      } else {
+        final Socket socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
+        await socket.close();
+      }
+    } catch (error) {
+      throw UnternehmenException('Verbindung fehlgeschlagen: $error');
     }
     return 'Verbindung erfolgreich hergestellt';
   }
@@ -206,10 +266,15 @@ class UnternehmenRepository {
     }
   }
 
-  bool shouldShowProfilmanager({required int profileCount}) {
-    // if profilmanager_aktiv true or more than 1 profile, show
-    // need to fetch current
-    return false; // placeholder, caller should check via get()
+  bool shouldShowProfilmanager({required int profileCount, bool profilmanagerAktiv = false}) =>
+      profileCount > 1 || profilmanagerAktiv;
+
+  Future<List<Map<String, Object?>>> _selectSafeRows() async {
+    final columns = await _existingColumns();
+    final safe = columns.where((column) => column != 'smtp_passwort').toList()..sort();
+    if (safe.isEmpty) return <Map<String, Object?>>[];
+    final projection = safe.map((column) => '"$column"').join(', ');
+    return executor.runSelect('SELECT $projection FROM unternehmen WHERE id = 1', const <Object?>[]);
   }
 
   Future<Set<String>> _existingColumns() async {
@@ -251,9 +316,13 @@ class UnternehmenRepository {
       'pdfVorlage': 'pdf_vorlage',
       'pdf_vorlage': 'pdf_vorlage',
       'profilmanagerAktiv': 'profilmanager_aktiv',
-      'profilmanger_aktiv': 'profilmanger_aktiv',
+      // Keep accepting the historical typo while writing to the canonical
+      // column so older callers cannot silently lose this preference.
+      'profilmanger_aktiv': 'profilmanager_aktiv',
       'smtpHost': 'smtp_host',
       'smtp_host': 'smtp_host',
+      'smtpPasswort': 'smtp_passwort',
+      'smtp_passwort': 'smtp_passwort',
       'smtpPort': 'smtp_port',
       'smtp_port': 'smtp_port',
       'dashboardConfig': 'dashboard_config',
@@ -325,9 +394,12 @@ class UnternehmenRepository {
     };
     for (final d in defs) {
       if (!existing.contains(d.name)) {
-        try {
-          await ex.runCustom('ALTER TABLE $table ADD COLUMN ${d.name} ${d.definition}');
-        } catch (_) {}
+        await ex.runCustom('ALTER TABLE $table ADD COLUMN ${d.name} ${d.definition}');
+        existing.add(d.name);
+        final verified = await ex.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+        if (!verified.any((row) => row['name'] == d.name)) {
+          throw StateError('Unternehmensschema konnte Spalte ${d.name} nicht verifizieren');
+        }
       }
     }
   }

@@ -351,13 +351,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
   static Future<void> _ensureLieferantLinkColumns(QueryExecutor executor) async {
     for (final table in <String>['journal', 'artikel']) {
-      try {
-        final rows = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
-        final hasCol = rows.any((r) => r['name'] == 'lieferant_id');
-        if (!hasCol) {
-          await executor.runCustom('ALTER TABLE $table ADD COLUMN lieferant_id INTEGER REFERENCES lieferanten(id)');
-        }
-      } catch (_) {}
+      final rows = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+      final hasCol = rows.any((r) => r['name'] == 'lieferant_id');
+      if (!hasCol) {
+        await executor.runCustom('ALTER TABLE $table ADD COLUMN lieferant_id INTEGER REFERENCES lieferanten(id)');
+      }
     }
   }
 
