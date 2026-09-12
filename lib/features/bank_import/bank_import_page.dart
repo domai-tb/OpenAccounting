@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/database.dart';
@@ -267,6 +269,20 @@ LIMIT 100
       await _rejectInput(fileName, 'Die Datei konnte nicht gelesen werden: ${error.message}');
     } catch (error) {
       await _rejectInput(fileName, 'Die Datei konnte nicht gelesen werden: ${_safeError(error)}');
+    }
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      const XTypeGroup csvGroup = XTypeGroup(label: 'CSV', extensions: <String>['csv']);
+      const XTypeGroup xmlGroup = XTypeGroup(label: 'CAMT', extensions: <String>['xml']);
+      final XFile? file = await openFile(acceptedTypeGroups: <XTypeGroup>[csvGroup, xmlGroup]);
+      if (file == null) return;
+      _pathController.text = file.path;
+      await _loadFileFromPath();
+    } catch (_) {
+      // ponytail: selector unavailable (web/test) — fallback to manual path field
+      await _loadFileFromPath();
     }
   }
 
@@ -712,6 +728,7 @@ LIMIT 100
                 labelText: 'Dateipfad',
                 hintText: '/Pfad/zum/Kontoauszug.csv',
                 prefixIcon: Icon(Icons.folder_open),
+                helperText: 'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt',
               ),
               onSubmitted: (_) => unawaited(_loadFileFromPath()),
             ),
@@ -721,10 +738,11 @@ LIMIT 100
               runSpacing: AppSpacing.sm,
               children: <Widget>[
                 FilledButton.icon(
-                  onPressed: _isBusy ? null : () => unawaited(_loadFileFromPath()),
+                  onPressed: _isBusy ? null : () => unawaited(_pickFile()),
                   icon: const Icon(Icons.file_open),
                   label: const Text('Datei auswählen'),
                 ),
+                // ponytail: native picker via file_selector, manual path fallback keeps headless/test path
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : () => unawaited(_pasteCsv()),
                   icon: const Icon(Icons.content_paste),

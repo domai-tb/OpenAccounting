@@ -12,6 +12,7 @@ import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
+import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
 import 'package:openaccounting/features/desktop/window_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,7 +40,21 @@ Future<void> main() async {
     }
   }
   final profileManager = ProfileManager();
-  final activeProfile = await profileManager.getActiveProfile();
+  String activeProfile;
+  try {
+    activeProfile = await profileManager.getActiveProfile();
+  } on ProfileSelectionRequiredException catch (_) {
+    // ponytail: multiple profiles without valid pointer — use last-used or first.
+    // Full UI via ProfileSelectionService.needsSelection() is available;
+    // this keeps startup non-blocking until profile picker screen lands.
+    final svc = ProfileSelectionService();
+    final last = await svc.getLastUsedProfile();
+    final profiles = await svc.listProfiles();
+    activeProfile = (last != null && profiles.contains(last))
+        ? last
+        : (profiles.isNotEmpty ? profiles.first : 'default');
+    await profileManager.setActiveProfile(activeProfile);
+  }
   final profileDirectory = profileManager.profileDir(activeProfile);
   await Directory(profileDirectory).create(recursive: true);
   final db = AppDatabase.forProfile(profileDirectory);

@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  auto_updater_windows
+  file_selector_windows
   hotkey_manager_windows
   screen_retriever_windows
   system_tray

@@ -203,7 +203,8 @@ class DioClient {
 
   /// ponytail: DNS/private-range guard — only loopback hosts are trusted for http;
   /// private ranges (10/8, 192.168/16, 172.16/12, fc00::/7) are not in trustedHosts
-  /// by default → blocked. https allowed only if explicitly in trustedHosts.
+  /// by default → blocked. Even if added to trustedHosts, private IP literals
+  /// are denied (DNS rebinding guard deferred — hostnames require DNS check).
   /// No production caller uses DioClient with external hosts — loopback only.
   bool _isTrustedUri(Uri uri) {
     if (uri.host.isEmpty || uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
@@ -212,8 +213,32 @@ class DioClient {
     if (uri.scheme != 'http' && uri.scheme != 'https') return false;
     if (uri.port < 0 || uri.port > 65535) return false;
     final host = uri.host.trim().toLowerCase();
+    if (_isPrivateNetworkHost(host)) return false;
     if (!trustedHosts.contains(host)) return false;
     return _isLoopbackHost(host) || uri.scheme == 'https';
+  }
+
+  static bool _isPrivateNetworkHost(String host) {
+    final address = InternetAddress.tryParse(host);
+    if (address == null) return false; // hostname — DNS check deferred
+    if (address.isLoopback) return false; // loopback allowed via _isLoopbackHost
+    final raw = address.rawAddress;
+    if (raw.length == 4) {
+      // 10/8
+      if (raw[0] == 10) return true;
+      // 172.16/12
+      if (raw[0] == 172 && raw[1] >= 16 && raw[1] <= 31) return true;
+      // 192.168/16
+      if (raw[0] == 192 && raw[1] == 168) return true;
+      // 169.254/16 link-local
+      if (raw[0] == 169 && raw[1] == 254) return true;
+    }
+    if (raw.length == 16) {
+      // fc00::/7 unique local, fe80::/10 link-local
+      if ((raw[0] & 0xfe) == 0xfc) return true;
+      if (raw[0] == 0xfe && (raw[1] & 0xc0) == 0x80) return true;
+    }
+    return false;
   }
 
   Uri _redactedUri(Uri uri) => uri.replace(userInfo: '', query: '', fragment: '');

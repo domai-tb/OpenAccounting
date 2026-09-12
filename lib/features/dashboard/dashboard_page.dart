@@ -7,15 +7,18 @@ import 'package:go_router/go_router.dart';
 import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
-const String _dashboardLoadError = 'Fehler beim Laden';
+String _dashboardLoadError(BuildContext context) =>
+    AppLocalizations.of(context)?.backendUnreachable ??
+    'Fehler beim Laden'; // ponytail: 1 key reused, add dashboard.* keys when full i18n needed
 
-String _dashboardErrorMessage(String area, Object error, StackTrace stackTrace) {
+String _dashboardErrorMessage(BuildContext context, String area, Object error, StackTrace stackTrace) {
   debugPrint('dashboard $area failed: $error\n$stackTrace');
-  return _dashboardLoadError;
+  return _dashboardLoadError(context);
 }
 
 /// Dashboard page — scrollable grid 2-4 columns responsive via LayoutBuilder.
@@ -44,7 +47,9 @@ class DashboardPageImpl extends ConsumerWidget {
     final cfgAsync = ref.watch(dashboardConfigProvider);
     return Scaffold(
       appBar: AppPageHeader(
-        title: 'Übersicht',
+        title:
+            AppLocalizations.of(context)?.sidebarOverview ??
+            'Übersicht', // ponytail: reuses sidebarOverview, add dedicated dashboardTitle when needed
         showFilterToolbar: false,
         actions: <Widget>[
           FilledButton.icon(
@@ -63,7 +68,7 @@ class DashboardPageImpl extends ConsumerWidget {
       body: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, StackTrace stackTrace) => _DashboardErrorState(
-          message: _dashboardErrorMessage('config', e, stackTrace),
+          message: _dashboardErrorMessage(context, 'config', e, stackTrace),
           onRetry: () => ref.invalidate(dashboardConfigProvider),
         ),
         data: (DashboardConfig cfg) {
@@ -124,7 +129,7 @@ class _DashboardConfigSheet extends ConsumerWidget {
               child: cfgAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (Object e, StackTrace stackTrace) => _DashboardErrorState(
-                  message: _dashboardErrorMessage('config', e, stackTrace),
+                  message: _dashboardErrorMessage(context, 'config', e, stackTrace),
                   onRetry: () => ref.invalidate(dashboardConfigProvider),
                 ),
                 data: (DashboardConfig cfg) {
@@ -186,7 +191,7 @@ class _WidgetCard extends ConsumerWidget {
       error: (Object e, StackTrace stackTrace) => DashboardCard(
         title: title,
         icon: icon,
-        error: _dashboardErrorMessage('widget $id', e, stackTrace),
+        error: _dashboardErrorMessage(context, 'widget $id', e, stackTrace),
         onRetry: () => ref.invalidate(dashboardWidgetDataProvider(id)),
       ),
       data: (WidgetData? data) {
