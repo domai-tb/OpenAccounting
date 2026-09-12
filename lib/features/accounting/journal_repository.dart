@@ -68,6 +68,9 @@ class JournalRepository {
     if (!_allowedArt.contains(art)) {
       throw const JournalException('Art muss Einnahme oder Ausgabe sein');
     }
+    if (stornoVon != null) {
+      throw const JournalException('Storno-Einträge dürfen nur über storno() erstellt werden');
+    }
 
     // Validate ustSonderfall whitelist
     String? cleanSonderfall;
@@ -170,35 +173,46 @@ class JournalRepository {
     }
 
     final String datumStr = _formatDate(datum);
-    final int id = await executor.runInsert(
-      'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
-      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      <Object?>[
-        datumStr,
-        cleanBezeichnung,
-        kategorieId,
-        cleanBetrag,
-        art,
-        resolvedKontoSkr03,
-        resolvedKontoSkr04,
-        ustSatzId,
-        belegNr,
-        stornoVon,
-        kontoId,
-        cleanUstSatz,
-        cleanSonderfall,
-        cleanMarge,
-        cleanUstSatz25a,
-        istEuInt,
-        cleanVorsteuer,
-      ],
-    );
+    final TransactionExecutor transaction = executor.beginTransaction();
+    late final int id;
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      id = await transaction.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
+        'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, beleg_nr, storno_von, konto_id, '
+        'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          datumStr,
+          cleanBezeichnung,
+          kategorieId,
+          cleanBetrag,
+          art,
+          resolvedKontoSkr03,
+          resolvedKontoSkr04,
+          ustSatzId,
+          belegNr,
+          kontoId,
+          cleanUstSatz,
+          cleanSonderfall,
+          cleanMarge,
+          cleanUstSatz25a,
+          istEuInt,
+          cleanVorsteuer,
+        ],
+      );
 
-    // Set gruppe_id to own id for new entries (self-referencing booking group root).
-    if (stornoVon == null) {
-      await executor.runCustom('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[id, id]);
+      // The self-referencing group root is committed with the booking. A
+      // reader can therefore never observe an inserted row without gruppe_id.
+      await transaction.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[id, id]);
+      await transaction.send();
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
     }
 
     final JournalEntry? entry = await findById(id);
@@ -242,6 +256,7 @@ class JournalRepository {
   }
 
   Future<JournalEntry> storno({required int originalId}) async {
+    await _ensureStornoIndex();
     final JournalEntry? original = await findById(originalId);
     if (original == null) {
       throw const JournalException('Original-Eintrag nicht gefunden');
@@ -250,15 +265,6 @@ class JournalRepository {
     // Spec §Storno: only immutable finalized sources may be reversed.
     if (!original.immutable) {
       throw const JournalException('Original-Eintrag nicht finalisiert');
-    }
-
-    // Prevent duplicate storno per spec §Storno correction.
-    final List<Map<String, Object?>> existing = await executor.runSelect(
-      'SELECT id FROM journal WHERE storno_von = ? LIMIT 1',
-      <Object?>[originalId],
-    );
-    if (existing.isNotEmpty) {
-      throw const JournalException('Eintrag bereits storniert');
     }
 
     final String negBetrag = _negateBetrag(original.betrag);
@@ -300,31 +306,57 @@ class JournalRepository {
       negVorsteuer = _negateBetrag(money.formatBetrag(origVorsteuer));
     }
 
-    final int id = await executor.runInsert(
-      'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
-      'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, storno_von, konto_id, '
-      'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag, gruppe_id) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      <Object?>[
-        datumStr,
-        stornoBezeichnung,
-        original.kategorieId,
-        negBetrag,
-        original.art,
-        original.kontoSkr03,
-        original.kontoSkr04,
-        original.ustSatzId,
-        originalId,
-        original.kontoId,
-        origUstSatz,
-        origSonderfall,
-        negMarge,
-        origSatz25a,
-        origEu,
-        negVorsteuer,
-        original.gruppeId ?? originalId,
-      ],
-    );
+    final TransactionExecutor transaction = executor.beginTransaction();
+    late final int id;
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      final List<Map<String, Object?>> existing = await transaction.runSelect(
+        'SELECT id FROM journal WHERE storno_von = ? LIMIT 1',
+        <Object?>[originalId],
+      );
+      if (existing.isNotEmpty) {
+        throw const JournalException('Eintrag bereits storniert');
+      }
+      id = await transaction.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, '
+        'konto_skr03_snapshot, konto_skr04_snapshot, ust_satz_id, immutable, storno_von, konto_id, '
+        'ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a, ist_eu_lieferung, vorsteuer_betrag, gruppe_id) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          datumStr,
+          stornoBezeichnung,
+          original.kategorieId,
+          negBetrag,
+          original.art,
+          original.kontoSkr03,
+          original.kontoSkr04,
+          original.ustSatzId,
+          originalId,
+          original.kontoId,
+          origUstSatz,
+          origSonderfall,
+          negMarge,
+          origSatz25a,
+          origEu,
+          negVorsteuer,
+          original.gruppeId ?? originalId,
+        ],
+      );
+      await transaction.send();
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      if (error is JournalException) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      if (error.toString().toUpperCase().contains('UNIQUE')) {
+        Error.throwWithStackTrace(const JournalException('Eintrag bereits storniert'), stackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
 
     final JournalEntry? entry = await findById(id);
     if (entry == null) {
@@ -411,4 +443,26 @@ class JournalRepository {
     final String neg = t.startsWith('-') ? t.substring(1) : '-$t';
     return money.formatBetrag(neg);
   }
+
+  Future<void> _ensureStornoIndex() async {
+    try {
+      await executor.runCustom(
+        'CREATE UNIQUE INDEX IF NOT EXISTS journal_storno_von_unique '
+        'ON journal(storno_von) WHERE storno_von IS NOT NULL',
+      );
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        const JournalException('Storno-Eindeutigkeit konnte nicht hergestellt werden'),
+        stackTrace,
+      );
+    }
+  }
+}
+
+class _NoopTransactionUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
 }

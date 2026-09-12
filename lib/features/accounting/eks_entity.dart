@@ -29,6 +29,8 @@ class EksPage9 {
 class EksResult {
   const EksResult({
     required this.jahr,
+    required this.kundeId,
+    required this.isUnscoped,
     required this.sectionD,
     required this.sectionF,
     required this.b6_5,
@@ -38,6 +40,13 @@ class EksResult {
   });
 
   final int jahr;
+
+  /// Customer scope used for this report. Null means an explicit all-customer
+  /// report was requested by omitting the filter.
+  final int? kundeId;
+
+  /// Makes the all-customer mode visible to callers and export code.
+  final bool isUnscoped;
 
   /// Section D — company data (empty strings if missing, warnings via debugPrint + warnings list)
   final EksSectionD sectionD;

@@ -220,13 +220,12 @@ void main() {
       expect(result.sectionF.isEmpty || result.sectionF.values.every((String v) => v == '0.00'), isTrue);
     });
 
-    test('kundeId filter does not break generation', () async {
+    test('unknown kundeId is rejected instead of producing an unscoped report', () async {
       await upsertUnternehmen(bgNummer: 'BG1', jobcenter: 'JC1');
       await insertKategorie(id: 740, eksKategorie: 'F23', bezeichnung: 'Einnahmen');
       await insertJournal(kategorieId: 740, betrag: '300.00', datum: '2025-08-10');
-      // Should accept kundeId optional
-      final EksResult result = await service.generate(jahr: 2025, kundeId: 999);
-      expect(result.sectionF['F23'], '300.00');
+
+      await expectLater(service.generate(jahr: 2025, kundeId: 999), throwsA(isA<EksException>()));
     });
   });
 }

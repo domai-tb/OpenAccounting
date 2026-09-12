@@ -16,8 +16,9 @@ void main() {
       expect(polished, '100.00');
 
       // Validation für gültig → kein Fehler.
-      final String? ok = service.validate('19%');
+      final String? ok = service.validate('19');
       expect(ok, isNull);
+      expect(service.validate('19%'), contains('ungültig'));
     });
 
     test('test_failure', () {

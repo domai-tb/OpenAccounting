@@ -22,6 +22,7 @@ void main() {
     Future<void> insertJournal({
       required String betrag,
       required String datum,
+      String belegTyp = 'Einnahme',
       String? ustSatz,
       String? ustSonderfall,
       String? marge,
@@ -30,7 +31,7 @@ void main() {
     }) async {
       await db.executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable, ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)',
-        <Object?>[datum, 'Test $datum', kategorieId, betrag, 'Einnahme', ustSatz, ustSonderfall, marge, ustSatz25a],
+        <Object?>[datum, 'Test $datum', kategorieId, betrag, belegTyp, ustSatz, ustSonderfall, marge, ustSatz25a],
       );
     }
 
@@ -126,11 +127,21 @@ void main() {
       // RC base 1000, tax 1000*19/119=159 (floor 159.66? compute: 100000*19/119=15966=>159.66 floor 159)
       // Let's compute exact: 1000.00 =100000 cents *19/119=15966 =>159.66
       expect(r.kz['89'], '1000.00');
-      expect(r.kz['93'], '159.66');
+      expect(r.kz['93'], '190.00');
       // KZ1 must be 500 only, not 1500
       expect(r.kz['1'], '500.00');
       // KZ3 should reflect only domestic (500*19/119=79.83 floor 79.83? 50000*19/119=7983=>79.83)
       expect(r.kz['3'], '79.83');
+    });
+
+    test('ordinary expenses are excluded from domestic turnover', () async {
+      await insertJournal(betrag: '119.00', datum: '2025-09-12', belegTyp: 'Ausgabe', ustSatz: '19');
+
+      final UstvaResult r = await service.compute(jahr: 2025, monatOrQuartal: 9, rhythmus: 'monatlich');
+
+      expect(r.kz['1'], '0.00');
+      expect(r.kz['3'], '0.00');
+      expect(r.kz['4'], '0.00');
     });
 
     test('quarterly filing aggregates 3 months', () async {

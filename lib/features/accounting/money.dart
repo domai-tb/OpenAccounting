@@ -1,39 +1,98 @@
-/// Shared money helpers for accounting — string cents to avoid double drift.
-/// ponytail: pure functions, round half-up on 3rd decimal to match normalize.
-int toCents(String raw) {
-  final String t = raw.trim().replaceAll(',', '.');
-  if (t.isEmpty) {
-    return 0;
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPartRaw = parts[0].isEmpty ? '0' : parts[0];
-  final String intNoLead = intPartRaw.replaceFirst(RegExp('^0+'), '');
-  final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  int decCents = 0;
-  bool carry = false;
-  if (decRaw.length <= 2) {
-    final String dec = '${decRaw}00'.substring(0, 2);
-    decCents = int.parse(dec);
-  } else {
-    final int firstTwo = int.parse(decRaw.substring(0, 2));
-    final int third = int.tryParse(decRaw[2]) ?? 0;
-    if (third >= 5) {
-      decCents = firstTwo + 1;
-      if (decCents == 100) {
-        decCents = 0;
-        carry = true;
-      }
-    } else {
-      decCents = firstTwo;
-    }
-  }
-  int cents = int.parse(effInt) * 100 + decCents;
-  if (carry) cents += 100;
-  return isNeg ? -cents : cents;
+/// A malformed or out-of-range decimal at an accounting boundary.
+class MoneyParseException implements Exception {
+  const MoneyParseException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
+
+/// Parse a decimal into an integer at [scale] decimal places.
+///
+/// The decimal text is parsed before any arithmetic is performed. Values with
+/// additional digits are rounded half-up only when [roundExcess] is true;
+/// otherwise they are rejected. This keeps quantity (scale 3) separate from
+/// currency (scale 2) and avoids converting through a binary double.
+int parseScaled(
+  String raw, {
+  required int scale,
+  String field = 'value',
+  bool allowNegative = true,
+  bool roundExcess = false,
+}) {
+  if (scale < 0) {
+    throw ArgumentError.value(scale, 'scale', 'Scale must not be negative');
+  }
+  final String text = raw.trim().replaceAll(',', '.');
+  if (text.isEmpty) {
+    throw MoneyParseException('$field must not be empty');
+  }
+  final match = RegExp(r'^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$').firstMatch(text);
+  if (match == null) {
+    throw MoneyParseException('$field is not a valid decimal');
+  }
+  final bool negative = match.group(1) == '-';
+  if (negative && !allowNegative) {
+    throw MoneyParseException('$field must not be negative');
+  }
+  final String integerPart = match.group(2)!;
+  final String fraction = match.group(3) ?? '';
+  final int exponent = int.tryParse(match.group(4) ?? '0') ?? 0;
+  final int decimalPlaces = fraction.length - exponent;
+  final BigInt digits = BigInt.parse('$integerPart$fraction');
+  final BigInt magnitude;
+  if (decimalPlaces <= scale) {
+    magnitude = digits * BigInt.from(10).pow(scale - decimalPlaces);
+  } else {
+    final BigInt divisor = BigInt.from(10).pow(decimalPlaces - scale);
+    final BigInt remainder = digits.remainder(divisor);
+    if (remainder != BigInt.zero && !roundExcess) {
+      throw MoneyParseException('$field has more than $scale decimal places');
+    }
+    var rounded = digits ~/ divisor;
+    if (roundExcess && remainder * BigInt.two >= divisor) {
+      rounded += BigInt.one;
+    }
+    magnitude = rounded;
+  }
+  final BigInt signed = negative ? -magnitude : magnitude;
+  if (signed < BigInt.from(-9223372036854775807) || signed > BigInt.from(9223372036854775807)) {
+    throw MoneyParseException('$field is outside the supported integer range');
+  }
+  // Keep this local so a malformed/excess value never reaches int.parse.
+  return signed.toInt();
+}
+
+int scaledFromNum(
+  num value, {
+  required int scale,
+  String field = 'value',
+  bool allowNegative = true,
+  bool roundExcess = false,
+}) {
+  if (!value.isFinite) {
+    throw MoneyParseException('$field must be finite');
+  }
+  return parseScaled(
+    value.toString(),
+    scale: scale,
+    field: field,
+    allowNegative: allowNegative,
+    roundExcess: roundExcess,
+  );
+}
+
+int toCents(String raw) {
+  final String text = raw.trim();
+  if (text.isEmpty) return 0;
+  return parseScaled(text, scale: 2, roundExcess: true, field: 'amount');
+}
+
+int toCurrencyCents(num value, {String field = 'amount'}) => scaledFromNum(value, scale: 2, field: field);
+
+int toQuantityThousandths(num value, {String field = 'quantity'}) =>
+    scaledFromNum(value, scale: 3, field: field, allowNegative: false);
 
 String fromCents(int cents) {
   final bool isNeg = cents < 0;
@@ -44,34 +103,9 @@ String fromCents(int cents) {
 }
 
 String formatBetrag(String raw) {
-  final String t = raw.trim().replaceAll(',', '.');
-  if (t.isEmpty) {
-    return '0.00';
-  }
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPart = parts[0].isEmpty ? '0' : parts[0];
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  // ponytail: round half-up for display, same as toCents.
-  if (decRaw.length <= 2) {
-    final String dec = '${decRaw}00'.substring(0, 2);
-    return '${isNeg ? '-' : ''}$intPart.$dec';
-  }
-  final int firstTwo = int.parse(decRaw.substring(0, 2).padRight(2, '0'));
-  final int third = int.tryParse(decRaw.length > 2 ? decRaw[2] : '0') ?? 0;
-  var decCents = firstTwo;
-  var carryInt = 0;
-  if (third >= 5) {
-    decCents += 1;
-    if (decCents == 100) {
-      decCents = 0;
-      carryInt = 1;
-    }
-  }
-  final int intVal = int.parse(intPart) + carryInt;
-  final String dec = decCents.toString().padLeft(2, '0');
-  return '${isNeg ? '-' : ''}$intVal.$dec';
+  final String text = raw.trim();
+  if (text.isEmpty) return '0.00';
+  return fromCents(parseScaled(text, scale: 2, roundExcess: true, field: 'amount'));
 }
 
 String add(String a, String b) {

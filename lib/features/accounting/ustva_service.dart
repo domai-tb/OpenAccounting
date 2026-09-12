@@ -4,9 +4,19 @@ import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/ustva_entity.dart';
 
 /// UStVA KZ 1-22 + special KZs per spec.
-/// ponytail: executor-injected, pure string money via money.dart, PRAGMA column checks with ponytail stub fallback.
-/// Missing columns (ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a) → 0 contribution, not crash.
-/// Uses brutto portion formula base*ust/(100+ust) with trunc, max(0) for negative margin.
+/// Journal direction is taken from beleg_typ. Ordinary Ausgabe rows never enter
+/// domestic turnover. Reverse-charge rows carry a net base, so their tax is
+/// calculated additively instead of extracting tax from a gross amount.
+class UstvaException implements Exception {
+  const UstvaException(this.message, [this.cause]);
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => 'UstvaException: $message';
+}
+
 class UstvaService {
   UstvaService(this.executor);
 
@@ -73,7 +83,12 @@ class UstvaService {
 
       final String? margeRaw = _stringOrNull(row, 'marge_25a_brutto');
       final String? satz25Raw = _stringOrNull(row, 'ust_satz_25a');
-      if (margeRaw != null && satz25Raw != null && margeRaw.trim().isNotEmpty && satz25Raw.trim().isNotEmpty) {
+      final bool isEinnahme = _isEinnahme(row);
+      if (isEinnahme &&
+          margeRaw != null &&
+          satz25Raw != null &&
+          margeRaw.trim().isNotEmpty &&
+          satz25Raw.trim().isNotEmpty) {
         final int margeCents = money.toCents(money.formatBetrag(margeRaw));
         final int base = margeCents < 0 ? 0 : margeCents;
         kz81Cents += base;
@@ -87,11 +102,15 @@ class UstvaService {
       }
 
       if (isRc) {
-        // Reverse charge: base → KZ89, tax → KZ93, not domestic (exclude from KZ1/3/4)
+        // Reverse charge is reported on the declared net base. Expense-side
+        // rows are input-side data and must not become outgoing turnover.
+        if (!isEinnahme) {
+          continue;
+        }
         kz89Cents += betragCents;
         final num? satz = _resolveSatz(row);
         if (satz != null && satz != 0) {
-          kz93Cents += _calcUstFromBrutto(betragCents, satz);
+          kz93Cents += _calcUstFromNetto(betragCents, satz);
         }
         continue;
       }
@@ -101,7 +120,11 @@ class UstvaService {
         continue;
       }
 
-      // Normal domestic turnover
+      // Normal domestic turnover. Unknown directions fail closed instead of
+      // being silently classified as sales.
+      if (!isEinnahme) {
+        continue;
+      }
       kz1Cents += betragCents;
       final num? satz = _resolveSatz(row);
       if (satz != null && satz != 0) {
@@ -162,8 +185,8 @@ class UstvaService {
     } catch (_) {
       try {
         return await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
-      } catch (_) {
-        return <Map<String, Object?>>[];
+      } catch (error, stackTrace) {
+        Error.throwWithStackTrace(UstvaException('Journal konnte für UStVA nicht gelesen werden', error), stackTrace);
       }
     }
   }
@@ -171,8 +194,11 @@ class UstvaService {
   Future<List<Map<String, Object?>>> _fetchVorsteuerRows() async {
     try {
       return await executor.runSelect('SELECT * FROM vorsteuer_ansprueche', const <Object?>[]);
-    } catch (_) {
-      return <Map<String, Object?>>[];
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        UstvaException('Vorsteueransprüche konnten für UStVA nicht gelesen werden', error),
+        stackTrace,
+      );
     }
   }
 }
@@ -239,6 +265,11 @@ num? _resolveSatz(Map<String, Object?> row) {
   return null;
 }
 
+bool _isEinnahme(Map<String, Object?> row) {
+  final Object? raw = row['beleg_typ'] ?? row['art'];
+  return raw?.toString().trim().toLowerCase() == 'einnahme';
+}
+
 int _calcUstFromBrutto(int baseCents, num satz) {
   if (satz == 0) {
     return 0;
@@ -247,6 +278,27 @@ int _calcUstFromBrutto(int baseCents, num satz) {
   if (satzCents == 0) {
     return 0;
   }
-  // ponytail: integer cents avoids float drift: base*19/119 → 1900/11900 exact
-  return (baseCents * satzCents) ~/ (10000 + satzCents);
+  // Integer half-up rounding avoids binary floating point drift.
+  return _roundHalfUp(baseCents * satzCents, 10000 + satzCents);
+}
+
+int _calcUstFromNetto(int baseCents, num satz) {
+  if (satz == 0) {
+    return 0;
+  }
+  final int satzCents = (satz * 100).round();
+  if (satzCents == 0) {
+    return 0;
+  }
+  return _roundHalfUp(baseCents * satzCents, 10000);
+}
+
+int _roundHalfUp(int numerator, int denominator) {
+  if (denominator <= 0) {
+    throw ArgumentError('denominator must be positive');
+  }
+  if (numerator < 0) {
+    return -_roundHalfUp(-numerator, denominator);
+  }
+  return (numerator + denominator ~/ 2) ~/ denominator;
 }

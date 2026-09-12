@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/accounting/datev_entity.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// DATEV EXTF Buchungsstapel export per spec §DATEV EXTF Export.
 /// ponytail: executor-injected, pure string money, semicolon CSV,
@@ -15,11 +18,18 @@ class DatevService {
 
   final QueryExecutor executor;
 
-  /// Export DATEV EXTF CSV as String.
+  /// Export DATEV EXTF CSV as String and optionally commit it atomically to a
+  /// caller-selected absolute path.
   /// [jahr] filters journal by year, [von]/[bis] by inclusive date range.
   /// [kontoBankFallback] overrides global unternehmen.datev_konto_bank.
   /// Throws [DatevException] if datev_beraternummer or mandantennummer missing.
-  Future<String> exportCsv({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback}) async {
+  Future<String> exportCsv({
+    int? jahr,
+    DateTime? von,
+    DateTime? bis,
+    String? kontoBankFallback,
+    String? destinationPath,
+  }) async {
     await _ensureDatevColumns();
 
     // --- Unternehmen metadata ---
@@ -226,6 +236,10 @@ class DatevService {
 
     final String csv = lines.join('\r\n');
 
+    if (destinationPath != null) {
+      await _writeArtifact(destinationPath, csv);
+    }
+
     // --- Export log ---
     try {
       final String vonStr;
@@ -257,28 +271,71 @@ class DatevService {
         vonVal,
         bisVal,
         filtered.length,
-        'memory_export.csv',
+        destinationPath ?? 'memory://datev.csv',
         unternehmenId,
         'erfolg',
       ]);
-    } catch (_) {
-      // ponytail: log failure must not break export
-      debugPrint('DATEV warn: export_log insert failed');
+    } catch (error, stackTrace) {
+      debugPrint('DATEV error: export_log insert failed: $error');
+      Error.throwWithStackTrace(
+        DatevException(
+          destinationPath == null
+              ? 'DATEV export generated but could not be recorded in export history'
+              : 'DATEV artifact written, but export history could not be recorded',
+        ),
+        stackTrace,
+      );
     }
 
     return csv;
   }
 
   /// Alias per task description: export({jahr, von, bis}) → CSV String
-  Future<String> export({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback}) {
-    return exportCsv(jahr: jahr, von: von, bis: bis, kontoBankFallback: kontoBankFallback);
+  Future<String> export({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback, String? destinationPath}) {
+    return exportCsv(
+      jahr: jahr,
+      von: von,
+      bis: bis,
+      kontoBankFallback: kontoBankFallback,
+      destinationPath: destinationPath,
+    );
   }
 
   Future<List<Map<String, Object?>>> _fetchJournalRows() async {
     try {
       return await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
-    } catch (_) {
-      return <Map<String, Object?>>[];
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(DatevException('Journal konnte für DATEV nicht gelesen werden: $error'), stackTrace);
+    }
+  }
+
+  Future<void> _writeArtifact(String destinationPath, String csv) async {
+    final String pathText = destinationPath.trim();
+    if (pathText.isEmpty) {
+      throw const DatevException('DATEV-Zielpfad darf nicht leer sein');
+    }
+    final File target = File(pathText);
+    if (!Uri.file(pathText).isAbsolute) {
+      throw const DatevException('DATEV-Zielpfad muss absolut sein');
+    }
+    final Directory parent = target.parent;
+    if (!parent.existsSync()) {
+      throw DatevException('DATEV-Zielordner existiert nicht: ${parent.path}');
+    }
+    final File temporary = File('${target.path}.tmp-${DateTime.now().microsecondsSinceEpoch}');
+    try {
+      await temporary.writeAsString(csv, flush: true);
+      await temporary.rename(target.path);
+    } catch (error, stackTrace) {
+      try {
+        if (temporary.existsSync()) {
+          await temporary.delete();
+        }
+      } catch (_) {}
+      Error.throwWithStackTrace(
+        DatevException('DATEV-Artefakt konnte nicht sicher geschrieben werden: $error'),
+        stackTrace,
+      );
     }
   }
 
@@ -431,17 +488,8 @@ String _formatDdMmYyyy(String raw) {
 }
 
 String _toGermanAmount(String raw) {
-  final String t = raw.trim();
-  if (t.isEmpty) return '0,00';
-  final bool isNeg = t.startsWith('-');
-  final String unsigned = isNeg ? t.substring(1) : t;
-  final List<String> parts = unsigned.split('.');
-  final String intPartRaw = parts[0].isEmpty ? '0' : parts[0].replaceFirst(RegExp('^0+'), '');
-  final String effInt = intPartRaw.isEmpty ? '0' : intPartRaw;
-  final String decRaw = parts.length > 1 ? parts[1] : '';
-  final String dec = '${decRaw}00'.substring(0, 2);
-  final String german = '$effInt,$dec';
-  return isNeg ? '-$german' : german;
+  final String formatted = money.formatBetrag(raw);
+  return formatted.replaceFirst('.', ',');
 }
 
 String _escapeCsv(String field) {

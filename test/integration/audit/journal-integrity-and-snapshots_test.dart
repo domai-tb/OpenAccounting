@@ -83,8 +83,8 @@ void main() {
       );
 
       // Storno of mutable entry must be rejected
-      expect(
-        () => repo.storno(originalId: mutable.id),
+      await expectLater(
+        repo.storno(originalId: mutable.id),
         throwsA(isA<JournalException>().having((e) => e.message, 'message', contains('nicht finalisiert'))),
       );
 
@@ -93,8 +93,8 @@ void main() {
       await repo.storno(originalId: mutable.id);
 
       // Storno of already-reversed entry must be rejected
-      expect(
-        () => repo.storno(originalId: mutable.id),
+      await expectLater(
+        repo.storno(originalId: mutable.id),
         throwsA(isA<JournalException>().having((e) => e.message, 'message', contains('bereits storniert'))),
       );
     });

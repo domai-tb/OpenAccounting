@@ -5,8 +5,18 @@ import 'package:openaccounting/features/accounting/eks_entity.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// Anlage EKS 9-page for Jobcenter Transferleistungen.
-/// ponytail: pure string cents via money.dart, ponytail stub columns via ALTER on first generate,
-/// warn via debugPrint not fail on missing bg/jobcenter.
+/// Customer-scoped reports resolve the customer before reading any journal row;
+/// an omitted filter remains explicit in the result.
+class EksException implements Exception {
+  const EksException(this.message, [this.cause]);
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => 'EksException: $message';
+}
+
 class EksService {
   EksService(this.executor);
 
@@ -14,6 +24,19 @@ class EksService {
 
   Future<EksResult> generate({required int jahr, int? kundeId}) async {
     await _ensureEksColumns();
+
+    if (kundeId != null) {
+      if (kundeId <= 0) {
+        throw const EksException('Kunde für EKS muss eine positive ID haben');
+      }
+      final List<Map<String, Object?>> customerRows = await executor.runSelect(
+        'SELECT id FROM kunden WHERE id = ? LIMIT 1',
+        <Object?>[kundeId],
+      );
+      if (customerRows.isEmpty) {
+        throw EksException('Kunde $kundeId für EKS nicht gefunden');
+      }
+    }
 
     final String jahrStr = jahr.toString().padLeft(4, '0');
     final List<String> warnings = <String>[];
@@ -47,12 +70,6 @@ class EksService {
         jobcenter = _stringOrEmpty(r, 'jobcenter_name');
         if (jobcenter.isEmpty) {
           jobcenter = _stringOrEmpty(r, 'jobcenter');
-        }
-        // ponytail: kundeId optional fetch — not fail if missing
-        if (kundeId != null) {
-          try {
-            await executor.runSelect('SELECT * FROM kunden WHERE id = ? LIMIT 1', <Object?>[kundeId]);
-          } catch (_) {}
         }
       } else {
         warnings.add('EKS warn: unternehmen empty');
@@ -93,7 +110,7 @@ class EksService {
     }
 
     // Journal rows
-    final List<Map<String, Object?>> journalRows = await _fetchJournalRows();
+    final List<Map<String, Object?>> journalRows = await _fetchJournalRows(kundeId: kundeId);
 
     // Filter by year and build sectionF + income/costs + b6_5
     final Map<String, String> sectionF = <String, String>{};
@@ -259,6 +276,8 @@ class EksService {
 
     return EksResult(
       jahr: jahr,
+      kundeId: kundeId,
+      isUnscoped: kundeId == null,
       sectionD: sectionD,
       sectionF: sectionF,
       b6_5: b65Str,
@@ -268,11 +287,24 @@ class EksService {
     );
   }
 
-  Future<List<Map<String, Object?>>> _fetchJournalRows() async {
+  Future<List<Map<String, Object?>>> _fetchJournalRows({int? kundeId}) async {
     try {
-      return await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
-    } catch (_) {
-      return <Map<String, Object?>>[];
+      if (kundeId == null) {
+        return await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
+      }
+      final List<Map<String, Object?>> journalColumns = await executor.runSelect(
+        'PRAGMA table_info(journal)',
+        const <Object?>[],
+      );
+      final bool hasJournalCustomer = journalColumns.any((Map<String, Object?> row) => row['name'] == 'kunde_id');
+      final String customerPredicate = hasJournalCustomer ? '(j.kunde_id = ? OR r.kunde_id = ?)' : 'r.kunde_id = ?';
+      final List<Object?> args = hasJournalCustomer ? <Object?>[kundeId, kundeId] : <Object?>[kundeId];
+      return await executor.runSelect(
+        'SELECT j.* FROM journal j LEFT JOIN rechnungen r ON r.id = j.rechnung_id WHERE $customerPredicate',
+        args,
+      );
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(EksException('Buchungen konnten für EKS nicht gelesen werden', error), stackTrace);
     }
   }
 

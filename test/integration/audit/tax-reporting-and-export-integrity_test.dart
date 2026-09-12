@@ -1,199 +1,233 @@
 // ignore_for_file: file_names
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/accounting/datev_entity.dart';
+import 'package:openaccounting/features/accounting/datev_service.dart';
+import 'package:openaccounting/features/accounting/euer_entity.dart';
+import 'package:openaccounting/features/accounting/euer_service.dart';
+import 'package:openaccounting/features/accounting/eks_entity.dart';
+import 'package:openaccounting/features/accounting/eks_service.dart';
+import 'package:openaccounting/features/accounting/ustva_entity.dart';
+import 'package:openaccounting/features/accounting/ustva_service.dart';
 
 void main() {
-  late AppDatabase db;
-
-  setUp(() async {
-    db = AppDatabase.createTestDatabase();
-    await db.ensureOpen();
-  });
-
-  tearDown(() async {
-    await db.close();
-  });
-
   group('Tax reporting and export integrity', () {
-    // ── Task 1: Expense is not turnover ──
+    late AppDatabase db;
 
-    test('test_tax_reporting_and_export_integrity_1_1_an_expense_is_not_turnover', () async {
-      // Insert a revenue journal row.
-      await db.executor.runInsert('INSERT INTO journal (datum, betrag, beschreibung, beleg_typ) VALUES (?, ?, ?, ?)', [
-        '2026-09-01',
-        119.00,
-        'Revenue',
-        'Einnahme',
-      ]);
-
-      // Insert an expense journal row.
-      await db.executor.runInsert('INSERT INTO journal (datum, betrag, beschreibung, beleg_typ) VALUES (?, ?, ?, ?)', [
-        '2026-09-01',
-        -50.00,
-        'Expense',
-        'Ausgabe',
-      ]);
-
-      // Query: only Einnahme rows should count as turnover.
-      final rows = await db.executor.runSelect(
-        "SELECT SUM(betrag) as total FROM journal WHERE beleg_typ = 'Einnahme' AND datum LIKE '2026-09%'",
-        [],
-      );
-      expect(rows.first['total'], 119.00, reason: 'Only revenue counts as turnover');
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      await _ensureColumn(db, 'journal', 'kunde_id', 'INTEGER');
+      await _ensureColumn(db, 'anlageverzeichnis', 'verkauft_am', 'TEXT');
     });
 
-    // ── Task 2: Zero-valued required keys are present ──
+    tearDown(() async {
+      await db.close();
+    });
 
-    test('test_tax_reporting_and_export_integrity_1_2_zero_valued_required_keys_are_present', () async {
-      // All required Kennzahlen keys must exist even if zero.
-      // This is a contract test — the UStVA result must include keys 1-22.
-      const requiredKeys = [
-        '1',
-        '2',
-        '3',
-        '4',
-        '5',
-        '6',
-        '7',
-        '8',
-        '9',
-        '10',
-        '11',
-        '12',
-        '13',
-        '14',
-        '15',
-        '16',
-        '17',
-        '18',
-        '19',
-        '20',
-        '21',
-        '22',
-      ];
+    test('UStVA uses journal direction and reports reverse charge on its net base', () async {
+      await _insertJournal(db, betrag: '119.00', datum: '2026-09-01', ustSatz: '19');
+      await _insertJournal(db, betrag: '200.00', datum: '2026-09-02', ustSatz: '19', belegTyp: 'Ausgabe');
+      await _insertJournal(db, betrag: '500.00', datum: '2026-09-03', ustSatz: '19', ustSonderfall: '13b_abs1');
 
-      // Without any journal rows, all keys should be '0.00'.
-      // This tests the contract — actual UStVA computation is in UstvaService.
-      final Map<String, String> kz = {};
-      for (final key in requiredKeys) {
-        kz[key] = '0.00';
+      final UstvaResult result = await UstvaService(db.executor)
+          .compute(jahr: 2026, monatOrQuartal: 9, rhythmus: 'monatlich');
+
+      expect(result.kz1, '119.00');
+      expect(result.kz3, '19.00');
+      expect(result.kz89, '500.00');
+      expect(result.kz93, '95.00');
+      expect(result.kz4, '0.00');
+    });
+
+    test('UStVA service returns every required Kennzahl, including zero values', () async {
+      final UstvaResult result = await UstvaService(db.executor)
+          .compute(jahr: 2026, monatOrQuartal: 9, rhythmus: 'monatlich');
+
+      for (int key = 1; key <= 22; key++) {
+        expect(result.kzValue('$key'), '0.00', reason: 'UStVA KZ $key must be present');
       }
-
-      expect(kz.keys, containsAll(requiredKeys));
-      expect(kz['1'], '0.00');
-      expect(kz['3'], '0.00');
-      expect(kz['4'], '0.00');
     });
 
-    // ── Task 3: Reverse charge uses the declared base ──
+    test('EÜR calculates profit from booking direction, independent of EÜR line number', () async {
+      await _insertKategorie(db, id: 801, euerZeile: 60, bezeichnung: 'Income on expense line');
+      await _insertKategorie(db, id: 802, euerZeile: 12, bezeichnung: 'Expense on income line');
+      await _insertJournal(db, kategorieId: 801, betrag: '200.00', datum: '2026-01-10');
+      await _insertJournal(db, kategorieId: 802, betrag: '80.00', datum: '2026-01-11', belegTyp: 'Ausgabe');
 
-    test('test_tax_reporting_and_export_integrity_1_3_reverse_charge_uses_the_declared_base', () async {
-      // Insert a reverse-charge journal row.
+      final EuerResult result = await EuerService(db.executor).generate(jahr: 2026);
+
+      expect(result.zeile(60), '200.00');
+      expect(result.zeile(12), '80.00');
+      expect(result.gewinn, '120.00');
+    });
+
+    test('EÜR prorates depreciation through the disposal month', () async {
       await db.executor.runInsert(
-        'INSERT INTO journal (datum, betrag, beschreibung, beleg_typ, ust_sonderfall) VALUES (?, ?, ?, ?, ?)',
-        ['2026-09-01', 500.00, 'RC Service', 'Einnahme', '13b_abs1'],
+        'INSERT INTO anlageverzeichnis '
+        '(bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status, verkauft_am) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['Disposed laptop', '2026-01-01', '1200.00', 3, '0', 'aktiv', '2026-06-15'],
       );
 
-      // Query: reverse charge rows should be identifiable.
-      final rows = await db.executor.runSelect(
-        "SELECT betrag, ust_sonderfall FROM journal WHERE ust_sonderfall = '13b_abs1'",
-        [],
-      );
-      expect(rows, hasLength(1));
-      expect(rows.first['betrag'], 500.00);
+      final EuerResult result = await EuerService(db.executor).generate(jahr: 2026);
+
+      expect(result.zeile(33), '200.00');
     });
 
-    // ── Task 4: Income and expense directions are respected ──
-
-    test('test_tax_reporting_and_export_integrity_2_1_income_and_expense_directions_are_respected', () async {
-      // Insert income and expense journal rows.
-      await db.executor.runInsert('INSERT INTO journal (datum, betrag, beschreibung, beleg_typ) VALUES (?, ?, ?, ?)', [
-        '2026-09-01',
-        200.00,
-        'Income',
-        'Einnahme',
-      ]);
-      await db.executor.runInsert('INSERT INTO journal (datum, betrag, beschreibung, beleg_typ) VALUES (?, ?, ?, ?)', [
-        '2026-09-01',
-        -80.00,
-        'Expense',
-        'Ausgabe',
-      ]);
-
-      // EÜR should separate income and expenses.
-      final income = await db.executor.runSelect(
-        "SELECT SUM(betrag) as total FROM journal WHERE beleg_typ = 'Einnahme' AND datum LIKE '2026-09%'",
-        [],
-      );
-      final expense = await db.executor.runSelect(
-        "SELECT SUM(betrag) as total FROM journal WHERE beleg_typ = 'Ausgabe' AND datum LIKE '2026-09%'",
-        [],
-      );
-      expect(income.first['total'], 200.00);
-      expect(expense.first['total'], -80.00);
-    });
-
-    // ── Task 5: Disposal stops AfA ──
-
-    test('test_tax_reporting_and_export_integrity_2_2_disposal_stops_afa', () async {
-      // A disposed asset should no longer generate AfA entries.
-      // This is a contract test — disposal logic is in the asset service.
-      expect(true, isTrue, reason: 'Disposal stopping AfA requires asset service integration test');
-    });
-
-    // ── Task 6: Default cutover is deterministic ──
-
-    test('test_tax_reporting_and_export_integrity_2_3_default_cutover_is_deterministic', () async {
-      // Cutover should produce the same result for the same input.
-      // This is a contract test — cutover logic is in the accounting service.
-      expect(true, isTrue, reason: 'Cutover determinism requires accounting service integration test');
-    });
-
-    // ── Task 7: Export is reopenable ──
-
-    test('test_tax_reporting_and_export_integrity_3_1_a_successful_export_is_reopenable', () async {
-      // A successful export should produce a file that can be reopened.
-      // This is a contract test — export logic is in the export service.
-      expect(true, isTrue, reason: 'Export reopenability requires export service integration test');
-    });
-
-    // ── Task 8: Export failure is truthful ──
-
-    test('test_tax_reporting_and_export_integrity_3_2_export_failure_is_truthful', () async {
-      // Export failure should produce a clear error message.
-      // This is a contract test — export error handling is in the export service.
-      expect(true, isTrue, reason: 'Export failure handling requires export service integration test');
-    });
-
-    // ── Task 9: EKS excludes another customer's bookings ──
-
-    test('test_tax_reporting_and_export_integrity_4_1_eks_excludes_another_customer_s_bookings', () async {
-      // Seed konten for FK constraints.
-      await db.executor.runInsert('INSERT INTO konten (id, name) VALUES (?, ?)', [1, 'Konto A']);
-      await db.executor.runInsert('INSERT INTO konten (id, name) VALUES (?, ?)', [2, 'Konto B']);
-
-      // Insert journal rows for two different customers.
+    test('EÜR uses the configured cutover deterministically', () async {
       await db.executor.runInsert(
-        'INSERT INTO journal (datum, betrag, beschreibung, beleg_typ, konto_id) VALUES (?, ?, ?, ?, ?)',
-        ['2026-09-01', 100.00, 'Customer A', 'Einnahme', 1],
+        'INSERT INTO vorsteuer_ansprueche (betrag, faelligkeit, status) VALUES (?, ?, ?)',
+        <Object?>['19.00', '2026-03-01', 'offen'],
       );
-      await db.executor.runInsert(
-        'INSERT INTO journal (datum, betrag, beschreibung, beleg_typ, konto_id) VALUES (?, ?, ?, ?, ?)',
-        ['2026-09-01', 200.00, 'Customer B', 'Einnahme', 2],
-      );
+      final EuerService service = EuerService(db.executor, defaultCutoverDatum: DateTime(2026));
 
-      // Query for Customer A only.
-      final rows = await db.executor.runSelect('SELECT SUM(betrag) as total FROM journal WHERE konto_id = 1', []);
-      expect(rows.first['total'], 100.00, reason: 'EKS must exclude other customers');
+      final EuerResult first = await service.generate(jahr: 2026);
+      final EuerResult second = await service.generate(jahr: 2026);
+
+      expect(first.vorsteuerBetrag, '19.00');
+      expect(second.vorsteuerBetrag, first.vorsteuerBetrag);
     });
 
-    // ── Task 10: Missing customer scope is explicit ──
+    test('DATEV writes a reopenable artifact and records its actual path', () async {
+      await _configureUnternehmen(db, berater: '123', mandant: '456', kontoBank: '1200');
+      await _insertKategorie(db, id: 901, euerZeile: null, skr03: '8400');
+      await _insertJournal(db, kategorieId: 901, betrag: '10.005', datum: '2026-04-01');
+      final Directory directory = await Directory.systemTemp.createTemp('openaccounting-tax-audit-');
+      addTearDown(() => directory.delete(recursive: true));
+      final String path = '${directory.path}/buchungsstapel.csv';
 
-    test('test_tax_reporting_and_export_integrity_4_2_missing_customer_scope_is_explicit', () async {
-      // Without a customer filter, EKS should return an error or empty result.
-      // This is a contract test — EKS service should enforce customer scope.
-      expect(true, isTrue, reason: 'Missing customer scope requires EKS service integration test');
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2026, destinationPath: path);
+      final File artifact = File(path);
+
+      expect(artifact.existsSync(), isTrue);
+      expect(await artifact.readAsString(), csv);
+      expect(csv, contains('10,01'));
+      final List<Map<String, Object?>> logs = await db.executor.runSelect(
+        'SELECT datei_pfad, status FROM datev_export_log ORDER BY id DESC LIMIT 1',
+        const <Object?>[],
+      );
+      expect(logs.single['datei_pfad'], path);
+      expect(logs.single['status'], 'erfolg');
+    });
+
+    test('DATEV reports an unavailable artifact destination without success history', () async {
+      await _configureUnternehmen(db, berater: '123', mandant: '456', kontoBank: '1200');
+      final int before = await _count(db, 'datev_export_log');
+      final String path = '${Directory.systemTemp.path}/missing-openaccounting-tax-audit/datev.csv';
+
+      await expectLater(
+        DatevService(db.executor).exportCsv(jahr: 2026, destinationPath: path),
+        throwsA(isA<DatevException>()),
+      );
+
+      expect(await _count(db, 'datev_export_log'), before);
+    });
+
+    test('EKS scopes journal rows to the requested customer and exposes all-customer mode', () async {
+      final int customerA = await _insertKunde(db, 'Customer A');
+      final int customerB = await _insertKunde(db, 'Customer B');
+      await _insertKategorie(db, id: 950, euerZeile: null, eksKategorie: 'F23');
+      await _insertJournal(db, kategorieId: 950, betrag: '100.00', datum: '2026-05-01', kundeId: customerA);
+      await _insertJournal(db, kategorieId: 950, betrag: '200.00', datum: '2026-05-02', kundeId: customerB);
+
+      final EksService service = EksService(db.executor);
+      final EksResult scoped = await service.generate(jahr: 2026, kundeId: customerA);
+      final EksResult unscoped = await service.generate(jahr: 2026);
+
+      expect(scoped.kundeId, customerA);
+      expect(scoped.isUnscoped, isFalse);
+      expect(scoped.page9.totalIncome, '100.00');
+      expect(unscoped.kundeId, isNull);
+      expect(unscoped.isUnscoped, isTrue);
+      expect(unscoped.page9.totalIncome, '300.00');
+      await expectLater(service.generate(jahr: 2026, kundeId: 999999), throwsA(isA<EksException>()));
     });
   });
+}
+
+Future<void> _ensureColumn(AppDatabase db, String table, String column, String definition) async {
+  final List<Map<String, Object?>> columns = await db.executor.runSelect(
+    'PRAGMA table_info($table)',
+    const <Object?>[],
+  );
+  if (!columns.any((Map<String, Object?> row) => row['name'] == column)) {
+    await db.executor.runCustom('ALTER TABLE $table ADD COLUMN $column $definition');
+  }
+}
+
+Future<void> _configureUnternehmen(
+  AppDatabase db, {
+  required String berater,
+  required String mandant,
+  required String kontoBank,
+}) async {
+  final List<Map<String, Object?>> rows = await db.executor.runSelect(
+    'SELECT id FROM unternehmen LIMIT 1',
+    const <Object?>[],
+  );
+  if (rows.isEmpty) {
+    await db.executor.runInsert(
+      'INSERT INTO unternehmen (name, datev_beraternummer, datev_mandantennummer, datev_konto_bank) VALUES (?, ?, ?, ?)',
+      <Object?>['Tax audit company', berater, mandant, kontoBank],
+    );
+  } else {
+    await db.executor.runUpdate(
+      'UPDATE unternehmen SET datev_beraternummer = ?, datev_mandantennummer = ?, datev_konto_bank = ? WHERE id = ?',
+      <Object?>[berater, mandant, kontoBank, rows.first['id']],
+    );
+  }
+}
+
+Future<int> _insertKunde(AppDatabase db, String name) {
+  return db.executor.runInsert('INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)', <Object?>[
+    name,
+    'Teststraße 1',
+    '10115',
+    'Berlin',
+  ]);
+}
+
+Future<void> _insertKategorie(
+  AppDatabase db, {
+  required int id,
+  required int? euerZeile,
+  String? eksKategorie,
+  String? skr03,
+  String bezeichnung = 'Tax audit category',
+}) async {
+  await db.executor.runInsert(
+    'INSERT OR REPLACE INTO kategorien '
+    '(id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, eks_kategorie) VALUES (?, ?, ?, ?, ?, 1, ?)',
+    <Object?>[id, bezeichnung, skr03 ?? '8400', skr03 ?? '8400', euerZeile, eksKategorie],
+  );
+}
+
+Future<void> _insertJournal(
+  AppDatabase db, {
+  required String betrag,
+  required String datum,
+  String belegTyp = 'Einnahme',
+  String? ustSatz,
+  String? ustSonderfall,
+  int? kategorieId,
+  int? kundeId,
+}) async {
+  await db.executor.runInsert(
+    'INSERT INTO journal '
+    '(datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable, ust_satz, ust_sonderfall, kunde_id) '
+    'VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)',
+    <Object?>[datum, 'Tax audit booking', kategorieId, betrag, belegTyp, ustSatz, ustSonderfall, kundeId],
+  );
+}
+
+Future<int> _count(AppDatabase db, String table) async {
+  final List<Map<String, Object?>> rows = await db.executor.runSelect(
+    'SELECT COUNT(*) AS count FROM $table',
+    const <Object?>[],
+  );
+  return (rows.single['count']! as num).toInt();
 }

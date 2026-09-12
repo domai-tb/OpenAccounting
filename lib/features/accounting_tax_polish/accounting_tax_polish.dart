@@ -17,6 +17,13 @@ class AccountingTaxPolishService {
   /// Validiert Eingabe — null wenn gültig, 'ungültig:...' wenn ungültig.
   String? validate(String? eingabe) {
     if (eingabe == null || eingabe.trim().isEmpty) return _kEmptyInput;
+    try {
+      // Use the same parser as the formatter so validation and execution
+      // cannot disagree about what is a numeric accounting value.
+      money.parseScaled(eingabe, scale: 2, field: 'amount', roundExcess: true);
+    } on money.MoneyParseException {
+      return _kNotANumber;
+    }
     return null;
   }
 
@@ -26,7 +33,7 @@ class AccountingTaxPolishService {
     if (raw.trim().isEmpty) return _kEmptyInput;
     try {
       return money.formatBetrag(raw);
-    } on FormatException {
+    } on money.MoneyParseException {
       return _kNotANumber;
     }
   }

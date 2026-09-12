@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/datev_entity.dart';
@@ -301,6 +303,53 @@ void main() {
       // header + colHeader only, no data
       expect(lines.length, 2);
       expect(lines.first.startsWith('EXTF'), isTrue);
+    });
+
+    test('writes a reopenable artifact and records the selected path', () async {
+      await upsertUnternehmen(berater: '123', mandant: '456', kontoBank: '1200');
+      await insertKategorie(id: 970, skr03: '8400');
+      await insertJournal(kategorieId: 970, betrag: '10.005', datum: '2025-10-01', bezeichnung: 'Rundung');
+      final Directory directory = await Directory.systemTemp.createTemp('openaccounting-datev-');
+      addTearDown(() => directory.delete(recursive: true));
+      final String path = '${directory.path}/buchungsstapel.csv';
+
+      final String csv = await service.exportCsv(jahr: 2025, destinationPath: path);
+
+      final File artifact = File(path);
+      expect(artifact.existsSync(), isTrue);
+      expect(await artifact.readAsString(), csv);
+      expect(csv, contains('10,01'));
+      final List<Map<String, Object?>> logs = await db.executor.runSelect(
+        'SELECT datei_pfad, status FROM datev_export_log ORDER BY id DESC LIMIT 1',
+        const <Object?>[],
+      );
+      expect(logs.single['datei_pfad'], path);
+      expect(logs.single['status'], 'erfolg');
+    });
+
+    test('unavailable artifact destination fails without success history', () async {
+      await upsertUnternehmen(berater: '123', mandant: '456', kontoBank: '1200');
+      final int before =
+          ((await db.executor.runSelect(
+                    'SELECT COUNT(*) AS count FROM datev_export_log',
+                    const <Object?>[],
+                  )).single['count']!
+                  as num)
+              .toInt();
+
+      await expectLater(
+        service.exportCsv(jahr: 2025, destinationPath: '${Directory.systemTemp.path}/does-not-exist/datev.csv'),
+        throwsA(isA<DatevException>()),
+      );
+
+      final int after =
+          ((await db.executor.runSelect(
+                    'SELECT COUNT(*) AS count FROM datev_export_log',
+                    const <Object?>[],
+                  )).single['count']!
+                  as num)
+              .toInt();
+      expect(after, before);
     });
   });
 }
