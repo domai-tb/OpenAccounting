@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_initializing_formals, avoid_redundant_argument_values
-import 'package:auto_updater/auto_updater.dart';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -37,7 +38,12 @@ abstract class ReleaseFetcher {
 /// Alias expected by VM test (`ReleasesBackend`).
 abstract class ReleasesBackend implements ReleaseFetcher {}
 
-/// VM-safe backend over GitHub Releases + auto_updater + Ed25519 stub.
+/// VM-safe backend over GitHub Releases + auto_updater.
+///
+/// Installation is deliberately unavailable until a reviewed signature
+/// verifier and updater hand-off are configured. Downloaded bytes are still
+/// written to a private temporary artifact so a future verifier can bind the
+/// exact bytes it checks to the install operation.
 abstract class UpdateBackend {
   Future<Map<String, dynamic>?> fetchLatestRelease();
 
@@ -58,20 +64,22 @@ class ReleaseFetcherAdapter implements UpdateBackend {
   Future<Map<String, dynamic>?> fetchLatestRelease() => fetcher.fetchLatestReleaseJson();
 
   @override
-  Future<void> download(String url, void Function(double) onProgress) async {}
+  Future<void> download(String url, void Function(double) onProgress) async {
+    throw UnsupportedError('Update download is unavailable until artifact storage is configured');
+  }
 
   @override
   Future<bool> verifySignature(String version, String signature) async {
-    if (signature.isEmpty) return false;
-    if (signature == 'valid') return true;
     return false;
   }
 
   @override
-  Future<void> installAndRestart() async {}
+  Future<void> installAndRestart() async {
+    throw UnsupportedError('Update installation is unavailable until signature verification is configured');
+  }
 }
 
-/// Real GitHub Releases backend — never throws, returns null/false on error.
+/// Real GitHub Releases backend.
 class GithubUpdateBackend implements UpdateBackend, ReleaseFetcher {
   GithubUpdateBackend({Dio? dio, String? latestUrl})
     : _dio = dio ?? Dio(),
@@ -79,6 +87,9 @@ class GithubUpdateBackend implements UpdateBackend, ReleaseFetcher {
 
   final Dio _dio;
   final String _latestUrl;
+  File? _downloadedArtifact;
+  String? _downloadedUrl;
+  String? _verifiedVersion;
 
   @override
   Future<Map<String, dynamic>?> fetchLatestReleaseJson() => fetchLatestRelease();
@@ -110,56 +121,52 @@ class GithubUpdateBackend implements UpdateBackend, ReleaseFetcher {
   @override
   Future<void> download(String url, void Function(double) onProgress) async {
     if (kIsWeb) {
-      return;
+      throw UnsupportedError('Desktop updates are unavailable on web');
     }
-    try {
-      await _dio.get<dynamic>(
-        url,
-        onReceiveProgress: (int count, int total) {
-          if (total > 0) {
-            onProgress(count / total);
-          }
-        },
-      );
-    } on DioException catch (_) {
-      return;
-    } on MissingPluginException catch (_) {
-      return;
-    } catch (_) {
-      return;
+    final Uri? uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      throw FormatException('Update artifact URL must use HTTPS', url);
     }
+    final Response<List<int>> response = await _dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes),
+      onReceiveProgress: (int count, int total) {
+        if (total > 0) {
+          onProgress(count / total);
+        }
+      },
+    );
+    final List<int>? bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Update artifact download returned no bytes');
+    }
+    final Directory directory = await Directory.systemTemp.createTemp('openaccounting-update-');
+    final File artifact = File('${directory.path}${Platform.pathSeparator}update-artifact');
+    await artifact.writeAsBytes(bytes, flush: true);
+    _downloadedArtifact = artifact;
+    _downloadedUrl = url;
+    _verifiedVersion = null;
   }
 
   @override
   Future<bool> verifySignature(String version, String signature) async {
-    try {
-      if (signature.isEmpty) {
-        return false;
-      }
-      // ponytail: stub until signing trust model documented — only 'valid' passes.
-      if (signature == 'valid') {
-        return true;
-      }
-      return false;
-    } catch (_) {
-      return false;
-    }
+    // No trust root is shipped yet. Never treat a marker string as a valid
+    // signature and never allow an unbound artifact to reach installation.
+    _verifiedVersion = null;
+    return false;
   }
 
   @override
   Future<void> installAndRestart() async {
     if (kIsWeb) {
-      return;
+      throw UnsupportedError('Desktop updates are unavailable on web');
     }
-    try {
-      await autoUpdater.checkForUpdates();
-    } on MissingPluginException catch (_) {
-      return;
-    } on PlatformException catch (_) {
-      return;
-    } catch (_) {
-      return;
+    if (_downloadedArtifact == null || _downloadedUrl == null || _verifiedVersion == null) {
+      throw StateError('No verified update artifact is ready for installation');
     }
+    // Keep this explicit until auto_updater accepts the exact verified file.
+    // Calling checkForUpdates here would install an unrelated remote release.
+    throw UnsupportedError('Update installation is unavailable until the verified artifact hand-off is configured');
   }
 }
 
@@ -168,13 +175,17 @@ class _NoopUpdateBackend implements UpdateBackend {
   Future<Map<String, dynamic>?> fetchLatestRelease() async => null;
 
   @override
-  Future<void> download(String url, void Function(double) onProgress) async {}
+  Future<void> download(String url, void Function(double) onProgress) async {
+    throw UnsupportedError('Update download is unavailable');
+  }
 
   @override
   Future<bool> verifySignature(String version, String signature) async => false;
 
   @override
-  Future<void> installAndRestart() async {}
+  Future<void> installAndRestart() async {
+    throw UnsupportedError('Update installation is unavailable');
+  }
 }
 
 /// Contract expected by test's `DesktopUpdaterService` (hide import).
@@ -210,6 +221,8 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
   final bool _enabled;
   final DateTime Function()? _clock;
   DateTime? _nextCheck;
+  UpdateInfo? _downloadedInfo;
+  UpdateInfo? _verifiedInfo;
 
   @override
   bool get isEnabled => _enabled;
@@ -242,8 +255,10 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
       if (!_isNewer(_currentVersion, tag)) {
         return null;
       }
-      final String url =
-          (json['url'] as String?) ?? (json['browser_download_url'] as String?) ?? 'https://example.com/app.zip';
+      final String? url = _artifactUrl(json);
+      if (url == null) {
+        return null;
+      }
       final String? sig = json['signature'] as String?;
       return UpdateInfo(version: tag, url: url, signature: sig);
     } on DioException catch (_) {
@@ -257,15 +272,39 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
 
   @override
   Future<void> downloadUpdate(UpdateInfo info, void Function(double) onProgress) async {
-    await _backend.download(info.url, onProgress);
-    final bool ok = await verifySignature(info);
-    if (!ok) {
-      throw StateError('Update-Signatur ungültig');
+    _downloadedInfo = null;
+    _verifiedInfo = null;
+    final Uri? uri = Uri.tryParse(info.url);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      throw StateError('Update-Artefakt hat keine sichere HTTPS-Adresse');
+    }
+    try {
+      await _backend.download(info.url, onProgress);
+      _downloadedInfo = info;
+      final bool ok = await verifySignature(info);
+      if (!ok) {
+        _downloadedInfo = null;
+        throw StateError('Update-Signatur ungültig oder nicht verifizierbar');
+      }
+      _verifiedInfo = info;
+    } catch (_) {
+      _downloadedInfo = null;
+      _verifiedInfo = null;
+      rethrow;
     }
   }
 
   @override
   Future<bool> verifySignature(UpdateInfo info) async {
+    final UpdateInfo? downloaded = _downloadedInfo;
+    if (downloaded == null ||
+        downloaded.version != info.version ||
+        downloaded.url != info.url ||
+        downloaded.signature != info.signature ||
+        info.signature == null ||
+        info.signature!.trim().isEmpty) {
+      return false;
+    }
     try {
       return await _backend.verifySignature(info.version, info.signature ?? '');
     } on MissingPluginException catch (_) {
@@ -277,13 +316,10 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
 
   @override
   Future<void> installAndRestart() async {
-    try {
-      await _backend.installAndRestart();
-    } on MissingPluginException catch (_) {
-      return;
-    } catch (_) {
-      return;
+    if (_verifiedInfo == null) {
+      throw StateError('Kein verifiziertes Update zur Installation vorhanden');
     }
+    await _backend.installAndRestart();
   }
 
   @override
@@ -291,6 +327,23 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
     final DateTime now = _clock != null ? _clock.call() : DateTime.now();
     _nextCheck = now.add(const Duration(hours: 4));
   }
+}
+
+String? _artifactUrl(Map<String, dynamic> json) {
+  final dynamic direct = json['browser_download_url'] ?? json['url'];
+  if (direct is String && direct.trim().isNotEmpty) {
+    return direct.trim();
+  }
+  final dynamic assets = json['assets'];
+  if (assets is List) {
+    for (final dynamic asset in assets) {
+      if (asset is Map && asset['browser_download_url'] is String) {
+        final String url = (asset['browser_download_url'] as String).trim();
+        if (url.isNotEmpty) return url;
+      }
+    }
+  }
+  return null;
 }
 
 /// Factory returning disabled impl per spec MAY deferral.
