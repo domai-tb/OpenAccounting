@@ -73,9 +73,8 @@ void main() {
       await pm.createProfile('ProfileA');
       await pm.createProfile('ProfileB');
 
-      // Initially, getActiveProfile falls back to first alphabetically.
-      final initial = await pm.getActiveProfile();
-      expect(initial, 'ProfileA', reason: 'Initial active must be first profile');
+      // Multiple profiles without a durable pointer require an explicit choice.
+      await expectLater(pm.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
 
       // Switch to ProfileB.
       final restartRequired = await pm.setActiveProfile('ProfileB');
@@ -93,7 +92,7 @@ void main() {
     // ── Task 4: Corrupt or unavailable profile is recoverable ──
 
     test('test_profile_workspace_lifecycle_2_2_corrupt_or_unavailable_profile_is_recoverable', () async {
-      // Corrupted profile.json must not crash — fallback to first available.
+      // Corrupted profile.json must not silently select another company.
       await pm.createProfile('ProfileA');
       await pm.createProfile('ProfileB');
       await pm.setActiveProfile('ProfileA');
@@ -102,31 +101,15 @@ void main() {
       final jsonFile = File(pm.profileJsonPath);
       await jsonFile.writeAsString('{broken json!!!');
 
-      // getActiveProfile must fallback to first available profile.
-      final recovered = await pm.getActiveProfile();
-      expect(
-        recovered,
-        anyOf(equals('ProfileA'), equals('ProfileB')),
-        reason: 'Corrupted profile.json must fallback to available profile',
-      );
+      await expectLater(pm.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
 
-      // Missing profile.json — fallback to first available.
+      // Missing profile.json — explicit selection is still required.
       await jsonFile.delete();
-      final recovered2 = await pm.getActiveProfile();
-      expect(
-        recovered2,
-        anyOf(equals('ProfileA'), equals('ProfileB')),
-        reason: 'Missing profile.json must fallback to available profile',
-      );
+      await expectLater(pm.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
 
-      // Non-existent active profile directory — fallback.
+      // Non-existent active profile directory — explicit selection is required.
       await jsonFile.writeAsString('{"active": "NonExistent"}');
-      final recovered3 = await pm.getActiveProfile();
-      expect(
-        recovered3,
-        anyOf(equals('ProfileA'), equals('ProfileB')),
-        reason: 'Non-existent active profile directory must fallback',
-      );
+      await expectLater(pm.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
     });
   });
 }

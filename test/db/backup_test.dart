@@ -58,23 +58,50 @@ void main() {
     });
 
     test('encrypted backups store a versioned salt and IV header', () async {
-      final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        externalTargetApproved: true,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
 
-      final firstPath = await service.createEncryptedBackup('${externalDirectory.path}/external-a', 'secret');
-      final secondPath = await service.createEncryptedBackup('${externalDirectory.path}/external-b', 'secret');
+      final firstPath = await service.createEncryptedBackup('${externalDirectory.path}/external-a', 'correct-horse');
+      final secondPath = await service.createEncryptedBackup('${externalDirectory.path}/external-b', 'correct-horse');
       final first = await File(firstPath).readAsBytes();
       final second = await File(secondPath).readAsBytes();
 
       expect(first.take(8).toList(), <int>[79, 65, 66, 75, 48, 48, 48, 49]);
       expect(first.length, greaterThan(40));
       expect(first.sublist(8, 24), isNot(equals(second.sublist(8, 24))));
+      final localSnapshots = await Directory(service.backupDir)
+          .list()
+          .where((entry) => entry is File && entry.path.endsWith('.db'))
+          .toList();
+      expect(localSnapshots, isEmpty, reason: 'Encrypted export must not retain a plaintext staging snapshot');
+    });
+
+    test('rejects short encrypted-backup passphrases', () async {
+      final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
+
+      await expectLater(
+        service.createEncryptedBackup('${externalDirectory.path}/external', 'too-short'),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('restores a local backup atomically', () async {
       await database.executor.runCustom(
         "INSERT INTO rechnungen (rechnungsnummer, typ, datum) VALUES ('RE-ORIGINAL', 'rechnung', '2026-01-01')",
       );
-      final service = BackupService(profileDir: profileDirectory.path);
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
       final backupPath = await service.createLocalBackup();
       final backup = sqlite3.open(backupPath, mode: OpenMode.readOnly);
       expect(backup.select('SELECT rechnungsnummer FROM rechnungen').single['rechnungsnummer'], 'RE-ORIGINAL');
@@ -98,12 +125,19 @@ void main() {
       await database.executor.runCustom(
         "INSERT INTO rechnungen (rechnungsnummer, typ, datum) VALUES ('RE-ORIGINAL', 'rechnung', '2026-01-01')",
       );
-      final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
-      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'secret');
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        externalTargetApproved: true,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
+      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'correct-horse');
       await database.executor.runCustom("UPDATE rechnungen SET rechnungsnummer = 'RE-CHANGED' WHERE id = 1");
 
       await expectLater(
-        service.restoreEncrypted(encryptedPath, 'wrong', p.join(profileDirectory.path, 'openinvoices.db')),
+        service.restoreEncrypted(encryptedPath, 'wrong-passphrase', p.join(profileDirectory.path, 'openinvoices.db')),
         throwsA(isA<StateError>()),
       );
 
@@ -120,13 +154,20 @@ void main() {
       await database.executor.runCustom(
         "INSERT INTO rechnungen (rechnungsnummer, typ, datum) VALUES ('RE-ORIGINAL', 'rechnung', '2026-01-01')",
       );
-      final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
-      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'secret');
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        externalTargetApproved: true,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
+      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'correct-horse');
       await database.executor.runCustom("UPDATE rechnungen SET rechnungsnummer = 'RE-CHANGED' WHERE id = 1");
       final activeDbPath = p.join(profileDirectory.path, 'openinvoices.db');
       expect(File('$activeDbPath-wal').existsSync(), isTrue, reason: 'diagnostic: expected active WAL before close');
       await database.close();
-      await service.restoreEncrypted(encryptedPath, 'secret', activeDbPath);
+      await service.restoreEncrypted(encryptedPath, 'correct-horse', activeDbPath);
 
       final restored = sqlite3.open(p.join(profileDirectory.path, 'openinvoices.db'), mode: OpenMode.readOnly);
       try {
@@ -138,7 +179,13 @@ void main() {
     });
 
     test('persists last backup time for scheduled backup checks', () async {
-      final service = BackupService(profileDir: profileDirectory.path);
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
 
       expect(await service.isScheduledDue(), isTrue);
       await service.createLocalBackup();
@@ -175,14 +222,14 @@ void main() {
     test('rejects system-drive encrypted backup without explicit override', () async {
       final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
 
-      await expectLater(service.createEncryptedBackup('/', 'secret'), throwsA(isA<StateError>()));
+      await expectLater(service.createEncryptedBackup('/', 'correct-horse'), throwsA(isA<StateError>()));
     });
 
     test('requires explicit approval for external backup targets', () async {
       final service = BackupService(profileDir: profileDirectory.path);
 
       await expectLater(
-        service.createEncryptedBackup('${profileDirectory.path}/external', 'secret'),
+        service.createEncryptedBackup('${profileDirectory.path}/external', 'correct-horse'),
         throwsA(isA<StateError>()),
       );
       await expectLater(service.createSmbBackup('smb://server/share', 'user', 'password'), throwsA(isA<StateError>()));
@@ -192,7 +239,7 @@ void main() {
       final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
 
       await expectLater(
-        service.createEncryptedBackup(p.join(profileDirectory.path, 'inside'), 'secret'),
+        service.createEncryptedBackup(p.join(profileDirectory.path, 'inside'), 'correct-horse'),
         throwsA(isA<StateError>()),
       );
     });
@@ -201,14 +248,21 @@ void main() {
       await database.executor.runCustom(
         "INSERT INTO rechnungen (rechnungsnummer, typ, datum) VALUES ('RE-ORIGINAL', 'rechnung', '2026-01-01')",
       );
-      final service = BackupService(profileDir: profileDirectory.path, externalTargetApproved: true);
-      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'secret');
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        externalTargetApproved: true,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
+      final encryptedPath = await service.createEncryptedBackup('${externalDirectory.path}/external', 'correct-horse');
       final corrupted = await File(encryptedPath).readAsBytes();
       corrupted[corrupted.length - 1] ^= 1;
       await File(encryptedPath).writeAsBytes(corrupted, flush: true);
 
       await expectLater(
-        service.restoreEncrypted(encryptedPath, 'secret', p.join(profileDirectory.path, 'openinvoices.db')),
+        service.restoreEncrypted(encryptedPath, 'correct-horse', p.join(profileDirectory.path, 'openinvoices.db')),
         throwsA(isA<StateError>()),
       );
       final active = sqlite3.open(p.join(profileDirectory.path, 'openinvoices.db'), mode: OpenMode.readOnly);
@@ -223,7 +277,13 @@ void main() {
       await database.executor.runCustom(
         "INSERT INTO rechnungen (rechnungsnummer, typ, datum) VALUES ('RE-ORIGINAL', 'rechnung', '2026-01-01')",
       );
-      final service = BackupService(profileDir: profileDirectory.path);
+      final service = BackupService(
+        profileDir: profileDirectory.path,
+        restoreReadinessCheck: () async {
+          if (database.isOpen) await database.close();
+          return true;
+        },
+      );
       final activeDbPath = p.join(profileDirectory.path, 'openinvoices.db');
 
       await expectLater(

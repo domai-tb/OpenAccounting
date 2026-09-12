@@ -158,6 +158,29 @@ void main() {
       expect(resp.statusCode, 200);
       expect(call, 3);
     });
+
+    test('does not replay a POST without an idempotency key', () async {
+      final dio = Dio();
+      final client = DioClient(dio: dio);
+      final adapter = FakeAdapter(<dynamic>[500, 200]);
+      dio.httpClientAdapter = adapter;
+
+      await expectLater(client.dio.post<dynamic>('http://localhost/test'), throwsA(isA<DioException>()));
+      expect(adapter.callCount, 1);
+    });
+
+    test('rejects an endpoint outside the trusted host allowlist', () async {
+      final dio = Dio();
+      final client = DioClient(dio: dio);
+      final adapter = FakeAdapter(<dynamic>[200]);
+      dio.httpClientAdapter = adapter;
+
+      await expectLater(
+        client.dio.get<dynamic>('https://example.com/test'),
+        throwsA(isA<DioException>().having((error) => error.message, 'message', contains('nicht freigegeben'))),
+      );
+      expect(adapter.callCount, 0);
+    });
   });
 
   group('422 detail parsing', () {

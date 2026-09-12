@@ -41,7 +41,7 @@ class AppDatabase {
   late final KundenRepository _kundenRepository = KundenRepository(_executor);
   late final LieferantenRepository _lieferantenRepository = LieferantenRepository(_executor);
   late final ArtikelRepository _artikelRepository = ArtikelRepository(_executor);
-  late final UnternehmenRepository _unternehmenRepository = UnternehmenRepository(_executor);
+  late final UnternehmenRepository _unternehmenRepository = UnternehmenRepository(_executor, profileDir: profileDir);
   late final KategorienRepository _kategorienRepository = KategorienRepository(_executor);
 
   static const int currentVersion = MigrationRunner.currentVersion;
@@ -136,7 +136,11 @@ class AppDatabase {
     try {
       await _executor.runCustom('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch (_) {}
-    final runner = MigrationRunner(executor: _executor, profileDir: profileDir ?? resolveDefaultBaseDir());
+    final runner = MigrationRunner(
+      executor: _executor,
+      profileDir: profileDir ?? resolveDefaultBaseDir(),
+      requiredTables: allTableNames,
+    );
     await runner.run(createSchema: _createAllTables);
     // Ensure triggers and seed idempotent even when no migration
     await GobdTriggers.install(_executor);
@@ -154,70 +158,58 @@ class AppDatabase {
       const <Object?>[],
     );
     final bool hadPersistedCount = bankImportColumns.any((row) => row['name'] == 'anzahl_importiert');
-    for (final String sql in <String>[
-      'ALTER TABLE bank_imports ADD COLUMN duplikate INTEGER DEFAULT 0',
-      'ALTER TABLE bank_imports ADD COLUMN template_typ TEXT',
-      'ALTER TABLE bank_imports ADD COLUMN anzahl_importiert INTEGER NOT NULL DEFAULT 0',
-      'ALTER TABLE bank_imports ADD COLUMN anzahl_auto_kategorisiert INTEGER NOT NULL DEFAULT 0',
-      'ALTER TABLE bank_imports ADD COLUMN anzahl_manuelle_pruefung INTEGER NOT NULL DEFAULT 0',
-      'ALTER TABLE bank_imports ADD COLUMN anzahl_fehlgeschlagen INTEGER NOT NULL DEFAULT 0',
-      'ALTER TABLE bank_imports ADD COLUMN fehler_details TEXT',
-    ]) {
-      try {
-        await _executor.runCustom(sql);
-      } catch (_) {}
+    for (final entry in <String, String>{
+      'duplikate': 'INTEGER DEFAULT 0',
+      'template_typ': 'TEXT',
+      'anzahl_importiert': 'INTEGER NOT NULL DEFAULT 0',
+      'anzahl_auto_kategorisiert': 'INTEGER NOT NULL DEFAULT 0',
+      'anzahl_manuelle_pruefung': 'INTEGER NOT NULL DEFAULT 0',
+      'anzahl_fehlgeschlagen': 'INTEGER NOT NULL DEFAULT 0',
+      'fehler_details': 'TEXT',
+    }.entries) {
+      await _addColumnIfMissing('bank_imports', entry.key, entry.value);
     }
     // Before these fields existed, anzahl_transaktionen was the persisted-row count written by the service.
     // Preserve that historical meaning for upgraded databases without changing the legacy column.
     if (!hadPersistedCount) {
-      try {
-        await _executor.runCustom(
-          'UPDATE bank_imports SET anzahl_importiert = anzahl_transaktionen '
-          'WHERE anzahl_importiert = 0 AND anzahl_transaktionen > 0',
-        );
-      } catch (_) {}
+      await _executor.runCustom(
+        'UPDATE bank_imports SET anzahl_importiert = anzahl_transaktionen '
+        'WHERE anzahl_importiert = 0 AND anzahl_transaktionen > 0',
+      );
     }
-    try {
-      await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN dashboard_config TEXT');
-    } catch (_) {}
-    for (final col in <String>[
-      'einleitungstext_rechnung TEXT',
-      'schlusstext_rechnung TEXT',
-      'einleitungstext_angebot TEXT',
-      'schlusstext_angebot TEXT',
-      'einleitungstext_auftrag TEXT',
-      'schlusstext_auftrag TEXT',
-      'einleitungstext_proforma TEXT',
-      'schlusstext_proforma TEXT',
-      'einleitungstext_lieferschein TEXT',
-      'schlusstext_lieferschein TEXT',
-      'einleitungstext_gutschrift TEXT',
-      'schlusstext_gutschrift TEXT',
-      'einleitungstext_storno TEXT',
-      'schlusstext_storno TEXT',
-    ]) {
-      try {
-        await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN $col');
-      } catch (_) {}
+    await _addColumnIfMissing('unternehmen', 'dashboard_config', 'TEXT');
+    for (final entry in <String, String>{
+      'einleitungstext_rechnung': 'TEXT',
+      'schlusstext_rechnung': 'TEXT',
+      'einleitungstext_angebot': 'TEXT',
+      'schlusstext_angebot': 'TEXT',
+      'einleitungstext_auftrag': 'TEXT',
+      'schlusstext_auftrag': 'TEXT',
+      'einleitungstext_proforma': 'TEXT',
+      'schlusstext_proforma': 'TEXT',
+      'einleitungstext_lieferschein': 'TEXT',
+      'schlusstext_lieferschein': 'TEXT',
+      'einleitungstext_gutschrift': 'TEXT',
+      'schlusstext_gutschrift': 'TEXT',
+      'einleitungstext_storno': 'TEXT',
+      'schlusstext_storno': 'TEXT',
+    }.entries) {
+      await _addColumnIfMissing('unternehmen', entry.key, entry.value);
     }
-    try {
-      await _executor.runCustom('ALTER TABLE unternehmen ADD COLUMN lagerfuehrung_aktiv INTEGER DEFAULT 0');
-    } catch (_) {}
+    await _addColumnIfMissing('unternehmen', 'lagerfuehrung_aktiv', 'INTEGER DEFAULT 0');
     // recurring: rechnungsvorlagen status/auftrag_id, buchungsvorlagen intervall etc., vorlage_id links
-    for (final String sql in <String>[
-      "ALTER TABLE rechnungsvorlagen ADD COLUMN status TEXT DEFAULT 'aktiv'",
-      'ALTER TABLE rechnungsvorlagen ADD COLUMN auftrag_id INTEGER REFERENCES rechnungen(id)',
-      'ALTER TABLE buchungsvorlagen ADD COLUMN intervall TEXT',
-      'ALTER TABLE buchungsvorlagen ADD COLUMN naechste_faelligkeit TEXT',
-      'ALTER TABLE buchungsvorlagen ADD COLUMN art TEXT',
-      'ALTER TABLE buchungsvorlagen ADD COLUMN lieferant_id INTEGER REFERENCES lieferanten(id)',
-      "ALTER TABLE buchungsvorlagen ADD COLUMN status TEXT DEFAULT 'aktiv'",
-      'ALTER TABLE rechnungen ADD COLUMN vorlage_id INTEGER REFERENCES rechnungsvorlagen(id)',
-      'ALTER TABLE journal ADD COLUMN vorlage_id INTEGER REFERENCES buchungsvorlagen(id)',
-    ]) {
-      try {
-        await _executor.runCustom(sql);
-      } catch (_) {}
+    for (final entry in <String, ({String table, String definition})>{
+      'rechnungsvorlagen.status': (table: 'rechnungsvorlagen', definition: "TEXT DEFAULT 'aktiv'"),
+      'rechnungsvorlagen.auftrag_id': (table: 'rechnungsvorlagen', definition: 'INTEGER REFERENCES rechnungen(id)'),
+      'buchungsvorlagen.intervall': (table: 'buchungsvorlagen', definition: 'TEXT'),
+      'buchungsvorlagen.naechste_faelligkeit': (table: 'buchungsvorlagen', definition: 'TEXT'),
+      'buchungsvorlagen.art': (table: 'buchungsvorlagen', definition: 'TEXT'),
+      'buchungsvorlagen.lieferant_id': (table: 'buchungsvorlagen', definition: 'INTEGER REFERENCES lieferanten(id)'),
+      'buchungsvorlagen.status': (table: 'buchungsvorlagen', definition: "TEXT DEFAULT 'aktiv'"),
+      'rechnungen.vorlage_id': (table: 'rechnungen', definition: 'INTEGER REFERENCES rechnungsvorlagen(id)'),
+      'journal.vorlage_id': (table: 'journal', definition: 'INTEGER REFERENCES buchungsvorlagen(id)'),
+    }.entries) {
+      await _addColumnIfMissing(entry.value.table, entry.key.split('.').last, entry.value.definition);
     }
     // Ensure user_version set for fresh memory DB where runner may have skipped (hasTables false path sets version)
     final v = await runner.getUserVersion();
@@ -234,6 +226,16 @@ class AppDatabase {
     }
     for (final sql in _indexSql) {
       await _executor.runCustom(sql);
+    }
+  }
+
+  Future<void> _addColumnIfMissing(String table, String name, String definition) async {
+    final columns = await _executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (columns.any((column) => column['name'] == name)) return;
+    await _executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
+    final verified = await _executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (!verified.any((column) => column['name'] == name)) {
+      throw StateError('Datenbank konnte Spalte $table.$name nicht verifizieren');
     }
   }
 

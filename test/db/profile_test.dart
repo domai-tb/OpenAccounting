@@ -86,19 +86,19 @@ void main() {
       await manager.createProfile('Geschäft');
       await manager.createProfile('Privat');
 
-      expect(await manager.setActiveProfile('Geschäft'), isFalse);
+      expect(await manager.setActiveProfile('Geschäft'), isTrue);
       expect(await manager.setActiveProfile('Privat'), isTrue);
       expect(await manager.getActiveProfile(), 'Privat');
       expect(await File(manager.profileJsonPath).readAsString(), jsonEncode(<String, String>{'active': 'Privat'}));
       expect(await manager.setActiveProfile('Privat'), isFalse);
     });
 
-    test('falls back to first profile when profile pointer is corrupted', () async {
+    test('requires explicit selection when profile pointer is corrupted', () async {
       await manager.createProfile('Büro');
       await manager.createProfile('Privat');
       await File(manager.profileJsonPath).writeAsString('{invalid');
 
-      expect(await manager.getActiveProfile(), 'Büro');
+      await expectLater(manager.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
     });
 
     test('rejects paths outside active profile data directory', () async {

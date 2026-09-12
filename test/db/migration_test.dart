@@ -38,6 +38,20 @@ void main() {
       expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
     });
 
+    test('rejects a current-version database with a missing required table', () async {
+      await db.executor.runCustom('DROP TABLE inventarbewegungen');
+      final runner = MigrationRunner(
+        executor: db.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+
+      await expectLater(
+        runner.run(createSchema: () async {}),
+        throwsA(isA<StateError>().having((error) => error.message, 'message', contains('inventarbewegungen'))),
+      );
+    });
+
     test('rolls back schema changes when migration fails', () async {
       final runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       await runner.setUserVersion(MigrationRunner.currentVersion - 1);

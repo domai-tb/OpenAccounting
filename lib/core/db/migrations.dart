@@ -5,10 +5,11 @@ import 'package:openaccounting/core/db/backup_service.dart';
 /// Migration runner per spec §Schema Versioning + §Migration System.
 /// Handles PRAGMA user_version, backup-before-migrate, post-hooks.
 class MigrationRunner {
-  MigrationRunner({required this.executor, required this.profileDir});
+  MigrationRunner({required this.executor, required this.profileDir, this.requiredTables = const <String>[]});
 
   final QueryExecutor executor;
   final String profileDir;
+  final List<String> requiredTables;
 
   static const int currentVersion = 7;
 
@@ -42,6 +43,7 @@ class MigrationRunner {
     final hasTables = await hasAnyTables();
 
     if (version == currentVersion && hasTables) {
+      await _verifyRequiredTables();
       return false;
     }
 
@@ -86,6 +88,7 @@ class MigrationRunner {
             await _migrateTo(v, createSchema);
           }
           await _postHooks();
+          await _verifyRequiredTables();
           await setUserVersion(currentVersion);
           await executor.runCustom('COMMIT');
           return true;
@@ -116,6 +119,7 @@ class MigrationRunner {
     await executor.runCustom('BEGIN');
     try {
       await createSchema();
+      await _verifyRequiredTables();
       await setUserVersion(currentVersion);
       await executor.runCustom('COMMIT');
     } catch (error, stackTrace) {
@@ -209,13 +213,7 @@ class MigrationRunner {
     for (final String col in jAdds) {
       final String name = col.split(' ').first;
       if (!jNames.contains(name)) {
-        try {
-          await executor.runCustom('ALTER TABLE journal ADD COLUMN $col');
-        } catch (_) {
-          try {
-            await executor.runCustom('ALTER TABLE journal ADD COLUMN IF NOT EXISTS $col');
-          } catch (_) {}
-        }
+        await _addColumnIfMissing('journal', name, col.substring(name.length).trim());
       }
     }
     final List<Map<String, Object?>> vCols = await executor.runSelect(
@@ -224,13 +222,7 @@ class MigrationRunner {
     );
     final Set<String> vNames = <String>{for (final Map<String, Object?> r in vCols) r['name'].toString()};
     if (!vNames.contains('ust_sonderfall')) {
-      try {
-        await executor.runCustom('ALTER TABLE vorsteuer_ansprueche ADD COLUMN ust_sonderfall TEXT');
-      } catch (_) {
-        try {
-          await executor.runCustom('ALTER TABLE vorsteuer_ansprueche ADD COLUMN IF NOT EXISTS ust_sonderfall TEXT');
-        } catch (_) {}
-      }
+      await _addColumnIfMissing('vorsteuer_ansprueche', 'ust_sonderfall', 'TEXT');
     }
   }
 
@@ -238,10 +230,10 @@ class MigrationRunner {
     final columns = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
     final names = <String>{for (final column in columns) column['name'].toString()};
     if (!names.contains('absender_snapshot')) {
-      await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN absender_snapshot TEXT');
+      await _addColumnIfMissing('rechnungen', 'absender_snapshot', 'TEXT');
     }
     if (!names.contains('ausgegeben_am')) {
-      await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN ausgegeben_am TEXT');
+      await _addColumnIfMissing('rechnungen', 'ausgegeben_am', 'TEXT');
     }
   }
 
@@ -257,27 +249,13 @@ class MigrationRunner {
     };
     for (final e in mAdds.entries) {
       if (!mNames.contains(e.key)) {
-        try {
-          await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN ${e.key} ${e.value}');
-        } catch (_) {
-          try {
-            await executor.runCustom('ALTER TABLE mahnungen ADD COLUMN IF NOT EXISTS ${e.key} ${e.value}');
-          } catch (_) {}
-        }
+        await _addColumnIfMissing('mahnungen', e.key, e.value);
       }
     }
     final rCols = await executor.runSelect('PRAGMA table_info(rechnungen)', const <Object?>[]);
     final rNames = <String>{for (final r in rCols) r['name'].toString()};
     if (!rNames.contains('mahnstufe_aktuell')) {
-      try {
-        await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN mahnstufe_aktuell INTEGER DEFAULT 0');
-      } catch (_) {
-        try {
-          await executor.runCustom(
-            'ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS mahnstufe_aktuell INTEGER DEFAULT 0',
-          );
-        } catch (_) {}
-      }
+      await _addColumnIfMissing('rechnungen', 'mahnstufe_aktuell', 'INTEGER DEFAULT 0');
     }
   }
 
@@ -303,6 +281,12 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
   Future<void> _rebuildRechnungen() async {
     await executor.runCustom('ALTER TABLE rechnungen RENAME TO rechnungen_v1');
     await executor.runCustom(_rechnungenTableSql);
+    final oldColumns = await executor.runSelect('PRAGMA table_info(rechnungen_v1)', const <Object?>[]);
+    final oldNames = <String>{for (final column in oldColumns) column['name'].toString()};
+    String expression(String name, [String fallback = 'NULL']) => oldNames.contains(name) ? '"$name"' : fallback;
+    if (!oldNames.contains('id') || !oldNames.contains('typ') || !oldNames.contains('datum')) {
+      throw StateError('Rechnungen-Migration benötigt mindestens id, typ und datum');
+    }
     await executor.runCustom('''
 INSERT INTO rechnungen (
   id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, faelligkeit,
@@ -311,13 +295,14 @@ INSERT INTO rechnungen (
   absender_snapshot, ausgegeben_am, mahnstufe_aktuell
 )
 SELECT
-  id, rechnungsnummer, typ, status,
-  CASE WHEN status = 'entwurf' THEN 1 ELSE 0 END,
+  ${expression('id')}, ${expression('rechnungsnummer')}, ${expression('typ')}, ${expression('status', "'entwurf'")},
+  CASE WHEN ${expression('status', "'entwurf'")} = 'entwurf' THEN 1 ELSE 0 END,
   'netto',
-  kunde_id, lieferant_id, datum, faelligkeit,
-  netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
-  notiz, unternehmen_id, nummernkreis_id, storno_von,
-  absender_snapshot, ausgegeben_am, mahnstufe_aktuell
+  ${expression('kunde_id')}, ${expression('lieferant_id')}, ${expression('datum')}, ${expression('faelligkeit')},
+  ${expression('netto_betrag', '0')}, ${expression('brutto_betrag', '0')}, ${expression('ust_betrag', '0')},
+  ${expression('skonto_prozent', '0')}, ${expression('skonto_faelligkeit')}, ${expression('notiz')},
+  ${expression('unternehmen_id')}, ${expression('nummernkreis_id')}, ${expression('storno_von')},
+  ${expression('absender_snapshot')}, ${expression('ausgegeben_am')}, ${expression('mahnstufe_aktuell', '0')}
 FROM rechnungen_v1
 ''');
     await executor.runCustom('DROP TABLE rechnungen_v1');
@@ -333,9 +318,32 @@ FROM rechnungen_v1
       }
     }
     if (!hasGruppeId) {
-      await executor.runCustom('ALTER TABLE journal ADD COLUMN gruppe_id INTEGER REFERENCES journal(id)');
+      await _addColumnIfMissing('journal', 'gruppe_id', 'INTEGER REFERENCES journal(id)');
     }
     await executor.runCustom('UPDATE journal SET gruppe_id = id WHERE gruppe_id IS NULL');
+  }
+
+  Future<void> _addColumnIfMissing(String table, String name, String definition) async {
+    final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (columns.any((column) => column['name'] == name)) return;
+    await executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
+    final verified = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (!verified.any((column) => column['name'] == name)) {
+      throw StateError('Migration konnte Spalte $table.$name nicht verifizieren');
+    }
+  }
+
+  Future<void> _verifyRequiredTables() async {
+    if (requiredTables.isEmpty) return;
+    final rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+      const <Object?>[],
+    );
+    final actual = <String>{for (final row in rows) row['name'].toString()};
+    final missing = requiredTables.where((table) => !actual.contains(table)).toList(growable: false);
+    if (missing.isNotEmpty) {
+      throw StateError('Datenbankschema unvollständig; fehlende Tabellen: ${missing.join(', ')}');
+    }
   }
 
   Future<void> _postHooks() async {

@@ -13,13 +13,18 @@ import 'package:openaccounting/core/api/api_exceptions.dart';
 /// ponytail: port scan loop is naive linear scan — good enough for 11 ports,
 /// upgrade to parallel probe if startup latency matters.
 class DioClient {
-  DioClient({Dio? dio, this.maxRetries = 3, this.baseHost = 'localhost'}) : dio = dio ?? Dio() {
+  DioClient({Dio? dio, this.maxRetries = 3, this.baseHost = 'localhost', Set<String>? trustedHosts})
+    : trustedHosts = Set<String>.unmodifiable(
+        (trustedHosts ?? const <String>{'localhost', '127.0.0.1', '::1'}).map((host) => host.trim().toLowerCase()),
+      ),
+      dio = dio ?? Dio() {
     _configure();
   }
 
   final Dio dio;
   final int maxRetries;
   final String baseHost;
+  final Set<String> trustedHosts;
 
   static const Duration timeout = Duration(seconds: 30);
   static const List<int> probePorts = <int>[8000, 8001, 8002, 8003, 8004, 8005, 8006, 8007, 8008, 8009, 8010];
@@ -29,10 +34,24 @@ class DioClient {
       connectTimeout: timeout,
       receiveTimeout: timeout,
       sendTimeout: timeout,
+      followRedirects: false,
+      maxRedirects: 0,
       validateStatus: (status) => status != null && status < 400, // 422 and 5xx trigger error pipeline.
     );
     dio.interceptors.add(
       InterceptorsWrapper(
+        onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+          if (!_isTrustedUri(options.uri)) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                error: StateError('API-Endpunkt ist nicht freigegeben'),
+                message: 'API-Endpunkt ist nicht freigegeben',
+              ),
+            );
+          }
+          handler.next(options);
+        },
         onError: (DioException err, ErrorInterceptorHandler handler) async {
           // 422 → parse detail fields.
           if (err.response?.statusCode == 422) {
@@ -50,11 +69,13 @@ class DioClient {
 
           // Retry first — connection errors respect retry count.
           final retries = (err.requestOptions.extra['retries'] as int?) ?? 0;
-          final shouldRetry = _shouldRetry(err);
+          final shouldRetry = _canRetry(err.requestOptions) && _shouldRetry(err);
           if (shouldRetry && retries < maxRetries) {
             final backoff = Duration(milliseconds: 200 * (1 << retries) + Random().nextInt(100));
             if (kDebugMode) {
-              debugPrint('DioClient retry ${retries + 1}/$maxRetries after $backoff for ${err.requestOptions.uri}');
+              debugPrint(
+                'DioClient retry ${retries + 1}/$maxRetries after $backoff for ${_redactedUri(err.requestOptions.uri)}',
+              );
             }
             await Future<void>.delayed(backoff);
             final opts = err.requestOptions..extra['retries'] = retries + 1;
@@ -101,31 +122,48 @@ class DioClient {
         err.type == DioExceptionType.sendTimeout) {
       return true;
     }
-    if (err.type == DioExceptionType.unknown && err.error is SocketException) return true;
+    if (err.type == DioExceptionType.unknown && err.error is SocketException) {
+      return true;
+    }
     if (BackendUnreachableException.isConnectionError(err)) return true;
     return false;
+  }
+
+  bool _canRetry(RequestOptions options) {
+    final method = options.method.toUpperCase();
+    if (method == 'GET' || method == 'HEAD' || method == 'OPTIONS') return true;
+    final key = options.headers['Idempotency-Key'] ?? options.headers['idempotency-key'];
+    return key is String && key.trim().isNotEmpty;
   }
 
   /// Probe ports 8000-8010 on [host] and return first responding base URI.
   /// Returns null if none respond — caller should show Backend nicht erreichbar.
   Future<Uri?> detectBackendPort({String? host, List<int>? ports}) async {
     final h = host ?? baseHost;
+    if (!_isLoopbackHost(h)) {
+      throw ArgumentError.value(h, 'host', 'Backend discovery is restricted to the local machine');
+    }
     final list = ports ?? probePorts;
+    if (list.any((port) => port < 1 || port > 65535)) {
+      throw ArgumentError.value(list, 'ports', 'Ports must be between 1 and 65535');
+    }
     final probe = Dio(
       BaseOptions(
         connectTimeout: const Duration(milliseconds: 500),
         receiveTimeout: const Duration(milliseconds: 500),
         sendTimeout: const Duration(milliseconds: 500),
+        followRedirects: false,
+        maxRedirects: 0,
       ),
     );
     try {
       for (final port in list) {
-        final uri = Uri.parse('http://$h:$port/health');
+        final uri = Uri.parse('http://${_hostForUri(h)}:$port/health');
         try {
           final resp = await probe.getUri<dynamic>(uri);
           if (resp.statusCode != null && resp.statusCode! >= 200 && resp.statusCode! < 300) {
-            dio.options.baseUrl = 'http://$h:$port';
-            return Uri.parse('http://$h:$port');
+            dio.options.baseUrl = 'http://${_hostForUri(h)}:$port';
+            return Uri.parse('http://${_hostForUri(h)}:$port');
           }
         } catch (_) {
           continue;
@@ -144,10 +182,37 @@ class DioClient {
     final url = baseUrl ?? dio.options.baseUrl;
     if (url.isEmpty) return false;
     try {
+      final Uri? parsed = Uri.tryParse(url);
+      if (parsed == null || !_isTrustedUri(parsed)) {
+        return false;
+      }
       final resp = await dio.get<dynamic>('$url/health');
-      return (resp.statusCode ?? 500) < 500;
+      final status = resp.statusCode ?? 0;
+      return status >= 200 && status < 300;
     } catch (_) {
       return false;
     }
   }
+
+  static bool _isLoopbackHost(String host) {
+    final String normalized = host.trim().toLowerCase();
+    if (normalized == 'localhost') return true;
+    final InternetAddress? address = InternetAddress.tryParse(normalized);
+    return address != null && address.isLoopback;
+  }
+
+  bool _isTrustedUri(Uri uri) {
+    if (uri.host.isEmpty || uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
+      return false;
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    if (uri.port < 0 || uri.port > 65535) return false;
+    final host = uri.host.trim().toLowerCase();
+    if (!trustedHosts.contains(host)) return false;
+    return _isLoopbackHost(host) || uri.scheme == 'https';
+  }
+
+  Uri _redactedUri(Uri uri) => uri.replace(userInfo: '', query: '', fragment: '');
+
+  static String _hostForUri(String host) => host.contains(':') && !host.startsWith('[') ? '[$host]' : host;
 }

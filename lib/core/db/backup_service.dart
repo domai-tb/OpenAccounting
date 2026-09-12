@@ -17,6 +17,8 @@ typedef SmbBackupWriter = Future<void> Function(
   Uint8List bytes,
 );
 
+typedef RestoreReadinessCheck = Future<bool> Function();
+
 class BackupService {
   BackupService({
     required this.profileDir,
@@ -25,6 +27,8 @@ class BackupService {
     SmbBackupWriter? smbWriter,
     this.externalTargetApproved = false,
     this.allowSystemDrive = false,
+    this.restoreReadinessCheck,
+    this.allowAlternateRestoreDestination = false,
   }) : databasePath = databasePath ?? p.join(profileDir, 'openinvoices.db'),
        smbWriter = smbWriter ?? _uploadToSmb;
 
@@ -41,6 +45,8 @@ class BackupService {
   final String databasePath;
   final SmbBackupWriter smbWriter;
   final bool externalTargetApproved;
+  final RestoreReadinessCheck? restoreReadinessCheck;
+  final bool allowAlternateRestoreDestination;
   bool allowSystemDrive;
 
   String get backupDir => p.join(profileDir, 'backups');
@@ -70,14 +76,15 @@ class BackupService {
   }
 
   Future<String> createEncryptedBackup(String externalPath, String passphrase) async {
-    _validateExternalPath(externalPath);
-    if (passphrase.isEmpty) throw ArgumentError('Passphrase fehlt');
+    await _validateExternalPath(externalPath);
+    _validatePassphrase(passphrase);
 
     final localPath = await createLocalBackup();
-    final plain = await File(localPath).readAsBytes();
-    final destination = externalPath.endsWith('.enc') ? externalPath : '$externalPath.enc';
-    final staged = _temporaryPath(destination, 'encrypt');
+    String? staged;
     try {
+      final plain = await File(localPath).readAsBytes();
+      final destination = externalPath.endsWith('.enc') ? externalPath : '$externalPath.enc';
+      staged = _temporaryPath(destination, 'encrypt');
       await Directory(p.dirname(destination)).create(recursive: true);
       final encrypted = _encrypt(plain, passphrase);
       await File(staged).writeAsBytes(encrypted, flush: true);
@@ -88,8 +95,10 @@ class BackupService {
       await _atomicReplace(staged, destination);
       return destination;
     } catch (_) {
-      await _deleteFile(staged);
+      if (staged != null) await _deleteFile(staged);
       throw StateError('Verschlüsseltes Backup fehlgeschlagen');
+    } finally {
+      await _deleteFileStrict(localPath);
     }
   }
 
@@ -112,9 +121,11 @@ class BackupService {
   }
 
   Future<void> restoreFromBackup(String backupPath, String activeDbPath) async {
+    await _validateRestorePaths(backupPath, activeDbPath, encrypted: false);
     if (!File(backupPath).existsSync()) {
       throw StateError('Backup-Datei nicht gefunden');
     }
+    await _ensureRestoreReady();
     final staged = _temporaryPath(activeDbPath, 'restore');
     try {
       await _backupDatabase(backupPath, staged);
@@ -127,9 +138,12 @@ class BackupService {
   }
 
   Future<void> restoreEncrypted(String encPath, String passphrase, String activeDbPath) async {
+    await _validateRestorePaths(encPath, activeDbPath, encrypted: true);
+    _validatePassphrase(passphrase);
     if (!File(encPath).existsSync()) {
       throw StateError('Verschlüsselte Backup-Datei nicht gefunden');
     }
+    await _ensureRestoreReady();
     final staged = _temporaryPath(activeDbPath, 'restore-encrypted');
     try {
       final plain = _decrypt(await File(encPath).readAsBytes(), passphrase);
@@ -259,7 +273,9 @@ class BackupService {
     }
     final header = Uint8List.fromList(data.sublist(0, _headerLength));
     final iterations = ByteData.sublistView(header, _headerLength - 4).getUint32(0);
-    if (iterations != _kdfIterations) throw StateError('Nicht unterstützte KDF-Version');
+    if (iterations != _kdfIterations) {
+      throw StateError('Nicht unterstützte KDF-Version');
+    }
     final salt = Uint8List.fromList(header.sublist(_magicLength, _magicLength + _saltLength));
     final iv = Uint8List.fromList(header.sublist(_magicLength + _saltLength, _headerLength - 4));
     final key = enc.Key(_deriveKey(passphrase, salt));
@@ -313,7 +329,7 @@ class BackupService {
     }
   }
 
-  void _validateExternalPath(String externalPath) {
+  Future<void> _validateExternalPath(String externalPath) async {
     _requireExternalApproval();
     if (externalPath.trim().isEmpty) throw ArgumentError('Externer Pfad fehlt');
     final profileRoot = p.normalize(p.absolute(profileDir));
@@ -321,14 +337,92 @@ class BackupService {
     if (externalRoot == profileRoot || p.isWithin(profileRoot, externalRoot)) {
       throw StateError('Externes Backup-Ziel muss außerhalb APP_DATA_DIR liegen');
     }
+    // Lexical checks alone are bypassed by a symlink inside the profile.
+    // Resolve the existing target or its nearest existing parent before any
+    // bytes are written.
+    final String resolvedProfileRoot = await Directory(profileRoot).resolveSymbolicLinks();
+    final String resolvedExternalRoot = await _resolvePathOrParent(externalRoot);
+    if (resolvedExternalRoot == resolvedProfileRoot || p.isWithin(resolvedProfileRoot, resolvedExternalRoot)) {
+      throw StateError('Externes Backup-Ziel muss außerhalb APP_DATA_DIR liegen');
+    }
     if (isSystemDrive(externalPath) && !allowSystemDrive) {
       throw StateError('Systemlaufwerk als Backup-Ziel nicht erlaubt');
     }
   }
 
+  Future<void> _validateRestorePaths(String sourcePath, String destinationPath, {required bool encrypted}) async {
+    if (sourcePath.trim().isEmpty || destinationPath.trim().isEmpty) {
+      throw ArgumentError('Backup- und Zieldatei sind erforderlich');
+    }
+    final String profileRootPath = p.normalize(p.absolute(profileDir));
+    if (FileSystemEntity.typeSync(profileRootPath, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Aktives Profil darf kein symbolischer Link sein');
+    }
+    final String profileRoot = await Directory(profileRootPath).resolveSymbolicLinks();
+    final String destination = p.normalize(p.absolute(destinationPath));
+    final String expectedDatabase = p.normalize(p.absolute(databasePath));
+    if (!allowAlternateRestoreDestination && destination != expectedDatabase) {
+      throw StateError('Wiederherstellungsziel muss die aktive Datenbank sein');
+    }
+    if (FileSystemEntity.typeSync(destination, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Wiederherstellungsziel darf kein symbolischer Link sein');
+    }
+    final String resolvedDestination = await _resolvePathOrParent(destination);
+    if (resolvedDestination != profileRoot && !p.isWithin(profileRoot, resolvedDestination)) {
+      throw StateError('Wiederherstellungsziel muss innerhalb des aktiven Profils liegen');
+    }
+    final File source = File(sourcePath);
+    final sourceName = p.basename(sourcePath).toLowerCase();
+    if (encrypted ? !sourceName.endsWith('.enc') : !_isBackupFile(sourceName)) {
+      throw StateError(
+        encrypted
+            ? 'Verschlüsselte Backup-Quelle muss auf .enc enden'
+            : 'Backup-Quelle ist keine lokale OpenAccounting-Sicherung',
+      );
+    }
+    if (source.existsSync()) {
+      final FileSystemEntityType type = FileSystemEntity.typeSync(sourcePath, followLinks: false);
+      if (type != FileSystemEntityType.file) {
+        throw StateError('Backup-Quelle ist keine reguläre Datei');
+      }
+      final String resolvedSource = await source.resolveSymbolicLinks();
+      if (p.normalize(p.absolute(resolvedSource)) != p.normalize(p.absolute(sourcePath))) {
+        throw StateError('Backup-Quelle darf kein symbolischer Link sein');
+      }
+    }
+    if (p.normalize(p.absolute(sourcePath)) == destination) {
+      throw StateError('Backup-Quelle und Wiederherstellungsziel müssen verschieden sein');
+    }
+  }
+
+  Future<String> _resolvePathOrParent(String path) async {
+    final FileSystemEntity target = File(path);
+    if (target.existsSync()) return target.resolveSymbolicLinks();
+    Directory parent = Directory(p.dirname(path));
+    while (!parent.existsSync() && parent.path != parent.parent.path) {
+      parent = parent.parent;
+    }
+    final String resolvedParent = await parent.resolveSymbolicLinks();
+    final String missing = p.relative(path, from: parent.path);
+    return p.normalize(p.join(resolvedParent, missing));
+  }
+
   void _requireExternalApproval() {
     if (!externalTargetApproved) {
       throw StateError('Externes Backup-Ziel nicht freigegeben');
+    }
+  }
+
+  void _validatePassphrase(String passphrase) {
+    if (passphrase.trim().length < 12) {
+      throw ArgumentError('Passphrase muss mindestens 12 Zeichen enthalten');
+    }
+  }
+
+  Future<void> _ensureRestoreReady() async {
+    final check = restoreReadinessCheck;
+    if (check == null || !await check()) {
+      throw StateError('Wiederherstellung erfordert einen geschlossenen Datenbankzugriff');
     }
   }
 
@@ -351,6 +445,15 @@ class BackupService {
     try {
       await File(path).delete();
     } catch (_) {}
+  }
+
+  Future<void> _deleteFileStrict(String path) async {
+    final file = File(path);
+    if (!file.existsSync()) return;
+    await file.delete();
+    if (file.existsSync()) {
+      throw StateError('Klartext-Backup konnte nicht entfernt werden');
+    }
   }
 
   static bool _isBackupFile(String name) => name.startsWith('openinvoices_') && name.endsWith('.db');
