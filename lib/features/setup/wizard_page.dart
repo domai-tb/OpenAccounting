@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
@@ -112,7 +116,7 @@ class _WizardPageState extends State<WizardPage> {
     try {
       final String iban = _ibanCtrl.text.trim();
       final List<BankAccount> accounts = iban.isEmpty
-          ? <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')]
+          ? const <BankAccount>[]
           : <BankAccount>[BankAccount(name: 'Giro', iban: iban, bic: _bicCtrl.text.trim())];
       await _service.completeWizard(
         companyName: _nameCtrl.text.trim().isEmpty ? 'Meine Firma' : _nameCtrl.text.trim(),
@@ -123,15 +127,37 @@ class _WizardPageState extends State<WizardPage> {
         kassenbestand: _kasseCtrl.text.trim().isEmpty ? '0.00' : _kasseCtrl.text.trim(),
         kategorieIds: _selectedKategorien.toList(),
       );
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup abgeschlossen')));
+      if (mounted) {
+        final GoRouter? router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup abgeschlossen')));
+        }
+      }
     } on SetupException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     }
   }
 
   Future<void> _skip() async {
-    await _service.skipWizard();
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup übersprungen')));
+    try {
+      await _service.skipWizard();
+      if (mounted) {
+        final GoRouter? router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.go('/');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup übersprungen')));
+        }
+      }
+    } on SetupException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
   }
 
   void _handleZurueck() {
@@ -147,7 +173,11 @@ class _WizardPageState extends State<WizardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            LinearProgressIndicator(value: (stepIndex + 1) / WizardStep.values.length),
+            Semantics(
+              label: 'Setup-Fortschritt',
+              value: 'Schritt ${stepIndex + 1} von ${WizardStep.values.length}',
+              child: LinearProgressIndicator(value: (stepIndex + 1) / WizardStep.values.length),
+            ),
             const SizedBox(height: 12),
             Text(
               'Schritt ${stepIndex + 1} von ${WizardStep.values.length}',
@@ -320,7 +350,7 @@ class _WizardPageState extends State<WizardPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text('Firma: ${_nameCtrl.text.isEmpty ? "Meine Firma" : _nameCtrl.text}'),
-                    Text('IBAN: ${_ibanCtrl.text.isEmpty ? "—" : _ibanCtrl.text}'),
+                    Text('IBAN: ${_maskedIban(_ibanCtrl.text)}'),
                     Text('Kassenbestand: ${_kasseCtrl.text} €'),
                     Text('Kategorien: ${_selectedKategorien.join(", ")}'),
                   ],
@@ -333,17 +363,44 @@ class _WizardPageState extends State<WizardPage> {
         );
     }
   }
+
+  String _maskedIban(String raw) {
+    final String value = raw.trim();
+    if (value.isEmpty) return '—';
+    final String compact = value.replaceAll(RegExp(r'\s+'), '');
+    if (compact.length <= 4) return '••••';
+    return '•••• •••• •••• •••• ${compact.substring(compact.length - 4)}';
+  }
 }
 
 /// Profil-Auswahl Widget — DESIGN §36, spec Profilwahl.
 /// Zeigt "Profil wählen" + "Zuletzt verwendet" Markierung.
 class ProfileSelectionWidget extends StatelessWidget {
-  const ProfileSelectionWidget({required this.profiles, this.lastUsed, super.key});
+  const ProfileSelectionWidget({required this.profiles, this.lastUsed, this.onSelected, super.key});
   final List<String> profiles;
   final String? lastUsed;
+  final ValueChanged<String>? onSelected;
+
+  Future<void> _selectProfile(BuildContext context, String name) async {
+    try {
+      final bool restartRequired = await ProfileManager().setActiveProfile(name);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(restartRequired ? 'Profil gespeichert. Bitte neu starten.' : 'Profil ist bereits aktiv.'),
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Profil konnte nicht gewählt werden: $error')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String? effectiveLast = lastUsed ?? (profiles.isNotEmpty ? profiles.first : null);
+    final String? effectiveLast = lastUsed;
     return Scaffold(
       appBar: AppBar(title: const Text(profileSelectionTitle)),
       body: ListView.builder(
@@ -356,7 +413,7 @@ class ProfileSelectionWidget extends StatelessWidget {
             subtitle: isLast ? const Text(lastUsedLabel) : null,
             selected: isLast,
             selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
-            onTap: () {},
+            onTap: onSelected == null ? () => unawaited(_selectProfile(context, name)) : () => onSelected!(name),
             trailing: isLast ? const Icon(Icons.check) : null,
           );
         },

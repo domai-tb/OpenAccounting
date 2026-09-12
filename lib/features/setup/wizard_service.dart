@@ -1,7 +1,11 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:io';
+
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String profileSelectionTitle = 'Profil wählen';
@@ -33,12 +37,20 @@ enum WizardStep {
 /// Wizard Service — Validierung, Navigation, Persistenz.
 /// ponytail: kein BLoC, synchron Validierung + async Persistenz minimal.
 class WizardService {
-  WizardService({SetupRepository? repository, SharedPreferences? prefs})
+  WizardService({SetupRepository? repository, SharedPreferences? prefs, String? profileId})
     : _repository = repository,
-      _prefsOverride = prefs;
+      _prefsOverride = prefs,
+      _profileId = profileId;
 
   final SetupRepository? _repository;
   final SharedPreferences? _prefsOverride;
+  final String? _profileId;
+
+  String get _completionKey {
+    final String? profileId = _profileId;
+    if (profileId == null || profileId.trim().isEmpty) return _setupCompletedKey;
+    return '$_setupCompletedKey.${profileId.trim()}';
+  }
 
   WizardStep currentStep = WizardStep.stammdaten;
 
@@ -65,7 +77,9 @@ class WizardService {
 
   void next() {
     final int idx = WizardStep.values.indexOf(currentStep);
-    if (idx < WizardStep.values.length - 1) currentStep = WizardStep.values[idx + 1];
+    if (idx < WizardStep.values.length - 1) {
+      currentStep = WizardStep.values[idx + 1];
+    }
   }
 
   void back() {
@@ -88,7 +102,9 @@ class WizardService {
     if (kErr != null) return kErr;
     if (accounts.isEmpty) return 'Mindestens ein Konto erforderlich';
     for (final BankAccount a in accounts) {
-      if (!SetupRepository.isValidIban(a.iban)) return 'IBAN ungültig: ${a.iban}';
+      if (!SetupRepository.isValidIban(a.iban)) {
+        return 'IBAN ungültig: ${a.iban}';
+      }
     }
     return null;
   }
@@ -120,17 +136,17 @@ class WizardService {
 
   Future<bool> isCompleted() async {
     final SharedPreferences p = await _prefs();
-    return p.getBool(_setupCompletedKey) ?? false;
+    return p.getBool(_completionKey) ?? false;
   }
 
   Future<void> markCompleted() async {
     final SharedPreferences p = await _prefs();
-    await p.setBool(_setupCompletedKey, true);
+    await p.setBool(_completionKey, true);
   }
 
   Future<void> clearCompleted() async {
     final SharedPreferences p = await _prefs();
-    await p.remove(_setupCompletedKey);
+    await p.remove(_completionKey);
   }
 
   /// Prüft ob Setup erforderlich (leere DB).
@@ -138,15 +154,20 @@ class WizardService {
     try {
       final List<Map<String, Object?>> rows = await db.executor.runSelect('SELECT name FROM unternehmen', const []);
       if (rows.isEmpty) return true;
-      if (rows.length == 1) {
-        final Object? name = rows.single['name'];
-        if (name == null) return true;
-        if (name == 'Meine Firma') return true;
-        if ((name as String).trim().isEmpty) return true;
-      }
-      return false;
-    } catch (_) {
-      return true;
+      final hasRealCompany = rows.any((row) {
+        final rawName = row['name'];
+        final name = rawName is String ? rawName.trim() : '';
+        return name.isNotEmpty && name != 'Meine Firma';
+      });
+      if (hasRealCompany) return false;
+      // The completion flag is written only after the database transaction
+      // commits. It is valid for an intentional skip only after the row exists.
+      return !(await isCompleted());
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        SetupDatabaseException('Datenbank konnte für den Setup-Status nicht gelesen werden', cause: error),
+        stackTrace,
+      );
     }
   }
 
@@ -170,21 +191,23 @@ class WizardService {
     if (err3 != null) throw SetupException(err3);
 
     if (_repository != null) {
-      await _repository.saveUnternehmen(
-        name: companyName,
-        strasse: strasse,
-        plz: plz,
-        ort: ort,
-        steuernummer: steuernummer,
-        ustIdnr: ustIdnr,
-        rechtsform: rechtsform,
-      );
-      for (final BankAccount a in accounts) {
-        await _repository.createKonto(name: a.name, iban: a.iban, bic: a.bic);
-      }
-      final String kb = kassenbestand.trim().isEmpty ? '0.00' : kassenbestand;
-      await _repository.ensureKassenKonto(betrag: kb);
-      await _repository.ensureKategorienSelected(kategorieIds);
+      await _repository.runInTransaction<void>((SetupRepository repository) async {
+        await repository.saveUnternehmen(
+          name: companyName,
+          strasse: strasse,
+          plz: plz,
+          ort: ort,
+          steuernummer: steuernummer,
+          ustIdnr: ustIdnr,
+          rechtsform: rechtsform,
+        );
+        for (final BankAccount a in accounts) {
+          await repository.createKonto(name: a.name, iban: a.iban, bic: a.bic);
+        }
+        final String kb = kassenbestand.trim().isEmpty ? '0.00' : kassenbestand;
+        await repository.ensureKassenKonto(betrag: kb);
+        await repository.ensureKategorienSelected(kategorieIds);
+      });
     } else {
       // fallback when no repo injected (pure validation test) — still mark completed
     }
@@ -221,18 +244,18 @@ class ProfileSelectionService {
     await p.setString(_lastUsedProfileKey, name);
   }
 
-  /// Ob Auswahl nötig: >1 Profile.
-  Future<bool> needsSelection() async {
-    // ponytail: ohne FS-Scan im Test via baseDir == /tmp/test-single-* → false
-    if (_baseDir != null && _baseDir.contains('test-single')) return false;
-    if (_baseDir != null && _baseDir.contains('test-multi')) return true;
-    // default: single profile → no selection
-    return false;
-  }
+  /// Ob Auswahl nötig: mehr als ein tatsächlich angelegtes Profil.
+  Future<bool> needsSelection() async => (await listProfiles()).length > 1;
 
   Future<List<String>> listProfiles() async {
-    if (_baseDir != null && _baseDir.contains('test-multi')) return <String>['Firma A', 'Firma B'];
-    if (_baseDir != null && _baseDir.contains('test-single')) return <String>['Default'];
-    return <String>['Default'];
+    final Directory root = Directory(p.join(_baseDir ?? ProfileManager.getDefaultBaseDir(), 'profiles'));
+    if (!root.existsSync()) return <String>[];
+    final List<FileSystemEntity> entries = await root.list().toList();
+    final List<String> profiles = <String>[];
+    for (final FileSystemEntity entry in entries) {
+      if (entry is Directory) profiles.add(p.basename(entry.path));
+    }
+    profiles.sort();
+    return profiles;
   }
 }

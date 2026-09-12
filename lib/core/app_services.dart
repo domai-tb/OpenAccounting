@@ -8,6 +8,8 @@ import 'package:openaccounting/features/mahnwesen/mahnwesen_einstellungen_reposi
 import 'package:openaccounting/features/mahnwesen/sperrung_service.dart';
 import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
 import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
+import 'package:openaccounting/features/setup/setup_repository.dart';
+import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -33,6 +35,7 @@ class AppServices {
   late final MahnstufenRepository mahnstufen = MahnstufenRepository(_db.executor);
   late final MahnwesenEinstellungenRepository mahnwesenEinstellungen = MahnwesenEinstellungenRepository(_db.executor);
   late final SperrungService sperrung = SperrungService(_db.executor);
+  late final WizardService setup = WizardService(repository: SetupRepository(_db.executor), profileId: _db.profileDir);
 }
 
 /// Provides the aggregated application services.

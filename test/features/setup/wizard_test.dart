@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/database.dart';
@@ -160,6 +162,34 @@ void main() {
       await service.clearCompleted();
       expect(await service.isCompleted(), isFalse);
     });
+
+    test('Setup retry does not duplicate an account with the same IBAN', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final db = _db();
+      await db.ensureOpen();
+      final service = WizardService(repository: SetupRepository(db.executor));
+      const account = BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX');
+
+      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account]);
+      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account]);
+
+      final accounts = await db.executor.runSelect('SELECT id FROM konten WHERE iban = ?', const <Object?>[
+        'DE89370400440532013000',
+      ]);
+      expect(accounts, hasLength(1));
+      await db.close();
+    });
+
+    test('Setup status surfaces database errors instead of treating them as first run', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final db = _db();
+      await db.ensureOpen();
+      await db.executor.runCustom('DROP TABLE unternehmen');
+      final service = WizardService(repository: SetupRepository(db.executor));
+
+      await expectLater(service.isSetupRequired(db), throwsA(isA<SetupDatabaseException>()));
+      await db.close();
+    });
   });
 
   group('Profil-Auswahl', () {
@@ -169,7 +199,10 @@ void main() {
     });
 
     test('Single-Profil wird automatisch geladen (kein Auswahl nötig)', () async {
-      final svc = ProfileSelectionService(baseDir: '/tmp/test-single-${DateTime.now().millisecondsSinceEpoch}');
+      final Directory base = await Directory.systemTemp.createTemp('openaccounting_profile_selection_');
+      addTearDown(() => base.delete(recursive: true));
+      await Directory('${base.path}/profiles/Firma').create(recursive: true);
+      final svc = ProfileSelectionService(baseDir: base.path);
       expect(await svc.needsSelection(), isFalse);
     });
   });
@@ -210,7 +243,11 @@ void main() {
 
     testWidgets('Profil-Auswahl Widget zeigt Profil wählen und Zuletzt verwendet', (tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{'last_used_profile': 'Firma A'});
-      await tester.pumpWidget(const MaterialApp(home: ProfileSelectionWidget(profiles: ['Firma A', 'Firma B'])));
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ProfileSelectionWidget(profiles: ['Firma A', 'Firma B'], lastUsed: 'Firma A'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Profil wählen'), findsOneWidget);
       // last used highlighted

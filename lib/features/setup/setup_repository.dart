@@ -19,7 +19,9 @@ class SetupRepository {
     if (cleaned.length < 15 || cleaned.length > 34) return false;
     if (!RegExp(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]+$').hasMatch(cleaned)) return false;
     // DE Spezial: DE + 20 Ziffern = 22
-    if (cleaned.startsWith('DE') && !RegExp(r'^DE[0-9]{20}$').hasMatch(cleaned)) return false;
+    if (cleaned.startsWith('DE') && !RegExp(r'^DE[0-9]{20}$').hasMatch(cleaned)) {
+      return false;
+    }
     return true;
   }
 
@@ -46,14 +48,9 @@ class SetupRepository {
       'steuernummer = COALESCE(?, steuernummer), ust_idnr = COALESCE(?, ust_idnr) WHERE id = 1',
       <Object?>[trimmed, strasse, plz, ort, steuernummer, ustIdnr],
     );
-    // rechtsform: optional column, add if missing
     if (rechtsform != null) {
-      try {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN rechtsform TEXT');
-      } catch (_) {}
-      try {
-        await executor.runUpdate('UPDATE unternehmen SET rechtsform = ? WHERE id = 1', <Object?>[rechtsform]);
-      } catch (_) {}
+      await _addColumnIfMissing('unternehmen', 'rechtsform', 'TEXT');
+      await executor.runUpdate('UPDATE unternehmen SET rechtsform = ? WHERE id = 1', <Object?>[rechtsform]);
     }
   }
 
@@ -71,9 +68,26 @@ class SetupRepository {
     if (iban != null && iban.trim().isNotEmpty && !isValidIban(iban)) {
       throw const SetupException('IBAN ungültig');
     }
+    final normalizedIban = iban == null ? null : _normalizeIban(iban);
+    if (normalizedIban != null && normalizedIban.isNotEmpty) {
+      final existing = await executor.runSelect('SELECT id, iban FROM konten WHERE iban IS NOT NULL', const []);
+      for (final row in existing) {
+        final storedIban = row['iban'];
+        if (storedIban is! String || _normalizeIban(storedIban) != normalizedIban) {
+          continue;
+        }
+        final id = (row['id'] as num?)?.toInt();
+        if (id == null) continue;
+        await executor.runUpdate(
+          'UPDATE konten SET name = ?, bic = ?, kontoart = ?, waehrung = ? WHERE id = ?',
+          <Object?>[name.trim(), bic, kontoart, 'EUR', id],
+        );
+        return id;
+      }
+    }
     final int id = await executor.runInsert(
       'INSERT INTO konten (name, iban, bic, kontoart, waehrung) VALUES (?, ?, ?, ?, ?)',
-      <Object?>[name, iban, bic, kontoart, 'EUR'],
+      <Object?>[name, normalizedIban, bic, kontoart, 'EUR'],
     );
     return id;
   }
@@ -83,16 +97,24 @@ class SetupRepository {
   Future<void> ensureKassenKonto({required String betrag}) async {
     final String t = betrag.trim().replaceAll(',', '.');
     final String normalized = t.isEmpty ? '0.00' : t;
-    if (normalized.startsWith('-')) throw const SetupException('Kassenbestand darf nicht negativ sein');
+    if (normalized.startsWith('-')) {
+      throw const SetupException('Kassenbestand darf nicht negativ sein');
+    }
     final String formatted = money.formatBetrag(normalized);
     // validate numeric 12,2
     final int cents = money.toCents(formatted);
-    if (cents < 0) throw const SetupException('Kassenbestand darf nicht negativ sein');
+    if (cents < 0) {
+      throw const SetupException('Kassenbestand darf nicht negativ sein');
+    }
 
-    // check existing Kasse
+    // Reuse an account already named Kasse/Kassenbestand as well as one whose
+    // account type is Kasse.  The wizard accepts a user supplied account list,
+    // so otherwise a row named "Kasse" with the default Bank type would be
+    // left at zero while a second hidden Kasse row receives the opening cash.
     final List<Map<String, Object?>> existing = await executor.runSelect(
-      'SELECT id FROM konten WHERE kontoart = ? LIMIT 1',
-      const ['Kasse'],
+      "SELECT id FROM konten WHERE kontoart = 'Kasse' OR name IN ('Kasse', 'Kassenbestand') "
+      "ORDER BY CASE WHEN kontoart = 'Kasse' THEN 0 ELSE 1 END, id LIMIT 1",
+      const [],
     );
     int kasseId;
     if (existing.isEmpty) {
@@ -102,6 +124,10 @@ class SetupRepository {
       );
     } else {
       kasseId = ((existing.single['id'] as num?) ?? 0).toInt();
+      await executor.runUpdate(
+        "UPDATE konten SET name = 'Kasse', kontoart = 'Kasse', waehrung = 'EUR' WHERE id = ?",
+        <Object?>[kasseId],
+      );
     }
 
     // idempotent journal: if already one journal for this konto, reuse/update
@@ -115,7 +141,9 @@ class SetupRepository {
       int kategorieId = 1;
       try {
         final List<Map<String, Object?>> kats = await executor.runSelect('SELECT id FROM kategorien LIMIT 1', const []);
-        if (kats.isNotEmpty) kategorieId = ((kats.single['id'] as num?) ?? 0).toInt();
+        if (kats.isNotEmpty) {
+          kategorieId = ((kats.single['id'] as num?) ?? 0).toInt();
+        }
       } catch (_) {}
       await executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable) '
@@ -130,6 +158,9 @@ class SetupRepository {
         jid,
       ]);
     }
+    // Keep the account read model consistent with its opening journal entry.
+    // Setup may be retried, so assign the opening balance instead of adding it.
+    await executor.runUpdate('UPDATE konten SET saldo = ? WHERE id = ?', <Object?>[formatted, kasseId]);
   }
 
   // ---------------------------------------------------------------------------
@@ -137,7 +168,9 @@ class SetupRepository {
   // ---------------------------------------------------------------------------
 
   Future<void> ensureKategorienSelected(List<int> ids) async {
-    if (ids.isEmpty) throw const SetupException('Mindestens eine Kategorie erforderlich');
+    if (ids.isEmpty) {
+      throw const SetupException('Mindestens eine Kategorie erforderlich');
+    }
     // seed guarantees 1..85 exist; validate each exists
     for (final int id in ids) {
       final List<Map<String, Object?>> rows = await executor.runSelect(
@@ -153,7 +186,11 @@ class SetupRepository {
   // Skip defaults
   // ---------------------------------------------------------------------------
 
-  Future<void> createMinimalDefaults() async {
+  Future<void> createMinimalDefaults() => runInTransaction<void>((SetupRepository repository) {
+    return repository._createMinimalDefaults();
+  });
+
+  Future<void> _createMinimalDefaults() async {
     await executor.runInsert('INSERT OR IGNORE INTO unternehmen (id, name) VALUES (1, ?)', const ['Meine Firma']);
     // keep existing name if already set to real value
     final List<Map<String, Object?>> rows = await executor.runSelect(
@@ -166,6 +203,36 @@ class SetupRepository {
     await ensureKassenKonto(betrag: '0.00');
     // kategorien already seeded — ensure at least one aktiv
   }
+
+  /// Run a complete setup write as one SQLite transaction.
+  Future<T> runInTransaction<T>(Future<T> Function(SetupRepository repository) operation) async {
+    final TransactionExecutor transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_SetupTransactionUser());
+      final T result = await operation(SetupRepository(transaction));
+      await transaction.send();
+      return result;
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> _addColumnIfMissing(String table, String name, String definition) async {
+    final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (columns.any((column) => column['name'] == name)) return;
+    await executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
+    final verified = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (!verified.any((column) => column['name'] == name)) {
+      throw StateError('Setup konnte Spalte $table.$name nicht verifizieren');
+    }
+  }
+
+  static String _normalizeIban(String raw) => raw.replaceAll(RegExp(r'[\s-]'), '').toUpperCase();
 
   String _todayIso() {
     final DateTime now = DateTime.now();
@@ -181,4 +248,18 @@ class SetupException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+class SetupDatabaseException extends SetupException {
+  const SetupDatabaseException(super.message, {this.cause});
+
+  final Object? cause;
+}
+
+class _SetupTransactionUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
 }

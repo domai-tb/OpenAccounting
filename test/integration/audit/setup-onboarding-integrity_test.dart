@@ -151,6 +151,7 @@ void main() {
         const [],
       );
       expect(kontoRows, isNotEmpty, reason: 'Kassenkonto must exist');
+      expect(kontoRows.first['saldo'], 500.00, reason: 'Kassenkonto saldo must reflect the opening balance');
 
       // Check the journal entry for the opening balance.
       final journalRows = await db.executor.runSelect(
@@ -160,9 +161,6 @@ void main() {
       expect(journalRows, isNotEmpty, reason: 'Opening cash journal entry must exist');
       final journalBetrag = (journalRows.first['betrag'] as num?) ?? 0;
       expect(journalBetrag, 500.00, reason: 'Opening cash journal must reflect 500.00');
-
-      // BUG: konto saldo should match journal entry but currently stays 0.
-      // This gap is the "opening cash journal classified as income while account saldo remains zero" issue.
     });
 
     // ── Task 4: Intermediate failure rolls back ──
