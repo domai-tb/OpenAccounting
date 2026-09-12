@@ -80,7 +80,7 @@ class AppSidebar extends StatelessWidget {
         );
       },
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
         child: Text('● ${l10n?.localTitle ?? 'Lokal'}'),
       ),
     );

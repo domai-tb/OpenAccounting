@@ -47,13 +47,13 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       );
       if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
       if (!_asBool(cur.single['lager_aktiv'])) {
-        throw ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
+        throw const ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
       }
       final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
       final diff = neuerBestand - old;
       _validatePrecision(neuerBestand);
       if (neuerBestand < 0 && !_asBool(cur.single['minusbestand_erlaubt'])) {
-        throw ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
+        throw const ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
       }
       await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         neuerBestand,
@@ -93,13 +93,13 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       );
       if (cur.isEmpty) throw StateError('Artikel nicht gefunden');
       if (!_asBool(cur.single['lager_aktiv'])) {
-        throw ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
+        throw const ArtikelException('Lagerführung ist für diesen Artikel deaktiviert');
       }
       final old = _asNum(cur.single['bestand_aktuell']) ?? 0;
       final neuerBestand = old + delta;
       _validatePrecision(neuerBestand);
       if (neuerBestand < 0 && !_asBool(cur.single['minusbestand_erlaubt'])) {
-        throw ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
+        throw const ArtikelException('Minusbestand ist für diesen Artikel nicht erlaubt');
       }
       await t.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         neuerBestand,

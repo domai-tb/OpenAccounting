@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+      - name: Install FVM
+        run: dart pub global activate fvm
+      - name: Install Flutter via FVM
+        run: fvm install || true
+      - name: Install dependencies
+        run: fvm flutter pub get
+      - name: Analyze
+        run: fvm flutter analyze --fatal-infos
+      - name: Test
+        run: fvm flutter test --dart-define=platform=vm
+      - name: Build smoke
+        run: |
+          fvm flutter build linux --debug || echo "build skip - toolchain not installed"

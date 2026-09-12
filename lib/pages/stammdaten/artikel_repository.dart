@@ -125,6 +125,8 @@ FROM artikel
     if (bezeichnung.trim().isEmpty) throw const ArtikelException('Bezeichnung ist Pflicht');
     if (!_validTypes.contains(typ)) throw ArtikelException('Ungültiger Typ: $typ');
     await ensureSchema();
+    _validatePrecision(bestandAktuell);
+    _validatePrecision(mindestbestand);
     // clear supplier link for Dienstleistung/Eigenleistung
     var resolvedLieferantId = lieferantId;
     var resolvedLieferantenArtikelnr = lieferantenArtikelnr;
@@ -254,6 +256,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       assignments[col] = e.value is bool ? ((e.value as bool) ? 1 : 0) : e.value;
     }
     if (assignments.isEmpty) return current;
+    if (assignments.containsKey('bestand_aktuell')) {
+      _validateQuantityValue(assignments['bestand_aktuell']);
+    }
+    if (assignments.containsKey('mindestbestand')) {
+      _validateQuantityValue(assignments['mindestbestand']);
+    }
     final sql = assignments.keys.map((c) => '$c = ?').join(', ');
     await executor.runUpdate('UPDATE artikel SET $sql WHERE id = ?', <Object?>[...assignments.values, id]);
     return (await findById(id))!;
@@ -489,6 +497,21 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     if ((scaledValue - scaled).abs() > 1e-9) {
       throw ArtikelException('Precision exceeds configured limit for quantity: $value');
     }
+  }
+
+  static void _validateQuantityValue(Object? value) {
+    if (value == null) return;
+    if (value is num) {
+      _validatePrecision(value);
+      return;
+    }
+    if (value is String) {
+      final num? parsed = num.tryParse(value);
+      if (parsed == null) throw ArtikelException('Precision quantity must be finite: $value');
+      _validatePrecision(parsed);
+      return;
+    }
+    throw ArtikelException('Precision quantity must be finite: $value');
   }
 
   static String? _asString(Object? v) => v is String ? v : v?.toString();

@@ -76,6 +76,87 @@ class Unternehmen {
       : v == '1' || v == 'true';
 }
 
+/// ponytail: file-backed secret, OS keychain if platform plugin available.
+/// Ceiling: file 600 via chmod best-effort; upgrade to flutter_secure_storage/platform keychain for OS credential store.
+class SmtpSecretStore {
+  SmtpSecretStore(this.profileDir);
+  final String? profileDir;
+
+  String get _path {
+    if (profileDir == null || profileDir!.trim().isEmpty) {
+      throw const UnternehmenException('SMTP-Secret erfordert Profilverzeichnis');
+    }
+    return p.join(profileDir!, '.smtp_secret');
+  }
+
+  Future<void> store(String password) async {
+    if (password.trim().isEmpty) {
+      throw const UnternehmenException('SMTP-Passwort darf nicht leer sein');
+    }
+    if (password.length < 8) {
+      throw const UnternehmenException('SMTP-Passwort zu kurz');
+    }
+    final String path = _path;
+    if (FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.link) {
+      throw const UnternehmenException('SMTP-Secret darf kein Link sein');
+    }
+    await Directory(p.dirname(path)).create(recursive: true);
+    final String tmp = '$path.tmp-${DateTime.now().microsecondsSinceEpoch}';
+    await File(tmp).writeAsString(password, flush: true);
+    await _restrictPermissions(tmp);
+    // atomic replace, no-follow
+    if (File(path).existsSync() && FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.link) {
+      await File(tmp).delete();
+      throw const UnternehmenException('SMTP-Secret Ziel darf kein Link sein');
+    }
+    try {
+      await File(tmp).rename(path);
+    } on FileSystemException {
+      // fallback: delete target then rename
+      try {
+        await File(path).delete();
+      } catch (_) {}
+      await File(tmp).rename(path);
+    }
+    await _restrictPermissions(path);
+  }
+
+  Future<String?> read() async {
+    final String path = _path;
+    final File file = File(path);
+    if (!file.existsSync()) return null;
+    if (FileSystemEntity.typeSync(path, followLinks: false) != FileSystemEntityType.file) return null;
+    // resolve symlink check: ensure real path equals logical path
+    try {
+      final String resolved = await file.resolveSymbolicLinks();
+      if (p.normalize(p.absolute(resolved)) != p.normalize(p.absolute(path))) return null;
+    } catch (_) {
+      return null;
+    }
+    return file.readAsString();
+  }
+
+  Future<void> clear() async {
+    final String path = _path;
+    final File file = File(path);
+    if (!file.existsSync()) return;
+    if (FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.link) {
+      throw const UnternehmenException('SMTP-Secret darf kein Link sein');
+    }
+    await file.delete();
+  }
+
+  Future<void> _restrictPermissions(String path) async {
+    // best-effort chmod 600 on POSIX; no-op on Windows
+    try {
+      final result = await Process.run('chmod', <String>['600', path]);
+      if (result.exitCode != 0) {
+        // ignore, file still written
+      }
+    } catch (_) {}
+  }
+}
+
 class UnternehmenRepository {
   UnternehmenRepository(this.executor, {this.profileDir});
   final QueryExecutor executor;
@@ -88,6 +169,8 @@ class UnternehmenRepository {
       : value == '1' || value == 'true';
   Future<void>? _schemaReady;
   Future<void> ensureSchema() => _schemaReady ??= _ensureSchema(executor);
+
+  SmtpSecretStore get _secretStore => SmtpSecretStore(profileDir);
 
   static const List<_ColumnDefinition> _unternehmenColumns = <_ColumnDefinition>[
     _ColumnDefinition('hausnummer', 'TEXT'),
@@ -183,6 +266,32 @@ class UnternehmenRepository {
     final sql = assignments.keys.map((c) => '$c = ?').join(', ');
     await executor.runUpdate('UPDATE unternehmen SET $sql WHERE id = 1', <Object?>[...assignments.values]);
     return get();
+  }
+
+  /// SMTP password via secret store, never plaintext in DB.
+  /// ponytail: file-backed 600, upgrade to OS keychain when plugin available.
+  Future<void> setSmtpPassword(String password) async {
+    await ensureSchema();
+    await _secretStore.store(password);
+    // ensure legacy column cleared even if someone wrote directly
+    await executor.runUpdate('UPDATE unternehmen SET smtp_passwort = NULL WHERE id = 1', const <Object?>[]);
+  }
+
+  Future<String?> getSmtpPassword() async {
+    await ensureSchema();
+    return _secretStore.read();
+  }
+
+  Future<void> clearSmtpPassword() async {
+    await ensureSchema();
+    await _secretStore.clear();
+    await executor.runUpdate('UPDATE unternehmen SET smtp_passwort = NULL WHERE id = 1', const <Object?>[]);
+  }
+
+  /// Migration helper: clears any legacy plaintext passwords left in DB.
+  Future<void> clearLegacySmtpPasswords() async {
+    await ensureSchema();
+    await executor.runCustom('UPDATE unternehmen SET smtp_passwort = NULL WHERE smtp_passwort IS NOT NULL');
   }
 
   Future<void> updateLogo(String path) async {
@@ -377,6 +486,11 @@ class UnternehmenRepository {
     try {
       await t.ensureOpen(_NoopUser());
       await _addMissing(t, 'unternehmen', _unternehmenColumns);
+      // Migration: clear legacy plaintext SMTP passwords; secret now in file store.
+      // ponytail: best-effort, ignore if column already cleared or table empty.
+      try {
+        await t.runCustom('UPDATE unternehmen SET smtp_passwort = NULL WHERE smtp_passwort IS NOT NULL');
+      } catch (_) {}
       await t.send();
     } catch (e, s) {
       try {
@@ -384,6 +498,10 @@ class UnternehmenRepository {
       } catch (_) {}
       Error.throwWithStackTrace(e, s);
     }
+    // Ensure any pre-existing DB outside transaction also cleared (idempotent)
+    try {
+      await executor.runCustom('UPDATE unternehmen SET smtp_passwort = NULL WHERE smtp_passwort IS NOT NULL');
+    } catch (_) {}
   }
 
   static Future<void> _addMissing(QueryExecutor ex, String table, List<_ColumnDefinition> defs) async {

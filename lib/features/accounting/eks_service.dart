@@ -75,9 +75,9 @@ class EksService {
         warnings.add('EKS warn: unternehmen empty');
         debugPrint('EKS warn: unternehmen empty');
       }
-    } catch (_) {
-      warnings.add('EKS warn: unternehmen fetch failed');
-      debugPrint('EKS warn: unternehmen fetch failed');
+    } catch (error, stackTrace) {
+      // fail-closed: missing unternehmen table is not an empty report
+      Error.throwWithStackTrace(EksException('EKS: unternehmen konnte nicht gelesen werden', error), stackTrace);
     }
 
     if (bgNummer.trim().isEmpty) {
@@ -91,7 +91,7 @@ class EksService {
       debugPrint(msg);
     }
 
-    // Kategorien eks_kategorie map
+    // Kategorien eks_kategorie map — fail-closed if table missing
     final Map<int, String> katMap = <int, String>{};
     try {
       final List<Map<String, Object?>> kRows = await executor.runSelect(
@@ -105,11 +105,11 @@ class EksService {
           katMap[id] = eks.trim();
         }
       }
-    } catch (_) {
-      // table missing keep empty
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(EksException('EKS: kategorien konnte nicht gelesen werden', error), stackTrace);
     }
 
-    // Journal rows
+    // Journal rows — scoped to ownership
     final List<Map<String, Object?>> journalRows = await _fetchJournalRows(kundeId: kundeId);
 
     // Filter by year and build sectionF + income/costs + b6_5
@@ -147,30 +147,14 @@ class EksService {
       // Income / costs via art
       final bool isEinnahme = art.toLowerCase() == 'einnahme';
       final bool isAusgabe = art.toLowerCase() == 'ausgabe';
-      // ponytail: if art missing, infer from betrag sign? but keep
-      // Einnahme default for test where art provided
       if (isEinnahme) {
-        // Only count if eks_kategorie not null (EKS-relevant) else still
-        // count? spec says via eks_kategorie, but Page9 should reflect
-        // EKS-relevant only
-        // Use eksKat not null check to avoid unrelated journals polluting
-        // summary, but if missing keep for robustness?
-        // Test inserts only eks_kategorie journals, so either works. Use
-        // counting when eksKat != null else also count? choose eksKat
-        // check to be strict
         if (eksKat != null) {
           totalIncomeCents += betragCents;
-        } else {
-          // fallback: count Einnahme even without eks_kategorie? keep not to surprise
         }
       } else if (isAusgabe) {
         if (eksKat != null) {
-          // For Ausgabe, betrag field is positive per DDL, treat as cost
-          // But B6_5 travel entries have betrag 0.00 and km_anzahl drives cost, so they contribute 0 here + b6
           totalCostsBetragCents += betragCents;
         }
-      } else {
-        // unknown art — treat Einnahme if eksKat starts with F and Einnahme-like? skip
       }
 
       // B6_5 km_anzahl *0.10
@@ -179,7 +163,6 @@ class EksService {
         // Keep B6_5 comma handling: "1,5" -> "1.5"
         final String kmTrim = kmRaw.trim().replaceAll(',', '.');
         final String kmFormatted = money.formatBetrag(kmTrim);
-        // km can be integer without decimals: format adds .00, ok
         final int kmCents = money.toCents(kmFormatted);
         // travel cents = kmCents /10 with rounding (km*0.10)
         final int travel = (kmCents + 5) ~/ 10;
@@ -187,76 +170,87 @@ class EksService {
       }
     }
 
-    // B6_4_priv via anlageverzeichnis Betriebs-KFZ privatanteil
+    // B6_4_priv via anlageverzeichnis — ownership scoped, fail-closed
     int b64PrivCents = 0;
     try {
-      final List<Map<String, Object?>> avRows = await executor.runSelect(
-        'SELECT anschaffungskosten, nutzungsdauer, privatanteil, '
-        'status, bezeichnung, anschaffungsdatum '
-        'FROM anlageverzeichnis',
-        const <Object?>[],
-      );
-      for (final Map<String, Object?> r in avRows) {
-        final String? statusRaw = r['status'] as String?;
-        final String status = (statusRaw ?? 'aktiv').toLowerCase();
-        if (status == 'inaktiv' || status == 'verkauft') {
-          continue;
+      // Ownership scope: if kundeId provided and anlage has owner column, filter; otherwise scoped report excludes private assets to avoid cross-owner leak.
+      // ponytail: assets have no kunde_id in baseline schema — scoped report returns 0 for B6_4_priv to stay owner-isolated; add kunde_id column to anlageverzeichnis to enable per-customer KFZ.
+      final Set<String> anlageCols = await _tableColumns('anlageverzeichnis');
+      final bool hasKundeCol = anlageCols.contains('kunde_id');
+      final bool hasOwnerCol = anlageCols.contains('owner_id') || anlageCols.contains('inhaber_id');
+      if (kundeId != null && !hasKundeCol && !hasOwnerCol) {
+        // Fail-closed ownership: do not leak all-customer assets into scoped report.
+        b64PrivCents = 0;
+        if (anlageCols.isNotEmpty) {
+          debugPrint('EKS: scoped kundeId=$kundeId but anlageverzeichnis has no owner column — B6_4_priv excluded');
         }
-        // Optional date filter: skip assets acquired after jahr
-        final String? datumRaw = r['anschaffungsdatum'] as String?;
-        if (datumRaw != null && datumRaw.length >= 4) {
-          final int? anschaffJahr = int.tryParse(datumRaw.substring(0, 4));
-          if (anschaffJahr != null && anschaffJahr > jahr) {
+      } else {
+        final String select =
+            'SELECT anschaffungskosten, nutzungsdauer, privatanteil, '
+            'status, bezeichnung, anschaffungsdatum '
+            'FROM anlageverzeichnis'
+            '${kundeId != null && hasKundeCol ? ' WHERE kunde_id = ?' : ''}';
+        final List<Object?> args = kundeId != null && hasKundeCol ? <Object?>[kundeId] : const <Object?>[];
+        final List<Map<String, Object?>> avRows = await executor.runSelect(select, args);
+        for (final Map<String, Object?> r in avRows) {
+          final String? statusRaw = r['status'] as String?;
+          final String status = (statusRaw ?? 'aktiv').toLowerCase();
+          if (status == 'inaktiv' || status == 'verkauft') {
             continue;
           }
+          // Optional date filter: skip assets acquired after jahr
+          final String? datumRaw = r['anschaffungsdatum'] as String?;
+          if (datumRaw != null && datumRaw.length >= 4) {
+            final int? anschaffJahr = int.tryParse(datumRaw.substring(0, 4));
+            if (anschaffJahr != null && anschaffJahr > jahr) {
+              continue;
+            }
+          }
+          final String kostenRaw = r['anschaffungskosten']?.toString() ?? '0.00';
+          final int kostenCents = money.toCents(money.formatBetrag(kostenRaw));
+          if (kostenCents == 0) {
+            continue;
+          }
+          final String privatRaw = r['privatanteil']?.toString() ?? r['privat_anteil_prozent']?.toString() ?? '0';
+          final String privatFormatted = money.formatBetrag(privatRaw);
+          final int privatCents = money.toCents(privatFormatted); // percent*100
+          if (privatCents <= 0) {
+            continue;
+          }
+          final int nutz = (r['nutzungsdauer'] as num?)?.toInt() ?? 0;
+          final int baseCents;
+          if (nutz > 0) {
+            baseCents = kostenCents ~/ nutz;
+          } else {
+            baseCents = kostenCents;
+          }
+          // deduction = base * privat% = base * privatCents /10000
+          final int deduction = (baseCents * privatCents) ~/ 10000;
+          b64PrivCents += deduction;
         }
-        final String kostenRaw = r['anschaffungskosten']?.toString() ?? '0.00';
-        final int kostenCents = money.toCents(money.formatBetrag(kostenRaw));
-        if (kostenCents == 0) {
-          continue;
-        }
-        final String privatRaw = r['privatanteil']?.toString() ?? r['privat_anteil_prozent']?.toString() ?? '0';
-        final String privatFormatted = money.formatBetrag(privatRaw);
-        final int privatCents = money.toCents(privatFormatted); // percent*100
-        if (privatCents <= 0) {
-          continue;
-        }
-        // Only KFZ? Heuristic: bezeichnung contains KFZ or privatanteil
-        // set — test uses Betriebs-KFZ, so count all with privat>0
-        // ponytail: heuristic — any privat>0 counts as Betriebs-KFZ
-        // If bezeichnung not KFZ but privat set, still deduct? keep all
-        // privat>0 as Betriebs-KFZ per spec
-        final int nutz = (r['nutzungsdauer'] as num?)?.toInt() ?? 0;
-        final int baseCents;
-        if (nutz > 0) {
-          baseCents = kostenCents ~/ nutz;
-        } else {
-          baseCents = kostenCents;
-        }
-        // deduction = base * privat% = base * privatCents /10000
-        final int deduction = (baseCents * privatCents) ~/ 10000;
-        b64PrivCents += deduction;
       }
-    } catch (_) {
-      // keep 0
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(EksException('EKS: anlageverzeichnis konnte nicht gelesen werden', error), stackTrace);
     }
 
-    // Also try eks_einstellungen / schnellbuchungen fetch for completeness (ponytail: no fail)
+    // Also try eks_einstellungen / schnellbuchungen fetch — fail-closed if table expected but missing column is tolerated only for optional tables
+    // These are optional config tables; missing table now fails closed to surface DDL drift.
     try {
       await executor.runSelect('SELECT * FROM eks_einstellungen LIMIT 1', const <Object?>[]);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(EksException('EKS: eks_einstellungen konnte nicht gelesen werden', error), stackTrace);
+    }
     try {
       await executor.runSelect('SELECT * FROM schnellbuchungen LIMIT 5', const <Object?>[]);
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(EksException('EKS: schnellbuchungen konnte nicht gelesen werden', error), stackTrace);
+    }
 
     // Page9 summary: income/costs/net
     // totalCosts includes betrag costs + B6_5 + B6_4_priv per spec B6 lines
     final int totalCostsCents = totalCostsBetragCents + b65Cents + b64PrivCents;
     final int netCents = totalIncomeCents - totalCostsCents;
 
-    // Ensure sectionF strings are formatted and includes at least tested keys? keep as is; empty map handled
-    // For empty period, keep sectionF empty (test allows empty or all 0)
-    // B strings
     final String b65Str = money.fromCents(b65Cents);
     final String b64Str = money.fromCents(b64PrivCents);
 
@@ -292,11 +286,8 @@ class EksService {
       if (kundeId == null) {
         return await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
       }
-      final List<Map<String, Object?>> journalColumns = await executor.runSelect(
-        'PRAGMA table_info(journal)',
-        const <Object?>[],
-      );
-      final bool hasJournalCustomer = journalColumns.any((Map<String, Object?> row) => row['name'] == 'kunde_id');
+      final Set<String> journalCols = await _tableColumns('journal');
+      final bool hasJournalCustomer = journalCols.contains('kunde_id');
       final String customerPredicate = hasJournalCustomer ? '(j.kunde_id = ? OR r.kunde_id = ?)' : 'r.kunde_id = ?';
       final List<Object?> args = hasJournalCustomer ? <Object?>[kundeId, kundeId] : <Object?>[kundeId];
       return await executor.runSelect(
@@ -308,55 +299,53 @@ class EksService {
     }
   }
 
+  Future<Set<String>> _tableColumns(String table) async {
+    final List<Map<String, Object?>> rows = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    // PRAGMA returns empty for missing table — fail-closed instead of empty success
+    // Detect missing table via sqlite_master
+    if (rows.isEmpty) {
+      final List<Map<String, Object?>> exists = await executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+        <Object?>[table],
+      );
+      if (exists.isEmpty) {
+        throw EksException('EKS: Tabelle $table fehlt');
+      }
+    }
+    return <String>{for (final Map<String, Object?> r in rows) r['name'].toString()};
+  }
+
   Future<void> _ensureEksColumns() async {
-    // unternehmen
-    try {
-      final List<Map<String, Object?>> uCols = await executor.runSelect(
-        'PRAGMA table_info(unternehmen)',
-        const <Object?>[],
-      );
-      final Set<String> uNames = <String>{for (final Map<String, Object?> r in uCols) r['name'].toString()};
-      if (!uNames.contains('berufsbezeichnung')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN berufsbezeichnung TEXT');
-      }
-      if (!uNames.contains('kammer_mitgliedschaft')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN kammer_mitgliedschaft TEXT');
-      }
-      if (!uNames.contains('geburtsdatum')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN geburtsdatum TEXT');
-      }
-      if (!uNames.contains('bg_nummer')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN bg_nummer TEXT');
-      }
-      if (!uNames.contains('jobcenter_name')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN jobcenter_name TEXT');
-      }
-      if (!uNames.contains('jobcenter')) {
-        await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN jobcenter TEXT');
-      }
-    } catch (_) {}
+    // unternehmen — fail-closed on DDL
+    final Set<String> uNames = await _tableColumns('unternehmen');
+    if (!uNames.contains('berufsbezeichnung')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN berufsbezeichnung TEXT');
+    }
+    if (!uNames.contains('kammer_mitgliedschaft')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN kammer_mitgliedschaft TEXT');
+    }
+    if (!uNames.contains('geburtsdatum')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN geburtsdatum TEXT');
+    }
+    if (!uNames.contains('bg_nummer')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN bg_nummer TEXT');
+    }
+    if (!uNames.contains('jobcenter_name')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN jobcenter_name TEXT');
+    }
+    if (!uNames.contains('jobcenter')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN jobcenter TEXT');
+    }
     // kategorien
-    try {
-      final List<Map<String, Object?>> kCols = await executor.runSelect(
-        'PRAGMA table_info(kategorien)',
-        const <Object?>[],
-      );
-      final Set<String> kNames = <String>{for (final Map<String, Object?> r in kCols) r['name'].toString()};
-      if (!kNames.contains('eks_kategorie')) {
-        await executor.runCustom('ALTER TABLE kategorien ADD COLUMN eks_kategorie TEXT');
-      }
-    } catch (_) {}
+    final Set<String> kNames = await _tableColumns('kategorien');
+    if (!kNames.contains('eks_kategorie')) {
+      await executor.runCustom('ALTER TABLE kategorien ADD COLUMN eks_kategorie TEXT');
+    }
     // journal
-    try {
-      final List<Map<String, Object?>> jCols = await executor.runSelect(
-        'PRAGMA table_info(journal)',
-        const <Object?>[],
-      );
-      final Set<String> jNames = <String>{for (final Map<String, Object?> r in jCols) r['name'].toString()};
-      if (!jNames.contains('km_anzahl')) {
-        await executor.runCustom('ALTER TABLE journal ADD COLUMN km_anzahl NUMERIC(12,2)');
-      }
-    } catch (_) {}
+    final Set<String> jNames = await _tableColumns('journal');
+    if (!jNames.contains('km_anzahl')) {
+      await executor.runCustom('ALTER TABLE journal ADD COLUMN km_anzahl NUMERIC(12,2)');
+    }
   }
 }
 

@@ -1,4 +1,6 @@
 // ignore_for_file: prefer_initializing_formals, avoid_redundant_argument_values
+// ADR: docs/adr/001-desktop-updater-trust.md — updater disabled until Ed25519 trust root shipped.
+// ponytail: deny-all install gate; upgrade path pinned public key + bytes verification.
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -44,6 +46,7 @@ abstract class ReleasesBackend implements ReleaseFetcher {}
 /// verifier and updater hand-off are configured. Downloaded bytes are still
 /// written to a private temporary artifact so a future verifier can bind the
 /// exact bytes it checks to the install operation.
+/// See ADR 001 for trust deferral rationale.
 abstract class UpdateBackend {
   Future<Map<String, dynamic>?> fetchLatestRelease();
 
@@ -150,6 +153,7 @@ class GithubUpdateBackend implements UpdateBackend, ReleaseFetcher {
 
   @override
   Future<bool> verifySignature(String version, String signature) async {
+    // ponytail: no trust root shipped — deny all; upgrade: pin Ed25519 pubkey, verify artifact bytes + version
     // No trust root is shipped yet. Never treat a marker string as a valid
     // signature and never allow an unbound artifact to reach installation.
     _verifiedVersion = null;
@@ -296,6 +300,7 @@ class DesktopUpdaterServiceImpl implements DesktopUpdaterService {
 
   @override
   Future<bool> verifySignature(UpdateInfo info) async {
+    // ponytail: strict binding — downloaded bytes must match verified info; upgrade adds Ed25519 check over bytes
     final UpdateInfo? downloaded = _downloadedInfo;
     if (downloaded == null ||
         downloaded.version != info.version ||

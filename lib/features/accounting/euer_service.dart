@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import 'package:openaccounting/features/accounting/beleg_typ.dart';
 import 'package:openaccounting/features/accounting/euer_entity.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 
@@ -56,23 +57,32 @@ class EuerService {
       if (zeile < 12 || zeile > 107) {
         continue;
       }
+      // Explicit beleg_typ predicate — not string contains. Cash categories
+      // Zahlung/Ueberzahlung/Ausbuchung/Eroeffnung never count as revenue.
+      // ponytail: whitelist Einnahme/Ausgabe only, explicit exclusion list in BelegTyp.nonRevenue.
+      final String art = r['art']?.toString().trim().toLowerCase() ?? '';
+      final bool isRevenue = art == BelegTyp.einnahme.toLowerCase();
+      final bool isExpense = art == BelegTyp.ausgabe.toLowerCase();
+      if (!isRevenue && !isExpense) {
+        continue;
+      }
       final String raw = r['betrag']?.toString() ?? '0.00';
       final String formatted = money.formatBetrag(raw);
       final String current = zeilen[zeile] ?? '0.00';
       zeilen[zeile] = money.add(current, formatted);
 
       if (zeile != 106 && zeile != 107) {
-        final String art = r['art']?.toString().trim().toLowerCase() ?? '';
         final int cents = money.toCents(formatted);
-        if (art == 'einnahme') {
+        if (isRevenue) {
           einnahmen += cents;
-        } else if (art == 'ausgabe') {
+        } else if (isExpense) {
           ausgaben += cents;
         }
       }
     }
 
     // Zeile 33 — AfA from anlageverzeichnis, not journal.
+    int afaCents = 0;
     try {
       final Set<String> anlageColumns = await _tableColumns('anlageverzeichnis');
       final List<String> selectedColumns = <String>[
@@ -88,7 +98,6 @@ class EuerService {
         'SELECT ${selectedColumns.join(', ')} FROM anlageverzeichnis',
         const <Object?>[],
       );
-      int afaCents = 0;
       for (final Map<String, Object?> r in afaRows) {
         final String status = (r['status']?.toString() ?? 'aktiv').trim().toLowerCase();
         // ponytail: only 'aktiv' counts — 'inaktiv'/'verkauft' skipped, null treated as aktiv.
@@ -209,8 +218,9 @@ class EuerService {
     }
 
     // Gewinn/Verlust follows booking direction; Hinweise 106/107 were
-    // excluded while rows were classified above.
-    final int gewinnCents = einnahmen - ausgaben;
+    // excluded while rows were classified above. AfA row33 is expense
+    // not in journal einnahmen/ausgaben — subtract explicitly.
+    final int gewinnCents = einnahmen - ausgaben - afaCents;
     final String gewinn = money.fromCents(gewinnCents);
 
     return EuerResult(jahr: jahr, zeilen: zeilen, hinweise: hinweise, vorsteuerBetrag: vorsteuer, gewinn: gewinn);

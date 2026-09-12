@@ -65,7 +65,7 @@ Future<void> main() async {
         }),
         themeModeProvider.overrideWith(() => _PreloadedThemeModeNotifier(initialTheme)),
         appLocaleProvider.overrideWith(() => _PreloadedAppLocaleNotifier(initialLocale)),
-        privacyModeProvider.overrideWith(() => _PreloadedPrivacyModeNotifier(initialPrivacyMode)),
+        privacyModeProvider.overrideWith(() => _PreloadedPrivacyModeNotifier(initial: initialPrivacyMode)),
         appServicesProvider.overrideWithValue(services),
       ],
       child: AppScope(services: services, child: const OpenAccountingApp()),
@@ -89,7 +89,7 @@ class _PreloadedAppLocaleNotifier extends AppLocaleNotifier {
 }
 
 class _PreloadedPrivacyModeNotifier extends PrivacyModeNotifier {
-  _PreloadedPrivacyModeNotifier(this._initial);
+  _PreloadedPrivacyModeNotifier({required bool initial}) : _initial = initial; // ignore: prefer_initializing_formals
   final bool _initial;
 
   @override

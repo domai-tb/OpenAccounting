@@ -15,6 +15,8 @@ import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
+/// ponytail: German literals here are display strings for bank workflow; migrate to l10n via AppLocalizations when ARB coverage expands.
+/// Locale literals for sidebar/app shell already via l10n; this page pending full centralization (minimal diff per subtask 12).
 /// Provider for the existing bank-import service, scoped to the active database.
 final bankImportServiceProvider = Provider<BankImportService>((ref) {
   final AppDatabase db = ref.watch(appDatabaseProvider);

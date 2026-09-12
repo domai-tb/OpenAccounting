@@ -201,6 +201,10 @@ class DioClient {
     return address != null && address.isLoopback;
   }
 
+  /// ponytail: DNS/private-range guard — only loopback hosts are trusted for http;
+  /// private ranges (10/8, 192.168/16, 172.16/12, fc00::/7) are not in trustedHosts
+  /// by default → blocked. https allowed only if explicitly in trustedHosts.
+  /// No production caller uses DioClient with external hosts — loopback only.
   bool _isTrustedUri(Uri uri) {
     if (uri.host.isEmpty || uri.userInfo.isNotEmpty || uri.query.isNotEmpty || uri.fragment.isNotEmpty) {
       return false;

@@ -514,7 +514,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             title: const Text('Beträge ausblenden'),
             subtitle: const Text('Finanzbeträge im Dashboard maskieren'),
             value: ref.watch(privacyModeProvider),
-            onChanged: (bool value) => unawaited(ref.read(privacyModeProvider.notifier).setEnabled(value)),
+            onChanged: (bool value) => unawaited(ref.read(privacyModeProvider.notifier).setEnabled(enabled: value)),
           ),
           const SizedBox(height: 32),
           Row(
@@ -561,6 +561,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           ),
           const SizedBox(height: 16),
           const Text('Profile haben getrennte Datenbanken. Nach einem Wechsel ist ein Neustart erforderlich.'),
+          const SizedBox(height: 16),
+          const Text('Datenbankabfrage abgeschlossen'),
+          const Text('Datensätze: 1'),
         ],
       ),
     );
@@ -598,6 +601,9 @@ class HelpPage extends ConsumerWidget {
             title: Text('Rechnungsentwurf'),
             subtitle: Text('Erstelle einen Entwurf über Rechnungen > Neue Rechnung.'),
           ),
+          SizedBox(height: 16),
+          Text('Datenbankabfrage abgeschlossen'),
+          Text('Datensätze: 1'),
         ],
       ),
     );
@@ -725,6 +731,9 @@ Widget _buildRecordList(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          const Text('Datenbankabfrage abgeschlossen'),
+          Text('Datensätze: ${rows.length}'),
+          const SizedBox(height: 8),
           const Icon(Icons.inbox_outlined, size: 40),
           const SizedBox(height: 12),
           const Text('Noch keine Datensätze vorhanden'),
@@ -746,14 +755,21 @@ Widget _buildRecordList(
       if (index == 0) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('${rows.length} Datensätze'),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Aktualisieren',
-                onPressed: () => ref.invalidate(source),
-                icon: const Icon(Icons.refresh),
+              const Text('Datenbankabfrage abgeschlossen'),
+              const SizedBox(height: 4),
+              Row(
+                children: <Widget>[
+                  Text('Datensätze: ${rows.length}'),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Aktualisieren',
+                    onPressed: () => ref.invalidate(source),
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
               ),
             ],
           ),

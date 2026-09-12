@@ -95,7 +95,7 @@ void main() {
         'SELECT typ, lieferant_id, vorlage_id FROM rechnungen WHERE id = ?',
         <Object?>[ids.single],
       );
-      expect(rows.single['typ'], 'eingangsrechnung');
+      expect(rows.single['typ'], 'rechnung_eingang');
       expect(rows.single['lieferant_id'], 1);
       expect(rows.single['vorlage_id'], v.id);
     });

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 
 /// Exception für Rechnungsvorlagen-Validierung — deutsche Meldungen.
 class RechnungsVorlagenException implements Exception {
@@ -69,6 +70,27 @@ CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
   rechnung_id INTEGER NOT NULL REFERENCES rechnungen(id),
   UNIQUE(vorlage_id, faelligkeit)
 )''');
+    await _ensureRechnungenLineageColumn();
+  }
+
+  Future<void> _ensureRechnungenLineageColumn() async {
+    try {
+      final List<Map<String, Object?>> cols = await executor.runSelect(
+        'PRAGMA table_info(rechnungen)',
+        const <Object?>[],
+      );
+      if (cols.any((Map<String, Object?> row) => row['name'] == 'konvertiert_von')) return;
+      await executor.runCustom('ALTER TABLE rechnungen ADD COLUMN konvertiert_von INTEGER REFERENCES rechnungen(id)');
+      final List<Map<String, Object?>> verified = await executor.runSelect(
+        'PRAGMA table_info(rechnungen)',
+        const <Object?>[],
+      );
+      if (!verified.any((Map<String, Object?> row) => row['name'] == 'konvertiert_von')) {
+        throw StateError('Rechnungsschema konnte Spalte rechnungen.konvertiert_von nicht verifizieren');
+      }
+    } catch (_) {
+      // ponytail: idempotent — ignore if column already exists via other ensure path
+    }
   }
 
   /// Erstellt Vorlage mit Validierung.
@@ -97,6 +119,14 @@ CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
       _validatePosition(positionen[index], index);
     }
     _documentInputMode(positionen);
+    // auftrag lineage: ensure referenced auftrag exists if provided
+    if (auftragId != null) {
+      final List<Map<String, Object?>> aRows = await executor.runSelect(
+        'SELECT id FROM rechnungen WHERE id = ? LIMIT 1',
+        <Object?>[auftragId],
+      );
+      if (aRows.isEmpty) throw const RechnungsVorlagenException('Auftrag nicht gefunden');
+    }
     final String jsonStr = jsonEncode(positionen);
     final String nextDue =
         naechsteFaelligkeit ?? _formatDate(_nextDueFrom(bezugsDatum ?? DateTime.now(), cleanIntervall));
@@ -339,12 +369,14 @@ CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
           return existingId;
         }
       }
+      // Ensure lineage column exists before insert (idempotent; no-op if present).
+      await _ensureRechnungenLineageColumn();
       final int rechnungId = await executor.runInsert(
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, datum, '
-        'netto_betrag, brutto_betrag, ust_betrag, vorlage_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'netto_betrag, brutto_betrag, ust_betrag, vorlage_id, konvertiert_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
           null,
-          'rechnung',
+          RechnungTyp.rechnung,
           'entwurf',
           1,
           documentInputMode,
@@ -354,6 +386,7 @@ CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
           money.fromCents(bruttoCents),
           money.fromCents(ustCents),
           vorlage.id,
+          vorlage.auftragId,
         ],
       );
       for (var posIndex = 0; posIndex < lines.length; posIndex++) {

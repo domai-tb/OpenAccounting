@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 
 class BuchungsVorlagenException implements Exception {
   const BuchungsVorlagenException(this.message);
@@ -27,6 +30,8 @@ class BuchungsVorlage {
     this.lieferantId,
     required this.ustSatz,
     required this.eingabemodus,
+    this.vorlageDatenRaw,
+    this.positionen = const <Map<String, dynamic>>[],
   });
 
   final int id;
@@ -44,6 +49,8 @@ class BuchungsVorlage {
   final int? lieferantId;
   final String ustSatz;
   final String eingabemodus;
+  final String? vorlageDatenRaw;
+  final List<Map<String, dynamic>> positionen;
 }
 
 class BuchungsVorlagenRepository {
@@ -62,6 +69,7 @@ class BuchungsVorlagenRepository {
     for (final ({String name, String definition}) column in <({String name, String definition})>[
       (name: 'ust_satz', definition: 'NUMERIC(12,2) DEFAULT 19'),
       (name: 'eingabemodus', definition: "TEXT DEFAULT 'brutto'"),
+      (name: 'vorlage_daten', definition: 'TEXT'),
     ]) {
       final columns = await executor.runSelect('PRAGMA table_info(buchungsvorlagen)', const <Object?>[]);
       if (columns.any((row) => row['name'] == column.name)) continue;
@@ -96,6 +104,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     DateTime? bezugsDatum,
     num ustSatz = 19,
     String eingabemodus = 'brutto',
+    List<Map<String, dynamic>> positionen = const <Map<String, dynamic>>[],
   }) async {
     await ensureSchema();
     final String cleanName = name.trim();
@@ -121,11 +130,19 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     if (!allowedInterval.contains(cleanIntervall)) {
       throw BuchungsVorlagenException('Ungültiges Intervall: $cleanIntervall');
     }
+    for (var index = 0; index < positionen.length; index++) {
+      _validatePosition(positionen[index], index);
+    }
+    // Ensure uniform input mode across positions if provided.
+    if (positionen.isNotEmpty) {
+      _documentInputMode(positionen);
+    }
+    final String jsonStr = jsonEncode(positionen);
     final String nextDue =
         naechsteFaelligkeit ?? _formatDate(_nextDueFrom(bezugsDatum ?? DateTime.now(), cleanIntervall));
     final int id = await executor.runInsert(
       'INSERT INTO buchungsvorlagen (name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, '
-      'naechste_faelligkeit, art, lieferant_id, status, ust_satz, eingabemodus) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)',
+      'naechste_faelligkeit, art, lieferant_id, status, ust_satz, eingabemodus, vorlage_daten) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         cleanName,
         kategorieId,
@@ -140,6 +157,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
         'aktiv',
         cleanUstSatz,
         cleanEingabemodus,
+        jsonStr,
       ],
     );
     final BuchungsVorlage? created = await findById(id);
@@ -151,7 +169,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, naechste_faelligkeit, '
-      'art, lieferant_id, status, ust_satz, eingabemodus FROM buchungsvorlagen WHERE id = ?',
+      'art, lieferant_id, status, ust_satz, eingabemodus, vorlage_daten FROM buchungsvorlagen WHERE id = ?',
       <Object?>[id],
     );
     if (rows.isEmpty) return null;
@@ -162,7 +180,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     await ensureSchema();
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT id, name, kategorie_id, konto_id, betrag, beschreibung, modus, aktiv, intervall, naechste_faelligkeit, '
-      'art, lieferant_id, status, ust_satz, eingabemodus FROM buchungsvorlagen ORDER BY id',
+      'art, lieferant_id, status, ust_satz, eingabemodus, vorlage_daten FROM buchungsvorlagen ORDER BY id',
       const <Object?>[],
     );
     return rows.map(_fromRow).toList(growable: false);
@@ -180,6 +198,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     int? lieferantId,
     num? ustSatz,
     String? eingabemodus,
+    List<Map<String, dynamic>>? positionen,
   }) async {
     await ensureSchema();
     final BuchungsVorlage? cur = await findById(id);
@@ -200,12 +219,19 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
       if (t.isEmpty) throw const BuchungsVorlagenException('Intervall ist Pflicht');
       if (!allowedInterval.contains(t)) throw BuchungsVorlagenException('Ungültiges Intervall: $t');
     }
+    if (positionen != null) {
+      for (var index = 0; index < positionen.length; index++) {
+        _validatePosition(positionen[index], index);
+      }
+      if (positionen.isNotEmpty) _documentInputMode(positionen);
+    }
     final String newName = name?.trim().isEmpty ?? true ? cur.name : name!.trim();
     if (newName.isEmpty) throw const BuchungsVorlagenException('Name ist Pflicht');
     final String? cleanBetrag = betrag == null ? null : _normalizeBetrag(betrag);
+    final String newJson = positionen == null ? (cur.vorlageDatenRaw ?? '[]') : jsonEncode(positionen);
     await executor.runUpdate(
       'UPDATE buchungsvorlagen SET name = ?, betrag = ?, modus = ?, art = ?, intervall = ?, '
-      'kategorie_id = ?, konto_id = ?, lieferant_id = ?, ust_satz = ?, eingabemodus = ? WHERE id = ?',
+      'kategorie_id = ?, konto_id = ?, lieferant_id = ?, ust_satz = ?, eingabemodus = ?, vorlage_daten = ? WHERE id = ?',
       <Object?>[
         newName,
         cleanBetrag ?? cur.betrag,
@@ -217,6 +243,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
         lieferantId ?? cur.lieferantId,
         cleanUstSatz ?? cur.ustSatz,
         cleanEingabemodus ?? cur.eingabemodus,
+        newJson,
         id,
       ],
     );
@@ -332,11 +359,29 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     if (vorlage.modus == 'direkt') {
       // USt-Richtung: Ausgabe => Vorsteuer (KZ 66), Einnahme => Umsatzsteuer (KZ 81)
       final bool isAusgabe = vorlage.art == 'Ausgabe';
-      final int amountCents = _parseCents(vorlage.betrag ?? '0.00');
-      final int rateCents = _parseRateCents(vorlage.ustSatz);
-      final int taxCents = vorlage.eingabemodus == 'brutto'
-          ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
-          : _roundHalfUp(amountCents * rateCents, 10000);
+      // If positions exist, compute sum from them; otherwise fallback to single betrag.
+      int amountCents = 0;
+      int taxCents = 0;
+      if (vorlage.positionen.isNotEmpty) {
+        final List<_BuchungsLine> lines = <_BuchungsLine>[];
+        for (var i = 0; i < vorlage.positionen.length; i++) {
+          final _BuchungsLine line = _calculateLine(vorlage.positionen[i], i, vorlage.eingabemodus);
+          lines.add(line);
+        }
+        for (final _BuchungsLine l in lines) {
+          amountCents += l.bruttoCents;
+          taxCents += l.ustCents;
+        }
+        // Override per-line ust distribution already summed; total tax is sum.
+      } else {
+        amountCents = _parseCents(vorlage.betrag ?? '0.00');
+        final int rateCents = _parseRateCents(vorlage.ustSatz);
+        taxCents = vorlage.eingabemodus == 'brutto'
+            ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
+            : _roundHalfUp(amountCents * rateCents, 10000);
+      }
+      final int rateCentsForJournal = _parseRateCents(vorlage.ustSatz);
+      // For multi-line, journal ust_satz not representative; keep header rate.
       final String? vorsteuerBetrag = isAusgabe ? money.fromCents(taxCents) : null;
       final String belegTyp = vorlage.art;
       final String beschreibung = vorlage.beschreibung ?? vorlage.name;
@@ -363,7 +408,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
             vorlage.kontoId,
             vorlage.id,
             vorsteuerBetrag,
-            vorlage.ustSatz,
+            money.fromCents(rateCentsForJournal),
           ],
         );
         await executor.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[jId, jId]);
@@ -399,14 +444,49 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
         rethrow;
       }
     } else {
-      // beleg Modus: pre-filled Rechnung Draft (Eingangsrechnung).
-      final int amountCents = _parseCents(vorlage.betrag ?? '0.00');
-      final int rateCents = _parseRateCents(vorlage.ustSatz);
-      final int taxCents = vorlage.eingabemodus == 'brutto'
-          ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
-          : _roundHalfUp(amountCents * rateCents, 10000);
-      final int nettoCents = vorlage.eingabemodus == 'brutto' ? amountCents - taxCents : amountCents;
-      final int bruttoCents = vorlage.eingabemodus == 'brutto' ? amountCents : amountCents + taxCents;
+      // beleg Modus: pre-filled Rechnung Draft (rechnung_eingang).
+      // Reuse rechnungspositionen pattern — N lines round-trip, totals derived from lines.
+      final String documentInputMode = vorlage.positionen.isEmpty
+          ? vorlage.eingabemodus
+          : _documentInputMode(vorlage.positionen);
+      final List<_BuchungsLine> lines = <_BuchungsLine>[];
+      var nettoCents = 0;
+      var ustCents = 0;
+      var bruttoCents = 0;
+      if (vorlage.positionen.isNotEmpty) {
+        for (var i = 0; i < vorlage.positionen.length; i++) {
+          final _BuchungsLine line = _calculateLine(vorlage.positionen[i], i, vorlage.eingabemodus);
+          lines.add(line);
+          nettoCents += line.nettoCents;
+          ustCents += line.ustCents;
+          bruttoCents += line.bruttoCents;
+        }
+      } else {
+        // Legacy single-line fallback — still persist one rechnungsposition.
+        final int amountCents = _parseCents(vorlage.betrag ?? '0.00');
+        final int rateCents = _parseRateCents(vorlage.ustSatz);
+        final int tax = vorlage.eingabemodus == 'brutto'
+            ? _roundHalfUp(amountCents * rateCents, 10000 + rateCents)
+            : _roundHalfUp(amountCents * rateCents, 10000);
+        final int netto = vorlage.eingabemodus == 'brutto' ? amountCents - tax : amountCents;
+        final int brutto = vorlage.eingabemodus == 'brutto' ? amountCents : amountCents + tax;
+        nettoCents = netto;
+        ustCents = tax;
+        bruttoCents = brutto;
+        lines.add(
+          _BuchungsLine(
+            bezeichnung: vorlage.beschreibung ?? vorlage.name,
+            menge: '1.000',
+            einzelpreis: money.fromCents(vorlage.eingabemodus == 'brutto' ? brutto : netto),
+            rate: money.fromCents(rateCents),
+            inputMode: vorlage.eingabemodus,
+            nettoCents: netto,
+            ustCents: tax,
+            bruttoCents: brutto,
+            kontoId: vorlage.kontoId,
+          ),
+        );
+      }
       await executor.runCustom('BEGIN');
       try {
         final List<Map<String, Object?>> prior = await executor.runSelect(
@@ -417,23 +497,41 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
           await executor.runCustom('COMMIT');
           return (prior.single['rechnung_id'] as num?)?.toInt() ?? 0;
         }
+        // Canonical type via shared helper (old code used eingangsrechnung).
+        const String canonicalTyp = RechnungTyp.eingang;
         final int rId = await executor.runInsert(
           'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, lieferant_id, datum, '
           'netto_betrag, brutto_betrag, ust_betrag, vorlage_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           <Object?>[
             null,
-            'eingangsrechnung',
+            canonicalTyp,
             'entwurf',
             1,
-            vorlage.eingabemodus,
+            documentInputMode,
             vorlage.lieferantId,
             datumStr,
             money.fromCents(nettoCents),
             money.fromCents(bruttoCents),
-            money.fromCents(taxCents),
+            money.fromCents(ustCents),
             vorlage.id,
           ],
         );
+        for (var posIndex = 0; posIndex < lines.length; posIndex++) {
+          final _BuchungsLine line = lines[posIndex];
+          await executor.runInsert(
+            'INSERT INTO rechnungspositionen (rechnung_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              rId,
+              line.bezeichnung,
+              line.menge,
+              line.einzelpreis,
+              money.fromCents(line.inputMode == 'brutto' ? line.bruttoCents : line.nettoCents),
+              line.rate,
+              posIndex,
+            ],
+          );
+        }
         await executor.runCustom(
           'INSERT OR IGNORE INTO buchungsvorlagen_occurrences '
           '(vorlage_id, faelligkeit, rechnung_id) VALUES (?, ?, ?)',
@@ -473,6 +571,16 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     final bool aktiv = ((r['aktiv'] as num?) ?? 0) != 0;
     final String status = (r['status'] as String?) ?? (aktiv ? 'aktiv' : 'pausiert');
     final int? lieferantId = (r['lieferant_id'] as num?)?.toInt();
+    final String raw = (r['vorlage_daten'] as String?) ?? '[]';
+    List<Map<String, dynamic>> pos = <Map<String, dynamic>>[];
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is List) {
+        pos = decoded.whereType<Map>().map(Map<String, dynamic>.from).toList();
+      }
+    } catch (_) {
+      pos = <Map<String, dynamic>>[];
+    }
     return BuchungsVorlage(
       id: id,
       name: name,
@@ -489,6 +597,8 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
       lieferantId: lieferantId,
       ustSatz: r['ust_satz']?.toString() ?? '19.00',
       eingabemodus: r['eingabemodus']?.toString() ?? 'brutto',
+      vorlageDatenRaw: raw,
+      positionen: pos,
     );
   }
 
@@ -517,4 +627,132 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
   int _parseCents(String raw) => money.parseScaled(raw, scale: 2, field: 'betrag', allowNegative: false);
 
   int _roundHalfUp(int numerator, int denominator) => (numerator + denominator ~/ 2) ~/ denominator;
+
+  void _validatePosition(Map<String, dynamic> position, int index) {
+    final Object? description = position['bezeichnung'];
+    if (description is! String || description.trim().isEmpty) {
+      throw BuchungsVorlagenException('Position $index: bezeichnung ist Pflicht');
+    }
+    try {
+      _scaled(position['menge'] ?? 1, scale: 3, field: 'Position $index menge', allowNegative: false);
+      _scaled(position['einzelpreis'] ?? 0, scale: 4, field: 'Position $index einzelpreis', allowNegative: false);
+      _rate(position['ust_satz'] ?? position['ustSatz'] ?? 19, index);
+      _inputMode(position, index);
+    } on money.MoneyParseException catch (error) {
+      throw BuchungsVorlagenException(error.message);
+    }
+  }
+
+  _BuchungsLine _calculateLine(Map<String, dynamic> position, int index, String fallbackInputMode) {
+    _validatePosition(position, index);
+    final int menge = _scaled(position['menge'] ?? 1, scale: 3, field: 'Position $index menge', allowNegative: false);
+    final int einzelpreis = _scaled(
+      position['einzelpreis'] ?? 0,
+      scale: 4,
+      field: 'Position $index einzelpreis',
+      allowNegative: false,
+    );
+    final int rateCents = _rate(position['ust_satz'] ?? position['ustSatz'] ?? 19, index);
+    final String mode = position.containsKey('eingabemodus')
+        ? _inputMode(position, index)
+        : fallbackInputMode.trim().toLowerCase();
+    if (mode != 'netto' && mode != 'brutto') {
+      throw BuchungsVorlagenException('Position $index: eingabemodus muss netto oder brutto sein');
+    }
+    final int amountCents = _roundHalfUp(einzelpreis * menge, 100000);
+    final int nettoCents;
+    final int bruttoCents;
+    final int ustCents;
+    if (mode == 'brutto') {
+      bruttoCents = amountCents;
+      nettoCents = _roundHalfUp(amountCents * 10000, 10000 + rateCents);
+      ustCents = bruttoCents - nettoCents;
+    } else {
+      nettoCents = amountCents;
+      ustCents = _roundHalfUp(nettoCents * rateCents, 10000);
+      bruttoCents = nettoCents + ustCents;
+    }
+    return _BuchungsLine(
+      bezeichnung: position['bezeichnung'] as String,
+      menge: _formatScaled(menge, scale: 3),
+      einzelpreis: _formatScaled(einzelpreis, scale: 4),
+      rate: money.fromCents(rateCents),
+      inputMode: mode,
+      nettoCents: nettoCents,
+      ustCents: ustCents,
+      bruttoCents: bruttoCents,
+      kontoId: (position['konto_id'] as num?)?.toInt(),
+    );
+  }
+
+  String _inputMode(Map<String, dynamic> position, int index) {
+    final String mode = (position['eingabemodus'] ?? 'netto').toString().trim().toLowerCase();
+    if (mode != 'netto' && mode != 'brutto') {
+      throw BuchungsVorlagenException('Position $index: eingabemodus muss netto oder brutto sein');
+    }
+    return mode;
+  }
+
+  String _documentInputMode(List<Map<String, dynamic>> positions) {
+    String? mode;
+    for (var index = 0; index < positions.length; index++) {
+      final String current = _inputMode(positions[index], index);
+      if (mode != null && mode != current) {
+        throw const BuchungsVorlagenException('Eine wiederkehrende Buchung darf nicht netto und brutto mischen');
+      }
+      mode = current;
+    }
+    return mode ?? 'brutto';
+  }
+
+  int _rate(Object raw, int index) {
+    final int value = _scaled(raw, scale: 2, field: 'Position $index ust_satz', allowNegative: false);
+    if (value > 10000) {
+      throw BuchungsVorlagenException('Position $index: USt-Satz muss zwischen 0 und 100 liegen');
+    }
+    return value;
+  }
+
+  int _scaled(Object raw, {required int scale, required String field, required bool allowNegative}) {
+    if (raw is num) {
+      return money.scaledFromNum(raw, scale: scale, field: field, allowNegative: allowNegative);
+    }
+    return money.parseScaled(raw.toString(), scale: scale, field: field, allowNegative: allowNegative);
+  }
+
+  String _formatScaled(int value, {required int scale}) {
+    final bool negative = value < 0;
+    final int absolute = value.abs();
+    var divisor = 1;
+    for (var i = 0; i < scale; i++) {
+      divisor *= 10;
+    }
+    final String integerPart = (absolute ~/ divisor).toString();
+    final String fraction = (absolute % divisor).toString().padLeft(scale, '0');
+    return '${negative ? '-' : ''}$integerPart.$fraction';
+  }
+}
+
+class _BuchungsLine {
+  const _BuchungsLine({
+    required this.bezeichnung,
+    required this.menge,
+    required this.einzelpreis,
+    required this.rate,
+    required this.inputMode,
+    required this.nettoCents,
+    required this.ustCents,
+    required this.bruttoCents,
+    this.kontoId,
+  });
+
+  final String bezeichnung;
+  final String menge;
+  final String einzelpreis;
+  final String rate;
+  final String inputMode;
+  final int nettoCents;
+  final int ustCents;
+  final int bruttoCents;
+  final int? kontoId;
 }

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/accounting/beleg_typ.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 
 /// Repository für Setup-Persistenz: unternehmen, konten (Kasse), kategorien.
@@ -130,12 +131,25 @@ class SetupRepository {
       );
     }
 
-    // idempotent journal: if already one journal for this konto, reuse/update
-    final List<Map<String, Object?>> journals = await executor.runSelect(
-      'SELECT id FROM journal WHERE konto_id = ? LIMIT 1',
-      <Object?>[kasseId],
-    );
+    await _addColumnIfMissing('journal', 'is_opening_balance', 'INTEGER DEFAULT 0');
     final String datum = _todayIso();
+    // stable marker: WHERE is_opening_balance=1 (not konto_id LIMIT 1 — that clobbered unrelated rows)
+    List<Map<String, Object?>> journals = await executor.runSelect(
+      'SELECT id FROM journal WHERE is_opening_balance = 1 LIMIT 1',
+      const [],
+    );
+    if (journals.isEmpty) {
+      // backfill legacy opening entry created before marker existed
+      final List<Map<String, Object?>> legacy = await executor.runSelect(
+        'SELECT id FROM journal WHERE beleg_typ = ? LIMIT 1',
+        <Object?>[BelegTyp.eroeffnung],
+      );
+      if (legacy.isNotEmpty) {
+        final int legacyId = ((legacy.single['id'] as num?) ?? 0).toInt();
+        await executor.runUpdate('UPDATE journal SET is_opening_balance = 1 WHERE id = ?', <Object?>[legacyId]);
+        journals = await executor.runSelect('SELECT id FROM journal WHERE is_opening_balance = 1 LIMIT 1', const []);
+      }
+    }
     if (journals.isEmpty) {
       // need at least one kategorie for FK — use first available or create fallback 1
       int kategorieId = 1;
@@ -146,17 +160,16 @@ class SetupRepository {
         }
       } catch (_) {}
       await executor.runInsert(
-        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable) '
-        'VALUES (?, ?, ?, ?, ?, ?, 0)',
-        <Object?>[datum, 'Eröffnung Kasse', kategorieId, formatted, 'Einnahme', kasseId],
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable, is_opening_balance) '
+        'VALUES (?, ?, ?, ?, ?, ?, 0, 1)',
+        <Object?>[datum, 'Eröffnung Kasse', kategorieId, formatted, BelegTyp.eroeffnung, kasseId],
       );
     } else {
       final int jid = ((journals.single['id'] as num?) ?? 0).toInt();
-      await executor.runUpdate('UPDATE journal SET betrag = ?, datum = ? WHERE id = ?', <Object?>[
-        formatted,
-        datum,
-        jid,
-      ]);
+      await executor.runUpdate(
+        'UPDATE journal SET betrag = ?, datum = ?, konto_id = ?, beleg_typ = ?, beschreibung = ?, is_opening_balance = 1 WHERE id = ?',
+        <Object?>[formatted, datum, kasseId, BelegTyp.eroeffnung, 'Eröffnung Kasse', jid],
+      );
     }
     // Keep the account read model consistent with its opening journal entry.
     // Setup may be retried, so assign the opening balance instead of adding it.

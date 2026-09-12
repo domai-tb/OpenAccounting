@@ -57,20 +57,33 @@ class BackupService {
     if (!File(databasePath).existsSync() && executor == null) {
       throw StateError('Datenbank nicht gefunden');
     }
-    await Directory(backupDir).create(recursive: true);
+    await _ensureMaintenanceGate();
+    await _ensureBackupDir();
     final destination = await _nextBackupPath();
+    final staged = _temporaryPath(destination, 'backup');
     try {
       if (File(databasePath).existsSync()) {
-        await _backupDatabase(databasePath, destination);
+        if (FileSystemEntity.typeSync(databasePath, followLinks: false) == FileSystemEntityType.link) {
+          throw StateError('Datenbankpfad darf kein symbolischer Link sein');
+        }
+        await _backupDatabase(databasePath, staged);
       } else {
         // In-memory migration tests have no source path; keep their snapshot real.
-        await executor!.runCustom('VACUUM INTO ?', <Object?>[destination]);
+        await executor!.runCustom('VACUUM INTO ?', <Object?>[staged]);
       }
+      await _removeSqliteSidecars(staged);
+      await _validateSqliteFile(staged);
+      await _removeSqliteSidecars(staged);
+      await _atomicReplace(staged, destination);
+      await _removeSqliteSidecars(staged);
       await _rotate();
       await _writeLastBackup();
       return destination;
     } catch (error) {
+      await _deleteFile(staged);
+      await _removeSqliteSidecars(staged);
       await _deleteFile(destination);
+      await _removeSqliteSidecars(destination);
       throw StateError(_backupError(error));
     }
   }
@@ -116,6 +129,8 @@ class BackupService {
       await smbWriter(smbUrl, username, password, remotePath, bytes);
     } catch (_) {
       throw StateError('SMB-Backup fehlgeschlagen');
+    } finally {
+      await _deleteFileStrict(localPath);
     }
     return 'smb://${target.host}$remotePath';
   }
@@ -125,10 +140,12 @@ class BackupService {
     if (!File(backupPath).existsSync()) {
       throw StateError('Backup-Datei nicht gefunden');
     }
+    await _ensureMaintenanceGate();
     await _ensureRestoreReady();
     final staged = _temporaryPath(activeDbPath, 'restore');
     try {
       await _backupDatabase(backupPath, staged);
+      await _removeSqliteSidecars(staged);
       await _validateSqliteFile(staged);
       await _atomicReplace(staged, activeDbPath);
     } catch (_) {
@@ -143,6 +160,7 @@ class BackupService {
     if (!File(encPath).existsSync()) {
       throw StateError('Verschlüsselte Backup-Datei nicht gefunden');
     }
+    await _ensureMaintenanceGate();
     await _ensureRestoreReady();
     final staged = _temporaryPath(activeDbPath, 'restore-encrypted');
     try {
@@ -185,6 +203,15 @@ class BackupService {
   }
 
   Future<void> _backupDatabase(String sourcePath, String destinationPath) async {
+    if (FileSystemEntity.typeSync(destinationPath, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Backup-Ziel darf kein symbolischer Link sein');
+    }
+    // Ensure destination parent not symlink
+    final parent = p.dirname(destinationPath);
+    if (Directory(parent).existsSync() &&
+        FileSystemEntity.typeSync(parent, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Backup-Zielverzeichnis darf kein symbolischer Link sein');
+    }
     Database? source;
     Database? destination;
     try {
@@ -214,7 +241,8 @@ class BackupService {
     final timestamp = _timestamp();
     var path = p.join(backupDir, 'openinvoices_$timestamp.db');
     var suffix = 0;
-    while (File(path).existsSync()) {
+    while (File(path).existsSync() ||
+        FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.link) {
       suffix++;
       path = p.join(backupDir, 'openinvoices_${timestamp}_$suffix.db');
     }
@@ -299,6 +327,14 @@ class BackupService {
   }
 
   Future<void> _atomicReplace(String stagedPath, String destinationPath) async {
+    // ponytail: no-follow + atomic rename; ceiling: single-file atomic, not journaled multi-file
+    if (FileSystemEntity.typeSync(stagedPath, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Staged-Datei darf kein symbolischer Link sein');
+    }
+    if (File(destinationPath).existsSync() &&
+        FileSystemEntity.typeSync(destinationPath, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Zieldatei darf kein symbolischer Link sein');
+    }
     await Directory(p.dirname(destinationPath)).create(recursive: true);
     // Restore runs during restart; stale WAL/SHM files must not replay over the snapshot.
     await _removeSqliteSidecars(destinationPath);
@@ -324,6 +360,10 @@ class BackupService {
     for (final suffix in <String>['-wal', '-shm']) {
       final sidecar = File('$databasePath$suffix');
       if (sidecar.existsSync()) {
+        // no-follow delete
+        if (FileSystemEntity.typeSync(sidecar.path, followLinks: false) == FileSystemEntityType.link) {
+          throw StateError('WAL/SHM darf kein Link sein');
+        }
         await sidecar.delete();
       }
     }
@@ -426,9 +466,41 @@ class BackupService {
     }
   }
 
+  Future<void> _ensureMaintenanceGate() async {
+    // ponytail: global lock check — per-DB exclusive gate if high concurrency matters
+    if (executor == null) return;
+    try {
+      await executor!.runCustom('BEGIN IMMEDIATE');
+      await executor!.runCustom('ROLLBACK');
+    } catch (_) {
+      throw StateError('Backup erfordert Wartungsfenster ohne aktive Transaktion');
+    }
+  }
+
+  Future<void> _ensureBackupDir() async {
+    final dir = Directory(backupDir);
+    if (dir.existsSync()) {
+      if (FileSystemEntity.typeSync(backupDir, followLinks: false) == FileSystemEntityType.link) {
+        throw StateError('Backup-Verzeichnis darf kein symbolischer Link sein');
+      }
+      final String resolved = await dir.resolveSymbolicLinks();
+      if (p.normalize(p.absolute(resolved)) != p.normalize(p.absolute(backupDir))) {
+        throw StateError('Backup-Verzeichnis darf kein symbolischer Link sein');
+      }
+    } else {
+      await dir.create(recursive: true);
+      if (FileSystemEntity.typeSync(backupDir, followLinks: false) == FileSystemEntityType.link) {
+        throw StateError('Backup-Verzeichnis darf kein symbolischer Link sein');
+      }
+    }
+  }
+
   String _backupError(Object error) {
     if (error.toString().toLowerCase().contains('full')) {
       return 'Nicht genügend Speicherplatz für Backup';
+    }
+    if (error.toString().contains('Wartungsfenster')) {
+      return error.toString();
     }
     return 'Lokales Backup fehlgeschlagen';
   }
@@ -450,6 +522,9 @@ class BackupService {
   Future<void> _deleteFileStrict(String path) async {
     final file = File(path);
     if (!file.existsSync()) return;
+    if (FileSystemEntity.typeSync(path, followLinks: false) == FileSystemEntityType.link) {
+      throw StateError('Klartext-Backup darf kein Link sein');
+    }
     await file.delete();
     if (file.existsSync()) {
       throw StateError('Klartext-Backup konnte nicht entfernt werden');

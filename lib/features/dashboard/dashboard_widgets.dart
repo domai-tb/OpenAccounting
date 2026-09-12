@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 
@@ -57,7 +58,7 @@ const Map<String, String> dashboardWidgetRoutes = <String, String>{
   'quick_links': '/',
   'einnahmen_ausgaben': '/reports',
   'ueberfaellige_rechnungen': '/invoices?status=ueberfaellig',
-  'offene_verbindlichkeiten': '/invoices?typ=eingangsrechnung',
+  'offene_verbindlichkeiten': '/invoices?typ=${RechnungTyp.eingang}',
   'kontostand': '/banking',
   'aktivitaets_log': '/reports',
   'lagerbestand': '/inventory',

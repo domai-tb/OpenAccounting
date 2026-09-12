@@ -5,6 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 
 /// Dashboard repository — JSON config in unternehmen.dashboard_config.
@@ -238,8 +239,8 @@ class DashboardRepository {
 
   Future<Map<String, Object?>> fetchOffeneVerbindlichkeiten() async {
     final rows = await executor.runSelect(
-      "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'eingangsrechnung'",
+      'SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s '
+      "FROM rechnungen WHERE status != 'bezahlt' AND typ = '${RechnungTyp.eingang}'",
       const <Object?>[],
     );
     final c = (rows.first['c'] as num?)?.toInt() ?? 0;

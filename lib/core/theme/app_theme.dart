@@ -147,7 +147,7 @@ class PrivacyModeNotifier extends Notifier<bool> {
     }
   }
 
-  Future<void> setEnabled(bool enabled) async {
+  Future<void> setEnabled({required bool enabled}) async {
     state = enabled;
     try {
       final prefs = await SharedPreferences.getInstance();

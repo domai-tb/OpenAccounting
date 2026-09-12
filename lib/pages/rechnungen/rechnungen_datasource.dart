@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
+import 'package:openaccounting/features/pdf/pdf_generator.dart';
+import 'package:openaccounting/features/pdf/pdf_models.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
@@ -206,7 +209,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     );
   }
 
-  Future<int> finalizeRechnung({required int rechnungId, Directory? profileDir}) async {
+  Future<int> finalizeRechnung({
+    required int rechnungId,
+    Directory? profileDir,
+    // ponytail: test-only fault injection — throw after given posting step
+    String? debugFailAt,
+  }) async {
     await _ensureExtraColumns();
     File? createdPdfFile;
     final transaction = executor.beginTransaction();
@@ -214,7 +222,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       await transaction.ensureOpen(_NoopTransactionUser());
       final invoiceRows = await transaction.runSelect(
         '''
-SELECT id, ist_entwurf, datum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag
+SELECT id, ist_entwurf, datum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id
 FROM rechnungen
 WHERE id = ?
 ''',
@@ -390,6 +398,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
       }
 
       // Generate and write PDF artifact under the active profile — atomic via temp+rename.
+      // Snapshot is immutable: built from transaction-captured rows, defensive copy via PdfDocumentSnapshot.from
       final effectiveProfileDir = profileDir?.path ?? this.profileDir;
       final pdfDir = effectiveProfileDir != null ? Directory('$effectiveProfileDir/pdfs') : null;
       String pdfPath;
@@ -400,7 +409,19 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         createdPdfFile = pdfFile;
         tmpFile = File('${pdfDir.path}/$documentNumber.pdf.tmp');
         try {
-          tmpFile.writeAsBytesSync(_minimalPdf());
+          final PdfDocumentSnapshot snapshot = await _buildPdfSnapshot(
+            transaction: transaction,
+            invoice: invoice,
+            posRows: posRows,
+            preview: preview,
+            documentNumber: documentNumber,
+            invoiceDate: invoiceDate,
+            typ: typ,
+            eingabemodus: eingabemodus,
+            companyRows: companyRows,
+          );
+          final Uint8List pdfBytes = await const PdfGenerator().generate(snapshot);
+          tmpFile.writeAsBytesSync(pdfBytes);
           tmpFile.renameSync(pdfFile.path);
         } catch (e) {
           try {
@@ -435,6 +456,105 @@ WHERE id = ? AND ist_entwurf = 1
         throw StateError('Rechnung konnte nicht finalisiert werden');
       }
 
+      // — Atomic accounting postings: journal + receivable + tax in same tx (via RechnungTyp helper — centralized)
+      final kundeId = invoice['kunde_id'];
+      final lieferantId = invoice['lieferant_id'];
+      final bool isIncoming = RechnungTyp.isEingang(typ) || lieferantId != null;
+      final String belegTyp = RechnungTyp.belegTypFor(
+        typ: typ,
+        lieferantId: lieferantId is int ? lieferantId : int.tryParse('${lieferantId ?? ''}'),
+      );
+      final String datumStr = invoiceDate.toIso8601String().substring(0, 10);
+      // Resolve kategorie for journal — first active, fallback 1
+      int? kategorieId;
+      try {
+        final katRows = await transaction.runSelect(
+          'SELECT id FROM kategorien WHERE aktiv = 1 ORDER BY id LIMIT 1',
+          const <Object?>[],
+        );
+        if (katRows.isNotEmpty) {
+          final v = katRows.single['id'];
+          kategorieId = v is int ? v : int.tryParse(v.toString());
+        }
+      } catch (_) {}
+      kategorieId ??= 1;
+      final int journalId = await transaction.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL)',
+        <Object?>[
+          datumStr,
+          'Rechnung $documentNumber',
+          kategorieId,
+          preview.bruttoBetragString,
+          belegTyp,
+          rechnungId,
+          documentNumber,
+        ],
+      );
+      await transaction.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[journalId, journalId]);
+      if (debugFailAt == 'journal') throw StateError('Induced failure after journal');
+      final Object? partnerIdRaw = isIncoming ? lieferantId : kundeId;
+      final String partnerTyp = isIncoming ? 'lieferant' : 'kunde';
+      int? partnerId;
+      if (partnerIdRaw is int) {
+        partnerId = partnerIdRaw;
+      } else if (partnerIdRaw != null) {
+        partnerId = int.tryParse(partnerIdRaw.toString());
+      }
+      // Receivable — skip only if no partner (keeps journal atomic test green)
+      if (partnerId != null && partnerId > 0) {
+        final String forderungTyp = RechnungTyp.forderungTypFor(
+          typ: typ,
+          lieferantId: lieferantId is int ? lieferantId : int.tryParse('${lieferantId ?? ''}'),
+        );
+        final nowIso = DateTime.now().toIso8601String();
+        final int? legacyKundeId = partnerTyp == 'kunde' ? partnerId : null;
+        // ponytail: anfangsbetrag is added by ForderungenRepository.ensureSchema; base table lacks it, so insert via compatible column set
+        // Try with anfangsbetrag first, fallback without.
+        try {
+          await transaction.runInsert(
+            'INSERT INTO forderungen (typ, status, betrag, anfangsbetrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              forderungTyp,
+              'offen',
+              preview.bruttoBetragString,
+              preview.bruttoBetragString,
+              partnerTyp,
+              partnerId,
+              rechnungId,
+              journalId,
+              nowIso,
+              nowIso,
+              legacyKundeId,
+            ],
+          );
+        } catch (_) {
+          await transaction.runInsert(
+            'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              forderungTyp,
+              'offen',
+              preview.bruttoBetragString,
+              partnerTyp,
+              partnerId,
+              rechnungId,
+              journalId,
+              nowIso,
+              nowIso,
+              legacyKundeId,
+            ],
+          );
+        }
+      }
+      if (debugFailAt == 'receivable') throw StateError('Induced failure after receivable');
+      // Tax / input-tax claim — create when VAT present (covers both directions; incoming spec validated)
+      if (preview.ustCents != 0) {
+        await transaction.runInsert(
+          'INSERT INTO vorsteuer_ansprueche (rechnung_id, betrag, faelligkeit, status) VALUES (?, ?, ?, ?)',
+          <Object?>[rechnungId, preview.ustBetragString, datumStr, 'offen'],
+        );
+      }
+      if (debugFailAt == 'tax') throw StateError('Induced failure after tax');
+
       await transaction.send();
       return rechnungId;
     } catch (error, stackTrace) {
@@ -461,6 +581,7 @@ WHERE id = ? AND ist_entwurf = 1
     if (trimmed.length > 500) {
       throw StateError('Stornogrund zu lang');
     }
+    // ponytail: global tx lock, per-invoice lock if throughput matters
     final transaction = executor.beginTransaction();
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
@@ -607,6 +728,81 @@ WHERE id = ? AND ist_entwurf = 1
           'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
           'VALUES (?, ?, ?, ?, ?, ?)',
           <Object?>[aid, datum, menge, 'Storno $docNo', 'storno', stornoId],
+        );
+      }
+      // — Reversal postings negated, linked to original (atomic)
+      final origJournals = await transaction.runSelect('SELECT * FROM journal WHERE rechnung_id = ?', <Object?>[
+        rechnungId,
+      ]);
+      int? reversalJournalId;
+      for (final j in origJournals) {
+        final origBetrag = j['betrag']?.toString() ?? '0';
+        final cents = money.toCents(origBetrag);
+        final reversed = money.fromCents(-cents);
+        final int revId = await transaction.runInsert(
+          'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id, storno_von) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL, ?)',
+          <Object?>[datum, 'Storno $docNo', j['kategorie_id'], reversed, j['beleg_typ'], stornoId, docNo, j['id']],
+        );
+        await transaction.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[revId, revId]);
+        reversalJournalId ??= revId;
+      }
+      final origForderungen = await transaction.runSelect('SELECT * FROM forderungen WHERE rechnung_id = ?', <Object?>[
+        rechnungId,
+      ]);
+      for (final f in origForderungen) {
+        final betragStr = f['betrag']?.toString() ?? '0';
+        final cents = money.toCents(betragStr);
+        final reversed = money.fromCents(-cents);
+        final anfangsStr = f['anfangsbetrag']?.toString() ?? betragStr;
+        final anfangsCents = money.toCents(anfangsStr);
+        final revAnfangs = money.fromCents(-anfangsCents);
+        final nowIso = DateTime.now().toIso8601String();
+        try {
+          await transaction.runInsert(
+            'INSERT INTO forderungen (typ, status, betrag, anfangsbetrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              f['typ'],
+              'offen',
+              reversed,
+              revAnfangs,
+              f['partner_typ'],
+              f['partner_id'],
+              stornoId,
+              reversalJournalId,
+              nowIso,
+              nowIso,
+              f['kunde_id'],
+            ],
+          );
+        } catch (_) {
+          await transaction.runInsert(
+            'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              f['typ'],
+              'offen',
+              reversed,
+              f['partner_typ'],
+              f['partner_id'],
+              stornoId,
+              reversalJournalId,
+              nowIso,
+              nowIso,
+              f['kunde_id'],
+            ],
+          );
+        }
+      }
+      final origVorsteuer = await transaction.runSelect(
+        'SELECT * FROM vorsteuer_ansprueche WHERE rechnung_id = ?',
+        <Object?>[rechnungId],
+      );
+      for (final v in origVorsteuer) {
+        final betragStr = v['betrag']?.toString() ?? '0';
+        final cents = money.toCents(betragStr);
+        final reversed = money.fromCents(-cents);
+        await transaction.runInsert(
+          'INSERT INTO vorsteuer_ansprueche (rechnung_id, betrag, faelligkeit, status) VALUES (?, ?, ?, ?)',
+          <Object?>[stornoId, reversed, v['faelligkeit'] ?? datum, 'offen'],
         );
       }
       await transaction.runUpdate(
@@ -1123,7 +1319,219 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
 
   static String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
-  /// Minimal valid PDF — placeholder until full PdfGenerator integration.
+  Future<PdfDocumentSnapshot> _buildPdfSnapshot({
+    required TransactionExecutor transaction,
+    required Map<String, Object?> invoice,
+    required List<Map<String, Object?>> posRows,
+    required VorschauResult preview,
+    required String documentNumber,
+    required DateTime invoiceDate,
+    required String typ,
+    required String eingabemodus,
+    required List<Map<String, Object?>> companyRows,
+  }) async {
+    final Map<String, Object?> companyRow = companyRows.isEmpty ? const <String, Object?>{} : companyRows.single;
+    final PdfCompanySnapshot companySnapshot = PdfCompanySnapshot.from(
+      name: (companyRow['name']?.toString().trim().isNotEmpty ?? false) ? companyRow['name'].toString() : 'Firma',
+      street: _companyStreet(companyRow),
+      postalCode: companyRow['plz']?.toString(),
+      city: companyRow['ort']?.toString(),
+      country: companyRow['land']?.toString(),
+      phone: companyRow['telefon']?.toString() ?? companyRow['phone']?.toString(),
+      email: companyRow['email']?.toString(),
+      website: companyRow['website']?.toString(),
+      taxNumber: companyRow['steuernummer']?.toString(),
+      vatId: companyRow['ust_idnr']?.toString() ?? companyRow['ust_id']?.toString(),
+      iban: companyRow['iban']?.toString(),
+      bic: companyRow['bic']?.toString(),
+    );
+    PdfCustomerSnapshot customerSnapshot = const PdfCustomerSnapshot(name: 'Unbekannt');
+    final Object? kundeId = invoice['kunde_id'];
+    final Object? lieferantId = invoice['lieferant_id'];
+    try {
+      if (kundeId != null) {
+        final rows = await transaction.runSelect('SELECT * FROM kunden WHERE id = ?', <Object?>[kundeId]);
+        if (rows.isNotEmpty) {
+          customerSnapshot = _customerFromKunde(rows.single);
+        }
+      } else if (lieferantId != null) {
+        final rows = await transaction.runSelect('SELECT * FROM lieferanten WHERE id = ?', <Object?>[lieferantId]);
+        if (rows.isNotEmpty) {
+          customerSnapshot = _customerFromLieferant(rows.single);
+        }
+      }
+    } catch (_) {}
+    final List<PdfPositionSnapshot> pdfPositions = _pdfPositionsFromRows(posRows, eingabemodus);
+    final PdfTemplate template = PdfTemplate.fromRaw(companyRow['pdf_vorlage']?.toString());
+    final PdfDocumentType docType = () {
+      try {
+        return PdfDocumentType.fromRaw(typ);
+      } catch (_) {
+        return PdfDocumentType.rechnung;
+      }
+    }();
+    PdfDocumentTextsSnapshot texts = const PdfDocumentTextsSnapshot();
+    try {
+      texts = PdfDocumentTextsSnapshot(
+        rechnung: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_rechnung']?.toString(),
+          schlusstext: companyRow['schlusstext_rechnung']?.toString(),
+        ),
+        angebot: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_angebot']?.toString(),
+          schlusstext: companyRow['schlusstext_angebot']?.toString(),
+        ),
+        auftrag: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_auftrag']?.toString(),
+          schlusstext: companyRow['schlusstext_auftrag']?.toString(),
+        ),
+        proforma: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_proforma']?.toString(),
+          schlusstext: companyRow['schlusstext_proforma']?.toString(),
+        ),
+        lieferschein: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_lieferschein']?.toString(),
+          schlusstext: companyRow['schlusstext_lieferschein']?.toString(),
+        ),
+        gutschrift: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_gutschrift']?.toString(),
+          schlusstext: companyRow['schlusstext_gutschrift']?.toString(),
+        ),
+        storno: PdfTypeTextSnapshot(
+          einleitungstext: companyRow['einleitungstext_storno']?.toString(),
+          schlusstext: companyRow['schlusstext_storno']?.toString(),
+        ),
+      );
+    } catch (_) {}
+    return PdfDocumentSnapshot.from(
+      documentType: docType,
+      template: template,
+      documentNumber: documentNumber,
+      company: companySnapshot,
+      customer: customerSnapshot,
+      positions: pdfPositions,
+      totals: PdfTotalsSnapshot(
+        netAmount: preview.nettoBetrag,
+        taxAmount: preview.ustBetrag,
+        grossAmount: preview.bruttoBetrag,
+      ),
+      texts: texts,
+      documentDate: invoiceDate,
+    );
+  }
+
+  static String? _companyStreet(Map<String, Object?> row) {
+    final String? strasse = row['strasse']?.toString();
+    final String? hausnummer = row['hausnummer']?.toString();
+    if (strasse == null || strasse.trim().isEmpty) return null;
+    if (hausnummer != null && hausnummer.trim().isNotEmpty) return '$strasse $hausnummer';
+    return strasse;
+  }
+
+  static PdfCustomerSnapshot _customerFromKunde(Map<String, Object?> row) {
+    final String street = [
+      row['strasse']?.toString(),
+      row['hausnummer']?.toString(),
+    ].where((e) => e != null && e.trim().isNotEmpty).join(' ');
+    return PdfCustomerSnapshot(
+      name: (row['name']?.toString().trim().isNotEmpty ?? false) ? row['name'].toString() : 'Kunde',
+      company: row['firma']?.toString(),
+      street: street.isEmpty ? null : street,
+      postalCode: row['plz']?.toString(),
+      city: row['ort']?.toString(),
+      country: row['land']?.toString(),
+    );
+  }
+
+  static PdfCustomerSnapshot _customerFromLieferant(Map<String, Object?> row) {
+    final String street = [
+      row['strasse']?.toString(),
+      row['hausnummer']?.toString(),
+    ].where((e) => e != null && e.trim().isNotEmpty).join(' ');
+    return PdfCustomerSnapshot(
+      name: (row['name']?.toString().trim().isNotEmpty ?? false) ? row['name'].toString() : 'Lieferant',
+      company: row['firma']?.toString(),
+      street: street.isEmpty ? null : street,
+      postalCode: row['plz']?.toString(),
+      city: row['ort']?.toString(),
+      country: row['land']?.toString(),
+    );
+  }
+
+  static List<PdfPositionSnapshot> _pdfPositionsFromRows(List<Map<String, Object?>> posRows, String eingabemodus) {
+    final List<PdfPositionSnapshot> result = <PdfPositionSnapshot>[];
+    for (var index = 0; index < posRows.length; index++) {
+      final Map<String, Object?> r = posRows[index];
+      final String description = r['bezeichnung']?.toString() ?? '';
+      final num quantity = _asNum(r['menge']);
+      final num unitPrice = _asNum(r['einzelpreis']);
+      final num taxRate = _asNum(r['ust_satz']);
+      final num grossRaw = _asNum(r['gesamt']);
+      final int rateScaled = _percentScaled(taxRate);
+      // undiscounted line via integer arithmetic for consistency
+      int netCents;
+      int grossCents;
+      int taxCents;
+      try {
+        final int qtyScaled = money.scaledFromNum(quantity, scale: 3, field: 'menge', allowNegative: false);
+        final int priceScaled = money.scaledFromNum(unitPrice, scale: 4, field: 'einzelpreis', allowNegative: false);
+        final int lineUndiscounted = _roundHalfUp(priceScaled * qtyScaled, 100000);
+        final int discountScaled = r['rabatt_prozent'] == null
+            ? 0
+            : money.scaledFromNum(_asNum(r['rabatt_prozent']), scale: 2, field: 'rabatt', allowNegative: false);
+        final int lineCents = discountScaled == 0
+            ? lineUndiscounted
+            : _roundHalfUp(lineUndiscounted * (10000 - discountScaled), 10000);
+        if (eingabemodus == 'netto') {
+          netCents = lineCents;
+          taxCents = _roundHalfUp(netCents * rateScaled, 10000);
+          grossCents = netCents + taxCents;
+        } else {
+          grossCents = lineCents;
+          netCents = _roundHalfUp(grossCents * 10000, 10000 + rateScaled);
+          taxCents = grossCents - netCents;
+        }
+      } catch (_) {
+        // fallback to grossRaw approximation
+        if (eingabemodus == 'netto') {
+          netCents = money.toCents(grossRaw.toString());
+          taxCents = _roundHalfUp(netCents * rateScaled, 10000);
+          grossCents = netCents + taxCents;
+        } else {
+          grossCents = money.toCents(grossRaw.toString());
+          netCents = _roundHalfUp(grossCents * 10000, 10000 + rateScaled);
+          taxCents = grossCents - netCents;
+        }
+      }
+      result.add(
+        PdfPositionSnapshot(
+          description: description,
+          quantity: quantity,
+          unitPrice: unitPrice,
+          netAmount: netCents / 100.0,
+          taxRate: taxRate,
+          taxAmount: taxCents / 100.0,
+          grossAmount: grossCents / 100.0,
+          position: r['position'] == null ? index : _asInt(r['position']),
+          discountPercent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+        ),
+      );
+    }
+    return result;
+  }
+
+  static int _percentScaled(num value) {
+    try {
+      return money.scaledFromNum(value, scale: 2, field: 'percent', allowNegative: false);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static int _roundHalfUp(int numerator, int denominator) => (numerator + denominator ~/ 2) ~/ denominator;
+
+  /// Minimal valid PDF — placeholder retained for fallback; finalize now uses PdfGenerator.
+  // ignore: unused_element
   static List<int> _minimalPdf() => [
     0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, // %PDF-1.4
     0x0a, 0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a, // \n%âãÏÓ\n

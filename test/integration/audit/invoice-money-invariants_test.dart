@@ -48,8 +48,10 @@ void main() {
     });
 
     test('test_invoice_money_invariants_2_2_negative_caller_amount_is_not_normalized', () async {
-      final result = VorschauService.calculate(eingabemodus: 'netto', positionen: [_pos('Artikel 1', 1, -100, 19)]);
-      expect(result.nettoBetrag, lessThan(0));
+      expect(
+        () => VorschauService.calculate(eingabemodus: 'netto', positionen: [_pos('Artikel 1', 1, -100, 19)]),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('test_invoice_money_invariants_3_1_generated_correction_reverses_source', () async {

@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/accounting/beleg_typ.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 
 class Forderung {
   const Forderung({
@@ -61,13 +63,12 @@ class ForderungenRepository {
 
   final QueryExecutor executor;
 
-  Future<void>? _schemaReady;
-
   static const Set<String> _typSet = {'rechnung', 'rechnung_eingang', 'journal'};
   static const Set<String> _statusSet = {'offen', 'teilbezahlt', 'bezahlt', 'ausgebucht'};
   static const Set<String> _partnerSet = {'kunde', 'lieferant'};
 
-  Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
+  // ponytail: O(n) scan, cache by version if needed
+  Future<void> ensureSchema() => _ensureSchema();
 
   Future<void> _ensureSchema() async {
     final List<Map<String, Object?>> columnRows = await executor.runSelect(
@@ -92,7 +93,15 @@ class ForderungenRepository {
       if (columns.contains(entry.key)) {
         continue;
       }
-      await executor.runCustom('ALTER TABLE forderungen ADD COLUMN ${entry.key} ${entry.value}');
+      try {
+        await executor.runCustom('ALTER TABLE forderungen ADD COLUMN ${entry.key} ${entry.value}');
+      } catch (error) {
+        // concurrent ALTER raced — column may now exist
+        final String msg = error.toString().toLowerCase();
+        if (!msg.contains('duplicate')) {
+          rethrow;
+        }
+      }
       final List<Map<String, Object?>> verifiedRows = await executor.runSelect(
         'PRAGMA table_info(forderungen)',
         const <Object?>[],
@@ -193,15 +202,34 @@ CREATE TABLE IF NOT EXISTS forderung_zahlungen (
     }
     final typRaw = (r['typ'] as String?) ?? 'rechnung';
     final brutto = _asNum(r['brutto_betrag']) ?? 0;
-    final isEingang = typRaw == 'rechnung_eingang' || r['lieferant_id'] != null;
-    final typ = isEingang ? 'rechnung_eingang' : 'rechnung';
+    final isEingang = RechnungTyp.isEingang(typRaw) || r['lieferant_id'] != null;
+    final typ = RechnungTyp.forderungTypFor(typ: typRaw, lieferantId: r['lieferant_id'] as int?);
     final partnerTyp = isEingang ? 'lieferant' : 'kunde';
     final partnerId = isEingang ? (r['lieferant_id'] as int?) : (r['kunde_id'] as int?);
     if (partnerId == null) return null;
 
     final existing = await executor.runSelect('SELECT id FROM forderungen WHERE rechnung_id = ? LIMIT 1', [rechnungId]);
     if (existing.isNotEmpty) return findById(_asNum(existing.single['id'])?.toInt() ?? 0);
-    return create(typ: typ, betrag: brutto, partnerTyp: partnerTyp, partnerId: partnerId, rechnungId: rechnungId);
+    try {
+      return await create(
+        typ: typ,
+        betrag: brutto,
+        partnerTyp: partnerTyp,
+        partnerId: partnerId,
+        rechnungId: rechnungId,
+      );
+    } catch (error, stackTrace) {
+      if (error.toString().toUpperCase().contains('UNIQUE') ||
+          (error is ForderungenException && error.message.contains('existiert bereits'))) {
+        final retry = await executor.runSelect('SELECT id FROM forderungen WHERE rechnung_id = ? LIMIT 1', [
+          rechnungId,
+        ]);
+        if (retry.isNotEmpty) {
+          return findById(_asNum(retry.single['id'])?.toInt() ?? 0);
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<Forderung?> findById(int id) async {
@@ -304,7 +332,7 @@ CREATE TABLE IF NOT EXISTS forderung_zahlungen (
       final int paymentCents = centsBetrag < centsOffen ? centsBetrag : centsOffen;
       final int payJournalId = await transaction.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        <Object?>[now, 'Zahlung Forderung #$forderungId', _fmtCents(paymentCents), 'Einnahme', f.rechnungId],
+        <Object?>[now, 'Zahlung Forderung #$forderungId', _fmtCents(paymentCents), BelegTyp.zahlung, f.rechnungId],
       );
       await transaction.runInsert(
         'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
@@ -325,7 +353,13 @@ CREATE TABLE IF NOT EXISTS forderung_zahlungen (
         final int excessCents = centsBetrag - centsOffen;
         final int excessJournalId = await transaction.runInsert(
           'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          <Object?>[now, 'Überzahlung Forderung #$forderungId', _fmtCents(excessCents), 'Einnahme', f.rechnungId],
+          <Object?>[
+            now,
+            'Überzahlung Forderung #$forderungId',
+            _fmtCents(excessCents),
+            BelegTyp.ueberzahlung,
+            f.rechnungId,
+          ],
         );
         await transaction.runInsert(
           'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum) VALUES (?, ?, ?, ?, ?)',
@@ -381,7 +415,13 @@ CREATE TABLE IF NOT EXISTS forderung_zahlungen (
       await transaction.ensureOpen(_NoopTransactionUser());
       final journalId = await transaction.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        <Object?>[now, 'Forderungsausfall: ${grund.trim()}', _fmtCents(_toCents(f.betrag)), 'Ausgabe', f.rechnungId],
+        <Object?>[
+          now,
+          'Forderungsausfall: ${grund.trim()}',
+          _fmtCents(_toCents(f.betrag)),
+          BelegTyp.ausbuchung,
+          f.rechnungId,
+        ],
       );
       await transaction.runInsert(
         'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum) VALUES (?, ?, ?, ?, ?)',
