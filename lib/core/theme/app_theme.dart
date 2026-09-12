@@ -126,3 +126,36 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 }
 
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+
+/// App-wide privacy mode for financial amounts. Dashboard values follow this
+/// persisted setting by default.
+class PrivacyModeNotifier extends Notifier<bool> {
+  static const String _key = 'openaccounting.privacy_mode';
+
+  @override
+  bool build() {
+    Future.microtask(_loadAsync);
+    return false;
+  }
+
+  Future<void> _loadAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = prefs.getBool(_key) ?? false;
+    } catch (_) {
+      // Keep the visible default when preferences are unavailable.
+    }
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_key, enabled);
+    } catch (_) {
+      // Current-session state remains useful if persistence fails.
+    }
+  }
+}
+
+final privacyModeProvider = NotifierProvider<PrivacyModeNotifier, bool>(PrivacyModeNotifier.new);

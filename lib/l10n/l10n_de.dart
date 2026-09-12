@@ -55,6 +55,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sidebarSettings => 'Einstellungen';
 
   @override
+  String get sidebarHelp => 'Hilfe';
+
+  @override
+  String get sidebarMenu => 'Menü';
+
+  @override
+  String get sidebarSectionOverview => 'ÜBERSICHT';
+
+  @override
+  String get sidebarSectionBusiness => 'GESCHÄFT';
+
+  @override
+  String get sidebarSectionTaxes => 'STEUERN';
+
+  @override
+  String get workspaceLocalProfile => 'Lokales Profil';
+
+  @override
+  String get workspaceManage => 'Profil verwalten';
+
+  @override
+  String get localTitle => 'Lokal';
+
+  @override
+  String get localDescription => 'Alle Daten werden lokal gespeichert — kein Cloud-Zugriff.';
+
+  @override
+  String get close => 'Schließen';
+
+  @override
   String get backendUnreachable => 'Backend nicht erreichbar';
 
   @override

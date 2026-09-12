@@ -44,9 +44,9 @@ class MoneyText extends StatelessWidget {
 
   String get _formatted {
     if (obscured) {
-      // Privacy masking: bullets with currency, still de-DE spacing.
-      // Use NBSP before € to match NumberFormat.currency spacing.
-      return '••••\u00A0€';
+      // Privacy masking: never expose the underlying amount in either text or
+      // semantics. Keep the currency marker so the column remains meaningful.
+      return '••••\u00A0$currencySymbol';
     }
     return formatMoney(amount, locale: locale, symbol: currencySymbol);
   }
@@ -63,12 +63,16 @@ class MoneyText extends StatelessWidget {
     // Padding not visual here, but token usage proves design-system compliance.
     // Using SizedBox with AppSpacing inside Align is token-consuming.
     return Semantics(
-      label: semanticsLabel ?? _formatted,
+      label: semanticsLabel ?? (obscured ? 'Betrag verborgen' : _formatted),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         child: Align(
           alignment: Alignment.centerRight,
-          child: Text(_formatted, style: effective, textAlign: textAlign, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(_formatted, style: effective, textAlign: textAlign),
+          ),
         ),
       ),
     );

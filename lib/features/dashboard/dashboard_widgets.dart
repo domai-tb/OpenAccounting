@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 
@@ -75,6 +76,7 @@ class DashboardCard extends StatelessWidget {
     this.error,
     this.emptyMessage,
     this.onTap,
+    this.onRetry,
     super.key,
   });
 
@@ -86,6 +88,7 @@ class DashboardCard extends StatelessWidget {
   final String? error;
   final String? emptyMessage;
   final VoidCallback? onTap;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -95,10 +98,29 @@ class DashboardCard extends StatelessWidget {
         child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()),
       );
     } else if (error != null) {
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      body = SingleChildScrollView(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  textAlign: TextAlign.center,
+                ),
+                if (onRetry != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Erneut versuchen'),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       );
     } else if (emptyMessage != null && content == null) {
@@ -109,28 +131,23 @@ class DashboardCard extends StatelessWidget {
       body = content ?? const SizedBox.shrink();
     }
 
-    final card = Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                if (icon != null) ...<Widget>[Icon(icon, size: 18), const SizedBox(width: 8)],
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
-              ],
-            ),
-            if (subtitle != null) ...<Widget>[
-              const SizedBox(height: 4),
-              Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+    final card = AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              if (icon != null) ...<Widget>[Icon(icon, size: 18), const SizedBox(width: 8)],
+              Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
             ],
-            const SizedBox(height: 12),
-            Expanded(child: body),
+          ),
+          if (subtitle != null) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
           ],
-        ),
+          const SizedBox(height: 12),
+          Expanded(child: body),
+        ],
       ),
     );
 

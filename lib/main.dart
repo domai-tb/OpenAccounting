@@ -6,6 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/app.dart';
+import 'package:openaccounting/core/app_locale.dart';
+import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
@@ -13,6 +16,9 @@ import 'package:openaccounting/features/desktop/desktop_tray.dart';
 import 'package:openaccounting/features/desktop/window_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
+
+DesktopTrayService? _desktopTrayService;
+final _WindowPersistenceListener _windowPersistenceListener = _WindowPersistenceListener();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,15 +31,8 @@ Future<void> main() async {
       }
     }
     try {
-      final WindowStateService windowState = WindowStateService();
-      // ponytail: fire-and-forget, never block launch
-      unawaited(windowState.init().catchError((Object _) {}));
-    } catch (_) {
-      // VM / unsupported — continue
-    }
-    try {
       final DesktopTrayService tray = createDesktopTrayService();
-      // ponytail: fire-and-forget, never block launch
+      _desktopTrayService = tray;
       unawaited(tray.init().catchError((Object _) => false));
     } catch (_) {
       // unsupported platform — continue without tray
@@ -45,6 +44,7 @@ Future<void> main() async {
   await Directory(profileDirectory).create(recursive: true);
   final db = AppDatabase.forProfile(profileDirectory);
   await db.ensureOpen();
+  final AppServices services = AppServices(db);
   // Preload theme before runApp to avoid flash — DESIGN §7 System persist.
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? savedTheme = prefs.getString('openaccounting.theme_mode');
@@ -52,6 +52,8 @@ Future<void> main() async {
     (ThemeMode e) => e.name == savedTheme,
     orElse: () => ThemeMode.system,
   );
+  final bool initialPrivacyMode = prefs.getBool('openaccounting.privacy_mode') ?? false;
+  final Locale initialLocale = parseAppLocale(prefs.getString(appLocalePreferenceKey));
   runApp(
     ProviderScope(
       overrides: [
@@ -62,8 +64,11 @@ Future<void> main() async {
           return db;
         }),
         themeModeProvider.overrideWith(() => _PreloadedThemeModeNotifier(initialTheme)),
+        appLocaleProvider.overrideWith(() => _PreloadedAppLocaleNotifier(initialLocale)),
+        privacyModeProvider.overrideWith(() => _PreloadedPrivacyModeNotifier(initialPrivacyMode)),
+        appServicesProvider.overrideWithValue(services),
       ],
-      child: const OpenAccountingApp(),
+      child: AppScope(services: services, child: const OpenAccountingApp()),
     ),
   );
 }
@@ -75,8 +80,25 @@ class _PreloadedThemeModeNotifier extends ThemeModeNotifier {
   ThemeMode build() => _initial;
 }
 
+class _PreloadedAppLocaleNotifier extends AppLocaleNotifier {
+  _PreloadedAppLocaleNotifier(this._initial);
+  final Locale _initial;
+
+  @override
+  Locale build() => _initial;
+}
+
+class _PreloadedPrivacyModeNotifier extends PrivacyModeNotifier {
+  _PreloadedPrivacyModeNotifier(this._initial);
+  final bool _initial;
+
+  @override
+  bool build() => _initial;
+}
+
 Future<void> _setupWindow() async {
   await windowManager.ensureInitialized();
+  windowManager.addListener(_windowPersistenceListener);
   const WindowOptions windowOptions = WindowOptions(size: Size(1280, 800), center: true, minimumSize: Size(960, 640));
   if (await _tryRestore(windowOptions)) {
     unawaited(_persistBounds());
@@ -154,4 +176,31 @@ Future<void> _persistBounds() async {
     await prefs.setBool('window_maximized', maximized);
     // off-screen guard verified via isOffScreen on next launch
   } catch (_) {}
+}
+
+class _WindowPersistenceListener with WindowListener {
+  void _persist() {
+    unawaited(_persistBounds());
+  }
+
+  @override
+  void onWindowClose() {
+    _persist();
+    final DesktopTrayService? tray = _desktopTrayService;
+    if (tray != null) {
+      unawaited(tray.dispose());
+    }
+  }
+
+  @override
+  void onWindowMaximize() => _persist();
+
+  @override
+  void onWindowUnmaximize() => _persist();
+
+  @override
+  void onWindowMoved() => _persist();
+
+  @override
+  void onWindowResized() => _persist();
 }

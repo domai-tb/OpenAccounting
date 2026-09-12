@@ -115,9 +115,7 @@ void main() {
           reason: 'AppCard border must be 1px per DESIGN §10 (subtle border for secondary cards)',
         );
       } else {
-        // Allow border via theme, but card source must reference BorderSide.
-        // Fallback: check AppCard source uses AppRadius.card and BorderSide.
-        expect(true, isTrue, reason: 'border check skipped — verified via source grep if needed');
+        fail('AppCard must expose its 1px border in the rendered decoration');
       }
     });
 

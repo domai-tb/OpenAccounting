@@ -182,6 +182,66 @@ abstract class AppLocalizations {
   /// **'Einstellungen'**
   String get sidebarSettings;
 
+  /// No description provided for @sidebarHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Hilfe'**
+  String get sidebarHelp;
+
+  /// No description provided for @sidebarMenu.
+  ///
+  /// In de, this message translates to:
+  /// **'Menü'**
+  String get sidebarMenu;
+
+  /// No description provided for @sidebarSectionOverview.
+  ///
+  /// In de, this message translates to:
+  /// **'ÜBERSICHT'**
+  String get sidebarSectionOverview;
+
+  /// No description provided for @sidebarSectionBusiness.
+  ///
+  /// In de, this message translates to:
+  /// **'GESCHÄFT'**
+  String get sidebarSectionBusiness;
+
+  /// No description provided for @sidebarSectionTaxes.
+  ///
+  /// In de, this message translates to:
+  /// **'STEUERN'**
+  String get sidebarSectionTaxes;
+
+  /// No description provided for @workspaceLocalProfile.
+  ///
+  /// In de, this message translates to:
+  /// **'Lokales Profil'**
+  String get workspaceLocalProfile;
+
+  /// No description provided for @workspaceManage.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil verwalten'**
+  String get workspaceManage;
+
+  /// No description provided for @localTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Lokal'**
+  String get localTitle;
+
+  /// No description provided for @localDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Daten werden lokal gespeichert — kein Cloud-Zugriff.'**
+  String get localDescription;
+
+  /// No description provided for @close.
+  ///
+  /// In de, this message translates to:
+  /// **'Schließen'**
+  String get close;
+
   /// No description provided for @backendUnreachable.
   ///
   /// In de, this message translates to:

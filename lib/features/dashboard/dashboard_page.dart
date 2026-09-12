@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:openaccounting/design_system/components/app_money.dart';
+import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
@@ -40,9 +43,15 @@ class DashboardPageImpl extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cfgAsync = ref.watch(dashboardConfigProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Übersicht'),
+      appBar: AppPageHeader(
+        title: 'Übersicht',
+        showFilterToolbar: false,
         actions: <Widget>[
+          FilledButton.icon(
+            onPressed: () => context.go('/invoices/new'),
+            icon: const Icon(Icons.add),
+            label: const Text('Neue Rechnung'),
+          ),
           IconButton(icon: const Icon(Icons.tune), tooltip: 'Anpassen', onPressed: () => _showConfig(context)),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -53,8 +62,10 @@ class DashboardPageImpl extends ConsumerWidget {
       ),
       body: cfgAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, StackTrace stackTrace) =>
-            Center(child: Text(_dashboardErrorMessage('config', e, stackTrace))),
+        error: (Object e, StackTrace stackTrace) => _DashboardErrorState(
+          message: _dashboardErrorMessage('config', e, stackTrace),
+          onRetry: () => ref.invalidate(dashboardConfigProvider),
+        ),
         data: (DashboardConfig cfg) {
           final List<String> visible = cfg.order.where((String id) => cfg.visibility[id] ?? true).toList();
           return LayoutBuilder(
@@ -67,7 +78,7 @@ class DashboardPageImpl extends ConsumerWidget {
                     crossAxisCount: cols,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 1.6,
+                    childAspectRatio: 1.9,
                   ),
                   itemCount: visible.length,
                   itemBuilder: (BuildContext context, int i) {
@@ -112,8 +123,10 @@ class _DashboardConfigSheet extends ConsumerWidget {
             Expanded(
               child: cfgAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (Object e, StackTrace stackTrace) =>
-                    Center(child: Text(_dashboardErrorMessage('config', e, stackTrace))),
+                error: (Object e, StackTrace stackTrace) => _DashboardErrorState(
+                  message: _dashboardErrorMessage('config', e, stackTrace),
+                  onRetry: () => ref.invalidate(dashboardConfigProvider),
+                ),
                 data: (DashboardConfig cfg) {
                   final List<String> order = cfg.order;
                   return ReorderableListView.builder(
@@ -166,27 +179,33 @@ class _WidgetCard extends ConsumerWidget {
     final String title = dashboardWidgetTitles[id] ?? id;
     final IconData? icon = dashboardWidgetIcons[id];
     final String? route = dashboardWidgetRoutes[id];
+    final bool inventoryUnavailable = id == 'lagerwarnung' || id == 'lagerbestand';
+    final bool privacyMode = ref.watch(privacyModeProvider);
     return dataAsync.when(
       loading: () => DashboardCard(title: title, icon: icon, isLoading: true),
-      error: (Object e, StackTrace stackTrace) =>
-          DashboardCard(title: title, icon: icon, error: _dashboardErrorMessage('widget $id', e, stackTrace)),
+      error: (Object e, StackTrace stackTrace) => DashboardCard(
+        title: title,
+        icon: icon,
+        error: _dashboardErrorMessage('widget $id', e, stackTrace),
+        onRetry: () => ref.invalidate(dashboardWidgetDataProvider(id)),
+      ),
       data: (WidgetData? data) {
         if (data == null) return const SizedBox.shrink();
-        final Widget content = _buildContent(context, data);
+        final Widget content = _buildContent(context, data, privacyMode);
         final String? empty = _emptyFor(data);
         return DashboardCard(
           title: data.title,
           icon: data.icon,
-          content: empty == null ? content : null,
-          emptyMessage: empty,
-          subtitle: data.subtitle,
-          onTap: route != null ? () => _navigate(context, route) : null,
+          content: inventoryUnavailable ? null : (empty == null ? content : null),
+          emptyMessage: inventoryUnavailable ? 'Noch nicht verfügbar' : empty,
+          subtitle: inventoryUnavailable ? 'Noch nicht verfügbar' : data.subtitle,
+          onTap: !inventoryUnavailable && route != null && route != '/' ? () => _navigate(context, route) : null,
         );
       },
     );
   }
 
-  Widget _buildContent(BuildContext context, WidgetData d) {
+  Widget _buildContent(BuildContext context, WidgetData d, bool privacyMode) {
     switch (d.id) {
       case 'offene_rechnungen':
       case 'ueberfaellige_rechnungen':
@@ -196,31 +215,30 @@ class _WidgetCard extends ConsumerWidget {
           children: <Widget>[
             Text('${d.count ?? 0} Rechnungen', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('${d.sum ?? '0.00'} €'),
+            MoneyText(_parseDashboardMoney(d.sum), textAlign: TextAlign.left, obscured: privacyMode),
           ],
         );
       case 'kontostand':
-        return Text('${d.sum ?? '0.00'} €', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold));
+        return MoneyText(
+          _parseDashboardMoney(d.sum),
+          textAlign: TextAlign.left,
+          obscured: privacyMode,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        );
       case 'einnahmen_ausgaben':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[Text('Einnahmen: ${d.sum ?? '0.00'} €'), Text('Ausgaben: ${d.subtitle ?? '0.00'} €')],
+          children: <Widget>[
+            _DashboardMoneyLine(label: 'Einnahmen', amount: _parseDashboardMoney(d.sum), obscured: privacyMode),
+            _DashboardMoneyLine(label: 'Ausgaben', amount: _parseDashboardMoney(d.subtitle), obscured: privacyMode),
+          ],
         );
       case 'quick_links':
         final List<QuickLink>? links = d.raw as List<QuickLink>?;
         if (links == null || links.isEmpty) return const Text('Keine Links');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            for (final QuickLink l in links)
-              InkWell(
-                onTap: () => context.go(l.route),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text('${l.label} → ${l.route}', style: const TextStyle(color: Colors.blue)),
-                ),
-              ),
-          ],
+          children: <Widget>[for (final QuickLink l in links) _QuickLinkRow(link: l)],
         );
       case 'ustva_frist':
         return Text(d.subtitle ?? '');
@@ -233,15 +251,119 @@ class _WidgetCard extends ConsumerWidget {
 
   String? _emptyFor(WidgetData d) {
     if (d.id == 'lagerwarnung' && (d.count ?? 0) == 0) return 'Keine Warnungen';
-    if (d.id == 'lagerbestand' && (d.count ?? 0) == 0) return 'Kein Lagerbestand';
-    if (d.id == 'mahnung_warnung' && (d.count ?? 0) == 0) return 'Keine Mahnungen';
+    if (d.id == 'lagerbestand' && (d.count ?? 0) == 0) {
+      return 'Kein Lagerbestand';
+    }
+    if (d.id == 'mahnung_warnung' && (d.count ?? 0) == 0) {
+      return 'Keine Mahnungen';
+    }
     if (d.id == 'fristen' && (d.count ?? 0) == 0) return 'Keine Fristen';
-    if (d.id == 'aktivitaets_log' && (d.count ?? 0) == 0) return 'Keine Aktivitäten';
-    if (d.id == 'zahlungseingaenge' && (d.count ?? 0) == 0) return 'Keine Zahlungen';
+    if (d.id == 'aktivitaets_log' && (d.count ?? 0) == 0) {
+      return 'Keine Aktivitäten';
+    }
+    if (d.id == 'zahlungseingaenge' && (d.count ?? 0) == 0) {
+      return 'Keine Zahlungen';
+    }
     return null;
   }
 
   void _navigate(BuildContext context, String route) {
     context.go(route);
+  }
+}
+
+class _QuickLinkRow extends StatelessWidget {
+  const _QuickLinkRow({required this.link});
+
+  final QuickLink link;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool unavailable = link.route == '/inventory';
+    final Color color = unavailable
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : Theme.of(context).colorScheme.primary;
+    final String label = unavailable ? '${link.label} (nicht verfügbar)' : link.label;
+    return Semantics(
+      button: !unavailable,
+      label: label,
+      child: InkWell(
+        onTap: unavailable || link.route.isEmpty ? null : () => context.go(link.route),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Flexible(
+                child: Text(label, style: TextStyle(color: color)),
+              ),
+              const SizedBox(width: 4),
+              Icon(unavailable ? Icons.lock_outline : Icons.arrow_forward, size: 16, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+num _parseDashboardMoney(String? raw) {
+  final String value = raw?.trim().replaceAll('€', '').replaceAll('\u00A0', '').trim() ?? '';
+  if (value.isEmpty) {
+    return 0;
+  }
+  if (value.contains(',') && value.contains('.')) {
+    return num.tryParse(value.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+  }
+  return num.tryParse(value.replaceAll(',', '.')) ?? 0;
+}
+
+class _DashboardMoneyLine extends StatelessWidget {
+  const _DashboardMoneyLine({required this.label, required this.amount, required this.obscured});
+
+  final String label;
+  final num amount;
+  final bool obscured;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(child: Text('$label:')),
+        MoneyText(amount, obscured: obscured),
+      ],
+    );
+  }
+}
+
+class _DashboardErrorState extends StatelessWidget {
+  const _DashboardErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Erneut versuchen'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

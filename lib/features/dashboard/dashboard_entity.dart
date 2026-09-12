@@ -109,9 +109,9 @@ const Map<String, String> dashboardWidgetTitles = <String, String>{
 
 /// Default quick links per spec.
 const List<QuickLink> defaultQuickLinks = <QuickLink>[
-  QuickLink(label: 'Neue Rechnung', route: '/invoices'),
+  QuickLink(label: 'Neue Rechnung', route: '/invoices/new'),
   QuickLink(label: 'Journal', route: '/reports'),
-  QuickLink(label: 'Artikel', route: '/contacts'),
+  QuickLink(label: 'Artikel', route: '/inventory'),
 ];
 
 DashboardConfig defaultDashboardConfig() {

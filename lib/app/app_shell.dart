@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:openaccounting/app/app_drawer_scope.dart';
 import 'package:openaccounting/app/sidebar_controller.dart';
 import 'package:openaccounting/design_system/components/app_sidebar.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
@@ -19,6 +20,7 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   bool _tempExpanded = false;
+  final GlobalKey<ScaffoldState> _drawerKey = GlobalKey<ScaffoldState>();
 
   bool _isSelected(String path) {
     if (path == '/') return widget.location == '/';
@@ -44,9 +46,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             },
           );
           return Scaffold(
-            appBar: AppBar(title: const Text('OpenAccounting')),
+            key: _drawerKey,
             drawer: Drawer(child: sidebar),
-            body: widget.child,
+            body: AppDrawerScope(openDrawer: () => _drawerKey.currentState?.openDrawer(), child: widget.child),
           );
         }
 

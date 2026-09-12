@@ -55,6 +55,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sidebarSettings => 'Settings';
 
   @override
+  String get sidebarHelp => 'Help';
+
+  @override
+  String get sidebarMenu => 'Menu';
+
+  @override
+  String get sidebarSectionOverview => 'OVERVIEW';
+
+  @override
+  String get sidebarSectionBusiness => 'BUSINESS';
+
+  @override
+  String get sidebarSectionTaxes => 'TAXES';
+
+  @override
+  String get workspaceLocalProfile => 'Local profile';
+
+  @override
+  String get workspaceManage => 'Manage profiles';
+
+  @override
+  String get localTitle => 'Local';
+
+  @override
+  String get localDescription => 'All data is stored locally — no cloud access.';
+
+  @override
+  String get close => 'Close';
+
+  @override
   String get backendUnreachable => 'Backend not reachable';
 
   @override

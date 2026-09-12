@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:openaccounting/app/app_drawer_scope.dart';
 import 'package:openaccounting/design_system/tokens/radius.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 
@@ -10,6 +11,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.subtitle,
     this.actions,
+    this.leading,
     this.primaryAction,
     this.primaryActionLabel,
     this.onPrimaryAction,
@@ -38,6 +40,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final String? subtitle;
   final List<Widget>? actions;
+  final Widget? leading;
 
   /// Custom primary action. If omitted, [primaryActionLabel] creates a [FilledButton].
   final Widget? primaryAction;
@@ -72,11 +75,17 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
 
   bool get _hasTabs => tabs?.isNotEmpty ?? false;
 
+  bool get _hasSearchControl => searchController != null || onSearchChanged != null;
+
+  bool get _hasFilterControl => onFilterPressed != null;
+
+  bool get _hasToolbar => showFilterToolbar && (_hasSearchControl || _hasFilterControl);
+
   bool get _hasFilterSummary =>
       showFilterToolbar && (activeFilters.isNotEmpty || resultCount != null || onResetFilters != null);
 
   double get _bottomHeight {
-    double height = showFilterToolbar ? _toolbarHeight : 0;
+    double height = _hasToolbar ? _toolbarHeight : 0;
     if (subtitle != null) {
       height += _subtitleHeight;
     }
@@ -111,6 +120,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppDrawerScope? drawer = AppDrawerScope.maybeOf(context);
     final Widget? resolvedPrimaryAction = _resolvedPrimaryAction;
     final List<Widget> resolvedActions = <Widget>[
       ...?actions,
@@ -123,6 +133,11 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
 
     return AppBar(
       toolbarHeight: kToolbarHeight,
+      leading:
+          leading ??
+          (drawer == null
+              ? null
+              : IconButton(icon: const Icon(Icons.menu), tooltip: 'Menü', onPressed: drawer.openDrawer)),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       actions: resolvedActions.isEmpty ? null : resolvedActions,
       bottom: PreferredSize(
@@ -132,7 +147,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
           children: <Widget>[
             if (subtitle != null) _buildSubtitle(),
             if (_hasTabs) _buildTabs(),
-            if (showFilterToolbar) _buildToolbar(),
+            if (_hasToolbar) _buildToolbar(),
             if (_hasFilterSummary) _buildFilterSummary(),
           ],
         ),
@@ -194,38 +209,63 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
   Widget _buildToolbar() {
     return SizedBox(
       height: _toolbarHeight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Semantics(
-                label: searchLabel,
-                textField: true,
-                child: TextField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
-                    hintText: searchHint,
-                    labelText: searchLabel,
-                    prefixIcon: const Icon(Icons.search),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final Widget? search = _hasSearchControl
+              ? Semantics(
+                  label: searchLabel,
+                  textField: true,
+                  child: TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+                      hintText: searchHint,
+                      labelText: searchLabel,
+                      prefixIcon: const Icon(Icons.search),
+                    ),
+                    onChanged: onSearchChanged,
                   ),
-                  onChanged: onSearchChanged,
-                ),
+                )
+              : null;
+          final Widget? filter = _hasFilterControl
+              ? OutlinedButton.icon(
+                  onPressed: onFilterPressed,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                  ),
+                  icon: const Icon(Icons.filter_list),
+                  label: Text(filterButtonLabel),
+                )
+              : null;
+
+          final Widget controls;
+          if (search != null && filter != null && constraints.maxWidth < 560) {
+            controls = SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  SizedBox(width: 240, child: search),
+                  const SizedBox(width: AppSpacing.sm),
+                  filter,
+                ],
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: onFilterPressed,
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              ),
-              icon: const Icon(Icons.filter_list),
-              label: Text(filterButtonLabel),
-            ),
-          ],
-        ),
+            );
+          } else {
+            controls = Row(
+              children: <Widget>[
+                if (search != null) Expanded(child: search),
+                if (search != null && filter != null) const SizedBox(width: AppSpacing.sm),
+                if (filter case final Widget filterWidget) filterWidget,
+              ],
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: controls,
+          );
+        },
       ),
     );
   }

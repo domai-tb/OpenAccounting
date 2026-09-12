@@ -55,9 +55,13 @@ void main() {
     });
 
     testWidgets('test_header_filter_toolbar_present', (WidgetTester tester) async {
+      final TextEditingController controller = TextEditingController();
+      addTearDown(controller.dispose);
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(appBar: AppPageHeader(title: 'Rechnungen')),
+        MaterialApp(
+          home: Scaffold(
+            appBar: AppPageHeader(title: 'Rechnungen', searchController: controller, onFilterPressed: () {}),
+          ),
         ),
       );
 
@@ -79,6 +83,8 @@ void main() {
     testWidgets('test_header_filter_chips_count_and_reset', (WidgetTester tester) async {
       String? removedFilter;
       var resetPressed = false;
+      final TextEditingController controller = TextEditingController();
+      addTearDown(controller.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -86,6 +92,7 @@ void main() {
           home: Scaffold(
             appBar: AppPageHeader(
               title: 'Rechnungen',
+              searchController: controller,
               activeFilters: const <String>['Offen', '2026'],
               resultCount: 42,
               onFilterRemoved: (String filter) => removedFilter = filter,

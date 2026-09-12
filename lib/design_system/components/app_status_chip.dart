@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:openaccounting/core/theme/app_colors.dart';
 
 /// Semantic status chip per DESIGN §7 §43 §44.
@@ -109,6 +110,19 @@ class _AppStatusChipState extends State<AppStatusChip> {
   bool _hovered = false;
   bool _pressed = false;
   bool _focused = false;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(debugLabel: 'AppStatusChip');
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   Set<WidgetState> get _states {
     final Set<WidgetState> s = <WidgetState>{};
@@ -118,6 +132,14 @@ class _AppStatusChipState extends State<AppStatusChip> {
     if (_pressed) s.add(WidgetState.pressed);
     if (_focused) s.add(WidgetState.focused);
     return s;
+  }
+
+  void _activate() {
+    if (!widget.enabled || widget.onPressed == null) {
+      return;
+    }
+    _focusNode.requestFocus();
+    widget.onPressed!.call();
   }
 
   @override
@@ -162,13 +184,25 @@ class _AppStatusChipState extends State<AppStatusChip> {
       ),
     );
 
-    // Wrap with interaction handlers when enabled.
+    // Wrap with interaction handlers when enabled. Focus handles Enter and
+    // Space explicitly because the visual chip is custom-painted rather than
+    // built from a Material button.
     if (isDisabled) {
       return Opacity(opacity: 0.6, child: chip);
     }
 
     return Focus(
+      focusNode: _focusNode,
+      canRequestFocus: widget.onPressed != null,
       onFocusChange: (bool v) => setState(() => _focused = v),
+      onKeyEvent: (FocusNode node, KeyEvent event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+          _activate();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -176,7 +210,7 @@ class _AppStatusChipState extends State<AppStatusChip> {
           onTapDown: (_) => setState(() => _pressed = true),
           onTapUp: (_) => setState(() => _pressed = false),
           onTapCancel: () => setState(() => _pressed = false),
-          onTap: widget.onPressed,
+          onTap: widget.onPressed == null ? null : _activate,
           child: Material(color: Colors.transparent, child: chip),
         ),
       ),
