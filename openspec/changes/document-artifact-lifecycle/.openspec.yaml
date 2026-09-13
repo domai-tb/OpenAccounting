@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-13
+goal: Make every finalized document artifact truthful, atomic, and usable from
+  the UI.
