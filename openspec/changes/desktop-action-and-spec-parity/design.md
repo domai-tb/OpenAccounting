@@ -19,7 +19,7 @@ Desktop adapters for shortcuts, file associations, drag/drop, PDF viewing, tray 
 
 ## Decisions
 
-- Build a single desktop capability registry during bootstrap and inject adapters into feature services; registration must be idempotent.
+- Build a `DesktopCapabilityRegistry` with `register<T>(DesktopCapability<T>)` and `isAvailable<T>()` methods. The registry is constructed during bootstrap and injected into `AppServices`. Registration is idempotent (registering the same capability type twice is a no-op). Each adapter is a `DesktopCapability<T>` wrapping an optional implementation (`supported`) or an `Unavailable(reason)` marker.
 - Use target adapters with typed results (`supported`, `unavailable`, `failed`) instead of empty callbacks.
 - Keep updater installation unavailable until a separate policy defines trust root, package format, provenance, replay/downgrade protection, rollback, and key rotation.
 - Treat project source, current `AGENTS.md`, and current Flutter dependencies as documentation authority; add a mechanical contradiction check for forbidden architecture names in active desktop specs.

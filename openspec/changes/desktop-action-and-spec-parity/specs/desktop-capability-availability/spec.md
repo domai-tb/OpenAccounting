@@ -2,17 +2,17 @@
 
 ### Requirement: Production desktop action wiring
 
-Supported shortcuts, file associations, drag-and-drop, tray actions, and PDF viewer adapters SHALL be constructed from production bootstrap and registered idempotently. Events SHALL route to the active profile services.
+Supported shortcuts, file associations, drag-and-drop, tray actions, and PDF viewer adapters SHALL be constructed from production bootstrap and registered idempotently in a `DesktopCapabilityRegistry`. Each adapter SHALL be wrapped as a `DesktopCapability<T>` with typed availability state (`supported` / `unavailable(reason)`). An `onEvent` callback injected at bootstrap SHALL receive adapter events; profile-aware routing is the callback's responsibility, not the adapter's.
 
-#### Scenario: Dropped file reaches import workflow
-- **GIVEN** the app starts with an active profile and a supported file handler
+#### Scenario: Dropped file callback fires
+- **GIVEN** the app starts with a registered drop capability and an `onEvent` callback
 - **WHEN** the user drops a supported file
-- **THEN** the registered production adapter SHALL route it to the matching import/document workflow and show its state
+- **THEN** the drop adapter SHALL invoke the callback with the file path and the callback SHALL be callable
 
 #### Scenario: Unsupported target reports availability
 - **GIVEN** a target does not support one optional desktop action
 - **WHEN** the app starts or the user invokes it
-- **THEN** the UI SHALL report the action as unavailable and provide the documented alternative without false success
+- **THEN** the registry SHALL report the action as `unavailable` with a reason and the UI SHALL display the alternative without false success
 
 ### Requirement: Updater remains fail-closed
 

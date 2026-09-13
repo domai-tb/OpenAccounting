@@ -18,7 +18,7 @@ Desktop integrations are implemented as isolated adapters but are not consistent
 
 ### Modified Capabilities
 
-None. Existing desktop specifications remain the baseline until these focused parity and availability contracts are implemented.
+- `desktop`: Supersede Tauri/Python-sidecar/webview requirements with Flutter-only desktop contract. The existing spec contains requirements referencing Tauri updater, Python sidecar, and webview flags that contradict the Flutter architecture. This change replaces those with Flutter-desktop equivalents.
 
 ## Impact
 

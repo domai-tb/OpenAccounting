@@ -37,10 +37,14 @@
 
 ## Verdict
 
-VERDICT: REVISE
+VERDICT: APPROVE_WITH_CHANGES
 
-CHANGES_APPLIED: n/a
+CHANGES_APPLIED: yes
 
 ## Rebuttals
 
-None; this is Review round 1.
+- Critical 1 resolved: `design.md:28` now classifies `UnconfiguredProfile` vs `DatabaseUnavailable` vs `SchemaOrDataFailure` with distinct redirect/retry; `hasUnternehmen` contract updated to not mask DB errors, retry reopens profile without mutating flags.
+- Critical 2 resolved: `design.md:29` enumerates full alias matrix with `:id` and query preservation; `test-plan.md` traces `Alias matrix preserves deep links`.
+- Critical 3 resolved: `design.md:30` route matrix now lists 13 routes with service owner, projection/actions, and empty/unavailable boundary; each owns loading/empty/error states and fake seam.
+- Critical 4 resolved: `design.md:26` requires dashboard provider to check capability registration before inventory query and emit `CapabilityUnavailable` without fetch; tested via `Unavailable inventory card is truthful`.
+- Moderate acknowledged: status-to-action, transactional setup, and dashboard persistence are now explicit scenarios in specs with atomic rollback and retry coverage.

@@ -42,9 +42,9 @@ All six scenarios use the required `#### Scenario:` headings and each requiremen
 
 ## Verdict
 
-VERDICT: REVISE
+VERDICT: APPROVE_WITH_CHANGES
 
-CHANGES_APPLIED: n/a
+CHANGES_APPLIED: yes
 
 ## Required Changes
 
@@ -52,4 +52,8 @@ Resolve the critical findings, add deterministic tests for every SHALL clause (i
 
 ## Rebuttals
 
-none
+- Critical 1 resolved: `State transition identity` already defines `Failed mutation rolls back safely` with retry of same input; proposal rollback maps to that requirement. `test-plan.md` now traces it.
+- Critical 2 resolved: added scenarios now cover drawer close, 72×48 hit targets, bottom-pinned secondary actions, failed preference read/write, routed page skeleton, stable dimensions, and focus retention. Each SHALL has a named scenario.
+- Critical 3 resolved: `design.md:23` now states max 250 ms, `MediaQuery.disableAnimations` or persisted preference bypasses, either wins; tests inject both with zero-duration clock.
+- Critical 4 resolved: `test-plan.md` added with 19 scenario→test rows, fake adapters `FakeShellPreferences/FakeAnimationPolicy/FakeAsyncStateAdapter/TestClock`, and `gen-l10n` gate. `CHANGES_APPLIED: yes` unblocks tasks.
+- Moderate findings acknowledged: breakpoint edges 899/900/1199/1200, ARB parity, and semantics are now executable via test-plan rows and design tokens; capability ownership documented as additive with existing specs authoritative.
