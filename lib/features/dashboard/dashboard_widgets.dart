@@ -260,6 +260,8 @@ Future<WidgetData> _fetchWidgetData(DashboardRepository repo, String id) async {
 
 /// Generic widget data provider — checks visibility, returns null if hidden (no fetch).
 final dashboardWidgetDataProvider = FutureProvider.family<WidgetData?, String>((ref, id) async {
+  // Inventory capability unavailable — do not fetch, per routed-domain spec
+  if (id == 'lagerwarnung' || id == 'lagerbestand') return null;
   final cfg = await ref.watch(dashboardConfigProvider.future);
   if (cfg.visibility[id] == false) return null;
   final repo = ref.watch(dashboardRepositoryProvider);

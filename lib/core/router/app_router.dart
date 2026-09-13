@@ -59,9 +59,13 @@ Future<bool> hasUnternehmen(AppDatabase db) async {
       if (defaults.isNotEmpty) return true;
     }
     return false;
-  } catch (_) {
-    // ponytail: no such table or not open → treat as unconfigured, redirect to /setup.
-    return false;
+  } catch (error) {
+    final String msg = error.toString().toLowerCase();
+    if (msg.contains('no such table') || msg.contains('not open') || msg.contains('no such file')) {
+      return false;
+    }
+    // DatabaseUnavailable or Schema failure — do not redirect to setup, preserve route
+    rethrow;
   }
 }
 
@@ -72,8 +76,13 @@ GoRouter createRouter(AppDatabase db) {
       final loc = state.matchedLocation;
       // allow setup always, avoid loop.
       if (loc == '/setup') return null;
-      final configured = await hasUnternehmen(db);
-      if (!configured) return '/setup';
+      try {
+        final configured = await hasUnternehmen(db);
+        if (!configured) return '/setup';
+      } catch (_) {
+        // DatabaseUnavailable / SchemaOrDataFailure — stay on requested route with retry UI
+        return null;
+      }
       return null;
     },
     routes: <RouteBase>[
@@ -120,12 +129,20 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
           GoRoute(path: '/inventory', builder: (context, state) => const InventoryUnavailablePage()),
-          // German alias per specs/app/spec.md deep-link scenario — preserve query.
+          // German alias per specs/app/spec.md deep-link scenario — preserve query and id.
           GoRoute(
             path: '/rechnungen',
             redirect: (BuildContext context, GoRouterState state) {
               final q = state.uri.query;
               return q.isEmpty ? '/invoices' : '/invoices?$q';
+            },
+          ),
+          GoRoute(
+            path: '/rechnungen/:id',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String id = state.pathParameters['id']!;
+              final String q = state.uri.query;
+              return q.isEmpty ? '/invoices/$id' : '/invoices/$id?$q';
             },
           ),
           GoRoute(
@@ -135,10 +152,49 @@ GoRouter createRouter(AppDatabase db) {
               return q.isEmpty ? '/receipts' : '/receipts?$q';
             },
           ),
-          GoRoute(path: '/bank', redirect: (BuildContext context, GoRouterState state) => '/banking'),
-          GoRoute(path: '/kontakte', redirect: (BuildContext context, GoRouterState state) => '/contacts'),
-          GoRoute(path: '/steuern', redirect: (BuildContext context, GoRouterState state) => '/taxes'),
-          GoRoute(path: '/auswertungen', redirect: (BuildContext context, GoRouterState state) => '/reports'),
+          GoRoute(
+            path: '/belege/:id',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String id = state.pathParameters['id']!;
+              final String q = state.uri.query;
+              return q.isEmpty ? '/receipts/$id' : '/receipts/$id?$q';
+            },
+          ),
+          GoRoute(
+            path: '/bank',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/banking' : '/banking?$q';
+            },
+          ),
+          GoRoute(
+            path: '/kontakte',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/contacts' : '/contacts?$q';
+            },
+          ),
+          GoRoute(
+            path: '/steuern',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/taxes' : '/taxes?$q';
+            },
+          ),
+          GoRoute(
+            path: '/auswertungen',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/reports' : '/reports?$q';
+            },
+          ),
+          GoRoute(
+            path: '/einrichtung',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/setup' : '/setup?$q';
+            },
+          ),
         ],
       ),
     ],

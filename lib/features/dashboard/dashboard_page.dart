@@ -195,16 +195,25 @@ class _WidgetCard extends ConsumerWidget {
         onRetry: () => ref.invalidate(dashboardWidgetDataProvider(id)),
       ),
       data: (WidgetData? data) {
+        if (inventoryUnavailable) {
+          return DashboardCard(
+            title: title,
+            icon: icon,
+            emptyMessage: 'Noch nicht verfügbar',
+            subtitle: 'Noch nicht verfügbar',
+            onTap: null,
+          );
+        }
         if (data == null) return const SizedBox.shrink();
         final Widget content = _buildContent(context, data, privacyMode);
         final String? empty = _emptyFor(data);
         return DashboardCard(
           title: data.title,
           icon: data.icon,
-          content: inventoryUnavailable ? null : (empty == null ? content : null),
-          emptyMessage: inventoryUnavailable ? 'Noch nicht verfügbar' : empty,
-          subtitle: inventoryUnavailable ? 'Noch nicht verfügbar' : data.subtitle,
-          onTap: !inventoryUnavailable && route != null && route != '/' ? () => _navigate(context, route) : null,
+          content: empty == null ? content : null,
+          emptyMessage: empty,
+          subtitle: data.subtitle,
+          onTap: route != null && route != '/' ? () => _navigate(context, route) : null,
         );
       },
     );
