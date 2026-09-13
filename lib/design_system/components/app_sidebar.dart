@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/l10n/l10n.dart';
@@ -95,15 +96,37 @@ class AppSidebar extends StatelessWidget {
 
     Widget item(IconData icon, String label, String path) {
       final bool selected = isSelected(path);
+      void activate() {
+        if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+          Navigator.of(context).pop();
+        }
+        context.go(path);
+      }
+
       final ListTile tile = ListTile(
         leading: Icon(icon, color: selected ? selectedColor : null),
         title: isCompact ? null : Text(label),
         selected: selected,
         selectedTileColor: selectedTileColor,
         selectedColor: selectedColor,
-        onTap: () => context.go(path),
+        onTap: activate,
       );
-      final Widget withFocus = Focus(child: tile);
+      final Widget withFocus = Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: Focus(
+          onKeyEvent: (FocusNode node, KeyEvent event) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
+              activate();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48, minWidth: 72), child: tile),
+        ),
+      );
       if (isCompact) {
         return Tooltip(message: label, child: withFocus);
       }

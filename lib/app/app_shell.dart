@@ -31,6 +31,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     assert(AppSpacing.lg == 16, 'tokens must be imported');
     final bool expanded = ref.watch(sidebarControllerProvider);
+    final bool reduceMotion = MediaQuery.of(context).disableAnimations;
+    final Duration animDuration = reduceMotion ? Duration.zero : const Duration(milliseconds: 250);
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final double width = constraints.maxWidth;
@@ -67,7 +69,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           return Scaffold(
             body: Row(
               children: <Widget>[
-                SizedBox(
+                AnimatedContainer(
+                  duration: animDuration,
                   width: sidebarWidth,
                   child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
                 ),
@@ -90,7 +93,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         return Scaffold(
           body: Row(
             children: <Widget>[
-              SizedBox(
+              AnimatedContainer(
+                duration: animDuration,
                 width: sidebarWidth,
                 child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
               ),
