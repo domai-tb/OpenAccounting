@@ -41,6 +41,9 @@ class PdfViewerService {
   }
 
   Future<void> open(String path) async {
+    if (path.contains('..')) {
+      throw StateError('Unsafe artifact path: $path — path escapes profile root');
+    }
     final file = File(path);
     if (!file.existsSync()) {
       throw StateError('PDF artifact not found at $path — retry finalization or check profile storage');
@@ -71,6 +74,9 @@ class PdfViewerService {
     final source = _lastPath;
     if (source == null || !backend.isOpen) {
       throw StateError('No document open — open a finalized PDF first');
+    }
+    if (dest.contains('..')) {
+      throw StateError('Unsafe destination path: $dest — path escapes profile root');
     }
     final src = File(source);
     if (!src.existsSync()) {

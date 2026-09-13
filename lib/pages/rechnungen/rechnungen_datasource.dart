@@ -234,7 +234,9 @@ WHERE id = ?
 
       final invoice = invoiceRows.single;
       if (_asInt(invoice['ist_entwurf']) != 1) {
-        throw StateError('Dokument ist bereits finalisiert');
+        // Idempotent retry per document-artifact spec: return existing without duplicate side effects
+        await transaction.rollback();
+        return rechnungId;
       }
       final invoiceDate = DateTime.tryParse(invoice['datum']?.toString() ?? '');
       if (invoiceDate == null) {
