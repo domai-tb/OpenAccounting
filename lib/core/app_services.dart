@@ -14,6 +14,7 @@ import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
+import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 
 /// Aggregated use-cases for the application.
 /// Pages resolve from here instead of constructing repositories directly.
@@ -33,6 +34,8 @@ class AppServices {
   late final BuchungsVorlagenRepository buchungsVorlagen = BuchungsVorlagenRepository(_db.executor);
 
   late final RechnungsVorlagenRepository rechnungsVorlagen = RechnungsVorlagenRepository(_db.executor);
+
+  late final KundenRepository kunden = KundenRepository(_db.executor);
 
   late final MahnungenRepository mahnungen = MahnungenRepository(_db.executor, profileDir: _db.profileDir);
   late final MahnstufenRepository mahnstufen = MahnstufenRepository(_db.executor);

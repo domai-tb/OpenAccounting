@@ -20,6 +20,7 @@ import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
+import 'package:openaccounting/pages/stammdaten/contact_create_page.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
 
@@ -116,6 +117,7 @@ GoRouter createRouter(AppDatabase db) {
             path: '/contacts',
             builder: (context, state) => const ContactsPage(),
             routes: <RouteBase>[
+              GoRoute(path: 'new', builder: (context, state) => const ContactCreatePage()),
               GoRoute(
                 path: ':id',
                 builder: (context, state) {
@@ -426,11 +428,11 @@ class ContactsPage extends ConsumerWidget {
       icon: Icons.people_outline,
       subtitle: 'Kunden und Lieferanten verwalten',
       primaryActionLabel: 'Kontakt hinzufügen',
-      onPrimaryAction: () => _showContactCreationHint(context),
+      onPrimaryAction: () => context.go('/contacts/new'),
       emptyTitle: 'Noch keine Kontakte',
       emptyMessage: 'Lege deinen ersten Kunden oder Lieferanten an, damit Rechnungen vollständig bleiben.',
       emptyActionLabel: 'Kontakt hinzufügen',
-      onEmptyAction: () => _showContactCreationHint(context),
+      onEmptyAction: () => context.go('/contacts/new'),
     );
   }
 }
@@ -828,11 +830,6 @@ void _openRecord(BuildContext context, String table, int id, Map<String, Object?
     return;
   }
   _showRecordDialog(context, table, row);
-}
-
-void _showContactCreationHint(BuildContext context) {
-  ScaffoldMessenger.of(context)
-      .showSnackBar(const SnackBar(content: Text('Kontaktanlage wird mit dem nächsten Stammdaten-Update verfügbar.')));
 }
 
 void _showRecordDialog(BuildContext context, String table, Map<String, Object?> row) {
