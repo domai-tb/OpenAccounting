@@ -18,6 +18,7 @@ import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
@@ -388,7 +389,11 @@ class InvoiceDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProductionRecordDetailPage(table: 'rechnungen', title: 'Rechnung $id', id: id);
+    final int? recordId = int.tryParse(id);
+    if (recordId == null) {
+      return const NotFoundPage(message: 'Die Rechnungs-ID ist ungültig.');
+    }
+    return InvoiceDocumentPage(id: recordId);
   }
 }
 

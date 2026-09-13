@@ -53,6 +53,14 @@ class RechnungenRepository {
     return _loadRechnung(id, missingMessage: 'Finalisierte Rechnung wurde nicht gespeichert');
   }
 
+  /// Loads one invoice for a routed detail surface without exposing raw rows.
+  Future<RechnungItem?> findById(int id) async {
+    final Map<String, Object?>? invoice = await dataSource.findRechnungById(id);
+    if (invoice == null) return null;
+    final List<Map<String, Object?>> storedPositions = await dataSource.findPositionenByRechnungId(id);
+    return _toItem(invoice, storedPositions);
+  }
+
   Future<RechnungItem> stornoRechnung({required int rechnungId, required String grund}) async {
     final id = await dataSource.stornoRechnung(rechnungId: rechnungId, grund: grund);
     return _loadRechnung(id, missingMessage: 'Storno wurde nicht gespeichert');
@@ -89,6 +97,10 @@ class RechnungenRepository {
       throw StateError(missingMessage);
     }
     final storedPositions = await dataSource.findPositionenByRechnungId(id);
+    return _toItem(invoice, storedPositions);
+  }
+
+  RechnungItem _toItem(Map<String, Object?> invoice, List<Map<String, Object?>> storedPositions) {
     return RechnungItem(
       id: _requiredInt(invoice, 'id'),
       rechnungsnummer: invoice['rechnungsnummer'] as String?,
@@ -97,6 +109,7 @@ class RechnungenRepository {
       istEntwurf: _asBool(invoice['ist_entwurf']),
       eingabemodus: _requiredString(invoice, 'eingabemodus'),
       datum: _requiredString(invoice, 'datum'),
+      originalPdfPath: invoice['original_pdf_pfad'] as String?,
       positionen: storedPositions.map(_positionFromRow).toList(growable: false),
     );
   }

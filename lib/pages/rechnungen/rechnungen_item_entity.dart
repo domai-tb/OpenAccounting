@@ -31,6 +31,7 @@ class RechnungItem {
     required this.istEntwurf,
     required this.eingabemodus,
     required this.datum,
+    this.originalPdfPath,
     required List<RechnungPositionItem> positionen,
   }) : positionen = List<RechnungPositionItem>.unmodifiable(positionen);
 
@@ -41,5 +42,6 @@ class RechnungItem {
   final bool istEntwurf;
   final String eingabemodus;
   final String datum;
+  final String? originalPdfPath;
   final List<RechnungPositionItem> positionen;
 }

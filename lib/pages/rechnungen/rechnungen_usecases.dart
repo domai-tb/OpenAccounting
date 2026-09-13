@@ -66,7 +66,19 @@ class RechnungenUseCases {
   }
 
   Future<RechnungItem> finalizeRechnung({required int rechnungId}) {
+    return _finalize(rechnungId);
+  }
+
+  Future<RechnungItem> _finalize(int rechnungId) async {
+    final RechnungItem? existing = await repository.findById(rechnungId);
+    if (existing != null && !existing.istEntwurf) {
+      throw StateError('Dokument ist bereits finalisiert');
+    }
     return repository.finalizeRechnung(rechnungId: rechnungId);
+  }
+
+  Future<RechnungItem?> findById(int id) {
+    return repository.findById(id);
   }
 
   Future<RechnungItem> stornoRechnung({required int rechnungId, required String grund}) async {

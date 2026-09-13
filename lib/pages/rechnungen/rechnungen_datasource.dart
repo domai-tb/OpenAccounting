@@ -1178,7 +1178,7 @@ WHERE id = ? AND ist_entwurf = 1
     await _ensureExtraColumns();
     final rows = await executor.runSelect(
       '''
-SELECT id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum, lieferadresse_id
+SELECT id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum, lieferadresse_id, original_pdf_pfad
 FROM rechnungen
 WHERE id = ?
 ''',
