@@ -83,6 +83,10 @@ AND SHALL use default dimensions (1280x800)
 
 The application SHALL apply platform-specific workarounds: hide the console window on Windows in release builds, and handle profile path differences across macOS, Linux, and Windows.
 
+#### Scenario: Linux GPU Workaround
+
+REMOVED — GPU configuration is a runtime concern managed by the Flutter engine, not a spec requirement. The Flutter desktop runtime handles Wayland/X11 compatibility automatically.
+
 #### Scenario: Windows Console Hide
 
 GIVEN the app launches on Windows in release mode
