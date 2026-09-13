@@ -13,6 +13,7 @@ import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
@@ -222,6 +223,7 @@ class InvoicesPage extends ConsumerWidget {
     return ProductionRoutePage(
       title: 'Rechnungen',
       table: 'rechnungen',
+      icon: Icons.receipt_long,
       subtitle: filters.isEmpty ? null : filters.join(' · '),
       primaryActionLabel: 'Neue Rechnung',
       onPrimaryAction: () => context.go('/invoices/new'),
@@ -395,7 +397,16 @@ class ReceiptsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(title: 'Belege', table: 'belege');
+    return ProductionRoutePage(
+      title: 'Belege',
+      table: 'belege',
+      icon: Icons.receipt_outlined,
+      subtitle: 'Eingangsbelege und Ausgaben an einem Ort',
+      emptyTitle: 'Noch keine Belege',
+      emptyMessage: 'Importiere einen Beleg oder prüfe deine Banktransaktionen.',
+      emptyActionLabel: 'Beleg importieren',
+      onEmptyAction: () => context.go('/banking'),
+    );
   }
 }
 
@@ -404,7 +415,18 @@ class ContactsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(title: 'Kontakte', table: 'kunden');
+    return ProductionRoutePage(
+      title: 'Kontakte',
+      table: 'kunden',
+      icon: Icons.people_outline,
+      subtitle: 'Kunden und Lieferanten verwalten',
+      primaryActionLabel: 'Kontakt hinzufügen',
+      onPrimaryAction: () => _showContactCreationHint(context),
+      emptyTitle: 'Noch keine Kontakte',
+      emptyMessage: 'Lege deinen ersten Kunden oder Lieferanten an, damit Rechnungen vollständig bleiben.',
+      emptyActionLabel: 'Kontakt hinzufügen',
+      onEmptyAction: () => _showContactCreationHint(context),
+    );
   }
 }
 
@@ -424,7 +446,14 @@ class TaxesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(title: 'Steuern', table: 'ustva_exporte');
+    return ProductionRoutePage(
+      title: 'Steuern',
+      table: 'ustva_exporte',
+      icon: Icons.percent,
+      subtitle: 'Umsatzsteuer und Abgabefristen',
+      emptyTitle: 'Noch keine Steuerzeiträume',
+      emptyMessage: 'Steuerdaten werden automatisch aus deinen Buchungen aufgebaut.',
+    );
   }
 }
 
@@ -433,7 +462,14 @@ class ReportsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(title: 'Auswertungen', table: 'journal');
+    return ProductionRoutePage(
+      title: 'Auswertungen',
+      table: 'journal',
+      icon: Icons.bar_chart,
+      subtitle: 'Einnahmen, Ausgaben und Buchungen',
+      emptyTitle: 'Noch keine Buchungen',
+      emptyMessage: 'Sobald du eine Rechnung oder einen Beleg speicherst, erscheint die Auswertung hier.',
+    );
   }
 }
 
@@ -670,46 +706,48 @@ class ProductionRoutePage extends ConsumerWidget {
   const ProductionRoutePage({
     required this.title,
     required this.table,
+    required this.icon,
     this.subtitle,
     this.primaryActionLabel,
     this.onPrimaryAction,
     this.filterTyp,
     this.filterStatus,
+    this.emptyTitle,
+    this.emptyMessage,
+    this.emptyActionLabel,
+    this.onEmptyAction,
     super.key,
   });
 
   final String title;
   final String table;
+  final IconData icon;
   final String? subtitle;
   final String? primaryActionLabel;
   final VoidCallback? onPrimaryAction;
   final String? filterTyp;
   final String? filterStatus;
+  final String? emptyTitle;
+  final String? emptyMessage;
+  final String? emptyActionLabel;
+  final VoidCallback? onEmptyAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final RouteRecordsQuery? query = filterTyp == null && filterStatus == null
-        ? null
-        : RouteRecordsQuery(table: table, typ: filterTyp, status: filterStatus);
-    final FutureProvider<List<Map<String, Object?>>> source = query == null
-        ? routeRecordsProvider(table)
-        : routeRecordsQueryProvider(query);
-    final AsyncValue<List<Map<String, Object?>>> records = ref.watch(source);
-    return AppPage(
-      maxWidth: 1100,
-      header: AppPageHeader(
-        title: title,
-        subtitle: subtitle,
-        showFilterToolbar: false,
-        primaryActionLabel: primaryActionLabel,
-        onPrimaryAction: onPrimaryAction,
-      ),
-      child: records.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object error, StackTrace stackTrace) =>
-            _routeError(context, table, error, stackTrace, onRetry: () => ref.invalidate(source)),
-        data: (List<Map<String, Object?>> rows) => _buildRecordList(context, ref, table, rows, source),
-      ),
+    return FinanceListSurface(
+      table: table,
+      title: title,
+      icon: icon,
+      subtitle: subtitle,
+      primaryActionLabel: primaryActionLabel,
+      onPrimaryAction: onPrimaryAction,
+      emptyTitle: emptyTitle,
+      emptyMessage: emptyMessage,
+      emptyActionLabel: emptyActionLabel,
+      onEmptyAction: onEmptyAction,
+      filterTyp: filterTyp,
+      filterStatus: filterStatus,
+      onOpen: (int id) => _openRecord(context, table, id, const <String, Object?>{}),
     );
   }
 }
@@ -775,75 +813,6 @@ class ProductionRecordDetailPage extends ConsumerWidget {
   }
 }
 
-Widget _buildRecordList(
-  BuildContext context,
-  WidgetRef ref,
-  String table,
-  List<Map<String, Object?>> rows,
-  FutureProvider<List<Map<String, Object?>>> source,
-) {
-  if (rows.isEmpty) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const Text('Datenbankabfrage abgeschlossen'),
-          Text('Datensätze: ${rows.length}'),
-          const SizedBox(height: 8),
-          const Icon(Icons.inbox_outlined, size: 40),
-          const SizedBox(height: 12),
-          const Text('Noch keine Datensätze vorhanden'),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => ref.invalidate(source),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Aktualisieren'),
-          ),
-        ],
-      ),
-    );
-  }
-  return ListView.separated(
-    padding: const EdgeInsets.only(bottom: 24),
-    itemCount: rows.length + 1,
-    separatorBuilder: (BuildContext context, int index) => const Divider(height: 1),
-    itemBuilder: (BuildContext context, int index) {
-      if (index == 0) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text('Datenbankabfrage abgeschlossen'),
-              const SizedBox(height: 4),
-              Row(
-                children: <Widget>[
-                  Text('Datensätze: ${rows.length}'),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Aktualisieren',
-                    onPressed: () => ref.invalidate(source),
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      }
-      final Map<String, Object?> row = rows[index - 1];
-      final int? id = _recordId(row);
-      return ListTile(
-        leading: const Icon(Icons.description_outlined),
-        title: Text(_recordTitle(table, row)),
-        subtitle: Text(_recordSubtitle(table, row)),
-        trailing: id == null ? null : Text('#$id'),
-        onTap: id == null ? null : () => _openRecord(context, table, id, row),
-      );
-    },
-  );
-}
-
 void _openRecord(BuildContext context, String table, int id, Map<String, Object?> row) {
   if (table == 'rechnungen') {
     context.go('/invoices/$id');
@@ -854,6 +823,11 @@ void _openRecord(BuildContext context, String table, int id, Map<String, Object?
     return;
   }
   _showRecordDialog(context, table, row);
+}
+
+void _showContactCreationHint(BuildContext context) {
+  ScaffoldMessenger.of(context)
+      .showSnackBar(const SnackBar(content: Text('Kontaktanlage wird mit dem nächsten Stammdaten-Update verfügbar.')));
 }
 
 void _showRecordDialog(BuildContext context, String table, Map<String, Object?> row) {
@@ -897,18 +871,6 @@ String _recordTitle(String table, Map<String, Object?> row) {
   };
   final String value = _displayValue(preferred);
   return value == '—' ? 'Datensatz #${_recordId(row) ?? '?'}' : value;
-}
-
-String _recordSubtitle(String table, Map<String, Object?> row) {
-  final List<String> fields = <String>[
-    if (table == 'rechnungen') ...<String>[_displayValue(row['datum']), _displayValue(row['status'])],
-    if (table == 'kunden') ...<String>[_displayValue(row['email']), _displayValue(row['ort'])],
-    if (table == 'belege') ...<String>[_displayValue(row['datum']), _displayValue(row['betrag'])],
-    if (table == 'journal') ...<String>[_displayValue(row['datum']), _displayValue(row['betrag'])],
-    if (table != 'rechnungen' && table != 'kunden' && table != 'belege' && table != 'journal')
-      _displayValue(row['status'] ?? row['datum']),
-  ];
-  return fields.where((String field) => field != '—').join(' · ');
 }
 
 String _fieldLabel(String key) {
