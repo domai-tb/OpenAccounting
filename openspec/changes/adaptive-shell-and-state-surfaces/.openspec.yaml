@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-09-13
+goal: Make the Flutter shell and every async UI state stable, accessible,
+  localized, and useful.
