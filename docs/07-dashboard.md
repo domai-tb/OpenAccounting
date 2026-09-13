@@ -155,7 +155,7 @@ OpenInvoices provides a configurable dashboard with 13+ widgets showing key busi
 
 - No polling (desktop app, not web)
 - Manual refresh button in header
-- Data refreshes on return from other pages (React state)
+- Data refreshes on return from other pages (Riverpod state)
 
 ### Performance
 
@@ -252,9 +252,9 @@ ORDER BY monat
 
 ## Technical Notes
 
-- **State management**: React Context for dashboard config
-- **API**: `GET /dashboard/config` and `PUT /dashboard/config` for persistence
-- **Widget lazy loading**: Each widget is a separate component with independent data fetching
+- **State management**: Riverpod providers for dashboard config
+- **API**: Local Drift/SQLite persistence for dashboard config
+- **Widget lazy loading**: Each widget is a separate widget with independent data fetching
 - **No WebSocket**: Desktop app uses HTTP polling on demand
 - **Accessibility**: ARIA labels on all interactive elements; keyboard navigation for drag-and-drop
 - **Empty states**: Each widget has a configured empty state message

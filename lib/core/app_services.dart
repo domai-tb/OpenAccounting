@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/desktop/desktop_capability.dart';
 import 'package:openaccounting/features/einkommen/forderungen_usecases.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/mahnungen_repository.dart';
@@ -17,9 +18,11 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 /// Aggregated use-cases for the application.
 /// Pages resolve from here instead of constructing repositories directly.
 class AppServices {
-  AppServices(this._db);
+  AppServices(this._db, {DesktopCapabilityRegistry? desktopCapabilities})
+    : desktopCapabilities = desktopCapabilities ?? DesktopCapabilityRegistry();
 
   final AppDatabase _db;
+  final DesktopCapabilityRegistry desktopCapabilities;
 
   late final RechnungenUseCases rechnungen = RechnungenUseCases(
     RechnungenRepository(RechnungenDataSource(_db.executor, profileDir: _db.profileDir)),

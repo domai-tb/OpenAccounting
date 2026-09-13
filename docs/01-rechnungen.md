@@ -4,7 +4,7 @@
 
 OpenInvoices manages seven document types through a unified lifecycle: **Rechnung**, **Storno**, **Gutschrift**, **Angebot**, **Auftrag**, **Proforma**, and **Lieferschein**. Every document starts as an **Entwurf** (draft), transitions to **Finalisiert** (finalized/issued), and can then reach **Bezahlt** (paid) or **Storniert** (cancelled).
 
-The invoicing engine runs server-side in a FastAPI backend with SQLAlchemy 2.0 + SQLite (WAL mode). The frontend is React 19 + Vite + TypeScript + Tailwind v4, wrapped in Tauri 2 for desktop deployment.
+The invoicing engine runs in a Flutter desktop application using Dart with Drift/SQLite for persistence and Riverpod for state management.
 
 ---
 

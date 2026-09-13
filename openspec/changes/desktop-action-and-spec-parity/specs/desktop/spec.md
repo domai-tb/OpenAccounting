@@ -2,7 +2,7 @@
 
 ### Requirement: Auto-Update
 
-The application SHALL check GitHub Releases for updates on startup and periodically (every 4 hours). Updater installation SHALL remain unavailable until a separate approved policy defines trusted root, package format, provenance, replay/downgrade protection, rollback, and key rotation. This change SHALL expose availability and rejection states only.
+The application SHALL check GitHub Releases for updates when enabled. Updater installation SHALL remain unavailable until a separate approved policy defines trusted root, package format, provenance, replay/downgrade protection, rollback, and key rotation. This change SHALL expose availability and rejection states only.
 
 #### Scenario: Update Available Notification
 
@@ -77,18 +77,11 @@ THEN the next launch SHALL open the window maximized
 GIVEN the saved window position references a disconnected monitor
 WHEN the app launches
 THEN the window SHALL appear centered on the primary monitor
-AND SHALL use default dimensions (1200x800)
+AND SHALL use default dimensions (1280x800)
 
 ### Requirement: Platform Workarounds
 
-The application SHALL apply platform-specific workarounds: disable GPU acceleration on Linux (Wayland compatibility), hide the console window on Windows in release builds, and handle macOS-specific file path differences for profile storage and Linux display server compatibility.
-
-#### Scenario: Linux GPU Workaround
-
-GIVEN the app launches on Linux
-WHEN the webview initializes
-THEN GPU acceleration SHALL be disabled via the appropriate Tauri/webview flag
-AND the app SHALL render correctly on Wayland and X11
+The application SHALL apply platform-specific workarounds: hide the console window on Windows in release builds, and handle profile path differences across macOS, Linux, and Windows.
 
 #### Scenario: Windows Console Hide
 
@@ -100,21 +93,19 @@ THEN no console window SHALL appear alongside the application window
 
 GIVEN the app launches on macOS
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/Library/Application Support/OpenAccounting/profile/<Name>/`
-AND NOT at `~/.local/share/OpenInvoices/` (the Linux convention)
+THEN the profile directory SHALL be at `~/Library/Application Support/OpenAccounting/profiles/<name>/`
 
 #### Scenario: Linux Profile Path
 
 GIVEN the app launches on Linux
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/.local/share/OpenInvoices/profile/<Name>/`
-AND NOT at `~/Library/Application Support/` (the macOS convention)
+THEN the profile directory SHALL be at `~/.local/share/OpenAccounting/profiles/<name>/`
 
 #### Scenario: Windows Profile Path
 
 GIVEN the app launches on Windows
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `%APPDATA%/OpenAccounting/profile/<Name>/`
+THEN the profile directory SHALL be at `%APPDATA%/OpenAccounting/profiles/<name>/`
 
 ## REMOVED Requirements
 

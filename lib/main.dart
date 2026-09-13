@@ -13,7 +13,9 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/features/desktop/desktop_capability.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
+import 'package:openaccounting/features/desktop/file_assoc_service.dart';
 import 'package:openaccounting/features/desktop/window_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -59,7 +61,23 @@ Future<void> main() async {
   await Directory(profileDirectory).create(recursive: true);
   final db = AppDatabase.forProfile(profileDirectory);
   await db.ensureOpen();
-  final AppServices services = AppServices(db);
+  final DesktopCapabilityRegistry desktopCapabilities = DesktopCapabilityRegistry();
+  // Register tray capability
+  final DesktopTrayService? tray = _desktopTrayService;
+  if (tray != null) {
+    desktopCapabilities.register<DesktopTrayService>(SupportedDesktopCapability<DesktopTrayService>(tray));
+  } else {
+    desktopCapabilities.register<DesktopTrayService>(
+      const UnavailableDesktopCapability<DesktopTrayService>('tray not supported on this target'),
+    );
+  }
+  // Register drop capability with callback placeholder — routing wired in AppScope
+  desktopCapabilities.register<void>(DropCapability(onFileDropped: (_) {}));
+  // Register file association capability
+  desktopCapabilities.register<DesktopFileAssocService>(
+    SupportedDesktopCapability<DesktopFileAssocService>(DesktopFileAssocService(FakeFileAssocBackend())),
+  );
+  final AppServices services = AppServices(db, desktopCapabilities: desktopCapabilities);
   // Preload theme before runApp to avoid flash — DESIGN §7 System persist.
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? savedTheme = prefs.getString('openaccounting.theme_mode');
