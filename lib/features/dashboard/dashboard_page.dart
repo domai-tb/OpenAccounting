@@ -83,7 +83,7 @@ class DashboardPageImpl extends ConsumerWidget {
                     crossAxisCount: cols,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 1.9,
+                    mainAxisExtent: 176,
                   ),
                   itemCount: visible.length,
                   itemBuilder: (BuildContext context, int i) {

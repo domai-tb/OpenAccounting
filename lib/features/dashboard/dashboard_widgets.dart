@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
+import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
@@ -95,8 +96,17 @@ class DashboardCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget body;
     if (isLoading) {
-      body = const Center(
-        child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()),
+      body = const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SkeletonBox(width: 132, height: 24),
+          SizedBox(height: 12),
+          SkeletonBox(width: 208, height: 14),
+          SizedBox(height: 8),
+          SkeletonBox(width: 156, height: 14),
+          SizedBox(height: 12),
+          SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+        ],
       );
     } else if (error != null) {
       body = SingleChildScrollView(

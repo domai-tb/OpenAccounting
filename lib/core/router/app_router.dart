@@ -11,6 +11,7 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
@@ -661,8 +662,14 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           const SizedBox(height: 16),
           const Text('Profile haben getrennte Datenbanken. Nach einem Wechsel ist ein Neustart erforderlich.'),
           const SizedBox(height: 16),
-          const Text('Datenbankabfrage abgeschlossen'),
-          const Text('Datensätze: 1'),
+          const AppCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.storage_outlined),
+              title: const Text('Lokale Daten'),
+              subtitle: const Text('Deine Buchungsdaten liegen geschützt im aktiven Profil auf diesem Gerät.'),
+            ),
+          ),
         ],
       ),
     );
@@ -684,25 +691,33 @@ class HelpPage extends ConsumerWidget {
     return AppPage(
       header: const AppPageHeader(title: 'Hilfe', showFilterToolbar: false),
       child: ListView(
-        children: const <Widget>[
-          ListTile(
+        children: <Widget>[
+          const ListTile(
             leading: Icon(Icons.language),
             title: Text('Sprache und Darstellung'),
             subtitle: Text('Diese Optionen findest du in den Einstellungen.'),
           ),
-          ListTile(
+          const ListTile(
             leading: Icon(Icons.storage_outlined),
             title: Text('Lokale Daten'),
             subtitle: Text('Daten werden im aktiven Profil auf diesem Gerät gespeichert.'),
           ),
-          ListTile(
+          const ListTile(
             leading: Icon(Icons.receipt_long),
             title: Text('Rechnungsentwurf'),
             subtitle: Text('Erstelle einen Entwurf über Rechnungen > Neue Rechnung.'),
           ),
-          SizedBox(height: 16),
-          Text('Datenbankabfrage abgeschlossen'),
-          Text('Datensätze: 1'),
+          const SizedBox(height: 16),
+          const AppCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Privat und lokal'),
+              subtitle: const Text(
+                'OpenAccounting speichert deine Daten im aktiven Profil und zeigt keine künstlichen Ladezähler.',
+              ),
+            ),
+          ),
         ],
       ),
     );
