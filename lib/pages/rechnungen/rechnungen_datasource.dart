@@ -1176,9 +1176,12 @@ WHERE id = ? AND ist_entwurf = 1
     await _ensureExtraColumns();
     final rows = await executor.runSelect(
       '''
-SELECT id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, datum, lieferadresse_id, original_pdf_pfad
-FROM rechnungen
-WHERE id = ?
+SELECT r.id, r.rechnungsnummer, r.typ, r.status, r.ist_entwurf, r.eingabemodus, r.datum, r.lieferadresse_id,
+       r.original_pdf_pfad, k.name AS kunde_name, k.firma AS kunde_firma, k.strasse AS kunde_strasse,
+       k.plz AS kunde_plz, k.ort AS kunde_ort
+FROM rechnungen r
+LEFT JOIN kunden k ON k.id = r.kunde_id
+WHERE r.id = ?
 ''',
       <Object?>[id],
     );

@@ -272,7 +272,7 @@ class _InvoicePaper extends StatelessWidget {
         ),
         const SizedBox(height: 48),
         const Text('Rechnung an', style: TextStyle(fontWeight: FontWeight.w700)),
-        const Text('Kunde noch nicht hinterlegt'),
+        ..._customerAddress(invoice),
         const SizedBox(height: 32),
         Text('Datum: ${_formatDate(invoice.datum)}'),
         const SizedBox(height: 20),
@@ -352,6 +352,18 @@ class _InvoicePaper extends StatelessWidget {
       ],
     );
   }
+}
+
+List<Widget> _customerAddress(RechnungItem invoice) {
+  final List<String> lines = <String>[
+    if (invoice.kundeFirma?.trim().isNotEmpty ?? false) invoice.kundeFirma!.trim(),
+    if (invoice.kundeName?.trim().isNotEmpty ?? false) invoice.kundeName!.trim(),
+    if (invoice.kundeStrasse?.trim().isNotEmpty ?? false) invoice.kundeStrasse!.trim(),
+    if ((invoice.kundePlz?.trim().isNotEmpty ?? false) || (invoice.kundeOrt?.trim().isNotEmpty ?? false))
+      '${invoice.kundePlz?.trim() ?? ''} ${invoice.kundeOrt?.trim() ?? ''}'.trim(),
+  ];
+  if (lines.isEmpty) return <Widget>[const Text('Kunde noch nicht hinterlegt')];
+  return <Widget>[for (final String line in lines) Text(line)];
 }
 
 class _SummaryMetric extends StatelessWidget {

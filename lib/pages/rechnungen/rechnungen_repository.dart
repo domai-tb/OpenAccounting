@@ -109,6 +109,11 @@ class RechnungenRepository {
       istEntwurf: _asBool(invoice['ist_entwurf']),
       eingabemodus: _requiredString(invoice, 'eingabemodus'),
       datum: _requiredString(invoice, 'datum'),
+      kundeName: invoice['kunde_name'] as String?,
+      kundeFirma: invoice['kunde_firma'] as String?,
+      kundeStrasse: invoice['kunde_strasse'] as String?,
+      kundePlz: invoice['kunde_plz'] as String?,
+      kundeOrt: invoice['kunde_ort'] as String?,
       originalPdfPath: invoice['original_pdf_pfad'] as String?,
       positionen: storedPositions.map(_positionFromRow).toList(growable: false),
     );
