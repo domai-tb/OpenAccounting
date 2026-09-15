@@ -69,10 +69,13 @@ class _AppShellState extends ConsumerState<AppShell> {
           return Scaffold(
             body: Row(
               children: <Widget>[
-                AnimatedContainer(
-                  duration: animDuration,
+                SizedBox(
                   width: sidebarWidth,
-                  child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
+                  child: AnimatedContainer(
+                    duration: animDuration,
+                    width: sidebarWidth,
+                    child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
+                  ),
                 ),
                 const VerticalDivider(width: 1),
                 Expanded(child: widget.child),
@@ -93,10 +96,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         return Scaffold(
           body: Row(
             children: <Widget>[
-              AnimatedContainer(
-                duration: animDuration,
+              SizedBox(
                 width: sidebarWidth,
-                child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
+                child: AnimatedContainer(
+                  duration: animDuration,
+                  width: sidebarWidth,
+                  child: Material(color: Theme.of(context).colorScheme.surface, child: sidebar),
+                ),
               ),
               const VerticalDivider(width: 1),
               Expanded(child: widget.child),
