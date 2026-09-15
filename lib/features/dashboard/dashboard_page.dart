@@ -201,7 +201,6 @@ class _WidgetCard extends ConsumerWidget {
             icon: icon,
             emptyMessage: 'Noch nicht verfügbar',
             subtitle: 'Noch nicht verfügbar',
-            onTap: null,
           );
         }
         if (data == null) return const SizedBox.shrink();

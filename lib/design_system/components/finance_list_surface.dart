@@ -81,7 +81,6 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
         title: widget.title,
         subtitle: widget.subtitle,
         searchController: _searchController,
-        searchLabel: 'Suchen',
         searchHint: '${widget.title} durchsuchen…',
         onSearchChanged: (String value) => setState(() => _search = value.trim().toLowerCase()),
         primaryActionLabel: widget.primaryActionLabel,
@@ -264,7 +263,7 @@ class _FinanceRow extends StatelessWidget {
     );
     return Semantics(
       button: onTap != null,
-      label: [title, subtitle, if (status != null) status, if (amount != null) amount].join(', '),
+      label: [title, subtitle, ?status, ?amount].join(', '),
       child: InkWell(
         onTap: onTap,
         child: Padding(
