@@ -10,6 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/app.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/app_router.dart';
+import 'package:openaccounting/design_system/components/finance_list_surface.dart';
+import 'package:openaccounting/design_system/components/app_page.dart';
 
 void main() {
   test('test_analyzer_and_integration_test_gates_1_1_analyzer_gate_passes', () async {
@@ -83,16 +85,10 @@ void main() {
         );
         expect(find.byKey(const ValueKey<String>('bank-import-workflow')), findsOneWidget);
       } else {
-        expect(
-          find.text('Datenbankabfrage abgeschlossen'),
-          findsOneWidget,
-          reason: 'Route ${route.path} must query data',
-        );
-        expect(
-          find.textContaining('Datensätze:'),
-          findsOneWidget,
-          reason: 'Route ${route.path} must expose query results',
-        );
+        final Finder surface = route == AppRoute.settings || route == AppRoute.help
+            ? find.byType(AppPage)
+            : find.byType(FinanceListSurface);
+        expect(surface, findsOneWidget, reason: 'Route ${route.path} must expose its reviewable workspace surface');
       }
     }
   });

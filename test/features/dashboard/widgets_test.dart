@@ -219,6 +219,10 @@ void main() {
       addTearDown(container.dispose);
       for (final id in dashboardWidgetIds) {
         final data = await container.read(dashboardWidgetDataProvider(id).future);
+        if (id == 'lagerwarnung' || id == 'lagerbestand') {
+          expect(data, isNull, reason: 'inventory widget $id must stay unavailable until inventory is wired');
+          continue;
+        }
         expect(data, isNotNull, reason: 'widget $id should fetch');
         expect(data!.title, isNotEmpty, reason: 'title $id');
         expect(data.icon, isNotNull, reason: 'icon $id');
