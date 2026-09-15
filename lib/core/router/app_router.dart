@@ -467,7 +467,7 @@ class TaxesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ProductionRoutePage(
+    return const ProductionRoutePage(
       title: 'Steuern',
       table: 'ustva_exporte',
       icon: Icons.percent,
@@ -483,7 +483,7 @@ class ReportsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ProductionRoutePage(
+    return const ProductionRoutePage(
       title: 'Auswertungen',
       table: 'journal',
       icon: Icons.bar_chart,
@@ -678,9 +678,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           const AppCard(
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.storage_outlined),
-              title: const Text('Lokale Daten'),
-              subtitle: const Text('Deine Buchungsdaten liegen geschützt im aktiven Profil auf diesem Gerät.'),
+              leading: Icon(Icons.storage_outlined),
+              title: Text('Lokale Daten'),
+              subtitle: Text('Deine Buchungsdaten liegen geschützt im aktiven Profil auf diesem Gerät.'),
             ),
           ),
         ],
@@ -704,29 +704,29 @@ class HelpPage extends ConsumerWidget {
     return AppPage(
       header: const AppPageHeader(title: 'Hilfe', showFilterToolbar: false),
       child: ListView(
-        children: <Widget>[
-          const ListTile(
+        children: const <Widget>[
+          ListTile(
             leading: Icon(Icons.language),
             title: Text('Sprache und Darstellung'),
             subtitle: Text('Diese Optionen findest du in den Einstellungen.'),
           ),
-          const ListTile(
+          ListTile(
             leading: Icon(Icons.storage_outlined),
             title: Text('Lokale Daten'),
             subtitle: Text('Daten werden im aktiven Profil auf diesem Gerät gespeichert.'),
           ),
-          const ListTile(
+          ListTile(
             leading: Icon(Icons.receipt_long),
             title: Text('Rechnungsentwurf'),
             subtitle: Text('Erstelle einen Entwurf über Rechnungen > Neue Rechnung.'),
           ),
-          const SizedBox(height: 16),
-          const AppCard(
+          SizedBox(height: 16),
+          AppCard(
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.verified_user_outlined),
-              title: const Text('Privat und lokal'),
-              subtitle: const Text(
+              leading: Icon(Icons.verified_user_outlined),
+              title: Text('Privat und lokal'),
+              subtitle: Text(
                 'OpenAccounting speichert deine Daten im aktiven Profil und zeigt keine künstlichen Ladezähler.',
               ),
             ),

@@ -87,7 +87,7 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
         primaryActionLabel: widget.primaryActionLabel,
         onPrimaryAction: widget.onPrimaryAction,
         resultCount: records.hasValue ? _filteredRows(records.value!).length : null,
-        resultCountLabelBuilder: (int count) => _countLabel(count),
+        resultCountLabelBuilder: _countLabel,
       ),
       child: records.when(
         loading: _buildLoading,
