@@ -384,7 +384,7 @@ class _InvoiceStatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppPage(
-      header: AppPageHeader(title: 'Rechnung', showFilterToolbar: false),
+      header: const AppPageHeader(title: 'Rechnung', showFilterToolbar: false),
       child: AppCard(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 72, horizontal: AppSpacing.xl),
