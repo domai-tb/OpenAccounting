@@ -129,7 +129,20 @@ GoRouter createRouter(AppDatabase db) {
             ],
           ),
           GoRoute(path: '/taxes', builder: (context, state) => const TaxesPage()),
-          GoRoute(path: '/reports', builder: (context, state) => const ReportsPage()),
+          GoRoute(
+            path: '/reports',
+            builder: (context, state) => const ReportsPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => ProductionRecordDetailPage(
+                  table: 'journal',
+                  title: 'Buchung ${state.pathParameters['id']}',
+                  id: state.pathParameters['id']!,
+                ),
+              ),
+            ],
+          ),
           GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
@@ -769,7 +782,7 @@ class ProductionRoutePage extends ConsumerWidget {
       onEmptyAction: onEmptyAction,
       filterTyp: filterTyp,
       filterStatus: filterStatus,
-      onOpen: (int id) => _openRecord(context, table, id, const <String, Object?>{}),
+      onOpen: (int id, Map<String, Object?> row) => _openRecord(context, table, id, row),
     );
   }
 }
@@ -805,26 +818,54 @@ class ProductionRecordDetailPage extends ConsumerWidget {
         if (row == null) {
           return NotFoundPage(message: 'Der Datensatz mit der ID $id wurde nicht gefunden.');
         }
+        final String recordTitle = _recordTitle(table, row);
+        final List<_DetailField> fields = _detailFields(table, row);
         return AppPage(
-          header: AppPageHeader(title: title, showFilterToolbar: false),
+          maxWidth: 860,
+          header: AppPageHeader(
+            title: recordTitle,
+            showFilterToolbar: false,
+            leading: IconButton(
+              onPressed: () => _goBackOrHome(context),
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Zurück',
+            ),
+          ),
           child: ListView(
             children: <Widget>[
-              Text('Datensatz-ID: $id', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              for (final MapEntry<String, Object?> entry in row.entries)
-                if (entry.key != 'id')
-                  ListTile(
-                    dense: true,
-                    title: Text(_fieldLabel(entry.key)),
-                    subtitle: Text(_displayValue(entry.value)),
-                  ),
+              AppCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                      child: Icon(table == 'kunden' ? Icons.person_outline : Icons.menu_book_outlined),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(recordTitle, style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 4),
+                          Text('Datensatz-ID $id', style: Theme.of(context).textTheme.bodyMedium),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => _goBackOrHome(context),
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Zurück'),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: <Widget>[
+                    for (int index = 0; index < fields.length; index++) ...<Widget>[
+                      ListTile(title: Text(fields[index].label), subtitle: Text(fields[index].value), dense: true),
+                      if (index < fields.length - 1) const Divider(height: 1, indent: 16, endIndent: 16),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -835,6 +876,37 @@ class ProductionRecordDetailPage extends ConsumerWidget {
   }
 }
 
+class _DetailField {
+  const _DetailField(this.label, this.value);
+
+  final String label;
+  final String value;
+}
+
+List<_DetailField> _detailFields(String table, Map<String, Object?> row) {
+  final List<String> keys = switch (table) {
+    'kunden' => <String>[
+      'firma',
+      'strasse',
+      'hausnummer',
+      'plz',
+      'ort',
+      'land',
+      'email',
+      'telefon',
+      'ust_idnr',
+      'zahlungsziel',
+    ],
+    'journal' => <String>['datum', 'beleg_nr', 'beleg_typ', 'beschreibung', 'betrag', 'soll', 'haben', 'ust_satz'],
+    _ => row.keys.where((String key) => key != 'id').take(12).toList(),
+  };
+  return <_DetailField>[
+    for (final String key in keys)
+      if (row.containsKey(key) && _displayValue(row[key]) != '—')
+        _DetailField(_fieldLabel(key), _displayValue(row[key])),
+  ];
+}
+
 void _openRecord(BuildContext context, String table, int id, Map<String, Object?> row) {
   if (table == 'rechnungen') {
     context.go('/invoices/$id');
@@ -842,6 +914,10 @@ void _openRecord(BuildContext context, String table, int id, Map<String, Object?
   }
   if (table == 'kunden') {
     context.go('/contacts/$id');
+    return;
+  }
+  if (table == 'journal') {
+    context.go('/reports/$id');
     return;
   }
   _showRecordDialog(context, table, row);

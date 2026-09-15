@@ -44,7 +44,7 @@ class FinanceListSurface extends ConsumerStatefulWidget {
   final VoidCallback? onEmptyAction;
   final String? filterTyp;
   final String? filterStatus;
-  final void Function(int id)? onOpen;
+  final void Function(int id, Map<String, Object?> row)? onOpen;
 
   @override
   ConsumerState<FinanceListSurface> createState() => _FinanceListSurfaceState();
@@ -187,7 +187,7 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
               row: filtered[index],
               onTap: () {
                 final int? id = _recordId(filtered[index]);
-                if (id != null) widget.onOpen?.call(id);
+                if (id != null) widget.onOpen?.call(id, filtered[index]);
               },
             ),
             if (index < filtered.length - 1) const Divider(height: 1, indent: 72),
