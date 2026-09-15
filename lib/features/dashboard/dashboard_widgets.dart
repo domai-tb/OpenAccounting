@@ -157,7 +157,7 @@ class DashboardCard extends StatelessWidget {
             Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
           ],
           const SizedBox(height: 12),
-          Expanded(child: body),
+          Expanded(child: SingleChildScrollView(child: body)),
         ],
       ),
     );
