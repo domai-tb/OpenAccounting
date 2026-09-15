@@ -58,10 +58,7 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
       error: (Object error, StackTrace stackTrace) => _errorPage(context, error, stackTrace),
       data: (RechnungItem? value) {
         if (value == null) {
-          return const _InvoiceStatePage(
-            title: 'Rechnung nicht gefunden',
-            message: 'Diese Rechnung existiert nicht mehr.',
-          );
+          return const _InvoiceStatePage(title: 'Nicht gefunden', message: 'Diese Rechnung existiert nicht mehr.');
         }
         return _documentPage(context, value);
       },
@@ -106,8 +103,8 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
       maxWidth: 1100,
       header: AppPageHeader(
         leading: _backButton(context),
-        title: heading,
-        subtitle: '${_documentLabel(invoice.typ)} · ${_formatDate(invoice.datum)}',
+        title: 'Rechnung ${invoice.id}',
+        subtitle: '$heading · ${_documentLabel(invoice.typ)} · ${_formatDate(invoice.datum)}',
         showFilterToolbar: false,
         actions: <Widget>[
           if (isDraft)
