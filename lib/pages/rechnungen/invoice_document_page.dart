@@ -345,7 +345,7 @@ class _InvoicePaper extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(height: 48),
         const Divider(),
         const Text(
           'OpenAccounting · Lokale Finanzverwaltung',
