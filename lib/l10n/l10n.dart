@@ -1135,6 +1135,90 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Bank'**
   String get pdfBank;
+
+  /// No description provided for @setupWizardTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Setup Wizard'**
+  String get setupWizardTitle;
+
+  /// No description provided for @setupStepCompany.
+  ///
+  /// In de, this message translates to:
+  /// **'Stammdaten'**
+  String get setupStepCompany;
+
+  /// No description provided for @setupStepAccounts.
+  ///
+  /// In de, this message translates to:
+  /// **'Konten'**
+  String get setupStepAccounts;
+
+  /// No description provided for @setupStepCategories.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorien'**
+  String get setupStepCategories;
+
+  /// No description provided for @setupStepCompletion.
+  ///
+  /// In de, this message translates to:
+  /// **'Abschluss'**
+  String get setupStepCompletion;
+
+  /// No description provided for @profileSelectionTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil wählen'**
+  String get profileSelectionTitle;
+
+  /// No description provided for @profileLastUsed.
+  ///
+  /// In de, this message translates to:
+  /// **'Zuletzt verwendet'**
+  String get profileLastUsed;
+
+  /// No description provided for @dashboardLoadError.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehler beim Laden'**
+  String get dashboardLoadError;
+
+  /// No description provided for @dashboardInventoryWarning.
+  ///
+  /// In de, this message translates to:
+  /// **'Lagerwarnung'**
+  String get dashboardInventoryWarning;
+
+  /// No description provided for @dashboardInventoryStock.
+  ///
+  /// In de, this message translates to:
+  /// **'Lagerbestand'**
+  String get dashboardInventoryStock;
+
+  /// No description provided for @actionChooseFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei auswählen'**
+  String get actionChooseFile;
+
+  /// No description provided for @actionPreview.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschau'**
+  String get actionPreview;
+
+  /// No description provided for @actionHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Verlauf'**
+  String get actionHistory;
+
+  /// No description provided for @actionImport.
+  ///
+  /// In de, this message translates to:
+  /// **'Importieren'**
+  String get actionImport;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -13,8 +13,7 @@ import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
-String _dashboardLoadError(BuildContext context) => appLocalizationsOf(context)
-    .backendUnreachable; // ponytail: 1 key reused, add dashboard.* keys when full i18n needed
+String _dashboardLoadError(BuildContext context) => appLocalizationsOf(context).dashboardLoadError;
 
 String _dashboardErrorMessage(BuildContext context, String area, Object error, StackTrace stackTrace) {
   debugPrint('dashboard $area failed: $error\n$stackTrace');
@@ -330,7 +329,8 @@ String _dashboardTitle(String id, AppLocalizations l10n) {
   return switch (id) {
     'offene_rechnungen' || 'ueberfaellige_rechnungen' || 'offene_verbindlichkeiten' => l10n.sidebarInvoices,
     'zahlungseingaenge' => l10n.sidebarBanking,
-    'lagerwarnung' || 'lagerbestand' => l10n.dashboardInventory,
+    'lagerwarnung' => l10n.dashboardInventoryWarning,
+    'lagerbestand' => l10n.dashboardInventoryStock,
     'mahnung_warnung' => l10n.pdfReminder,
     'fristen' || 'ustva_frist' => l10n.sidebarTaxes,
     'quick_links' => l10n.actionBackOverview,

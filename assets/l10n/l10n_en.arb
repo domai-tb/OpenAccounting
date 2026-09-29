@@ -173,5 +173,19 @@
   "pdfPaymentDetails": "Payment details",
   "pdfIban": "IBAN",
   "pdfBic": "BIC",
-  "pdfBank": "Bank"
+  "pdfBank": "Bank",
+  "setupWizardTitle": "Setup wizard",
+  "setupStepCompany": "Company details",
+  "setupStepAccounts": "Accounts",
+  "setupStepCategories": "Categories",
+  "setupStepCompletion": "Completion",
+  "profileSelectionTitle": "Choose profile",
+  "profileLastUsed": "Last used",
+  "dashboardLoadError": "Loading failed",
+  "dashboardInventoryWarning": "Inventory warning",
+  "dashboardInventoryStock": "Inventory stock",
+  "actionChooseFile": "Choose file",
+  "actionPreview": "Preview",
+  "actionHistory": "History",
+  "actionImport": "Import"
 }

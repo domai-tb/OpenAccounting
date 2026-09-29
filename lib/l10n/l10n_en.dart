@@ -530,4 +530,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pdfBank => 'Bank';
+
+  @override
+  String get setupWizardTitle => 'Setup wizard';
+
+  @override
+  String get setupStepCompany => 'Company details';
+
+  @override
+  String get setupStepAccounts => 'Accounts';
+
+  @override
+  String get setupStepCategories => 'Categories';
+
+  @override
+  String get setupStepCompletion => 'Completion';
+
+  @override
+  String get profileSelectionTitle => 'Choose profile';
+
+  @override
+  String get profileLastUsed => 'Last used';
+
+  @override
+  String get dashboardLoadError => 'Loading failed';
+
+  @override
+  String get dashboardInventoryWarning => 'Inventory warning';
+
+  @override
+  String get dashboardInventoryStock => 'Inventory stock';
+
+  @override
+  String get actionChooseFile => 'Choose file';
+
+  @override
+  String get actionPreview => 'Preview';
+
+  @override
+  String get actionHistory => 'History';
+
+  @override
+  String get actionImport => 'Import';
 }

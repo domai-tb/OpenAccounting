@@ -173,5 +173,19 @@
   "pdfPaymentDetails": "Zahlungsdaten",
   "pdfIban": "IBAN",
   "pdfBic": "BIC",
-  "pdfBank": "Bank"
+  "pdfBank": "Bank",
+  "setupWizardTitle": "Setup Wizard",
+  "setupStepCompany": "Stammdaten",
+  "setupStepAccounts": "Konten",
+  "setupStepCategories": "Kategorien",
+  "setupStepCompletion": "Abschluss",
+  "profileSelectionTitle": "Profil wählen",
+  "profileLastUsed": "Zuletzt verwendet",
+  "dashboardLoadError": "Fehler beim Laden",
+  "dashboardInventoryWarning": "Lagerwarnung",
+  "dashboardInventoryStock": "Lagerbestand",
+  "actionChooseFile": "Datei auswählen",
+  "actionPreview": "Vorschau",
+  "actionHistory": "Verlauf",
+  "actionImport": "Importieren"
 }

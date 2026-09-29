@@ -530,4 +530,46 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pdfBank => 'Bank';
+
+  @override
+  String get setupWizardTitle => 'Setup Wizard';
+
+  @override
+  String get setupStepCompany => 'Stammdaten';
+
+  @override
+  String get setupStepAccounts => 'Konten';
+
+  @override
+  String get setupStepCategories => 'Kategorien';
+
+  @override
+  String get setupStepCompletion => 'Abschluss';
+
+  @override
+  String get profileSelectionTitle => 'Profil wählen';
+
+  @override
+  String get profileLastUsed => 'Zuletzt verwendet';
+
+  @override
+  String get dashboardLoadError => 'Fehler beim Laden';
+
+  @override
+  String get dashboardInventoryWarning => 'Lagerwarnung';
+
+  @override
+  String get dashboardInventoryStock => 'Lagerbestand';
+
+  @override
+  String get actionChooseFile => 'Datei auswählen';
+
+  @override
+  String get actionPreview => 'Vorschau';
+
+  @override
+  String get actionHistory => 'Verlauf';
+
+  @override
+  String get actionImport => 'Importieren';
 }

@@ -193,7 +193,7 @@ class _WizardPageState extends State<WizardPage> {
     final AppLocalizations l10n = appLocalizationsOf(context);
     final int stepIndex = WizardStep.values.indexOf(_step);
     return AppPage(
-      header: AppPageHeader(title: l10n.setupTitle),
+      header: AppPageHeader(title: l10n.setupWizardTitle),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -405,10 +405,10 @@ class _WizardPageState extends State<WizardPage> {
 
   String _localizedStepLabel(AppLocalizations l10n, WizardStep step) {
     return switch (step) {
-      WizardStep.stammdaten => l10n.setupCompanyName,
-      WizardStep.konten => l10n.sidebarBanking,
-      WizardStep.kategorien => l10n.setupCategories,
-      WizardStep.abschluss => l10n.setupComplete,
+      WizardStep.stammdaten => l10n.setupStepCompany,
+      WizardStep.konten => l10n.setupStepAccounts,
+      WizardStep.kategorien => l10n.setupStepCategories,
+      WizardStep.abschluss => l10n.setupStepCompletion,
     };
   }
 }
@@ -446,7 +446,7 @@ class ProfileSelectionWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final String? effectiveLast = lastUsed;
     return Scaffold(
-      appBar: AppBar(title: Text(appLocalizationsOf(context).settingsProfiles)),
+      appBar: AppBar(title: Text(appLocalizationsOf(context).profileSelectionTitle)),
       body: ListView.builder(
         itemCount: profiles.length,
         itemBuilder: (BuildContext context, int i) {
@@ -454,7 +454,7 @@ class ProfileSelectionWidget extends StatelessWidget {
           final bool isLast = name == effectiveLast;
           return ListTile(
             title: Text(name),
-            subtitle: isLast ? Text(appLocalizationsOf(context).setupSaved) : null,
+            subtitle: isLast ? Text(appLocalizationsOf(context).profileLastUsed) : null,
             selected: isLast,
             selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
             onTap: onSelected == null ? () => unawaited(_selectProfile(context, name)) : () => onSelected!(name),

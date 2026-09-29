@@ -768,7 +768,7 @@ LIMIT 100
                 FilledButton.icon(
                   onPressed: _isBusy ? null : () => unawaited(_pickFile()),
                   icon: const Icon(Icons.file_open),
-                  label: Text(_l10n.actionContinue),
+                  label: Text(_l10n.actionChooseFile),
                 ),
                 // ponytail: native picker via file_selector, manual path fallback keeps headless/test path
                 OutlinedButton.icon(
@@ -822,7 +822,7 @@ LIMIT 100
               child: FilledButton.icon(
                 onPressed: _isBusy || _fileBytes == null ? null : () => unawaited(_parseLoadedFile()),
                 icon: const Icon(Icons.preview),
-                label: Text(_l10n.pdfInvoice),
+                label: Text(_l10n.actionPreview),
               ),
             ),
           ],
@@ -1402,7 +1402,7 @@ LIMIT 100
                     _view = _view == _BankImportView.import ? _BankImportView.history : _BankImportView.import;
                   }),
             icon: Icon(_view == _BankImportView.import ? Icons.history : Icons.file_upload),
-            label: Text(_view == _BankImportView.import ? _l10n.emptyEntries : _l10n.actionContinue),
+            label: Text(_view == _BankImportView.import ? _l10n.actionHistory : _l10n.actionImport),
           ),
         ],
       ),
