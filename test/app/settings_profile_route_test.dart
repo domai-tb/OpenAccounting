@@ -56,7 +56,7 @@ void main() {
     addTearDown(db.close);
 
     await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(router.state.matchedLocation, '/settings');
     expect(find.byType(AppShell), findsOneWidget);
