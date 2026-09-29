@@ -88,9 +88,30 @@ historical planning verdict remains `REVISE`; this follow-up records implementat
 - `openspec validate --specs --strict` — **54 passed, 0 failed**.
 - Scoped `fvm dart format --line-length=120` — no remaining changes; `git diff --check` — clean.
 
+## Race Hardening Follow-up Evidence (2026-09-29)
+
+The remaining race-evidence gap is closed in the scoped fingerprint test. Production transaction semantics remain
+unchanged: the deferred transaction factory is test-only, applies only to the initial payment attempt, and is rejected
+for write-off paths; payment retries and keyed reloads use the production immediate runner.
+
+- The observed-balance fixture uses two separate file-backed WAL executors, pauses after the first transaction observes
+  `offen`/`10000` cents, commits a competing full payment through the second production executor, then proves the
+  first attempt sees `SQLITE_BUSY_SNAPSHOT` 517, rolls back, retries immediately, and returns typed `alreadyClosed`.
+- The ordinary partial, full, and overpayment branches insert provisional payment/overpayment journal and relation rows,
+  force the conditional update to report zero affected rows through a test-only executor wrapper, and assert rollback
+  counts, unchanged status/balance/count snapshots, bound original id/status/cents, and no orphan journals.
+- The simultaneous write-off and write-off/payment races use separate file-backed WAL executors and assert one committed
+  closing effect, one typed `alreadyClosed` loser, unchanged final balance invariants, and no orphan journals or
+  relations.
+- Fingerprint race test: **32 passed, 0 failed**.
+- Affected receivable and migration suites: **61 passed, 0 failed**.
+- Full Linux VM suite: **804 passed, 0 failed**.
+- `fvm flutter analyze` — **No issues found**; strict named change validation — **valid**; strict specs — **54 passed,
+  0 failed**; scoped format and `git diff --check` — **clean**.
+
 ## Fresh Approval Placeholder
 
 `VERDICT: PENDING_FRESH_CONTEXT_APPROVAL`
 
-Reviewer: independent Anvil reviewer to complete a fresh review of this follow-up. Automated tests and this evidence
-update do not infer approval.
+Reviewer: independent Anvil reviewer to complete a fresh review of this race-hardening follow-up. Automated tests and
+this evidence update do not infer approval.

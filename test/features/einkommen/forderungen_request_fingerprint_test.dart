@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show QueryExecutor;
+import 'package:drift/drift.dart'
+    show BatchedStatements, OpeningDetails, QueryExecutor, QueryExecutorUser, SqlDialect, TransactionExecutor;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
@@ -335,37 +336,11 @@ void main() {
     });
 
     test('test_two_simultaneous_writeoffs_commit_one_effect', () async {
-      final Forderung f = await fixture.forderung(amount: 75);
-      final outcomes = await Future.wait(<Future<Object?>>[
-        fixture.repo.ausbuchen(forderungId: f.id, grund: 'first').then<Object?>((value) => value),
-        fixture.repo
-            .ausbuchen(forderungId: f.id, grund: 'second')
-            .then<Object?>((value) => value)
-            .catchError((error) => error),
-      ]);
-      expect(outcomes.whereType<Forderung>().length, 1);
-      expect(outcomes.whereType<ForderungenException>().single.code, ForderungenErrorCode.alreadyClosed);
+      await _runFileBackedWriteoffRace();
     });
 
     test('test_writeoff_and_full_payment_race_has_one_effect_no_orphan', () async {
-      final Forderung f = await fixture.forderung(amount: 75);
-      final outcomes = await Future.wait(<Future<Object?>>[
-        fixture.repo
-            .ausbuchen(forderungId: f.id, grund: 'race')
-            .then<Object?>((value) => value)
-            .catchError((error) => error),
-        fixture.repo
-            .zahlungBuchen(forderungId: f.id, betrag: 75, idempotencyKey: 'race-payment')
-            .then<Object?>((value) => value)
-            .catchError((error) => error),
-      ]);
-      expect(outcomes.whereType<Forderung>().length, 1);
-      final orphanRows = await fixture.db.executor.runSelect(
-        'SELECT j.id FROM journal j LEFT JOIN forderung_zahlungen p ON p.journal_id = j.id '
-        "WHERE j.beschreibung LIKE '%Forderung #${f.id}%' AND p.id IS NULL",
-        const <Object?>[],
-      );
-      expect(orphanRows, isEmpty);
+      await _runFileBackedWriteoffPaymentRace();
     });
 
     test('test_invalid_or_closed_writeoff_has_no_effect', () async {
@@ -376,27 +351,11 @@ void main() {
     });
 
     test('test_conditional_payment_update_rolls_back_on_observed_balance_race', () async {
-      final observed = <String>[];
-      final Forderung f = await fixture.forderung();
-      final repo = ForderungenRepository(
-        fixture.db.executor,
-        afterPaymentStateReadBeforeConditionalUpdate: (id, status, cents) async {
-          observed.add('$id:$status:$cents');
-        },
-      );
-      await repo.zahlungBuchen(forderungId: f.id, betrag: 10, idempotencyKey: 'observed');
-      expect(observed, contains('${f.id}:offen:10000'));
+      await _runObservedBalanceRace();
     });
 
     test('test_ordinary_zero_row_conditional_payment_update_is_already_closed_for_every_branch', () async {
-      final Forderung f = await fixture.forderung(amount: 75);
-      await fixture.repo.zahlungBuchen(forderungId: f.id, betrag: 75);
-      for (final amount in <num>[1, 75, 100]) {
-        await expectCode(
-          fixture.repo.zahlungBuchen(forderungId: f.id, betrag: amount, idempotencyKey: 'closed-$amount'),
-          ForderungenErrorCode.alreadyClosed,
-        );
-      }
+      await _runZeroRowPaymentRollbackBranches();
     });
 
     test('test_persistent_sqlite_lock_exhausts_exactly_three_writeoff_retries', () async {
@@ -422,6 +381,219 @@ Future<void> expectCode(Future<Object?> operation, ForderungenErrorCode code) as
     fail('expected ForderungenException with code $code');
   } on ForderungenException catch (error) {
     expect(error.code, code);
+  }
+}
+
+Future<void> _runObservedBalanceRace() async {
+  final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_observed_');
+  final AppDatabase firstDb = AppDatabase.forProfile(directory.path);
+  final AppDatabase competitorDb = AppDatabase.forProfile(directory.path);
+  final _DeferredWalTransactionFactory firstFactory = _DeferredWalTransactionFactory();
+  try {
+    await firstDb.ensureOpen();
+    await competitorDb.ensureOpen();
+    DateTime clock() => DateTime.utc(2026, 9, 30);
+    final ForderungenRepository setupRepo = ForderungenRepository(firstDb.executor, nowUtc: clock);
+    final ForderungenRepository competitorRepo = ForderungenRepository(competitorDb.executor, nowUtc: clock);
+    await setupRepo.ensureSchema();
+    await competitorRepo.ensureSchema();
+    final int partnerId = await firstDb.executor.runInsert(
+      "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Observed Race', 'A', '10115', 'Berlin', 'DE')",
+      const <Object?>[],
+    );
+    final Forderung f = await setupRepo.create(typ: 'rechnung', betrag: 100, partnerTyp: 'kunde', partnerId: partnerId);
+    final int beforeJournalCount = await _tableCount(firstDb.executor, 'journal');
+    final int beforeRelationCount = await _tableCount(firstDb.executor, 'forderung_zahlungen');
+    final List<String> observed = <String>[];
+    final Completer<void> observedState = Completer<void>();
+    final Completer<void> allowFirst = Completer<void>();
+    final ForderungenRepository firstRepo = ForderungenRepository(
+      firstDb.executor,
+      nowUtc: clock,
+      transactionFactory: firstFactory,
+      afterPaymentStateReadBeforeConditionalUpdate: (id, status, cents) async {
+        observed.add('$id:$status:$cents');
+        observedState.complete();
+        await allowFirst.future;
+      },
+    );
+    final Future<Forderung> firstFuture = firstRepo.zahlungBuchen(
+      forderungId: f.id,
+      betrag: 10,
+      idempotencyKey: 'observed-race',
+    );
+    await observedState.future;
+
+    final Forderung competitor = await competitorRepo.zahlungBuchen(
+      forderungId: f.id,
+      betrag: 100,
+      idempotencyKey: 'observed-competitor',
+    );
+    expect(competitor.status, 'bezahlt');
+    expect(competitor.betrag, 0);
+    allowFirst.complete();
+    await expectCode(firstFuture, ForderungenErrorCode.alreadyClosed);
+
+    expect(observed, <String>['${f.id}:offen:10000']);
+    expect(firstFactory.busySnapshotErrors, 1);
+    expect(firstFactory.deferredAttempts, <int>[1]);
+    expect(firstFactory.immediateAttempts, <int>[2]);
+    expect(await _tableCount(firstDb.executor, 'journal'), beforeJournalCount + 1);
+    expect(await _tableCount(firstDb.executor, 'forderung_zahlungen'), beforeRelationCount + 1);
+    final keyedRows = await firstDb.executor.runSelect(
+      'SELECT count(*) AS c FROM forderung_zahlungen WHERE idempotency_key = ?',
+      const <Object?>['observed-race'],
+    );
+    expect(keyedRows.single['c'], 0);
+    expect(await _orphanRows(firstDb.executor, <String>['Zahlung Forderung #${f.id}']), isEmpty);
+  } finally {
+    await firstDb.close();
+    await competitorDb.close();
+    await directory.delete(recursive: true);
+  }
+}
+
+Future<void> _runZeroRowPaymentRollbackBranches() async {
+  final AppDatabase db = AppDatabase.createTestDatabase();
+  try {
+    await db.ensureOpen();
+    final ForderungenRepository setupRepo = ForderungenRepository(db.executor, nowUtc: () => DateTime.utc(2026, 9, 30));
+    await setupRepo.ensureSchema();
+    final int partnerId = await db.executor.runInsert(
+      "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Zero Row', 'A', '10115', 'Berlin', 'DE')",
+      const <Object?>[],
+    );
+    final Forderung f = await setupRepo.create(typ: 'rechnung', betrag: 75, partnerTyp: 'kunde', partnerId: partnerId);
+    for (final num amount in <num>[10, 75, 100]) {
+      final _ZeroConditionalUpdateFactory factory = _ZeroConditionalUpdateFactory();
+      final ForderungenRepository repo = ForderungenRepository(
+        db.executor,
+        nowUtc: () => DateTime.utc(2026, 9, 30),
+        transactionFactory: factory,
+      );
+      final List<Object?> before = await _accountingSnapshot(db.executor, f.id);
+      await expectCode(
+        repo.zahlungBuchen(forderungId: f.id, betrag: amount, idempotencyKey: 'zero-row-$amount'),
+        ForderungenErrorCode.alreadyClosed,
+      );
+      expect(factory.rollbackCount, 1);
+      expect(factory.conditionalUpdates, hasLength(1));
+      final List<Object?> bound = factory.conditionalUpdates.single.args;
+      expect(bound.sublist(3), <Object?>[f.id, 'offen', '75.00']);
+      expect(await _accountingSnapshot(db.executor, f.id), before);
+      expect(await _orphanRows(db.executor, <String>['Zahlung Forderung #${f.id}']), isEmpty);
+    }
+  } finally {
+    await db.close();
+  }
+}
+
+Future<void> _runFileBackedWriteoffRace() async {
+  final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_writeoff_');
+  final AppDatabase firstDb = AppDatabase.forProfile(directory.path);
+  final AppDatabase secondDb = AppDatabase.forProfile(directory.path);
+  try {
+    await firstDb.ensureOpen();
+    await secondDb.ensureOpen();
+    DateTime clock() => DateTime.utc(2026, 9, 30);
+    final ForderungenRepository firstRepo = ForderungenRepository(firstDb.executor, nowUtc: clock);
+    final ForderungenRepository secondRepo = ForderungenRepository(secondDb.executor, nowUtc: clock);
+    await firstRepo.ensureSchema();
+    await secondRepo.ensureSchema();
+    final int partnerId = await firstDb.executor.runInsert(
+      "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Writeoff Race', 'A', '10115', 'Berlin', 'DE')",
+      const <Object?>[],
+    );
+    final Forderung f = await firstRepo.create(typ: 'rechnung', betrag: 75, partnerTyp: 'kunde', partnerId: partnerId);
+    final int beforeJournalCount = await _tableCount(firstDb.executor, 'journal');
+    final int beforeRelationCount = await _tableCount(firstDb.executor, 'forderung_zahlungen');
+    final List<Object?> outcomes = await Future.wait(<Future<Object?>>[
+      firstRepo
+          .ausbuchen(forderungId: f.id, grund: 'race-first')
+          .then<Object?>((value) => value)
+          .catchError((error) => error),
+      secondRepo
+          .ausbuchen(forderungId: f.id, grund: 'race-second')
+          .then<Object?>((value) => value)
+          .catchError((error) => error),
+    ]);
+    expect(outcomes.whereType<Forderung>(), hasLength(1));
+    expect(outcomes.whereType<ForderungenException>().single.code, ForderungenErrorCode.alreadyClosed);
+    expect(await _tableCount(firstDb.executor, 'journal'), beforeJournalCount + 1);
+    expect(await _tableCount(firstDb.executor, 'forderung_zahlungen'), beforeRelationCount + 1);
+    final state = (await firstDb.executor.runSelect('SELECT status, betrag FROM forderungen WHERE id = ?', <Object?>[
+      f.id,
+    ])).single;
+    expect(state['status'], 'ausgebucht');
+    expect(num.parse(state['betrag'].toString()), 0);
+    expect(
+      await _orphanRows(firstDb.executor, const <String>[
+        'Forderungsausfall: race-first',
+        'Forderungsausfall: race-second',
+      ]),
+      isEmpty,
+    );
+  } finally {
+    await firstDb.close();
+    await secondDb.close();
+    await directory.delete(recursive: true);
+  }
+}
+
+Future<void> _runFileBackedWriteoffPaymentRace() async {
+  final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_cross_race_');
+  final AppDatabase writeoffDb = AppDatabase.forProfile(directory.path);
+  final AppDatabase paymentDb = AppDatabase.forProfile(directory.path);
+  try {
+    await writeoffDb.ensureOpen();
+    await paymentDb.ensureOpen();
+    DateTime clock() => DateTime.utc(2026, 9, 30);
+    final ForderungenRepository writeoffRepo = ForderungenRepository(writeoffDb.executor, nowUtc: clock);
+    final ForderungenRepository paymentRepo = ForderungenRepository(paymentDb.executor, nowUtc: clock);
+    await writeoffRepo.ensureSchema();
+    await paymentRepo.ensureSchema();
+    final int partnerId = await writeoffDb.executor.runInsert(
+      "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Cross Race', 'A', '10115', 'Berlin', 'DE')",
+      const <Object?>[],
+    );
+    final Forderung f = await writeoffRepo.create(
+      typ: 'rechnung',
+      betrag: 75,
+      partnerTyp: 'kunde',
+      partnerId: partnerId,
+    );
+    final int beforeJournalCount = await _tableCount(writeoffDb.executor, 'journal');
+    final int beforeRelationCount = await _tableCount(writeoffDb.executor, 'forderung_zahlungen');
+    final List<Object?> outcomes = await Future.wait(<Future<Object?>>[
+      writeoffRepo
+          .ausbuchen(forderungId: f.id, grund: 'race-writeoff')
+          .then<Object?>((value) => value)
+          .catchError((error) => error),
+      paymentRepo
+          .zahlungBuchen(forderungId: f.id, betrag: 75, idempotencyKey: 'race-payment')
+          .then<Object?>((value) => value)
+          .catchError((error) => error),
+    ]);
+    expect(outcomes.whereType<Forderung>(), hasLength(1));
+    expect(outcomes.whereType<ForderungenException>().single.code, ForderungenErrorCode.alreadyClosed);
+    expect(await _tableCount(writeoffDb.executor, 'journal'), beforeJournalCount + 1);
+    expect(await _tableCount(writeoffDb.executor, 'forderung_zahlungen'), beforeRelationCount + 1);
+    final state = (await writeoffDb.executor.runSelect('SELECT status, betrag FROM forderungen WHERE id = ?', <Object?>[
+      f.id,
+    ])).single;
+    expect(<String>['bezahlt', 'ausgebucht'], contains(state['status']));
+    expect(num.parse(state['betrag'].toString()), 0);
+    expect(
+      await _orphanRows(writeoffDb.executor, <String>[
+        'Zahlung Forderung #${f.id}',
+        'Forderungsausfall: race-writeoff',
+      ]),
+      isEmpty,
+    );
+  } finally {
+    await writeoffDb.close();
+    await paymentDb.close();
+    await directory.delete(recursive: true);
   }
 }
 
@@ -567,8 +739,29 @@ Future<int> _tableCount(QueryExecutor executor, String table) async {
   return (rows.single['c']! as num).toInt();
 }
 
+Future<List<Object?>> _accountingSnapshot(QueryExecutor executor, int forderungId) async {
+  final rows = await executor.runSelect('SELECT status, betrag FROM forderungen WHERE id = ?', <Object?>[forderungId]);
+  return <Object?>[
+    rows.single['status'],
+    rows.single['betrag'],
+    await _tableCount(executor, 'journal'),
+    await _tableCount(executor, 'forderung_zahlungen'),
+  ];
+}
+
+Future<List<Map<String, Object?>>> _orphanRows(QueryExecutor executor, List<String> descriptions) async {
+  final String placeholders = List<String>.filled(descriptions.length, '?').join(', ');
+  return executor.runSelect(
+    'SELECT j.id FROM journal j LEFT JOIN forderung_zahlungen p ON p.journal_id = j.id '
+    'WHERE j.beschreibung IN ($placeholders) AND p.id IS NULL',
+    List<Object?>.from(descriptions),
+  );
+}
+
 class _DeferredWalTransactionFactory implements ForderungenTransactionFactory {
   int busySnapshotErrors = 0;
+  final List<int> deferredAttempts = <int>[];
+  final List<int> immediateAttempts = <int>[];
 
   @override
   Future<T> run<T>({
@@ -580,6 +773,11 @@ class _DeferredWalTransactionFactory implements ForderungenTransactionFactory {
     if (kind != ForderungenTransactionKind.payment) {
       throw StateError('Deferred WAL factory is payment-fixture-only');
     }
+    if (attempt != 1) {
+      immediateAttempts.add(attempt);
+      return _runImmediateTransaction(executor: executor, action: action);
+    }
+    deferredAttempts.add(attempt);
     await executor.runCustom('BEGIN DEFERRED');
     try {
       final T result = await action(executor);
@@ -593,6 +791,112 @@ class _DeferredWalTransactionFactory implements ForderungenTransactionFactory {
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
+}
+
+Future<T> _runImmediateTransaction<T>({
+  required QueryExecutor executor,
+  required Future<T> Function(QueryExecutor transaction) action,
+  void Function()? onRollback,
+}) async {
+  final TransactionExecutor transaction = executor.beginTransaction();
+  await transaction.ensureOpen(_TestTransactionUser());
+  try {
+    final T result = await action(transaction);
+    await transaction.send();
+    return result;
+  } catch (error, stackTrace) {
+    try {
+      await transaction.rollback();
+      onRollback?.call();
+    } catch (rollbackError, rollbackStackTrace) {
+      Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+    }
+    Error.throwWithStackTrace(error, stackTrace);
+  }
+}
+
+class _TestTransactionUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
+}
+
+class _ZeroConditionalUpdateFactory implements ForderungenTransactionFactory {
+  int rollbackCount = 0;
+  final List<_ConditionalUpdateCall> conditionalUpdates = <_ConditionalUpdateCall>[];
+
+  @override
+  Future<T> run<T>({
+    required ForderungenTransactionKind kind,
+    required int attempt,
+    required QueryExecutor executor,
+    required Future<T> Function(QueryExecutor transaction) action,
+  }) async {
+    if (kind != ForderungenTransactionKind.payment || attempt != 1) {
+      throw StateError('Zero-row factory is a single payment-attempt fixture');
+    }
+    return _runImmediateTransaction(
+      executor: executor,
+      action: (QueryExecutor transaction) => action(_ZeroUpdateExecutor(transaction, conditionalUpdates)),
+      onRollback: () => rollbackCount += 1,
+    );
+  }
+}
+
+class _ConditionalUpdateCall {
+  _ConditionalUpdateCall(this.statement, this.args);
+
+  final String statement;
+  final List<Object?> args;
+}
+
+final class _ZeroUpdateExecutor extends QueryExecutor {
+  _ZeroUpdateExecutor(this._delegate, this._calls);
+
+  final QueryExecutor _delegate;
+  final List<_ConditionalUpdateCall> _calls;
+
+  @override
+  SqlDialect get dialect => _delegate.dialect;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) =>
+      _delegate.runSelect(statement, args);
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) => _delegate.runInsert(statement, args);
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) {
+    if (statement.startsWith('UPDATE forderungen SET betrag = ?, status = ?')) {
+      _calls.add(_ConditionalUpdateCall(statement, List<Object?>.from(args)));
+      return Future<int>.value(0);
+    }
+    return _delegate.runUpdate(statement, args);
+  }
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) => _delegate.runDelete(statement, args);
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) => _delegate.runCustom(statement, args);
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) => _delegate.runBatched(statements);
+
+  @override
+  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
+
+  @override
+  QueryExecutor beginExclusive() => _delegate.beginExclusive();
+
+  @override
+  Future<void> close() => _delegate.close();
 }
 
 class _Fixture {

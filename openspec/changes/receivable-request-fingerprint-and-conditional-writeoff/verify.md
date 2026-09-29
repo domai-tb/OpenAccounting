@@ -45,6 +45,24 @@
 - Scoped implementation commit is created after staged-path verification.
 - No push performed.
 
+## Race Hardening Follow-up
+
+- [x] The observed-balance regression uses separate file-backed WAL executors and a real competing full-payment commit.
+- [x] The deferred test transaction factory applies only to the initial payment attempt; payment retries use immediate
+  transactions, and write-off/reload paths use the production runner without the deferred seam.
+- [x] Partial, full, and overpayment zero-row branches insert provisional rows, force `runUpdate == 0`, and verify
+  rollback, unchanged snapshots, bound original id/status/cents, and no orphan journals.
+- [x] Write-off/write-off and write-off/payment races use separate file-backed WAL executors and assert one effect with
+  no orphan journal or relation.
+- `fvm flutter test --dart-define=platform=vm test/features/einkommen/forderungen_request_fingerprint_test.dart` —
+  **32 passed, 0 failed**.
+- Affected receivable/migration suites — **61 passed, 0 failed**.
+- Full VM suite — **804 passed, 0 failed**.
+- `fvm flutter analyze` — **No issues found**.
+- `openspec validate receivable-request-fingerprint-and-conditional-writeoff --strict` — **valid**.
+- `openspec validate --specs --strict` — **54 passed, 0 failed**.
+- `fvm dart format --line-length=120` and `git diff --check` — **clean**.
+
 ## Overall Decision
 
 `REVISE_PENDING_FRESH_CONTEXT_APPROVAL`
