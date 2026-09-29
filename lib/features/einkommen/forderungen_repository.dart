@@ -25,7 +25,7 @@ class Forderung {
   final String typ;
   final String status;
   final num betrag;
-  final String partnerTyp;
+  final String? partnerTyp;
   final int partnerId;
   final int? rechnungId;
   final int? journalId;
@@ -463,7 +463,7 @@ class ForderungenRepository {
         );
       } catch (error, stackTrace) {
         if (key != null && (_isUniqueViolation(error) || _isBusySnapshot(error))) {
-          final Forderung? replay = await _reloadKeyedPayment(key, amount, requestDate);
+          final Forderung? replay = await _reloadKeyedPayment(key, forderungId, amount, requestDate);
           if (replay != null) return replay;
         }
         if (!_isRetryableLock(error)) Error.throwWithStackTrace(error, stackTrace);
@@ -673,7 +673,12 @@ class ForderungenRepository {
     return result;
   }
 
-  Future<Forderung?> _reloadKeyedPayment(String key, _CanonicalAmount amount, _CanonicalDate requestDate) async {
+  Future<Forderung?> _reloadKeyedPayment(
+    String key,
+    int forderungId,
+    _CanonicalAmount amount,
+    _CanonicalDate requestDate,
+  ) async {
     return _runTransaction<Forderung?>(
       kind: ForderungenTransactionKind.payment,
       attempt: 1,
@@ -693,12 +698,17 @@ class ForderungenRepository {
             code: ForderungenErrorCode.legacyFingerprintUnknown,
           );
         }
+        final Forderung? requestedForderung = await _readForderung(transaction, forderungId);
+        if (requestedForderung == null) throw ForderungenException('Forderung nicht gefunden');
+        final String? requestedDirection = _directionFromRaw(requestedForderung.partnerTyp);
+        if (requestedDirection == null) {
+          throw ForderungenException('Partner-Richtung unbekannt', code: ForderungenErrorCode.unknownDirection);
+        }
         final int targetId = _asNum(row['forderung_id'])?.toInt() ?? 0;
-        final String direction = row['fingerprint_direction']?.toString() ?? '';
         final _Fingerprint fingerprint = _Fingerprint(
           requestedCents: amount.cents,
-          forderungId: targetId,
-          direction: direction,
+          forderungId: forderungId,
+          direction: requestedDirection,
           datePolicy: requestDate.policy,
           effectiveDate: requestDate.date,
         );
@@ -800,7 +810,7 @@ class ForderungenRepository {
   static String _formatDate(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
-  static String? _directionFromRaw(String partnerTyp) {
+  static String? _directionFromRaw(String? partnerTyp) {
     if (partnerTyp == 'kunde') return 'incoming';
     if (partnerTyp == 'lieferant') return 'outgoing';
     return null;
@@ -925,7 +935,9 @@ class ForderungenRepository {
       typ: (r['typ'] as String?) ?? 'rechnung',
       status: (r['status'] as String?) ?? 'offen',
       betrag: _asNum(r['betrag']) ?? 0,
-      partnerTyp: (r['partner_typ'] as String?) ?? (r['kunde_id'] != null ? 'kunde' : 'kunde'),
+      // Preserve a null legacy partner type; payment validation maps it to
+      // typed unknownDirection instead of guessing kunde.
+      partnerTyp: r['partner_typ'] as String?,
       partnerId: (r['partner_id'] as int?) ?? (r['kunde_id'] as int?) ?? 0,
       rechnungId: r['rechnung_id'] as int?,
       journalId: r['journal_id'] as int?,

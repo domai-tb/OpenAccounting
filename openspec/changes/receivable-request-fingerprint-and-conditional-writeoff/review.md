@@ -47,8 +47,8 @@ No author rebuttals. The critical findings are evidence gates, not claims that p
 The implementation work is complete for this scoped change. The former `REVISE` verdict above is retained as the
 historical planning gate; it does not represent a fresh implementation review.
 
-- Focused receivable, migration, schema, and profile VM tests: **75 passed, 0 failed**.
-- Full Linux VM suite: `fvm flutter test --dart-define=platform=vm` — **802 passed, 0 failed**.
+- Focused receivable, migration, schema, and profile VM tests: **77 passed, 0 failed**.
+- Full Linux VM suite: `fvm flutter test --dart-define=platform=vm` — **804 passed, 0 failed**.
 - Static analysis: `fvm flutter analyze` — **No issues found**.
 - OpenSpec change validation: `openspec validate receivable-request-fingerprint-and-conditional-writeoff --type change --strict --json` — **1/1 passed**.
 - OpenSpec spec validation: `openspec validate --specs --strict` — **54/54 passed**.
@@ -63,9 +63,34 @@ ordering, canonical keyed-payment fingerprint comparison/reload, typed errors an
 direction validation, bounded lock retries, conditional payment and write-off transitions, and rollback/no-orphan
 race coverage. The feature relation remains outside the preserved 39-table base-schema assertion.
 
+## Verifier Follow-up Evidence (2026-09-29)
+
+The post-commit verifier fixes are implemented in the scoped migration, repository, and regression-test files. The
+historical planning verdict remains `REVISE`; this follow-up records implementation evidence and leaves approval open.
+
+- `_reloadKeyedPayment` now reloads and fingerprints the losing request's own Forderung target and raw partner direction
+  before classifying an idempotency conflict.
+- The two WAL race fixtures use separate file-backed SQLite executors and test-only `BEGIN DEFERRED` transactions. They
+  exercise the competing commit/`SQLITE_BUSY_SNAPSHOT` path, loser reload, ordered mismatch fields, rollback, one
+  journal/relation effect, unchanged balances, and no orphan payment journals. Production transactions remain
+  `BEGIN IMMEDIATE`.
+- `_fromRow` preserves nullable legacy `partner_typ`, and the regression maps it to typed `unknownDirection` rather than
+  defaulting to `kunde`.
+- Current-v8 repair verifies the required foreign keys and unique indexes and repairs a table that has all columns but
+  missing constraints.
+- Focused command: `fvm flutter test --dart-define=platform=vm
+  test/features/einkommen/forderungen_request_fingerprint_test.dart test/features/einkommen/forderungen_test.dart
+  test/db/migration_test.dart test/db/receivable_request_migration_test.dart test/db/schema_test.dart
+  test/db/profile_test.dart` — **77 passed, 0 failed**.
+- Full command: `fvm flutter test --dart-define=platform=vm` — **804 passed, 0 failed**.
+- `fvm flutter analyze` — **No issues found**.
+- `openspec validate receivable-request-fingerprint-and-conditional-writeoff --strict` — **valid**.
+- `openspec validate --specs --strict` — **54 passed, 0 failed**.
+- Scoped `fvm dart format --line-length=120` — no remaining changes; `git diff --check` — clean.
+
 ## Fresh Approval Placeholder
 
 `VERDICT: PENDING_FRESH_CONTEXT_APPROVAL`
 
-Reviewer: independent Anvil reviewer to complete after inspecting the committed implementation and evidence above.
-Approval has not been inferred from automated tests or this author update.
+Reviewer: independent Anvil reviewer to complete a fresh review of this follow-up. Automated tests and this evidence
+update do not infer approval.

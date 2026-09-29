@@ -237,7 +237,25 @@ class MigrationRunner {
       'fingerprint_direction',
       'fingerprint_date_policy',
     };
-    return !required.every((name) => columns.any((row) => row['name'] == name));
+    if (!required.every((name) => columns.any((row) => row['name'] == name))) return true;
+    return !(await _receivableFeatureHasRequiredConstraints());
+  }
+
+  Future<bool> _receivableFeatureHasRequiredConstraints() async {
+    final foreignKeys = await executor.runSelect('PRAGMA foreign_key_list(forderung_zahlungen)', const <Object?>[]);
+    final bool hasForderungForeignKey = foreignKeys.any((row) => row['table']?.toString() == 'forderungen');
+    final bool hasJournalForeignKey = foreignKeys.any((row) => row['table']?.toString() == 'journal');
+    if (!hasForderungForeignKey || !hasJournalForeignKey) return false;
+
+    final indexes = await executor.runSelect('PRAGMA index_list(forderung_zahlungen)', const <Object?>[]);
+    bool hasUniqueIndex(String name) {
+      return indexes.any((row) {
+        final Object? unique = row['unique'];
+        return row['name'] == name && (unique == 1 || unique == true);
+      });
+    }
+
+    return hasUniqueIndex('forderung_zahlungen_key_unique') && hasUniqueIndex('forderung_zahlungen_journal_unique');
   }
 
   Future<void> _migrateReceivableFeature() async {
@@ -262,8 +280,8 @@ class MigrationRunner {
       }
     }
     final foreignKeys = await executor.runSelect('PRAGMA foreign_key_list(forderung_zahlungen)', const <Object?>[]);
-    final hasForderungForeignKey = foreignKeys.any((row) => row['table'] == 'forderungen');
-    final hasJournalForeignKey = foreignKeys.any((row) => row['table'] == 'journal');
+    final hasForderungForeignKey = foreignKeys.any((row) => row['table']?.toString() == 'forderungen');
+    final hasJournalForeignKey = foreignKeys.any((row) => row['table']?.toString() == 'journal');
     if (!hasForderungForeignKey || !hasJournalForeignKey) {
       await _rebuildReceivablePaymentTable(columns);
     }
@@ -289,6 +307,9 @@ class MigrationRunner {
     };
     if (!required.every((name) => verified.any((row) => row['name'] == name))) {
       throw StateError('Forderungen-Zahlungsschema konnte nicht verifiziert werden');
+    }
+    if (!(await _receivableFeatureHasRequiredConstraints())) {
+      throw StateError('Forderungen-Zahlungsschema konnte seine Constraints nicht verifizieren');
     }
   }
 

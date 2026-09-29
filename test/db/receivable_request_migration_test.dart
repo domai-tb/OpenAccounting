@@ -97,6 +97,38 @@ void main() {
       expect(await runner.getUserVersion(), 8);
     });
 
+    test('test_current_v8_repairs_all_columns_when_constraints_are_missing', () async {
+      await db.executor.runCustom('DROP TABLE forderung_zahlungen');
+      await db.executor.runCustom('''
+CREATE TABLE forderung_zahlungen (
+  id INTEGER PRIMARY KEY,
+  forderung_id INTEGER,
+  journal_id INTEGER,
+  betrag NUMERIC,
+  typ TEXT,
+  datum TEXT,
+  idempotency_key TEXT,
+  requested_betrag_cents INTEGER,
+  fingerprint_direction TEXT,
+  fingerprint_date_policy TEXT
+)''');
+      await db.executor.runCustom('PRAGMA user_version = 8');
+      final runner = MigrationRunner(executor: db.executor, profileDir: '/tmp');
+      await runner.run(createSchema: () async {});
+
+      final foreignKeys = await db.executor.runSelect(
+        'PRAGMA foreign_key_list(forderung_zahlungen)',
+        const <Object?>[],
+      );
+      expect(foreignKeys.map((row) => row['table']), containsAll(<String>['forderungen', 'journal']));
+      final indexes = await db.executor.runSelect('PRAGMA index_list(forderung_zahlungen)', const <Object?>[]);
+      expect(
+        indexes.map((row) => row['name']),
+        containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
+      );
+      expect(await runner.getUserVersion(), 8);
+    });
+
     test('test_fresh_upgrade_current_v8_repair_and_rollback_share_raw_begin_migration_path', () async {
       final statements = <String>[];
       await db.executor.runCustom('DROP TABLE forderung_zahlungen');
