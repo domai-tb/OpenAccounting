@@ -101,8 +101,8 @@ class BankImportService {
     } catch (_) {}
 
     // Date: within 7 days => 30
-    if (jDatum != null) {
-      final int diffDays = tx.datum.difference(jDatum).inDays.abs();
+    if (tx.datum != null && jDatum != null) {
+      final int diffDays = tx.datum!.difference(jDatum).inDays.abs();
       if (diffDays <= 7) score += 30;
     }
 
@@ -248,7 +248,19 @@ class BankImportService {
 
       try {
         // String money: normalize betrag via money helper to 2 decimals for hash + storage.
-        final String normBetrag = _normalizeBetragForStorage(tx.betrag);
+        final ({List<String> diagnostics, String? normalizedAmount}) validation = _validateRow(tx);
+        if (validation.diagnostics.isNotEmpty) {
+          final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
+          final ImportRowFailure failure = ImportRowFailure(
+            rowNumber: rowNumber,
+            transaction: failureTransaction,
+            diagnostics: validation.diagnostics,
+            error: validation.diagnostics.join('; '),
+          );
+          failures.add(failure);
+          continue;
+        }
+        final String normBetrag = validation.normalizedAmount!;
         String hash = _hashFor(tx, normBetrag);
 
         final bool isDuplicate = await _hasDuplicate(kontoId: kontoId, hash: hash);
@@ -286,7 +298,7 @@ class BankImportService {
           matchedJournalId = bestId;
         }
 
-        final String datumStr = _formatDate(tx.datum);
+        final String datumStr = _formatDate(tx.datum!);
         final String status = matchedJournalId != null ? 'gebucht' : 'neu';
 
         await executor.runInsert(
@@ -327,9 +339,10 @@ class BankImportService {
           continue;
         }
 
+        final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
         final ImportRowFailure failure = ImportRowFailure(
           rowNumber: rowNumber,
-          transaction: tx,
+          transaction: failureTransaction,
           error: _errorMessage(error),
         );
         failures.add(failure);
@@ -437,26 +450,6 @@ class BankImportService {
         recoveryAction: 'Wählen Sie eine unterstützte Datei mit mindestens einer Transaktion.',
       );
     }
-    for (int index = 0; index < rawTxs.length; index++) {
-      final RawTx tx = rawTxs[index];
-      final int rowNumber = index + 1;
-      if (!_isValidDate(tx.datum)) {
-        throw BankImportException(
-          'Zeile $rowNumber: Datum ungültig.',
-          rowNumber: rowNumber,
-          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
-        );
-      }
-      try {
-        _normalizeBetragForStorage(tx.betrag);
-      } catch (error) {
-        throw BankImportException(
-          'Zeile $rowNumber: ${_errorMessage(error)}',
-          rowNumber: rowNumber,
-          recoveryAction: 'Korrigieren Sie den Betrag und versuchen Sie den Import erneut.',
-        );
-      }
-    }
   }
 
   Future<int> _createHistory({required int kontoId, required String dateiname, required BankTemplate? template}) async {
@@ -510,9 +503,16 @@ class BankImportService {
   }) async {
     final List<String> diagnostics =
         diagnosticsOverride ?? failures.map((failure) => failure.toDiagnostic()).toList(growable: false);
-    final String? details = diagnostics.isEmpty
-        ? null
-        : jsonEncode(diagnostics.map((diagnostic) => <String, Object?>{'message': diagnostic}).toList(growable: false));
+    final String? details;
+    if (failures.isNotEmpty) {
+      details = jsonEncode(failures.map((failure) => failure.toJson()).toList(growable: false));
+    } else if (diagnostics.isNotEmpty) {
+      details = jsonEncode(
+        diagnostics.map((diagnostic) => <String, Object?>{'message': diagnostic}).toList(growable: false),
+      );
+    } else {
+      details = null;
+    }
     try {
       await executor.runUpdate(
         'UPDATE bank_imports SET anzahl_transaktionen = ?, duplikate = ?, template_typ = ?, '
@@ -582,7 +582,7 @@ class BankImportService {
   String _hashFor(RawTx tx, String normalizedAmount) {
     final String? supplied = tx.dedupeHash?.trim();
     if (supplied != null && supplied.isNotEmpty) return supplied;
-    return computeDedupeHash(tx.datum, normalizedAmount, tx.partner, tx.verwendungszweck);
+    return computeDedupeHash(tx.datum!, normalizedAmount, tx.partner, tx.verwendungszweck);
   }
 
   String _statusFor({required int imported, required int failed}) {
@@ -612,6 +612,21 @@ class BankImportService {
 
   String _normalizeBetragForStorage(String raw) {
     return _parseBetrag(raw);
+  }
+
+  ({List<String> diagnostics, String? normalizedAmount}) _validateRow(RawTx tx) {
+    final List<String> diagnostics = <String>[];
+    if (tx.datum == null || !_isValidDate(tx.datum!)) {
+      diagnostics.add('Datum ungültig');
+    }
+
+    String? normalizedAmount;
+    try {
+      normalizedAmount = _normalizeBetragForStorage(tx.betrag);
+    } catch (_) {
+      diagnostics.add('Betrag ungültig');
+    }
+    return (diagnostics: diagnostics, normalizedAmount: normalizedAmount);
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.
@@ -675,41 +690,16 @@ class BankImportService {
       // If more, truncate to header length — preserve logical idx access.
       final String datumRaw = idxDatum < cols.length ? cols[idxDatum].trim() : '';
       final String betragRaw = idxBetrag < cols.length ? cols[idxBetrag].trim() : '';
-      if (datumRaw.isEmpty && betragRaw.isEmpty) continue;
-      if (datumRaw.isEmpty) {
-        throw BankImportException(
-          'Datum fehlt in Zeile ${i + 1}',
-          rowNumber: i + 1,
-          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
-        );
-      }
-      if (betragRaw.isEmpty) {
-        throw BankImportException(
-          'Betrag fehlt in Zeile ${i + 1}',
-          rowNumber: i + 1,
-          recoveryAction: 'Korrigieren Sie die Zeile und versuchen Sie den Import erneut.',
-        );
-      }
-      late final DateTime datum;
+      DateTime? datum;
       try {
         datum = _parseDate(datumRaw, template?.dateFormat);
-      } catch (error) {
-        throw BankImportException(
-          'Datum ungültig in Zeile ${i + 1}: ${_errorMessage(error)}',
-          rowNumber: i + 1,
-          recoveryAction: 'Korrigieren Sie das Datum und versuchen Sie den Import erneut.',
-        );
+      } catch (_) {
+        datum = null;
       }
-      late final String betrag;
+      String betrag = betragRaw;
       try {
         betrag = _parseBetrag(betragRaw);
-      } catch (error) {
-        throw BankImportException(
-          'Betrag ungültig in Zeile ${i + 1}: ${_errorMessage(error)}',
-          rowNumber: i + 1,
-          recoveryAction: 'Korrigieren Sie den Betrag und versuchen Sie den Import erneut.',
-        );
-      }
+      } catch (_) {}
 
       String verwendungszweck = '';
       if (idxVerwend != null && idxVerwend < cols.length) {
@@ -732,6 +722,9 @@ class BankImportService {
           verwendungszweck: verwendungszweck,
           partner: partner,
           gegenkonto: gegenkonto,
+          rawDatum: datumRaw,
+          rawBetrag: betragRaw,
+          sourceRowNumber: i + 1,
         ),
       );
     }
@@ -777,6 +770,8 @@ class BankImportService {
       throw const BankImportException('Unsupported XML format: Not CAMT');
     }
 
+    _validateCamtStructure(trimmed);
+
     if (hasDocument && !trimmed.contains('</Document') && !trimmed.contains('</document')) {
       throw const BankImportException('Ungültiges XML: Document nicht geschlossen (invalid)');
     }
@@ -806,7 +801,7 @@ class BankImportService {
       final String ntryContent = m.group(1) ?? '';
 
       // Amount — <Amt> with optional attributes
-      final RegExp amtReg = RegExp(r'<\s*(?:\w+:)?Amt\b[^>]*>([^<]+)</\s*(?:\w+:)?Amt\s*>', caseSensitive: false);
+      final RegExp amtReg = RegExp(r'<\s*(?:\w+:)?Amt\b[^>]*>([^<]*)</\s*(?:\w+:)?Amt\s*>', caseSensitive: false);
       RegExpMatch? amtM = amtReg.firstMatch(ntryOuter);
       amtM ??= amtReg.firstMatch(ntryContent);
       if (amtM == null) {
@@ -823,35 +818,30 @@ class BankImportService {
       final String? cdt = cdtM?.group(1)?.trim().toUpperCase();
 
       // Parse betrag with CdtDbtInd handling via _parseBetrag
-      String betrag;
+      String betrag = amtRaw;
+      String effective = amtRaw;
       try {
         final String stripped = amtRaw.replaceFirst(RegExp('^[+-]'), '').trim();
-        final String effective;
         if (cdt == 'DBIT') {
           effective = '-$stripped';
         } else if (cdt == 'CRDT') {
           effective = stripped;
-        } else {
-          effective = amtRaw;
         }
         betrag = _parseBetrag(effective);
-      } catch (e) {
-        if (e is BankImportException) rethrow;
-        throw BankImportException('Betrag ungültig: $amtRaw');
-      }
+      } catch (_) {}
 
       // Datum — prefer BookgDt/Dt, then ValDt/Dt, then generic Dt
       final RegExp bookgDtReg = RegExp(
-        r'<\s*(?:\w+:)?BookgDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>',
+        r'<\s*(?:\w+:)?BookgDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>',
         dotAll: true,
         caseSensitive: false,
       );
       final RegExp valDtReg = RegExp(
-        r'<\s*(?:\w+:)?ValDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>',
+        r'<\s*(?:\w+:)?ValDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>',
         dotAll: true,
         caseSensitive: false,
       );
-      final RegExp dtReg = RegExp(r'<\s*(?:\w+:)?Dt\s*>([^<]+)</\s*(?:\w+:)?Dt\s*>', caseSensitive: false);
+      final RegExp dtReg = RegExp(r'<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>', caseSensitive: false);
       RegExpMatch? dtM = bookgDtReg.firstMatch(ntryContent);
       dtM ??= valDtReg.firstMatch(ntryContent);
       dtM ??= dtReg.firstMatch(ntryContent);
@@ -862,12 +852,11 @@ class BankImportService {
         throw const BankImportException('Datum fehlt in Ntry');
       }
       final String dtRaw = dtM.group(1)!.trim();
-      late final DateTime datum;
+      DateTime? datum;
       try {
         datum = _parseDate(dtRaw, null);
-      } catch (e) {
-        if (e is BankImportException) rethrow;
-        throw BankImportException('Datum ungültig: $dtRaw');
+      } catch (_) {
+        datum = null;
       }
 
       // Verwendungszweck — Ustrd + AddtlNtryInf
@@ -916,6 +905,9 @@ class BankImportService {
           verwendungszweck: verwendungszweck,
           partner: partner,
           gegenkonto: gegenkonto,
+          rawDatum: dtRaw,
+          rawBetrag: amtRaw,
+          sourceRowNumber: out.length + 1,
         ),
       );
     }
@@ -924,6 +916,29 @@ class BankImportService {
       throw const BankImportException('Keine Transaktionen gefunden');
     }
     return out;
+  }
+
+  void _validateCamtStructure(String xml) {
+    final String withoutComments = xml
+        .replaceAll(RegExp('<!--.*?-->', dotAll: true), '')
+        .replaceAll(RegExp(r'<\?.*?\?>', dotAll: true), '');
+    final RegExp tagReg = RegExp(r'<\s*(/?)\s*([A-Za-z_][\w:.-]*)(?:\s[^>]*)?(\/?)\s*>', multiLine: true);
+    final List<String> stack = <String>[];
+    for (final RegExpMatch match in tagReg.allMatches(withoutComments)) {
+      final String name = match.group(2)!.toLowerCase();
+      final bool closing = match.group(1) == '/';
+      final bool selfClosing = match.group(3) == '/';
+      if (closing) {
+        if (stack.isEmpty || stack.removeLast() != name) {
+          throw const BankImportException('Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)');
+        }
+      } else if (!selfClosing) {
+        stack.add(name);
+      }
+    }
+    if (stack.isNotEmpty) {
+      throw const BankImportException('Ungültiges XML: Tag nicht geschlossen (invalid)');
+    }
   }
 
   String _detectDelimiter(String headerLine) {

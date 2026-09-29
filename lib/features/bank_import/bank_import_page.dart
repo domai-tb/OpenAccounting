@@ -12,7 +12,6 @@ import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
-import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
@@ -390,7 +389,8 @@ LIMIT 100
       _disposeRows();
       _rows.addAll(
         parsed.asMap().entries.map(
-          (MapEntry<int, RawTx> entry) => _EditableBankRow(lineNumber: entry.key + 2, source: entry.value),
+          (MapEntry<int, RawTx> entry) =>
+              _EditableBankRow(lineNumber: entry.value.sourceRowNumber ?? entry.key + 2, source: entry.value),
         ),
       );
       if (!mounted) return;
@@ -1425,12 +1425,16 @@ class _PreparedBankRow {
 
 class _EditableBankRow {
   _EditableBankRow({required this.lineNumber, required RawTx source})
-    : dateController = TextEditingController(text: _formatDate(source.datum)),
-      amountController = TextEditingController(text: source.betrag),
+    : _source = source,
+      dateController = TextEditingController(
+        text: source.rawDatum ?? (source.datum == null ? '' : _formatDate(source.datum!)),
+      ),
+      amountController = TextEditingController(text: source.rawBetrag ?? source.betrag),
       partnerController = TextEditingController(text: source.partner),
       purposeController = TextEditingController(text: source.verwendungszweck),
       counterAccount = source.gegenkonto;
 
+  final RawTx _source;
   final int lineNumber;
   final TextEditingController dateController;
   final TextEditingController amountController;
@@ -1441,8 +1445,8 @@ class _EditableBankRow {
   int? categoryId;
 
   RawTx toRawTx() {
-    final DateTime date = _parseEditableDate(dateController.text, lineNumber);
-    final String amount = _normaliseAmount(amountController.text, lineNumber: lineNumber);
+    final DateTime? date = _parseEditableDate(dateController.text);
+    final String amount = amountController.text.trim();
     return RawTx(
       datum: date,
       betrag: amount,
@@ -1450,6 +1454,9 @@ class _EditableBankRow {
       partner: partnerController.text.trim(),
       gegenkonto: counterAccount,
       kategorieId: categoryId,
+      rawDatum: dateController.text,
+      rawBetrag: amountController.text,
+      sourceRowNumber: _source.sourceRowNumber ?? lineNumber,
     );
   }
 
@@ -1611,7 +1618,7 @@ String _formatDate(DateTime date) =>
 String _formatDateTime(DateTime date) =>
     '${_formatDate(date)} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
-DateTime _parseEditableDate(String raw, int lineNumber) {
+DateTime? _parseEditableDate(String raw) {
   final String value = raw.trim();
   final DateTime? iso = DateTime.tryParse(value);
   if (iso != null) return DateTime(iso.year, iso.month, iso.day);
@@ -1626,46 +1633,13 @@ DateTime _parseEditableDate(String raw, int lineNumber) {
       return DateTime(year, month, day);
     }
   }
-  throw BankImportException('Zeile $lineNumber: Datum ist ungültig. Verwende z. B. 15.03.2026.');
+  return null;
 }
 
 bool _isValidDate(int year, int month, int day) {
   if (month < 1 || month > 12 || day < 1 || day > 31) return false;
   final DateTime candidate = DateTime(year, month, day);
   return candidate.year == year && candidate.month == month && candidate.day == day;
-}
-
-String _normaliseAmount(String raw, {int? lineNumber}) {
-  String value = raw
-      .trim()
-      .replaceAll('€', '')
-      .replaceAll(RegExp('eur', caseSensitive: false), '')
-      .replaceAll('\u00a0', '')
-      .replaceAll(' ', '');
-  if (value.isEmpty) {
-    throw BankImportException('Zeile ${lineNumber ?? ''}: Betrag fehlt.');
-  }
-  final bool negative = value.startsWith('-');
-  final bool positive = value.startsWith('+');
-  if (negative || positive) value = value.substring(1);
-  if (value.contains('.') && value.contains(',')) {
-    final int dot = value.lastIndexOf('.');
-    final int comma = value.lastIndexOf(',');
-    value = comma > dot ? value.replaceAll('.', '').replaceAll(',', '.') : value.replaceAll(',', '');
-  } else if (value.contains(',')) {
-    value = value.replaceAll('.', '').replaceAll(',', '.');
-  } else if (RegExp(r'^\d{1,3}(\.\d{3})+$').hasMatch(value)) {
-    value = value.replaceAll('.', '');
-  }
-  if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(value)) {
-    throw BankImportException('Zeile ${lineNumber ?? ''}: Betrag ist ungültig.');
-  }
-  final String signed = negative ? '-$value' : value;
-  try {
-    return money.fromCents(money.toCents(signed));
-  } catch (_) {
-    throw BankImportException('Zeile ${lineNumber ?? ''}: Betrag ist ungültig.');
-  }
 }
 
 String _historyStatus(String raw) {

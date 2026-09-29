@@ -10,10 +10,13 @@ class RawTx {
     this.kategorieId,
     this.journalId,
     this.dedupeHash,
+    this.rawDatum,
+    this.rawBetrag,
+    this.sourceRowNumber,
   });
 
   /// Transaction date — parsed from CSV via template dateFormat fallback.
-  final DateTime datum;
+  final DateTime? datum;
 
   /// Amount as String 12,2 e.g. "1234.56", "-42.50" — NUMERIC(12,2) safe.
   final String betrag;
@@ -36,6 +39,15 @@ class RawTx {
   /// SHA-256 dedupe hash — computed in dedup step, not upload.
   final String? dedupeHash;
 
+  /// Original source date text, retained when the parsed date is unavailable.
+  final String? rawDatum;
+
+  /// Original source amount text, retained when amount normalization fails.
+  final String? rawBetrag;
+
+  /// One-based source row: physical CSV line or CAMT entry ordinal.
+  final int? sourceRowNumber;
+
   /// Creates a reviewed copy without changing the parsed source row.
   ///
   /// Review screens can use this to apply a category, journal match, or text
@@ -50,6 +62,9 @@ class RawTx {
     int? kategorieId,
     int? journalId,
     String? dedupeHash,
+    String? rawDatum,
+    String? rawBetrag,
+    int? sourceRowNumber,
   }) {
     return RawTx(
       datum: datum ?? this.datum,
@@ -60,13 +75,21 @@ class RawTx {
       kategorieId: kategorieId ?? this.kategorieId,
       journalId: journalId ?? this.journalId,
       dedupeHash: dedupeHash ?? this.dedupeHash,
+      rawDatum: rawDatum ?? this.rawDatum,
+      rawBetrag: rawBetrag ?? this.rawBetrag,
+      sourceRowNumber: sourceRowNumber ?? this.sourceRowNumber,
     );
   }
 }
 
 /// A row that could not be persisted during a partial import.
 class ImportRowFailure {
-  const ImportRowFailure({required this.rowNumber, required this.transaction, required this.error});
+  const ImportRowFailure({
+    required this.rowNumber,
+    required this.transaction,
+    required this.error,
+    this.diagnostics = const <String>[],
+  });
 
   /// One-based row number within the confirmed import batch.
   final int rowNumber;
@@ -76,6 +99,12 @@ class ImportRowFailure {
 
   /// Database or validation error associated with [transaction].
   final String error;
+
+  /// Stable machine-readable categories for row validation failures.
+  final List<String> diagnostics;
+
+  /// One-based source row delegated from the failed transaction.
+  int get sourceRowNumber => transaction.sourceRowNumber ?? rowNumber;
 
   /// Zero-based counterpart for callers that address a list by index.
   int get rowIndex => rowNumber - 1;
@@ -90,10 +119,15 @@ class ImportRowFailure {
 
   Map<String, Object?> toJson() => <String, Object?>{
     'row': rowNumber,
-    'datum': transaction.datum.toIso8601String(),
+    'source_row': sourceRowNumber,
+    'datum': transaction.datum?.toIso8601String(),
+    'raw_datum': transaction.rawDatum ?? '',
+    'parsed_datum': transaction.datum?.toIso8601String(),
     'betrag': transaction.betrag,
+    'raw_betrag': transaction.rawBetrag ?? transaction.betrag,
     'verwendungszweck': transaction.verwendungszweck,
     'partner': transaction.partner,
+    'diagnostics': diagnostics,
     'error': error,
   };
 
