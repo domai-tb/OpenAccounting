@@ -25,7 +25,7 @@ void main() {
     );
 
     // Act
-    final RechnungItem finalized = await useCases.finalizeRechnung(rechnungId: draft.id);
+    final RechnungItem finalized = await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Assert
     expect(finalized.rechnungsnummer, 'RE-260001');
@@ -52,10 +52,13 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
       ],
     );
-    final RechnungItem finalized = await useCases.finalizeRechnung(rechnungId: draft.id);
+    final RechnungItem finalized = await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Act
-    final Future<RechnungItem> secondFinalization = useCases.finalizeRechnung(rechnungId: finalized.id);
+    final Future<RechnungItem> secondFinalization = useCases.finalizeRechnung(
+      locale: 'de_DE',
+      rechnungId: finalized.id,
+    );
 
     // Assert
     await expectLater(
@@ -93,7 +96,7 @@ void main() {
     );
 
     // Act
-    final RechnungItem finalized = await useCases.finalizeRechnung(rechnungId: draft.id);
+    final RechnungItem finalized = await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Assert
     expect(finalized.rechnungsnummer, 'RE-260001');
@@ -121,7 +124,7 @@ void main() {
     );
 
     // Act
-    final Future<RechnungItem> finalization = useCases.finalizeRechnung(rechnungId: draft.id);
+    final Future<RechnungItem> finalization = useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Assert
     await expectLater(
@@ -156,7 +159,7 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
       ],
     );
-    await useCases.finalizeRechnung(rechnungId: draft.id);
+    await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Act
     final Future<void> invoiceUpdate = database.executor.runCustom(
@@ -223,7 +226,7 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
       ],
     );
-    await useCases.finalizeRechnung(rechnungId: draft.id);
+    await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Act
     final Future<void> positionUpdate = database.executor.runCustom(
@@ -279,7 +282,7 @@ void main() {
 
     // Act
     final finalizationStarted = DateTime.now().toUtc();
-    await useCases.finalizeRechnung(rechnungId: draft.id);
+    await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     final finalizationEnded = DateTime.now().toUtc();
     final finalizedRows = await database.executor.runSelect(
       'SELECT absender_snapshot, ausgegeben_am FROM rechnungen WHERE id = ?',
@@ -358,7 +361,7 @@ void main() {
     ]);
 
     // Act
-    await useCases.finalizeRechnung(rechnungId: draft.id);
+    await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Assert
     final rows = await database.executor.runSelect('SELECT absender_snapshot FROM rechnungen WHERE id = ?', <Object?>[
@@ -401,7 +404,7 @@ void main() {
     );
 
     // Act
-    final finalized = await useCases.finalizeRechnung(rechnungId: draft.id);
+    final finalized = await useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
 
     // Assert
     expect(finalized.rechnungsnummer, 'RE-260101');
@@ -434,7 +437,7 @@ void main() {
 
     // Act / Assert
     await expectLater(
-      useCases.finalizeRechnung(rechnungId: draft.id),
+      useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id),
       throwsA(predicate<Object>((error) => error is StateError && error.message.contains('vor letzter'))),
     );
   });
@@ -459,7 +462,7 @@ void main() {
 
       // Act / Assert
       await expectLater(
-        useCases.finalizeRechnung(rechnungId: draft.id),
+        useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id),
         throwsA(predicate<Object>((error) => error is StateError && error.message.contains('Format'))),
       );
       final rangeRows = await database.executor.runSelect(
@@ -486,7 +489,7 @@ void main() {
 
     // Act / Assert
     await expectLater(
-      useCases.finalizeRechnung(rechnungId: draft.id),
+      useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id),
       throwsA(predicate<Object>((error) => error is StateError && error.message.contains('Nummernkreis'))),
     );
     final draftRows = await database.executor.runSelect('SELECT ist_entwurf FROM rechnungen WHERE id = ?', <Object?>[
@@ -517,7 +520,7 @@ WHEN OLD.ist_entwurf = 1 BEGIN SELECT RAISE(ABORT, 'forced finalization failure'
 
     // Act / Assert
     await expectLater(
-      useCases.finalizeRechnung(rechnungId: draft.id),
+      useCases.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id),
       throwsA(predicate<Object>((error) => error.toString().contains('forced finalization failure'))),
     );
     final rangeRows = await database.executor.runSelect(

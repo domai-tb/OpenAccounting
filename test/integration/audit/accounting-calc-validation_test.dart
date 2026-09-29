@@ -593,7 +593,7 @@ void main() {
           RechnungPositionItem(bezeichnung: 'Snapshot-Leistung', menge: 2, einzelpreis: 50, gesamt: 100, ustSatz: 19),
         ],
       );
-      await ds.finalizeRechnung(rechnungId: rechnungId, profileDir: tmpDir);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId, profileDir: tmpDir);
       final Map<String, Object?> row = (await db.executor.runSelect(
         'SELECT rechnungsnummer, original_pdf_pfad FROM rechnungen WHERE id = ?',
         <Object?>[rechnungId],
@@ -725,7 +725,7 @@ CREATE TABLE forderungen (
         ],
       );
       await db.executor.runUpdate('UPDATE rechnungen SET kunde_id = ? WHERE id = ?', <Object?>[kundeId, rechnungId]);
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       // Clean forderungen to test race via repository directly: delete then race create
       await db.executor.runCustom('DELETE FROM forderungen WHERE rechnung_id = ?', <Object?>[rechnungId]);
       final ForderungenRepository repo = ForderungenRepository(db.executor);

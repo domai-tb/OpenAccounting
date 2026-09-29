@@ -13,7 +13,7 @@ void main() {
       serviceFrom: DateTime(2026, 9),
       serviceTo: DateTime(2026, 9, 30),
     );
-    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot));
+    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
     expect(_containsExactLabel(parsedPdf.visibleText, 'Angebot'), isTrue);
     expect(parsedPdf.visibleText, allOf(contains('ANG-2026-001'), contains('Gültig bis'), contains('15.09.2026')));
@@ -22,7 +22,7 @@ void main() {
 
   test('Angebot PDF omits optional gueltig_bis and Leistungszeitraum lines when absent', () async {
     final snapshot = _snapshotFor(documentType: PdfDocumentType.angebot, documentNumber: 'ANG-2026-002');
-    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot));
+    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
     expect(parsedPdf.visibleText, allOf(isNot(contains('Gültig bis')), isNot(contains('Leistungszeitraum'))));
   });
@@ -67,6 +67,7 @@ void main() {
       final parsedPdf = parsePdf(
         await const PdfGenerator().generate(
           _snapshotFor(documentType: entry.key, documentNumber: '${entry.key.name}-2026-001'),
+          locale: 'de_DE',
         ),
       );
 
@@ -78,7 +79,10 @@ void main() {
     final warnings = <String>[];
     final template = PdfTemplate.fromRaw('neon', onWarning: warnings.add);
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.rechnung, template: template)),
+      await const PdfGenerator().generate(
+        _snapshotFor(documentType: PdfDocumentType.rechnung, template: template),
+        locale: 'de_DE',
+      ),
     );
 
     expect(PdfTemplate.values, orderedEquals(<PdfTemplate>[PdfTemplate.standard, PdfTemplate.gruen]));
@@ -91,7 +95,7 @@ void main() {
 
   test('Standard PDF retains USt columns', () async {
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.rechnung)),
+      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.rechnung), locale: 'de_DE'),
     );
 
     expect(parsedPdf.visibleText, allOf(contains('19,00 %'), contains('190,00 €')));
@@ -103,6 +107,7 @@ void main() {
     final parsedPdf = parsePdf(
       await const PdfGenerator().generate(
         _snapshotFor(documentType: PdfDocumentType.rechnung, template: PdfTemplate.gruen),
+        locale: 'de_DE',
       ),
     );
 
@@ -127,6 +132,7 @@ void main() {
     final parsedPdf = parsePdf(
       await const PdfGenerator().generate(
         _snapshotFor(documentType: PdfDocumentType.auftrag, orderStatus: 'in_bearbeitung'),
+        locale: 'de_DE',
       ),
     );
 
@@ -135,7 +141,7 @@ void main() {
 
   test('Lieferschein PDF renders description and quantity columns only', () async {
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.lieferschein)),
+      await const PdfGenerator().generate(_snapshotFor(documentType: PdfDocumentType.lieferschein), locale: 'de_DE'),
     );
 
     expect(

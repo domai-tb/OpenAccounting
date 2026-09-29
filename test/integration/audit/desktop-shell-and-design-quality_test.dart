@@ -58,16 +58,16 @@ void main() {
 
     test('test_desktop_shell_and_design_quality_2_1_long_and_private_amounts_remain_legible', () {
       // formatMoney must handle large numbers without ellipsis.
-      final large = formatMoney(123456789.99);
+      final large = formatMoney(123456789.99, locale: 'de_DE');
       expect(large, contains('123.456.789,99'));
       expect(large.length, lessThan(30), reason: 'Formatted money must be concise');
 
       // formatMoney must handle zero.
-      final zero = formatMoney(0);
+      final zero = formatMoney(0, locale: 'de_DE');
       expect(zero, contains('0,00'));
 
       // formatMoney must handle negative.
-      final negative = formatMoney(-42.50);
+      final negative = formatMoney(-42.50, locale: 'de_DE');
       expect(negative, contains('42,50'));
     });
 

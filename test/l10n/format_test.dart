@@ -22,17 +22,17 @@ void main() {
 
       // Helpers must match same output without locale assumptions in caller.
       expect(
-        formatMoney(1284.32).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
+        formatMoney(1284.32, locale: 'de_DE').replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
         '1.284,32 €',
         reason: 'formatMoney helper must use de-DE locale internally',
       );
       expect(
-        formatMoney(0).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
+        formatMoney(0, locale: 'de_DE').replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
         '0,00 €',
         reason: 'zero must be 0,00 €',
       );
       expect(
-        formatMoney(-42.5).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
+        formatMoney(-42.5, locale: 'de_DE').replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '),
         '-42,50 €',
         reason: 'negative must preserve sign and comma',
       );
@@ -114,12 +114,16 @@ void main() {
       );
 
       // Helper wrappers.
-      expect(formatDate(date), '30.08.2026', reason: 'formatDate helper must be dd.MM.yyyy de-DE');
-      expect(formatDateLong(date), '30. August 2026', reason: 'formatDateLong helper must be d. MMMM yyyy de-DE');
+      expect(formatDate(date, locale: 'de_DE'), '30.08.2026', reason: 'formatDate helper must be dd.MM.yyyy de-DE');
+      expect(
+        formatDateLong(date, locale: 'de_DE'),
+        '30. August 2026',
+        reason: 'formatDateLong helper must be d. MMMM yyyy de-DE',
+      );
 
       // AppTypography locale helpers also cover intl without caller passing locale.
-      expect(AppTypography.formatDate(date), '30.08.2026');
-      expect(AppTypography.formatDateLong(date), '30. August 2026');
+      expect(AppTypography.formatDate(date, locale: 'de_DE'), '30.08.2026');
+      expect(AppTypography.formatDateLong(date, locale: 'de_DE'), '30. August 2026');
     });
 
     testWidgets('test_language_switch_without_restart_preserves_route', (WidgetTester tester) async {
@@ -197,7 +201,7 @@ void main() {
       expect(loc.localeName.startsWith('en'), isTrue, reason: 'locale switch must update AppLocalizations to en');
 
       // Date/Money formatting still works after switch — business logic not tied to widget locale assumption.
-      expect(formatMoney(1284.32).replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '), '1.284,32 €');
+      expect(formatMoney(1284.32, locale: 'de_DE').replaceAll('\u00A0', ' ').replaceAll('\u202F', ' '), '1.284,32 €');
       expect(
         formatMoney(1284.32, locale: 'en_US').contains('1,284.32'),
         isTrue,

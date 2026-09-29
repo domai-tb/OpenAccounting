@@ -26,7 +26,7 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Beratung', menge: 2, einzelpreis: 100, gesamt: 200, ustSatz: 7),
       ],
     );
-    final finAngebot = await uc.finalizeRechnung(rechnungId: angebot.id);
+    final finAngebot = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: angebot.id);
     final auftrag = await uc.konvertiereDokument(quelleId: finAngebot.id, zielTyp: 'auftrag');
     expect(auftrag.typ, 'auftrag');
     expect(auftrag.eingabemodus, 'brutto');
@@ -93,9 +93,9 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'X', menge: 1, einzelpreis: 100, gesamt: 100)],
     );
-    final finAng = await uc.finalizeRechnung(rechnungId: ang.id);
+    final finAng = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: ang.id);
     final auftrag = await uc.konvertiereDokument(quelleId: finAng.id, zielTyp: 'auftrag');
-    final auftragFin = await uc.finalizeRechnung(rechnungId: auftrag.id);
+    final auftragFin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: auftrag.id);
     final ls = await uc.konvertiereDokument(quelleId: auftragFin.id, zielTyp: 'lieferschein');
     final re = await uc.konvertiereDokument(quelleId: ls.id, zielTyp: 'rechnung');
     expect(re.positionen.single.bezeichnung, 'X');
@@ -136,7 +136,7 @@ void main() {
         RechnungPositionItem(bezeichnung: 'Website-Design', menge: 10, einzelpreis: 150, gesamt: 1500),
       ],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: ang.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: ang.id);
     final auftrag = await uc.konvertiereDokument(quelleId: fin.id, zielTyp: 'auftrag');
     final pos = auftrag.positionen.single;
     expect(pos.bezeichnung, 'Website-Design');

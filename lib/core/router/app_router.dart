@@ -9,6 +9,7 @@ import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/l10n/l10n.dart';
@@ -43,7 +44,8 @@ enum AppRoute {
   reports('/reports'),
   settings('/settings'),
   setup('/setup'),
-  help('/help');
+  help('/help'),
+  inventory('/inventory');
 
   const AppRoute(this.path);
   final String path;
@@ -250,16 +252,17 @@ class InvoicesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final List<String> filters = <String>[
       if (filterTyp != null) 'Typ: $filterTyp',
       if (filterStatus != null) 'Status: $filterStatus',
     ];
     return ProductionRoutePage(
-      title: 'Rechnungen',
+      title: l10n.routeInvoices,
       table: 'rechnungen',
       icon: Icons.receipt_long,
       subtitle: filters.isEmpty ? null : filters.join(' · '),
-      primaryActionLabel: 'Neue Rechnung',
+      primaryActionLabel: l10n.actionNewInvoice,
       onPrimaryAction: () => context.go('/invoices/new'),
       filterTyp: filterTyp,
       filterStatus: filterStatus,
@@ -566,13 +569,14 @@ class ReceiptsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(
-      title: 'Belege',
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    return ProductionRoutePage(
+      title: l10n.routeReceipts,
       table: 'belege',
       icon: Icons.receipt_outlined,
-      subtitle: 'Eingangsbelege und Ausgaben an einem Ort',
-      emptyTitle: 'Noch keine Belege',
-      emptyMessage: 'Noch keine Belege gespeichert. Banktransaktionen findest du unter Bank & Zahlungen.',
+      subtitle: l10n.receiptsSubtitle,
+      emptyTitle: l10n.emptyEntries,
+      emptyMessage: l10n.receiptsSubtitle,
     );
   }
 }
@@ -582,16 +586,17 @@ class ContactsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return ProductionRoutePage(
-      title: 'Kontakte',
+      title: l10n.routeContacts,
       table: 'kunden',
       icon: Icons.people_outline,
-      subtitle: 'Kunden und Lieferanten verwalten',
-      primaryActionLabel: 'Kontakt hinzufügen',
+      subtitle: l10n.contactsSubtitle,
+      primaryActionLabel: l10n.actionSave,
       onPrimaryAction: () => context.go('/contacts/new'),
-      emptyTitle: 'Noch keine Kontakte',
-      emptyMessage: 'Lege deinen ersten Kunden oder Lieferanten an, damit Rechnungen vollständig bleiben.',
-      emptyActionLabel: 'Kontakt hinzufügen',
+      emptyTitle: l10n.emptyEntries,
+      emptyMessage: l10n.contactsSubtitle,
+      emptyActionLabel: l10n.actionSave,
       onEmptyAction: () => context.go('/contacts/new'),
     );
   }
@@ -613,13 +618,14 @@ class TaxesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(
-      title: 'Steuern',
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    return ProductionRoutePage(
+      title: l10n.routeTaxes,
       table: 'ustva_exporte',
       icon: Icons.percent,
-      subtitle: 'Umsatzsteuer und Abgabefristen',
-      emptyTitle: 'Noch keine Steuerzeiträume',
-      emptyMessage: 'Steuerdaten werden automatisch aus deinen Buchungen aufgebaut.',
+      subtitle: l10n.taxesSubtitle,
+      emptyTitle: l10n.emptyEntries,
+      emptyMessage: l10n.taxesSubtitle,
     );
   }
 }
@@ -629,13 +635,14 @@ class ReportsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const ProductionRoutePage(
-      title: 'Auswertungen',
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    return ProductionRoutePage(
+      title: l10n.routeReports,
       table: 'journal',
       icon: Icons.bar_chart,
-      subtitle: 'Einnahmen, Ausgaben und Buchungen',
-      emptyTitle: 'Noch keine Buchungen',
-      emptyMessage: 'Sobald du eine Rechnung oder einen Beleg speicherst, erscheint die Auswertung hier.',
+      subtitle: l10n.reportsSubtitle,
+      emptyTitle: l10n.emptyEntries,
+      emptyMessage: l10n.reportsSubtitle,
     );
   }
 }
@@ -746,21 +753,22 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final Locale selectedLocale = ref.watch(appLocaleProvider);
     final ThemeMode selectedTheme = ref.watch(themeModeProvider);
     return AppPage(
-      header: const AppPageHeader(title: 'Einstellungen', showFilterToolbar: false),
+      header: AppPageHeader(title: l10n.settingsTitle, showFilterToolbar: false),
       child: ListView(
         children: <Widget>[
-          Text('Darstellung', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n.settingsAppearance, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           DropdownButtonFormField<Locale>(
             key: ValueKey<String>('locale_${selectedLocale.languageCode}'),
             initialValue: selectedLocale,
-            decoration: const InputDecoration(labelText: 'Sprache'),
-            items: const <DropdownMenuItem<Locale>>[
-              DropdownMenuItem<Locale>(value: Locale('de'), child: Text('Deutsch')),
-              DropdownMenuItem<Locale>(value: Locale('en'), child: Text('English')),
+            decoration: InputDecoration(labelText: l10n.settingsLanguage),
+            items: <DropdownMenuItem<Locale>>[
+              DropdownMenuItem<Locale>(value: const Locale('de'), child: Text(l10n.languageGerman)),
+              DropdownMenuItem<Locale>(value: const Locale('en'), child: Text(l10n.languageEnglish)),
             ],
             onChanged: (Locale? locale) {
               if (locale != null) {
@@ -772,11 +780,11 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           DropdownButtonFormField<ThemeMode>(
             key: ValueKey<String>('theme_${selectedTheme.name}'),
             initialValue: selectedTheme,
-            decoration: const InputDecoration(labelText: 'Farbschema'),
-            items: const <DropdownMenuItem<ThemeMode>>[
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.system, child: Text('System')),
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.light, child: Text('Hell')),
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.dark, child: Text('Dunkel')),
+            decoration: InputDecoration(labelText: l10n.settingsTheme),
+            items: <DropdownMenuItem<ThemeMode>>[
+              DropdownMenuItem<ThemeMode>(value: ThemeMode.system, child: Text(l10n.themeSystem)),
+              DropdownMenuItem<ThemeMode>(value: ThemeMode.light, child: Text(l10n.themeLight)),
+              DropdownMenuItem<ThemeMode>(value: ThemeMode.dark, child: Text(l10n.themeDark)),
             ],
             onChanged: (ThemeMode? mode) {
               if (mode != null) {
@@ -787,20 +795,16 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           const SizedBox(height: 16),
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Beträge ausblenden'),
-            subtitle: const Text('Finanzbeträge im Dashboard maskieren'),
+            title: Text(l10n.amountHidden),
+            subtitle: Text(l10n.settingsPrivacyDescription),
             value: ref.watch(privacyModeProvider),
             onChanged: (bool value) => unawaited(ref.read(privacyModeProvider.notifier).setEnabled(enabled: value)),
           ),
           const SizedBox(height: 32),
           Row(
             children: <Widget>[
-              Expanded(child: Text('Profile', style: Theme.of(context).textTheme.titleMedium)),
-              FilledButton.icon(
-                onPressed: _createProfile,
-                icon: const Icon(Icons.add),
-                label: const Text('Neues Profil'),
-              ),
+              Expanded(child: Text(l10n.settingsProfiles, style: Theme.of(context).textTheme.titleMedium)),
+              FilledButton.icon(onPressed: _createProfile, icon: const Icon(Icons.add), label: Text(l10n.actionSave)),
             ],
           ),
           const SizedBox(height: 8),
@@ -815,9 +819,12 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(localizations?.profileLoadError ?? 'Profile konnten nicht geladen werden'),
+                    Text(localizations?.settingsProfileLoadError ?? l10n.settingsProfileLoadError),
                     const SizedBox(height: 8),
-                    FilledButton(onPressed: _reloadProfiles, child: Text(localizations?.retry ?? 'Erneut versuchen')),
+                    FilledButton(
+                      onPressed: _reloadProfiles,
+                      child: Text(localizations?.settingsProfileRetry ?? l10n.actionRetry),
+                    ),
                   ],
                 );
               }
@@ -836,7 +843,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                         value: profile,
                         selected: profile == value.active,
                         title: Text(profile),
-                        subtitle: profile == value.active ? const Text('Aktiv') : const Text('Neustart zum Wechseln'),
+                        subtitle: profile == value.active ? Text(l10n.setupSaved) : Text(l10n.setupRetry),
                       ),
                   ],
                 ),
@@ -844,14 +851,14 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             },
           ),
           const SizedBox(height: 16),
-          const Text('Profile haben getrennte Datenbanken. Nach einem Wechsel ist ein Neustart erforderlich.'),
+          Text(l10n.settingsPrivacyDescription),
           const SizedBox(height: 16),
-          const AppCard(
+          AppCard(
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.storage_outlined),
-              title: Text('Lokale Daten'),
-              subtitle: Text('Deine Buchungsdaten liegen geschützt im aktiven Profil auf diesem Gerät.'),
+              leading: const Icon(Icons.storage_outlined),
+              title: Text(l10n.localTitle),
+              subtitle: Text(l10n.localDescription),
             ),
           ),
         ],
@@ -872,34 +879,33 @@ class HelpPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return AppPage(
-      header: const AppPageHeader(title: 'Hilfe', showFilterToolbar: false),
+      header: AppPageHeader(title: l10n.routeHelp, showFilterToolbar: false),
       child: ListView(
-        children: const <Widget>[
+        children: <Widget>[
           ListTile(
-            leading: Icon(Icons.language),
-            title: Text('Sprache und Darstellung'),
-            subtitle: Text('Diese Optionen findest du in den Einstellungen.'),
+            leading: const Icon(Icons.language),
+            title: Text(l10n.settingsLanguage),
+            subtitle: Text(l10n.settingsAppearance),
           ),
           ListTile(
-            leading: Icon(Icons.storage_outlined),
-            title: Text('Lokale Daten'),
-            subtitle: Text('Daten werden im aktiven Profil auf diesem Gerät gespeichert.'),
+            leading: const Icon(Icons.storage_outlined),
+            title: Text(l10n.localTitle),
+            subtitle: Text(l10n.localDescription),
           ),
           ListTile(
-            leading: Icon(Icons.receipt_long),
-            title: Text('Rechnungsentwurf'),
-            subtitle: Text('Erstelle einen Entwurf über Rechnungen > Neue Rechnung.'),
+            leading: const Icon(Icons.receipt_long),
+            title: Text(l10n.routeInvoices),
+            subtitle: Text(l10n.actionNewInvoice),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           AppCard(
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.verified_user_outlined),
-              title: Text('Privat und lokal'),
-              subtitle: Text(
-                'OpenAccounting speichert deine Daten im aktiven Profil und zeigt keine künstlichen Ladezähler.',
-              ),
+              leading: const Icon(Icons.verified_user_outlined),
+              title: Text(l10n.localTitle),
+              subtitle: Text(l10n.localDescription),
             ),
           ),
         ],
@@ -1173,7 +1179,7 @@ Widget _routeError(BuildContext context, String source, Object error, StackTrace
           children: <Widget>[
             const Icon(Icons.error_outline, size: 40),
             const SizedBox(height: 12),
-            const Text('Daten konnten nicht geladen werden'),
+            Text(AppLocalizations.of(context)?.dataLoadError ?? 'Data could not be loaded'),
             const SizedBox(height: 8),
             Text('Vorgang: $source'),
             const SizedBox(height: 16),
@@ -1186,12 +1192,12 @@ Widget _routeError(BuildContext context, String source, Object error, StackTrace
                   FilledButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Erneut versuchen'),
+                    label: Text(AppLocalizations.of(context)?.actionRetry ?? 'Retry'),
                   ),
                 OutlinedButton.icon(
                   onPressed: () => _goBackOrHome(context),
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('Zurück'),
+                  label: Text(AppLocalizations.of(context)?.actionBack ?? 'Back'),
                 ),
               ],
             ),
@@ -1215,14 +1221,15 @@ class SetupPage extends ConsumerWidget {
 }
 
 class NotFoundPage extends StatelessWidget {
-  const NotFoundPage({this.message = 'Seite nicht gefunden', super.key});
+  const NotFoundPage({this.message, super.key});
 
-  final String message;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return Scaffold(
-      appBar: const AppPageHeader(title: 'Nicht gefunden', showFilterToolbar: false),
+      appBar: AppPageHeader(title: l10n.notFound, showFilterToolbar: false),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -1231,7 +1238,7 @@ class NotFoundPage extends StatelessWidget {
             children: <Widget>[
               const Icon(Icons.search_off, size: 48),
               const SizedBox(height: 12),
-              Text(message, textAlign: TextAlign.center),
+              Text(message ?? l10n.notFoundDescription, textAlign: TextAlign.center),
               const SizedBox(height: 16),
               Wrap(
                 alignment: WrapAlignment.center,
@@ -1241,12 +1248,12 @@ class NotFoundPage extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: () => _goBackOrHome(context),
                     icon: const Icon(Icons.arrow_back),
-                    label: const Text('Zurück'),
+                    label: Text(l10n.actionBack),
                   ),
                   FilledButton.icon(
                     onPressed: () => context.go('/'),
                     icon: const Icon(Icons.home_outlined),
-                    label: const Text('Zur Übersicht'),
+                    label: Text(l10n.actionBackOverview),
                   ),
                 ],
               ),
@@ -1263,22 +1270,45 @@ class InventoryUnavailablePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppPage(
-      header: const AppPageHeader(title: 'Lager', showFilterToolbar: false),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const Icon(Icons.inventory_2_outlined, size: 48),
-            const SizedBox(height: 12),
-            const Text('Die Lagerverwaltung ist noch nicht verfügbar.'),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => context.go('/'),
-              icon: const Icon(Icons.home_outlined),
-              label: const Text('Zur Übersicht'),
-            ),
-          ],
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    return FinanceListSurface(
+      table: 'inventory',
+      title: l10n.inventoryTitle,
+      icon: Icons.inventory_2_outlined,
+      subtitle: l10n.inventoryUnavailableDescription,
+      contentBuilder: (BuildContext contentContext, AppLocalizations contentL10n) => AppCard(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.inventory_2_outlined, size: 48),
+              const SizedBox(height: 12),
+              Text(contentL10n.inventoryUnavailable, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(contentL10n.inventoryUnavailableDescription, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(contentL10n.inventoryReadOnly, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: <Widget>[
+                  FilledButton.icon(
+                    onPressed: () => contentContext.go('/inventory'),
+                    icon: const Icon(Icons.refresh),
+                    label: Text(contentL10n.inventoryRetry),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => contentContext.go('/'),
+                    icon: const Icon(Icons.home_outlined),
+                    label: Text(contentL10n.inventoryBack),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

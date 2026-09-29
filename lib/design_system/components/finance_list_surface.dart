@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
@@ -8,6 +9,9 @@ import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
+import 'package:openaccounting/l10n/l10n.dart';
+
+typedef FinanceListContentBuilder = Widget Function(BuildContext context, AppLocalizations l10n);
 
 /// A consistent, task-oriented list surface for the accounting workspaces.
 ///
@@ -29,6 +33,7 @@ class FinanceListSurface extends ConsumerStatefulWidget {
     this.filterTyp,
     this.filterStatus,
     this.onOpen,
+    this.contentBuilder,
     super.key,
   });
 
@@ -45,6 +50,7 @@ class FinanceListSurface extends ConsumerStatefulWidget {
   final String? filterTyp;
   final String? filterStatus;
   final void Function(int id, Map<String, Object?> row)? onOpen;
+  final FinanceListContentBuilder? contentBuilder;
 
   @override
   ConsumerState<FinanceListSurface> createState() => _FinanceListSurfaceState();
@@ -68,31 +74,36 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final String locale = localeTag(Localizations.localeOf(context));
     final RouteRecordsQuery? query = widget.filterTyp == null && widget.filterStatus == null
         ? null
         : RouteRecordsQuery(table: widget.table, typ: widget.filterTyp, status: widget.filterStatus);
     final FutureProvider<List<Map<String, Object?>>> source = query == null
         ? routeRecordsProvider(widget.table)
         : routeRecordsQueryProvider(query);
-    final AsyncValue<List<Map<String, Object?>>> records = ref.watch(source);
+    final AsyncValue<List<Map<String, Object?>>>? records = widget.contentBuilder == null ? ref.watch(source) : null;
+    final int? resultCount = records != null && records.hasValue ? _filteredRows(records.value!).length : null;
     return AppPage(
       maxWidth: 1180,
       header: AppPageHeader(
         title: widget.title,
         subtitle: widget.subtitle,
         searchController: _searchController,
-        searchHint: '${widget.title} durchsuchen…',
+        searchHint: '${widget.title} ${l10n.actionSearch.toLowerCase()}…',
         onSearchChanged: (String value) => setState(() => _search = value.trim().toLowerCase()),
         primaryActionLabel: widget.primaryActionLabel,
         onPrimaryAction: widget.onPrimaryAction,
-        resultCount: records.hasValue ? _filteredRows(records.value!).length : null,
-        resultCountLabelBuilder: _countLabel,
+        resultCount: resultCount,
+        resultCountLabelBuilder: (int count) => _countLabel(count, l10n),
       ),
-      child: records.when(
-        loading: _buildLoading,
-        error: (Object error, StackTrace stackTrace) => _buildError(context, error, stackTrace, source),
-        data: (List<Map<String, Object?>> rows) => _buildData(context, rows, source),
-      ),
+      child:
+          widget.contentBuilder?.call(context, l10n) ??
+          records!.when(
+            loading: _buildLoading,
+            error: (Object error, StackTrace stackTrace) => _buildError(context, error, stackTrace, source, l10n),
+            data: (List<Map<String, Object?>> rows) => _buildData(context, rows, source, l10n, locale),
+          ),
     );
   }
 
@@ -133,14 +144,15 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
     Object error,
     StackTrace stackTrace,
     FutureProvider<List<Map<String, Object?>>> source,
+    AppLocalizations l10n,
   ) {
     debugPrint('route ${widget.table} failed: $error\n$stackTrace');
     return AppCard(
       child: _CenteredState(
         icon: Icons.cloud_off_outlined,
-        title: 'Daten konnten nicht geladen werden',
-        message: 'Prüfe die lokale Datenbank und versuche es erneut.',
-        actionLabel: 'Erneut versuchen',
+        title: l10n.loadError,
+        message: l10n.databaseUnavailable,
+        actionLabel: l10n.actionRetry,
         onAction: () => ref.invalidate(source),
       ),
     );
@@ -150,6 +162,8 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
     BuildContext context,
     List<Map<String, Object?>> rows,
     FutureProvider<List<Map<String, Object?>>> source,
+    AppLocalizations l10n,
+    String locale,
   ) {
     final List<Map<String, Object?>> filtered = _filteredRows(rows);
     if (filtered.isEmpty) {
@@ -157,18 +171,16 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
       return AppCard(
         child: _CenteredState(
           icon: isFiltered ? Icons.search_off : widget.icon,
-          title: isFiltered ? 'Keine Treffer' : (widget.emptyTitle ?? 'Noch keine Einträge'),
-          message: isFiltered
-              ? 'Passe deine Suche an oder setze sie zurück.'
-              : (widget.emptyMessage ?? 'Sobald du Daten anlegst, erscheinen sie hier.'),
-          actionLabel: isFiltered ? 'Suche zurücksetzen' : widget.emptyActionLabel,
+          title: isFiltered ? l10n.emptyResults : (widget.emptyTitle ?? l10n.emptyEntries),
+          message: isFiltered ? l10n.actionReset : (widget.emptyMessage ?? l10n.emptyEntries),
+          actionLabel: isFiltered ? l10n.actionReset : widget.emptyActionLabel,
           onAction: isFiltered
               ? () {
                   _searchController.clear();
                   setState(() => _search = '');
                 }
               : widget.onEmptyAction,
-          secondaryActionLabel: 'Aktualisieren',
+          secondaryActionLabel: l10n.actionRefresh,
           onSecondaryAction: () => ref.invalidate(source),
         ),
       );
@@ -178,12 +190,18 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
       padding: EdgeInsets.zero,
       child: Column(
         children: <Widget>[
-          _ListSummary(count: filtered.length, label: _countLabel(filtered.length)),
+          _ListSummary(
+            count: filtered.length,
+            label: _countLabel(filtered.length, l10n),
+            resultLabel: l10n.countResults,
+          ),
           const Divider(height: 1),
           for (int index = 0; index < filtered.length; index++) ...<Widget>[
             _FinanceRow(
               table: widget.table,
               row: filtered[index],
+              l10n: l10n,
+              locale: locale,
               onTap: () {
                 final int? id = _recordId(filtered[index]);
                 if (id != null) widget.onOpen?.call(id, filtered[index]);
@@ -206,25 +224,26 @@ class _FinanceListSurfaceState extends ConsumerState<FinanceListSurface> {
         .toList(growable: false);
   }
 
-  String _countLabel(int count) {
+  String _countLabel(int count, AppLocalizations l10n) {
     final String noun = widget.table == 'rechnungen'
-        ? 'Rechnungen'
+        ? l10n.countInvoices
         : widget.table == 'kunden'
-        ? 'Kontakte'
+        ? l10n.countContacts
         : widget.table == 'belege'
-        ? 'Belege'
+        ? l10n.countReceipts
         : widget.table == 'journal'
-        ? 'Buchungen'
-        : 'Einträge';
+        ? l10n.countRecords
+        : l10n.countRecords;
     return '$count $noun';
   }
 }
 
 class _ListSummary extends StatelessWidget {
-  const _ListSummary({required this.count, required this.label});
+  const _ListSummary({required this.count, required this.label, required this.resultLabel});
 
   final int count;
   final String label;
+  final String resultLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +253,7 @@ class _ListSummary extends StatelessWidget {
         children: <Widget>[
           Text(label, style: Theme.of(context).textTheme.titleSmall),
           const Spacer(),
-          Text('$count Ergebnisse', style: Theme.of(context).textTheme.bodySmall),
+          Text('$count $resultLabel', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
@@ -242,19 +261,21 @@ class _ListSummary extends StatelessWidget {
 }
 
 class _FinanceRow extends StatelessWidget {
-  const _FinanceRow({required this.table, required this.row, this.onTap});
+  const _FinanceRow({required this.table, required this.row, required this.l10n, required this.locale, this.onTap});
 
   final String table;
   final Map<String, Object?> row;
+  final AppLocalizations l10n;
+  final String locale;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final int? id = _recordId(row);
-    final String title = _recordTitle(table, row, id);
-    final String subtitle = _recordSubtitle(table, row);
-    final String? amount = _recordAmount(table, row);
-    final String? status = _recordStatus(row);
+    final String title = _recordTitle(table, row, id, l10n);
+    final String subtitle = _recordSubtitle(table, row, l10n, locale);
+    final String? amount = _recordAmount(table, row, locale);
+    final String? status = _recordStatus(row, l10n);
     final Widget leading = CircleAvatar(
       radius: 20,
       backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
@@ -361,7 +382,7 @@ int? _recordId(Map<String, Object?> row) {
   return int.tryParse(value?.toString() ?? '');
 }
 
-String _recordTitle(String table, Map<String, Object?> row, int? id) {
+String _recordTitle(String table, Map<String, Object?> row, int? id, AppLocalizations l10n) {
   final Object? value = switch (table) {
     'rechnungen' => row['rechnungsnummer'] ?? row['typ'],
     'kunden' => row['name'] ?? row['firma'],
@@ -370,19 +391,19 @@ String _recordTitle(String table, Map<String, Object?> row, int? id) {
     _ => row['name'] ?? row['beschreibung'] ?? row['typ'],
   };
   final String text = value?.toString().trim() ?? '';
-  if (text.isEmpty) return 'Eintrag #${id ?? '?'}';
-  if (table == 'rechnungen' && text == 'rechnung') return 'Entwurf #${id ?? '?'}';
+  if (text.isEmpty) return '${l10n.documentOther} #${id ?? '?'}';
+  if (table == 'rechnungen' && text == 'rechnung') return '${l10n.statusDraft} #${id ?? '?'}';
   return text;
 }
 
-String _recordSubtitle(String table, Map<String, Object?> row) {
+String _recordSubtitle(String table, Map<String, Object?> row, AppLocalizations l10n, String locale) {
   final List<String> values = <String>[];
   if (table == 'rechnungen' || table == 'belege' || table == 'journal') {
     final String date = row['datum']?.toString().trim() ?? '';
-    if (date.isNotEmpty) values.add(_formatDate(date));
+    if (date.isNotEmpty) values.add(_formatDate(date, locale));
   }
   if (table == 'rechnungen') {
-    final String type = _documentTypeLabel(row['typ']?.toString());
+    final String type = _documentTypeLabel(row['typ']?.toString(), l10n);
     if (type.isNotEmpty) values.add(type);
   }
   if (table == 'kunden') {
@@ -398,17 +419,17 @@ String _recordSubtitle(String table, Map<String, Object?> row) {
   return values.join(' · ');
 }
 
-String? _recordStatus(Map<String, Object?> row) {
+String? _recordStatus(Map<String, Object?> row, AppLocalizations l10n) {
   final String value = row['status']?.toString().trim() ?? '';
-  return value.isEmpty ? null : _statusLabel(value);
+  return value.isEmpty ? null : _statusLabel(value, l10n);
 }
 
-String? _recordAmount(String table, Map<String, Object?> row) {
+String? _recordAmount(String table, Map<String, Object?> row, String locale) {
   if (table != 'rechnungen' && table != 'belege' && table != 'journal') return null;
   final Object? raw = row['brutto_betrag'] ?? row['betrag'] ?? row['summe'] ?? row['netto_betrag'];
   final num? value = raw is num ? raw : num.tryParse(raw?.toString().replaceAll(',', '.') ?? '');
   if (value == null) return null;
-  return formatMoney(value);
+  return formatMoney(value, locale: locale);
 }
 
 IconData _iconFor(String table) {
@@ -431,33 +452,28 @@ AppStatus _statusFor(String value) {
   return AppStatus.neutral;
 }
 
-String _statusLabel(String value) {
+String _statusLabel(String value, AppLocalizations l10n) {
   return switch (value.toLowerCase()) {
-    'open' => 'Offen',
-    'paid' => 'Bezahlt',
-    'overdue' => 'Überfällig',
-    'draft' => 'Entwurf',
+    'open' => l10n.statusOpen,
+    'paid' => l10n.statusPaid,
+    'overdue' => l10n.statusOverdue,
+    'draft' => l10n.statusDraft,
     _ => value,
   };
 }
 
-String _documentTypeLabel(String? value) {
+String _documentTypeLabel(String? value, AppLocalizations l10n) {
   return switch (value) {
-    'rechnung' => 'Rechnung',
-    'gutschrift' => 'Gutschrift',
-    'storno' => 'Storno',
-    'angebot' => 'Angebot',
-    'auftrag' => 'Auftrag',
-    'proforma' => 'Proforma',
-    'lieferschein' => 'Lieferschein',
+    'rechnung' => l10n.documentInvoice,
+    'gutschrift' => l10n.documentCreditNote,
+    'beleg' => l10n.documentReceipt,
+    'storno' || 'angebot' || 'auftrag' || 'proforma' || 'lieferschein' => l10n.documentOther,
     _ => value ?? '',
   };
 }
 
-String _formatDate(String value) {
+String _formatDate(String value, String locale) {
   final DateTime? parsed = DateTime.tryParse(value);
   if (parsed == null) return value;
-  final String day = parsed.day.toString().padLeft(2, '0');
-  final String month = parsed.month.toString().padLeft(2, '0');
-  return '$day.$month.${parsed.year}';
+  return formatDate(parsed, locale: locale);
 }

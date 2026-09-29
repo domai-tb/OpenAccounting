@@ -217,6 +217,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   Future<int> finalizeRechnung({
     required int rechnungId,
     Directory? profileDir,
+    required String locale,
     // ponytail: test-only fault injection — throw after given posting step
     String? debugFailAt,
   }) async {
@@ -425,7 +426,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
             eingabemodus: eingabemodus,
             companyRows: companyRows,
           );
-          final Uint8List pdfBytes = await const PdfGenerator().generate(snapshot);
+          final Uint8List pdfBytes = await const PdfGenerator().generate(snapshot, locale: locale);
           tmpFile.writeAsBytesSync(pdfBytes);
           tmpFile.renameSync(pdfFile.path);
         } catch (e) {

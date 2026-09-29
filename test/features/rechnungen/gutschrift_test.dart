@@ -21,7 +21,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 500, gesamt: 500)],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     final gs = await uc.createGutschrift(vonRechnungId: fin.id, grund: 'Mangel');
     expect(gs.typ, 'gutschrift');
     expect(gs.rechnungsnummer, 'GS-260001');
@@ -64,7 +64,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     await expectLater(
       uc.createErsatzRechnung(vonRechnungId: fin.id),
       throwsA(predicate((e) => e.toString().contains('stornierter'))),

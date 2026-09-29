@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Ohne Lager', menge: 3, einzelpreis: 10, gesamt: 30, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(id), 50);
     });
 
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Mit Lager', menge: 3, einzelpreis: 10, gesamt: 30, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(id), 47);
     });
 
@@ -101,7 +101,10 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Knapp', menge: 5, einzelpreis: 10, gesamt: 50, artikelId: id),
         ],
       );
-      await expectLater(rechnungen.finalizeRechnung(rechnungId: rechnungId), throwsA(isA<StateError>()));
+      await expectLater(
+        rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId),
+        throwsA(isA<StateError>()),
+      );
       expect(await bestandOf(id), 2);
       final rows = await bewegungen(id);
       expect(rows, isEmpty);
@@ -115,7 +118,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Negativ OK', menge: 5, einzelpreis: 10, gesamt: 50, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(id), -3);
     });
 
@@ -127,7 +130,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Kg Ware', menge: 2.5, einzelpreis: 10, gesamt: 25, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       final bestand = await bestandOf(id);
       expect(bestand.toDouble(), closeTo(8.0, 0.001));
     });
@@ -144,7 +147,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'C Lager', menge: 3, einzelpreis: 10, gesamt: 30, artikelId: c),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(a), 10);
       expect(await bestandOf(b), 20);
       expect(await bestandOf(c), 17);
@@ -160,7 +163,10 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'B Knapp', menge: 5, einzelpreis: 10, gesamt: 50, artikelId: b),
         ],
       );
-      await expectLater(rechnungen.finalizeRechnung(rechnungId: rechnungId), throwsA(isA<StateError>()));
+      await expectLater(
+        rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId),
+        throwsA(isA<StateError>()),
+      );
       expect(await bestandOf(a), 100);
       expect(await bestandOf(b), 2);
     });
@@ -173,7 +179,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Storno A', menge: 10, einzelpreis: 10, gesamt: 100, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(id), 40);
       await rechnungen.stornoRechnung(rechnungId: rechnungId, grund: 'Korrektur');
       expect(await bestandOf(id), 50);
@@ -187,7 +193,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Manuell', menge: 10, einzelpreis: 10, gesamt: 100, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       // manuelle Reduktion auf 20
       await db.executor.runUpdate('UPDATE artikel SET bestand_aktuell = ?, bestand = ? WHERE id = ?', <Object?>[
         20,
@@ -208,7 +214,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Kein Lager', menge: 5, einzelpreis: 10, gesamt: 50, artikelId: b),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       expect(await bestandOf(a), 40);
       expect(await bestandOf(b), 50);
       await rechnungen.stornoRechnung(rechnungId: rechnungId, grund: 'Gemischt stornieren');
@@ -265,7 +271,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Bewegung', menge: 4, einzelpreis: 10, gesamt: 40, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       final rows = await bewegungen(id);
       expect(rows.length, 1);
       final diff = num.tryParse(rows.single['diff'].toString()) ?? 0;
@@ -282,7 +288,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           RechnungPositionItem(bezeichnung: 'Storno Bewegung', menge: 4, einzelpreis: 10, gesamt: 40, artikelId: id),
         ],
       );
-      await rechnungen.finalizeRechnung(rechnungId: rechnungId);
+      await rechnungen.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       await rechnungen.stornoRechnung(rechnungId: rechnungId, grund: 'Test Storno');
       final rows = await bewegungen(id);
       expect(rows.length, 2);

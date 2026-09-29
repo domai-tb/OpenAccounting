@@ -21,7 +21,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 2, einzelpreis: 100, gesamt: 200)],
     );
-    final finalized = await uc.finalizeRechnung(rechnungId: draft.id);
+    final finalized = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     final storno = await uc.stornoRechnung(rechnungId: finalized.id, grund: 'Falsch berechnet');
     expect(storno.typ, 'storno');
     expect(storno.rechnungsnummer, 'ST-260001');
@@ -50,7 +50,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
     );
-    final finalized = await uc.finalizeRechnung(rechnungId: draft.id);
+    final finalized = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     await expectLater(
       uc.stornoRechnung(rechnungId: finalized.id, grund: ''),
       throwsA(predicate((e) => e.toString().contains('Stornogrund'))),
@@ -76,7 +76,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     await uc.stornoRechnung(rechnungId: fin.id, grund: 'Grund');
     await expectLater(
       uc.stornoRechnung(rechnungId: fin.id, grund: 'Erneut'),
@@ -104,7 +104,7 @@ void main() {
         RechnungPositionItem(artikelId: artikelId, bezeichnung: 'Widget', menge: 10, einzelpreis: 10, gesamt: 100),
       ],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     var stock = await db.executor.runSelect('SELECT bestand FROM artikel WHERE id = ?', [artikelId]);
     expect(stock.single['bestand'], 10);
     await uc.stornoRechnung(rechnungId: fin.id, grund: 'Retoure');

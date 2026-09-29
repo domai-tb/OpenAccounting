@@ -38,7 +38,7 @@ void main() {
         positionen: [const RechnungPositionItem(bezeichnung: 'Testleistung', menge: 1, einzelpreis: 100, gesamt: 100)],
       );
 
-      await ds.finalizeRechnung(rechnungId: rechnungId, profileDir: tmpDir);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId, profileDir: tmpDir);
 
       // Read back the stored path.
       final rows = await db.executor.runSelect(
@@ -65,7 +65,7 @@ void main() {
         positionen: [const RechnungPositionItem(bezeichnung: 'Testleistung', menge: 1, einzelpreis: 100, gesamt: 100)],
       );
 
-      await ds.finalizeRechnung(rechnungId: rechnungId, profileDir: tmpDir);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId, profileDir: tmpDir);
 
       // Read back the stored path.
       final rows = await db.executor.runSelect('SELECT original_pdf_pfad FROM rechnungen WHERE id = ?', <Object?>[
@@ -87,7 +87,7 @@ void main() {
         positionen: [const RechnungPositionItem(bezeichnung: 'Testleistung', menge: 1, einzelpreis: 100, gesamt: 100)],
       );
 
-      await ds.finalizeRechnung(rechnungId: rechnungId, profileDir: tmpDir);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId, profileDir: tmpDir);
 
       final rows = await db.executor.runSelect('SELECT original_pdf_pfad FROM rechnungen WHERE id = ?', <Object?>[
         rechnungId,

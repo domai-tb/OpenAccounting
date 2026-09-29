@@ -13,7 +13,10 @@ void main() {
       angebot: PdfTypeTextSnapshot(einleitungstext: 'ANGEBOT INTRO', schlusstext: 'ANGEBOT CLOSING'),
     );
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
+        locale: 'de_DE',
+      ),
     );
 
     expect(parsedPdf.visibleText, allOf(contains('RECHNUNG INTRO'), contains('RECHNUNG CLOSING')));
@@ -27,11 +30,15 @@ void main() {
           documentType: PdfDocumentType.rechnung,
           texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
         ),
+        locale: 'de_DE',
       ),
     );
     const texts = PdfDocumentTextsSnapshot(angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'));
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
+        locale: 'de_DE',
+      ),
     );
 
     expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
@@ -48,6 +55,7 @@ void main() {
           documentType: PdfDocumentType.rechnung,
           texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
         ),
+        locale: 'de_DE',
       ),
     );
     const texts = PdfDocumentTextsSnapshot(
@@ -55,7 +63,10 @@ void main() {
       angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'),
     );
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
+        locale: 'de_DE',
+      ),
     );
 
     expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
@@ -72,6 +83,7 @@ void main() {
           documentType: PdfDocumentType.rechnung,
           texts: const PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(schlusstext: 'RECHNUNG CLOSING')),
         ),
+        locale: 'de_DE',
       ),
     );
     const texts = PdfDocumentTextsSnapshot(
@@ -79,7 +91,10 @@ void main() {
       angebot: PdfTypeTextSnapshot(schlusstext: 'ANGEBOT FALLBACK CLOSING'),
     );
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
+        locale: 'de_DE',
+      ),
     );
 
     expect(baseline.visibleText, contains('RECHNUNG CLOSING'));
@@ -95,6 +110,7 @@ void main() {
     );
     final pdfBytes = await const PdfGenerator().generate(
       _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts),
+      locale: 'de_DE',
     );
     final parsedPdf = parsePdf(pdfBytes);
     final pdfSource = latin1.decode(pdfBytes);
@@ -116,7 +132,7 @@ void main() {
         r'**outer *inner* outer** | *unmatched | \*escaped italic\* | \**escaped bold** | __unsupported__ | ~~strike~~';
     const texts = PdfDocumentTextsSnapshot(rechnung: PdfTypeTextSnapshot(einleitungstext: intro));
     final snapshot = _snapshotWithTexts(documentType: PdfDocumentType.rechnung, texts: texts);
-    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot));
+    final parsedPdf = parsePdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
     expect(
       parsedPdf.visibleText,
@@ -138,6 +154,7 @@ void main() {
     final parsedPdf = parsePdf(
       await const PdfGenerator().generate(
         _snapshotWithTexts(documentType: PdfDocumentType.angebot, texts: texts, validUntil: DateTime(2026, 9, 15)),
+        locale: 'de_DE',
       ),
     );
     final visibleText = parsedPdf.visibleText;
@@ -158,7 +175,10 @@ void main() {
   test('Lieferschein Schlusstext follows positions when totals are absent', () async {
     const texts = PdfDocumentTextsSnapshot(lieferschein: PdfTypeTextSnapshot(schlusstext: 'DELIVERY CLOSING'));
     final parsedPdf = parsePdf(
-      await const PdfGenerator().generate(_snapshotWithTexts(documentType: PdfDocumentType.lieferschein, texts: texts)),
+      await const PdfGenerator().generate(
+        _snapshotWithTexts(documentType: PdfDocumentType.lieferschein, texts: texts),
+        locale: 'de_DE',
+      ),
     );
     final visibleText = parsedPdf.visibleText;
     final positionIndex = visibleText.indexOf('Website-Design');

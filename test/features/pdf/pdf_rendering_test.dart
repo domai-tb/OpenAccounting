@@ -40,7 +40,7 @@ void main() {
       final PdfDocumentSnapshot snapshot = _minimalSnapshot();
 
       // WHEN: rendering generates bytes
-      final Uint8List bytes = await generator.generate(snapshot);
+      final Uint8List bytes = await generator.generate(snapshot, locale: 'de_DE');
 
       // THEN: bytes are non-empty and valid PDF
       expect(bytes.isNotEmpty, isTrue);
@@ -57,7 +57,7 @@ void main() {
 
       // WHEN: rendering generates bytes — incomplete data still produces PDF
       // (validation is at the domain layer, not the renderer)
-      final Uint8List bytes = await generator.generate(snapshot);
+      final Uint8List bytes = await generator.generate(snapshot, locale: 'de_DE');
 
       // THEN: bytes are valid PDF — renderer is permissive, domain enforces completeness
       expect(bytes.isNotEmpty, isTrue);
@@ -79,7 +79,7 @@ void main() {
       );
 
       // WHEN: rendering generates bytes
-      final Uint8List bytes = await generator.generate(snapshot);
+      final Uint8List bytes = await generator.generate(snapshot, locale: 'de_DE');
 
       // THEN: bytes are valid PDF with content
       expect(bytes.isNotEmpty, isTrue);
@@ -92,7 +92,7 @@ void main() {
       final PdfDocumentSnapshot snapshot = _minimalSnapshot(texts: const PdfDocumentTextsSnapshot());
 
       // WHEN: rendering generates bytes
-      final Uint8List bytes = await generator.generate(snapshot);
+      final Uint8List bytes = await generator.generate(snapshot, locale: 'de_DE');
 
       // THEN: bytes are valid PDF — missing optional content doesn't break rendering
       expect(bytes.isNotEmpty, isTrue);

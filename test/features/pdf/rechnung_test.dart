@@ -84,13 +84,13 @@ void main() {
   });
 
   test('Rechnung PDF contains PDF signature', () async {
-    final pdfBytes = await const PdfGenerator().generate(rechnungSnapshot());
+    final pdfBytes = await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE');
 
     expect(latin1.decode(pdfBytes.sublist(0, 5)), '%PDF-');
   });
 
   test('Rechnung PDF contains company header', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(
       parsedPdf.visibleText,
@@ -99,19 +99,19 @@ void main() {
   });
 
   test('Rechnung PDF contains Rechnung label and number', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(parsedPdf.visibleText, allOf(contains('Rechnung'), contains('RE-2026-001')));
   });
 
   test('Rechnung PDF contains position content', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(parsedPdf.visibleText, allOf(contains('Website-Design'), contains('2,00')));
   });
 
   test('Rechnung PDF contains customer address and German date', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(
       parsedPdf.visibleText,
@@ -120,7 +120,7 @@ void main() {
   });
 
   test('Rechnung PDF contains full Standard monetary columns', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(
       parsedPdf.visibleText,
@@ -150,7 +150,7 @@ void main() {
     final snapshot = rechnungSnapshot();
     final positions = snapshot.positions;
 
-    await const PdfGenerator().generate(snapshot);
+    await const PdfGenerator().generate(snapshot, locale: 'de_DE');
 
     expect(snapshot.positions, same(positions));
     expect(snapshot.documentNumber, 'RE-2026-001');
@@ -158,7 +158,7 @@ void main() {
   });
 
   test('Rechnung PDF contains German-formatted total', () async {
-    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot()));
+    final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(rechnungSnapshot(), locale: 'de_DE'));
 
     expect(parsedPdf.visibleText, allOf(contains('Gesamtbetrag'), contains('1.190,00 €')));
   });

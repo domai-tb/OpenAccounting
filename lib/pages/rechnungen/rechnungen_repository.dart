@@ -52,8 +52,8 @@ class RechnungenRepository {
     return _loadRechnung(id, missingMessage: 'Dokument wurde nicht gespeichert');
   }
 
-  Future<RechnungItem> finalizeRechnung({required int rechnungId}) async {
-    final id = await dataSource.finalizeRechnung(rechnungId: rechnungId);
+  Future<RechnungItem> finalizeRechnung({required int rechnungId, required String locale}) async {
+    final id = await dataSource.finalizeRechnung(rechnungId: rechnungId, locale: locale);
     return _loadRechnung(id, missingMessage: 'Finalisierte Rechnung wurde nicht gespeichert');
   }
 

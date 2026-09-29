@@ -79,7 +79,7 @@ void main() {
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 100, gesamt: 200)],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     final rows = await db.executor.runSelect(
       'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
       [fin.id],
@@ -106,7 +106,7 @@ void main() {
       eingabemodus: 'brutto',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 3, einzelpreis: 119, gesamt: 357)],
     );
-    final fin = await uc.finalizeRechnung(rechnungId: draft.id);
+    final fin = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
     final rows = await db.executor.runSelect('SELECT netto_betrag, brutto_betrag FROM rechnungen WHERE id = ?', [
       fin.id,
     ]);

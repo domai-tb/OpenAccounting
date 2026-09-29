@@ -161,6 +161,7 @@ class AppSidebar extends StatelessWidget {
         item(Icons.receipt, l10n?.sidebarReceipts ?? 'Belege', '/receipts'),
         item(Icons.account_balance, l10n?.sidebarBanking ?? 'Bank & Zahlungen', '/banking'),
         item(Icons.contacts, l10n?.sidebarContacts ?? 'Kontakte', '/contacts'),
+        item(Icons.inventory_2_outlined, l10n?.routeInventory ?? 'Inventory', '/inventory'),
         if (!isCompact)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),

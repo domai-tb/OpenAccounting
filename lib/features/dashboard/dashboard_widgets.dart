@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
@@ -126,7 +127,7 @@ class DashboardCard extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: onRetry,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Erneut versuchen'),
+                    label: Text(appLocalizationsOf(context).actionRetry),
                   ),
                 ],
               ],

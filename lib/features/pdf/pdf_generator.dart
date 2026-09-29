@@ -1,13 +1,16 @@
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
 
 final class PdfGenerator {
   const PdfGenerator();
 
-  Future<Uint8List> generate(PdfDocumentSnapshot snapshot) {
+  Future<Uint8List> generate(PdfDocumentSnapshot snapshot, {required String locale}) {
+    final AppLocalizations l10n = lookupAppLocalizations(Locale(locale.split('_').first));
     final document = pw.Document(compress: false);
     final isCopy = snapshot.copyState == PdfCopyState.copy;
     final pageTheme = pw.PageTheme(
@@ -17,67 +20,67 @@ final class PdfGenerator {
           ? (pw.Context context) => pw.FullPage(ignoreMargins: true, child: pw.Watermark.text('KOPIE'))
           : null,
     );
-    document.addPage(pw.MultiPage(pageTheme: pageTheme, build: (_) => _buildPage(snapshot)));
+    document.addPage(pw.MultiPage(pageTheme: pageTheme, build: (_) => _buildPage(snapshot, l10n, locale)));
     return document.save();
   }
 }
 
-List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot) {
+List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot, AppLocalizations l10n, String locale) {
   final showTax = snapshot.template == PdfTemplate.standard;
   final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
   final isMahnung = snapshot.documentType == PdfDocumentType.mahnung;
   final textSnapshot = snapshot.texts.forType(snapshot.documentType);
 
   return <pw.Widget>[
-    _companyHeader(snapshot.company, snapshot.documentType.label),
+    _companyHeader(snapshot.company, _documentLabel(snapshot.documentType, l10n), l10n),
     pw.SizedBox(height: 22),
-    _documentHeading(snapshot),
+    _documentHeading(snapshot, l10n, locale),
     pw.SizedBox(height: 16),
-    _customerBlock(snapshot.customer),
+    _customerBlock(snapshot.customer, l10n),
     if (snapshot.documentDate != null) ...[
       pw.SizedBox(height: 12),
-      pw.Text('Datum: ${_formatDate(snapshot.documentDate!)}'),
+      pw.Text('${l10n.pdfDate}: ${_formatDate(snapshot.documentDate!, locale)}'),
     ],
     if (isMahnung && snapshot.mahnung != null) ...[
       pw.SizedBox(height: 6),
-      pw.Text('Ursprüngliche Rechnung: ${snapshot.mahnung!.originalInvoiceNumber}'),
-      pw.Text('Rechnungsdatum: ${_formatDate(snapshot.mahnung!.originalInvoiceDate)}'),
-      pw.Text('Fällig seit: ${_formatDate(snapshot.mahnung!.dueDate)}'),
+      pw.Text('${l10n.pdfOriginalInvoice}: ${snapshot.mahnung!.originalInvoiceNumber}'),
+      pw.Text('${l10n.pdfInvoiceDate}: ${_formatDate(snapshot.mahnung!.originalInvoiceDate, locale)}'),
+      pw.Text('${l10n.pdfDueSince}: ${_formatDate(snapshot.mahnung!.dueDate, locale)}'),
     ],
     if (snapshot.documentType == PdfDocumentType.angebot && snapshot.validUntil != null) ...[
       pw.SizedBox(height: 6),
-      pw.Text('Gültig bis: ${_formatDate(snapshot.validUntil!)}'),
+      pw.Text('${l10n.pdfValidUntil}: ${_formatDate(snapshot.validUntil!, locale)}'),
     ],
     if (snapshot.documentType == PdfDocumentType.auftrag && _hasText(snapshot.orderStatus)) ...[
       pw.SizedBox(height: 6),
-      pw.Text('Auftragsstatus: ${snapshot.orderStatus}'),
+      pw.Text('${l10n.pdfOrderStatus}: ${snapshot.orderStatus}'),
     ],
-    if (snapshot.template == PdfTemplate.gruen) ...[
-      pw.SizedBox(height: 12),
-      pw.Text('Gemäß §19 UStG wird keine Umsatzsteuer berechnet'),
-    ],
+    if (snapshot.template == PdfTemplate.gruen) ...[pw.SizedBox(height: 12), pw.Text(l10n.pdfNoVat)],
     if (_hasText(textSnapshot.einleitungstext)) ...[
       pw.SizedBox(height: 18),
       _markdownText(textSnapshot.einleitungstext!),
     ],
     pw.SizedBox(height: 18),
-    _positionTable(snapshot),
-    if (!isDeliveryNote) ...[pw.SizedBox(height: 16), _totals(snapshot.totals, showTax: showTax)],
-    if (snapshot.paymentBlock != null) ...[pw.SizedBox(height: 18), _paymentBlock(snapshot.paymentBlock!)],
+    _positionTable(snapshot, l10n, locale),
+    if (!isDeliveryNote) ...[
+      pw.SizedBox(height: 16),
+      _totals(snapshot.totals, showTax: showTax, l10n: l10n, locale: locale),
+    ],
+    if (snapshot.paymentBlock != null) ...[pw.SizedBox(height: 18), _paymentBlock(snapshot.paymentBlock!, l10n)],
     if (_hasText(textSnapshot.schlusstext)) ...[pw.SizedBox(height: 18), _markdownText(textSnapshot.schlusstext!)],
   ];
 }
 
-pw.Widget _companyHeader(PdfCompanySnapshot company, String documentLabel) {
+pw.Widget _companyHeader(PdfCompanySnapshot company, String documentLabel, AppLocalizations l10n) {
   final details = <String>[
     if (_hasText(company.street)) company.street!,
     if (_hasText(_location(company.postalCode, company.city))) _location(company.postalCode, company.city)!,
     if (_hasText(company.country)) company.country!,
-    if (_hasText(company.phone)) 'Telefon: ${company.phone}',
-    if (_hasText(company.email)) 'E-Mail: ${company.email}',
+    if (_hasText(company.phone)) '${l10n.pdfPhone}: ${company.phone}',
+    if (_hasText(company.email)) '${l10n.pdfEmail}: ${company.email}',
     if (_hasText(company.website)) company.website!,
-    if (_hasText(company.taxNumber)) 'Steuernummer: ${company.taxNumber}',
-    if (_hasText(company.vatId)) 'USt-IdNr.: ${company.vatId}',
+    if (_hasText(company.taxNumber)) '${l10n.pdfTaxNumber}: ${company.taxNumber}',
+    if (_hasText(company.vatId)) '${l10n.pdfVatId}: ${company.vatId}',
   ];
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -95,20 +98,22 @@ pw.Widget _companyHeader(PdfCompanySnapshot company, String documentLabel) {
   );
 }
 
-pw.Widget _documentHeading(PdfDocumentSnapshot snapshot) {
+pw.Widget _documentHeading(PdfDocumentSnapshot snapshot, AppLocalizations l10n, String locale) {
   final title = snapshot.documentType == PdfDocumentType.mahnung && snapshot.mahnung != null
-      ? snapshot.mahnung!.dunningLevelLabel
-      : snapshot.documentType.label;
+      ? locale.startsWith('en')
+            ? '${l10n.pdfReminder} ${snapshot.mahnung!.dunningLevel}'
+            : '${snapshot.mahnung!.dunningLevel}. ${l10n.pdfReminder}'
+      : _documentLabel(snapshot.documentType, l10n);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
       pw.Text(title, style: const pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-      pw.Text('Rechnungsnummer: ${snapshot.documentNumber}'),
+      pw.Text('${l10n.pdfInvoiceNumber}: ${snapshot.documentNumber}'),
     ],
   );
 }
 
-pw.Widget _customerBlock(PdfCustomerSnapshot customer) {
+pw.Widget _customerBlock(PdfCustomerSnapshot customer, AppLocalizations l10n) {
   final address = <String>[
     customer.name,
     if (_hasText(customer.company)) customer.company!,
@@ -120,27 +125,27 @@ pw.Widget _customerBlock(PdfCustomerSnapshot customer) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
-      pw.Text('Rechnung an', style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      pw.Text(l10n.pdfTo, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
       for (final line in address) pw.Text(line),
     ],
   );
 }
 
-pw.Widget _positionTable(PdfDocumentSnapshot snapshot) {
+pw.Widget _positionTable(PdfDocumentSnapshot snapshot, AppLocalizations l10n, String locale) {
   final isDeliveryNote = snapshot.documentType == PdfDocumentType.lieferschein;
   final showTax = snapshot.template == PdfTemplate.standard && !isDeliveryNote;
   final headers = isDeliveryNote
-      ? <String>['Pos.', 'Beschreibung', 'Menge']
+      ? <String>[l10n.pdfPosition, l10n.pdfDescription, l10n.pdfQuantity]
       : <String>[
-          'Pos.',
-          'Beschreibung',
-          'Menge',
-          'Einzelpreis',
-          'Rabatt',
-          'Netto',
-          if (showTax) 'USt-Satz',
-          if (showTax) 'USt',
-          'Brutto',
+          l10n.pdfPosition,
+          l10n.pdfDescription,
+          l10n.pdfQuantity,
+          l10n.pdfUnitPrice,
+          l10n.pdfDiscount,
+          l10n.pdfNet,
+          if (showTax) l10n.pdfVatRate,
+          if (showTax) l10n.pdfTax,
+          l10n.pdfGross,
         ];
   final alignments = <int, pw.Alignment>{
     0: pw.Alignment.center,
@@ -185,7 +190,7 @@ pw.Widget _positionTable(PdfDocumentSnapshot snapshot) {
   return pw.TableHelper.fromTextArray(
     headers: headers,
     data: snapshot.positions
-        .map((position) => _positionRow(position, isDeliveryNote: isDeliveryNote, showTax: showTax))
+        .map((position) => _positionRow(position, isDeliveryNote: isDeliveryNote, showTax: showTax, locale: locale))
         .toList(growable: false),
     border: pw.TableBorder.all(color: pdf.PdfColors.grey, width: 0.5),
     cellPadding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 4),
@@ -199,45 +204,60 @@ pw.Widget _positionTable(PdfDocumentSnapshot snapshot) {
   );
 }
 
-List<String> _positionRow(PdfPositionSnapshot position, {required bool isDeliveryNote, required bool showTax}) {
+List<String> _positionRow(
+  PdfPositionSnapshot position, {
+  required bool isDeliveryNote,
+  required bool showTax,
+  required String locale,
+}) {
   if (isDeliveryNote) {
-    return <String>[position.position?.toString() ?? '', position.description, _formatDecimal(position.quantity)];
+    return <String>[
+      position.position?.toString() ?? '',
+      position.description,
+      _formatDecimal(position.quantity, locale),
+    ];
   }
 
   final row = <String>[
     position.position?.toString() ?? '',
     position.description,
-    _formatDecimal(position.quantity),
-    _formatCurrency(position.unitPrice),
-    _formatDiscount(position),
-    _formatCurrency(position.netAmount),
+    _formatDecimal(position.quantity, locale),
+    _formatCurrency(position.unitPrice, locale),
+    _formatDiscount(position, locale),
+    _formatCurrency(position.netAmount, locale),
   ];
   if (showTax) {
     row
-      ..add('${_formatDecimal(position.taxRate)} %')
-      ..add(_formatCurrency(position.taxAmount));
+      ..add('${_formatDecimal(position.taxRate, locale)} %')
+      ..add(_formatCurrency(position.taxAmount, locale));
   }
-  row.add(_formatCurrency(position.grossAmount));
+  row.add(_formatCurrency(position.grossAmount, locale));
   return row;
 }
 
-String _formatDiscount(PdfPositionSnapshot position) {
+String _formatDiscount(PdfPositionSnapshot position, String locale) {
   if (position.discountPercent != null) {
-    return '${_formatDecimal(position.discountPercent!)} %';
+    return '${_formatDecimal(position.discountPercent!, locale)} %';
   }
   if (position.discountAmount != null) {
-    return _formatCurrency(position.discountAmount!);
+    return _formatCurrency(position.discountAmount!, locale);
   }
   return '';
 }
 
-pw.Widget _totals(PdfTotalsSnapshot totals, {required bool showTax}) {
+pw.Widget _totals(
+  PdfTotalsSnapshot totals, {
+  required bool showTax,
+  required AppLocalizations l10n,
+  required String locale,
+}) {
   final rows = <List<String>>[
-    if (totals.subtotal != null) <String>['Zwischensumme', _formatCurrency(totals.subtotal!)],
-    if (totals.discountAmount != null) <String>['Rabatt', _formatCurrency(totals.discountAmount!)],
-    <String>['Netto', _formatCurrency(totals.netAmount)],
-    if (showTax) <String>['USt', _formatCurrency(totals.taxAmount)],
-    <String>['Gesamtbetrag', _formatCurrency(totals.grossAmount)],
+    if (totals.subtotal != null) <String>[l10n.pdfSubtotal, _formatCurrency(totals.subtotal!, locale)],
+    if (totals.discountAmount != null)
+      <String>[l10n.pdfDiscountAmount, _formatCurrency(totals.discountAmount!, locale)],
+    <String>[l10n.pdfNet, _formatCurrency(totals.netAmount, locale)],
+    if (showTax) <String>[l10n.pdfTax, _formatCurrency(totals.taxAmount, locale)],
+    <String>[l10n.pdfGrossTotal, _formatCurrency(totals.grossAmount, locale)],
   ];
   return pw.Align(
     alignment: pw.Alignment.centerRight,
@@ -256,15 +276,15 @@ pw.Widget _totals(PdfTotalsSnapshot totals, {required bool showTax}) {
   );
 }
 
-pw.Widget _paymentBlock(PdfPaymentBlockSnapshot payment) {
+pw.Widget _paymentBlock(PdfPaymentBlockSnapshot payment, AppLocalizations l10n) {
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: <pw.Widget>[
-      pw.Text('Zahlungsdaten', style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+      pw.Text(l10n.pdfPaymentDetails, style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
       pw.SizedBox(height: 6),
-      pw.Text('IBAN: ${payment.iban}'),
-      if (_hasText(payment.bic)) pw.Text('BIC: ${payment.bic}'),
-      if (_hasText(payment.bankName)) pw.Text('Bank: ${payment.bankName}'),
+      pw.Text('${l10n.pdfIban}: ${payment.iban}'),
+      if (_hasText(payment.bic)) pw.Text('${l10n.pdfBic}: ${payment.bic}'),
+      if (_hasText(payment.bankName)) pw.Text('${l10n.pdfBank}: ${payment.bankName}'),
       if (_hasText(payment.paymentTerms)) ...[pw.SizedBox(height: 6), _markdownText(payment.paymentTerms!)],
     ],
   );
@@ -273,9 +293,9 @@ pw.Widget _paymentBlock(PdfPaymentBlockSnapshot payment) {
 // Built-in WinAnsi fonts encode the Euro sign as byte 0x80, avoiding a font file dependency.
 const _winAnsiEuro = '\u0080';
 
-String _formatCurrency(num value) => '${_formatDecimal(value)} $_winAnsiEuro';
+String _formatCurrency(num value, String locale) => '${_formatDecimal(value, locale)} $_winAnsiEuro';
 
-String _formatDecimal(num value) {
+String _formatDecimal(num value, String locale) {
   if (!value.isFinite) {
     throw ArgumentError.value(value, 'value', 'Muss endlich sein.');
   }
@@ -285,25 +305,42 @@ String _formatDecimal(num value) {
   final fraction = separator == -1 ? '00' : fixed.substring(separator + 1).padRight(2, '0');
   final isNegative = integerPart.startsWith('-');
   final digits = isNegative ? integerPart.substring(1) : integerPart;
-  final grouped = _groupDigits(digits);
-  return '${isNegative ? '-' : ''}$grouped,$fraction';
+  final bool english = locale.startsWith('en');
+  final grouped = _groupDigits(digits, english ? ',' : '.');
+  return '${isNegative ? '-' : ''}$grouped${english ? '.' : ','}$fraction';
 }
 
-String _groupDigits(String digits) {
+String _groupDigits(String digits, String separator) {
   final result = StringBuffer();
   for (var index = 0; index < digits.length; index++) {
     if (index > 0 && (digits.length - index) % 3 == 0) {
-      result.write('.');
+      result.write(separator);
     }
     result.write(digits[index]);
   }
   return result.toString();
 }
 
-String _formatDate(DateTime date) {
+String _formatDate(DateTime date, String locale) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
+  if (locale.startsWith('en')) {
+    return '$month/$day/${date.year.toString().padLeft(4, '0')}';
+  }
   return '$day.$month.${date.year.toString().padLeft(4, '0')}';
+}
+
+String _documentLabel(PdfDocumentType type, AppLocalizations l10n) {
+  return switch (type) {
+    PdfDocumentType.gutschrift => l10n.pdfCreditNote,
+    PdfDocumentType.rechnung => l10n.pdfInvoice,
+    PdfDocumentType.storno => l10n.pdfStorno,
+    PdfDocumentType.angebot => l10n.pdfQuote,
+    PdfDocumentType.auftrag => l10n.pdfOrder,
+    PdfDocumentType.proforma => l10n.pdfProforma,
+    PdfDocumentType.lieferschein => l10n.pdfDelivery,
+    PdfDocumentType.mahnung => l10n.pdfReminder,
+  };
 }
 
 String? _location(String? postalCode, String? city) {

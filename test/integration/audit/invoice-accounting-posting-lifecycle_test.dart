@@ -46,7 +46,7 @@ void main() {
       final int kundeId = await insertKunde();
       final int rechnungId = await createDraftWithPositions(kundeId: kundeId);
 
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
 
       final rechnung = (await db.executor.runSelect('SELECT * FROM rechnungen WHERE id = ?', <Object?>[
         rechnungId,
@@ -95,7 +95,7 @@ void main() {
         rechnungId,
       ]);
 
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
 
       final journals = await db.executor.runSelect('SELECT * FROM journal WHERE rechnung_id = ?', <Object?>[
         rechnungId,
@@ -134,7 +134,7 @@ void main() {
       )).single['naechste_nummer'];
 
       await expectLater(
-        ds.finalizeRechnung(rechnungId: rechnungId, debugFailAt: 'receivable'),
+        ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId, debugFailAt: 'receivable'),
         throwsA(isA<StateError>().having((e) => e.message, 'message', contains('Induced'))),
       );
 
@@ -166,7 +166,7 @@ void main() {
       expect(afterKreis, beforeKreis, reason: 'sequence must roll back');
 
       // Retry without fault must succeed and create all postings
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       final afterJournals = await db.executor.runSelect('SELECT * FROM journal WHERE rechnung_id = ?', <Object?>[
         rechnungId,
       ]);
@@ -181,7 +181,7 @@ void main() {
       final int kundeId = await insertKunde();
       final int rechnungId = await createDraftWithPositions(kundeId: kundeId);
 
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
 
       final countBeforeJournals = (await db.executor.runSelect(
         'SELECT COUNT(*) as c FROM journal WHERE rechnung_id = ?',
@@ -197,7 +197,7 @@ void main() {
       )).single['c'];
 
       await expectLater(
-        ds.finalizeRechnung(rechnungId: rechnungId),
+        ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId),
         throwsA(isA<StateError>().having((e) => e.message, 'message', contains('bereits finalisiert'))),
       );
 
@@ -226,7 +226,7 @@ void main() {
       final int kundeId = await insertKunde();
       final int rechnungId = await createDraftWithPositions(kundeId: kundeId);
 
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
 
       // Seed storno nummernkreis format
       await db.executor.runCustom("UPDATE nummernkreise SET format = 'ST-{NNN}' WHERE typ = 'stornorechnung'");
@@ -309,7 +309,7 @@ void main() {
     test('test_invoice_accounting_posting_lifecycle_2_3_storno_retry_is_idempotent', () async {
       final int kundeId = await insertKunde();
       final int rechnungId = await createDraftWithPositions(kundeId: kundeId);
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       await db.executor.runCustom("UPDATE nummernkreise SET format = 'ST-{NNN}' WHERE typ = 'stornorechnung'");
 
       final int stornoId = await ds.stornoRechnung(rechnungId: rechnungId, grund: 'Erststorno');

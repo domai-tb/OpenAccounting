@@ -41,7 +41,7 @@ void main() {
       );
 
       // Finalize the invoice
-      await ds.finalizeRechnung(rechnungId: srcId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
 
       // Create credit note (Gutschrift)
       final int gsId = await ds.createGutschrift(vonRechnungId: srcId);
@@ -84,7 +84,7 @@ void main() {
         'UPDATE rechnungen SET netto_betrag = 999.00, ust_betrag = 0.00, brutto_betrag = 999.00 WHERE id = ?',
         <Object?>[srcId],
       );
-      await ds.finalizeRechnung(rechnungId: srcId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
 
       // Create credit note — should recalculate from positions, not copy corrupted header
       final int gsId = await ds.createGutschrift(vonRechnungId: srcId);
@@ -117,7 +117,7 @@ void main() {
         datum: '2025-07-01',
         positionen: [const RechnungPositionItem(bezeichnung: 'Artikel', menge: 1, einzelpreis: 100, gesamt: 100)],
       );
-      await ds.finalizeRechnung(rechnungId: srcId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
 
       // Storno the invoice
       await ds.stornoRechnung(rechnungId: srcId, grund: 'Fehlerhaft');
@@ -139,7 +139,7 @@ void main() {
         datum: '2025-07-01',
         positionen: [const RechnungPositionItem(bezeichnung: 'Artikel', menge: 1, einzelpreis: 100, gesamt: 100)],
       );
-      await ds.finalizeRechnung(rechnungId: srcId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
 
       // Storno
       await ds.stornoRechnung(rechnungId: srcId, grund: 'Fehlerhaft');

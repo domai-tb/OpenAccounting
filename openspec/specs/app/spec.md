@@ -89,7 +89,7 @@ AND the customer list SHALL refetch automatically
 
 ### Requirement: Theme and Language
 
-The application SHALL support Dark, Light, and System-follow theme modes. All user-facing text SHALL be in German using informal "Du"-Ansprache. Theme preferences SHALL persist across sessions.
+The application SHALL support Dark, Light, and System-follow theme modes. All user-facing text SHALL be available in German and English using the active locale, with German as the initial locale. Theme preferences SHALL persist across sessions.
 
 #### Scenario: Theme Mode Switching
 
@@ -117,12 +117,12 @@ GIVEN the user has selected "Dark" as theme mode (not "System")
 WHEN the OS switches from light to dark
 THEN the app theme SHALL remain Dark and not flicker
 
-#### Scenario: German Du-Ansprache Enforcement
+#### Scenario: Active Locale Copy Enforcement
 
 GIVEN any UI text is rendered
 WHEN a label, message, or confirmation is displayed
-THEN it SHALL use "Du" form
-AND no "Sie" form SHALL appear in any user-facing string
+THEN it SHALL come from the active German or English catalog
+AND no unkeyed production literal SHALL appear in a user-facing surface
 
 ### Requirement: Layout Structure
 

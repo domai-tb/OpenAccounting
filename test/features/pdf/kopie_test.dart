@@ -18,7 +18,7 @@ void main() {
       totals: base.totals,
       copyState: PdfCopyState.copy,
     );
-    final pdfBytes = await const PdfGenerator().generate(snapshot);
+    final pdfBytes = await const PdfGenerator().generate(snapshot, locale: 'de_DE');
     final parsed = parsePdf(pdfBytes);
 
     expect(parsed.visibleText, contains('KOPIE'));
@@ -36,7 +36,7 @@ void main() {
       positions: base.positions,
       totals: base.totals,
     );
-    final pdfBytes = await const PdfGenerator().generate(snapshot);
+    final pdfBytes = await const PdfGenerator().generate(snapshot, locale: 'de_DE');
     final parsed = parsePdf(pdfBytes);
 
     expect(parsed.visibleText, isNot(contains('KOPIE')));
@@ -55,7 +55,7 @@ void main() {
       totals: base.totals,
       copyState: PdfCopyState.copy,
     );
-    final pdfBytes = await const PdfGenerator().generate(snapshot);
+    final pdfBytes = await const PdfGenerator().generate(snapshot, locale: 'de_DE');
     final parsed = parsePdf(pdfBytes);
     final source = String.fromCharCodes(pdfBytes);
 

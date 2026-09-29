@@ -48,7 +48,7 @@ void main() {
         ),
       );
 
-      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot));
+      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
       expect(parsedPdf.visibleText, contains('Zahlungsdaten'));
       expect(parsedPdf.visibleText, contains('DE89 3704 0044 0532 0130 00'));
@@ -60,7 +60,7 @@ void main() {
     test('test_failure: Rechnung PDF without payment block omits payment section', () async {
       final snapshot = rechnungSnapshot();
 
-      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot));
+      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
       expect(parsedPdf.visibleText, isNot(contains('Zahlungsdaten')));
       expect(parsedPdf.visibleText, isNot(contains('IBAN')));
@@ -106,7 +106,7 @@ void main() {
         ),
       );
 
-      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot));
+      final parsedPdf = parseUncompressedPdf(await const PdfGenerator().generate(snapshot, locale: 'de_DE'));
 
       expect(parsedPdf.visibleText, contains('Mahnung'));
       expect(parsedPdf.visibleText, contains('MA-2026-001'));

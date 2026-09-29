@@ -7,6 +7,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/localization.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
@@ -92,6 +94,8 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
 
   AppDatabase get _db => ref.read(appDatabaseProvider);
 
+  AppLocalizations get _l10n => appLocalizationsOf(context);
+
   BankImportService get _service => widget.service ?? ref.read(bankImportServiceProvider);
 
   @override
@@ -125,7 +129,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       templates = await _service.loadTemplates();
     } catch (error, stackTrace) {
       debugPrint('bank_import templates failed: $error\n$stackTrace');
-      dataError = 'Bank-Templates konnten nicht geladen werden.';
+      dataError = _l10n.dataLoadError;
     }
 
     try {
@@ -135,7 +139,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       );
     } catch (error, stackTrace) {
       debugPrint('bank_import accounts failed: $error\n$stackTrace');
-      dataError = 'Bankkonten konnten nicht geladen werden. Prüfe die Datenbank und versuche es erneut.';
+      dataError = _l10n.dataLoadError;
     }
 
     try {
@@ -253,7 +257,7 @@ LIMIT 100
   Future<void> _loadFileFromPath() async {
     final String path = _pathController.text.trim();
     if (path.isEmpty) {
-      _showError('Gib einen Dateipfad ein oder füge CSV-Daten ein.');
+      _showError(_l10n.setupRequired);
       return;
     }
 
@@ -316,7 +320,7 @@ LIMIT 100
       _outcome = null;
       _isBusy = false;
       _errorMessage = null;
-      _noticeMessage = 'Datei bereit. Wähle das passende Template und öffne danach die Vorschau.';
+      _noticeMessage = _l10n.setupIbanHint;
     });
   }
 
@@ -354,7 +358,7 @@ LIMIT 100
     controller.dispose();
     if (!mounted || content == null) return;
     if (content.trim().isEmpty) {
-      _showError('Es wurden keine CSV-Daten eingefügt.');
+      _showError(_l10n.emptyResults);
       return;
     }
     await _acceptFile('eingefügter-import.csv', utf8.encode(content));
@@ -364,11 +368,11 @@ LIMIT 100
     final List<int>? bytes = _fileBytes;
     final String? fileName = _fileName;
     if (bytes == null || fileName == null) {
-      _showError('Lade zuerst eine CSV- oder CAMT.053-Datei.');
+      _showError(_l10n.setupRequired);
       return;
     }
     if (!_isCamtFile(fileName) && _selectedTemplate == null) {
-      _showError('Wähle vor der Vorschau ein Bank-Template aus.');
+      _showError(_l10n.setupRequired);
       return;
     }
 
@@ -398,7 +402,7 @@ LIMIT 100
         _stage = _BankImportStage.review;
         _isBusy = false;
         _errorMessage = null;
-        _noticeMessage = 'Vorschau geöffnet. Noch keine Transaktion wurde gespeichert.';
+        _noticeMessage = _l10n.setupSaved;
       });
     } on BankImportException catch (error) {
       await _rejectInput(fileName, error.message, recoveryAction: error.recoveryAction);
@@ -410,11 +414,11 @@ LIMIT 100
   Future<void> _confirmImport() async {
     final int selectedCount = _rows.where((_EditableBankRow row) => row.included).length;
     if (selectedCount == 0) {
-      _showError('Wähle mindestens eine Zeile für den Import aus.');
+      _showError(_l10n.setupRequired);
       return;
     }
     if (_selectedAccountId == null) {
-      _showError('Wähle ein Bankkonto aus, bevor du importierst.');
+      _showError(_l10n.setupRequired);
       return;
     }
 
@@ -462,7 +466,7 @@ LIMIT 100
     setState(() {
       _isBusy = true;
       _errorMessage = null;
-      _noticeMessage = 'Import wird verarbeitet …';
+      _noticeMessage = _l10n.setupSaving;
     });
 
     try {
@@ -714,7 +718,7 @@ LIMIT 100
             child: OutlinedButton.icon(
               onPressed: _isBusy ? null : () => unawaited(_retryPageData()),
               icon: const Icon(Icons.refresh),
-              label: const Text('Daten erneut laden'),
+              label: Text(_l10n.actionRetry),
             ),
           )
         else if (_errorMessage != null)
@@ -723,7 +727,7 @@ LIMIT 100
             child: OutlinedButton.icon(
               onPressed: _isBusy ? null : _startOver,
               icon: const Icon(Icons.refresh),
-              label: const Text('Erneut versuchen'),
+              label: Text(_l10n.actionRetry),
             ),
           ),
         if (_noticeMessage != null) _buildMessage(_noticeMessage!, isError: false),
@@ -764,13 +768,13 @@ LIMIT 100
                 FilledButton.icon(
                   onPressed: _isBusy ? null : () => unawaited(_pickFile()),
                   icon: const Icon(Icons.file_open),
-                  label: const Text('Datei auswählen'),
+                  label: Text(_l10n.actionContinue),
                 ),
                 // ponytail: native picker via file_selector, manual path fallback keeps headless/test path
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : () => unawaited(_pasteCsv()),
                   icon: const Icon(Icons.content_paste),
-                  label: const Text('CSV einfügen'),
+                  label: Text(_l10n.actionContinue),
                 ),
               ],
             ),
@@ -818,7 +822,7 @@ LIMIT 100
               child: FilledButton.icon(
                 onPressed: _isBusy || _fileBytes == null ? null : () => unawaited(_parseLoadedFile()),
                 icon: const Icon(Icons.preview),
-                label: const Text('Vorschau'),
+                label: Text(_l10n.pdfInvoice),
               ),
             ),
           ],
@@ -850,7 +854,7 @@ LIMIT 100
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : _startOver,
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('Andere Datei'),
+                  label: Text(_l10n.actionBack),
                 ),
               ],
             ),
@@ -889,7 +893,7 @@ LIMIT 100
 
   Widget _buildReviewTable() {
     if (_rows.isEmpty) {
-      return const Text('Keine Zeilen zur Prüfung vorhanden.');
+      return Text(_l10n.emptyResults);
     }
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 520),
@@ -973,15 +977,15 @@ LIMIT 100
 
   Widget _buildCategoryDropdown(_EditableBankRow row) {
     if (_categories.isEmpty) {
-      return const Text('Keine Kategorien');
+      return Text(_l10n.emptyResults);
     }
     final int selectedValue = row.categoryId ?? 0;
     return DropdownButton<int>(
       value: selectedValue,
       isDense: true,
-      hint: const Text('Manuell prüfen'),
+      hint: Text(_l10n.actionRetry),
       items: <DropdownMenuItem<int>>[
-        const DropdownMenuItem<int>(value: 0, child: Text('Manuell prüfen')),
+        DropdownMenuItem<int>(value: 0, child: Text(_l10n.actionRetry)),
         ..._categories.map(
           (_BankCategoryOption category) => DropdownMenuItem<int>(
             value: category.id,
@@ -1051,7 +1055,7 @@ LIMIT 100
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : _startOver,
                   icon: const Icon(Icons.add),
-                  label: const Text('Neuen Import starten'),
+                  label: Text(_l10n.actionContinue),
                 ),
                 FilledButton.icon(
                   onPressed: _isBusy
@@ -1061,7 +1065,7 @@ LIMIT 100
                           _historyError = null;
                         }),
                   icon: const Icon(Icons.history),
-                  label: const Text('Zum Importverlauf'),
+                  label: Text(_l10n.actionBack),
                 ),
               ],
             ),
@@ -1128,7 +1132,7 @@ LIMIT 100
             if (_historyLoading)
               const Center(child: CircularProgressIndicator())
             else if (_history.isEmpty)
-              const Text('Noch keine Importe vorhanden.')
+              Text(_l10n.emptyEntries)
             else
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -1254,7 +1258,7 @@ LIMIT 100
       initialValue: _accounts.any((_BankAccountOption account) => account.id == _selectedAccountId)
           ? _selectedAccountId
           : null,
-      decoration: const InputDecoration(labelText: 'Bankkonto'),
+      decoration: InputDecoration(labelText: _l10n.pdfBank),
       items: _accounts
           .map(
             (_BankAccountOption account) => DropdownMenuItem<int>(
@@ -1285,8 +1289,8 @@ LIMIT 100
       isExpanded: true,
       key: ValueKey<String?>(selectedTemplate?.typ),
       initialValue: selectedTemplate,
-      decoration: const InputDecoration(labelText: 'Bank-Template'),
-      hint: const Text('Template auswählen'),
+      decoration: InputDecoration(labelText: _l10n.pdfBank),
+      hint: Text(_l10n.actionContinue),
       items: _templates
           .map(
             (BankTemplate template) => DropdownMenuItem<BankTemplate>(
@@ -1385,7 +1389,7 @@ LIMIT 100
     return AppPage(
       maxWidth: 1400,
       header: AppPageHeader(
-        title: 'Bank & Zahlungen',
+        title: _l10n.sidebarBanking,
         subtitle: _view == _BankImportView.history
             ? 'Nachvollziehbarer Importverlauf'
             : 'Dateiimport mit Prüfung vor dem Speichern',
@@ -1398,7 +1402,7 @@ LIMIT 100
                     _view = _view == _BankImportView.import ? _BankImportView.history : _BankImportView.import;
                   }),
             icon: Icon(_view == _BankImportView.import ? Icons.history : Icons.file_upload),
-            label: Text(_view == _BankImportView.import ? 'Verlauf' : 'Importieren'),
+            label: Text(_view == _BankImportView.import ? _l10n.emptyEntries : _l10n.actionContinue),
           ),
         ],
       ),

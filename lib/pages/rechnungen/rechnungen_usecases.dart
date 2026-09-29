@@ -69,16 +69,16 @@ class RechnungenUseCases {
     );
   }
 
-  Future<RechnungItem> finalizeRechnung({required int rechnungId}) {
-    return _finalize(rechnungId);
+  Future<RechnungItem> finalizeRechnung({required int rechnungId, required String locale}) {
+    return _finalize(rechnungId, locale);
   }
 
-  Future<RechnungItem> _finalize(int rechnungId) async {
+  Future<RechnungItem> _finalize(int rechnungId, String locale) async {
     final RechnungItem? existing = await repository.findById(rechnungId);
     if (existing != null && !existing.istEntwurf) {
       throw StateError('Dokument ist bereits finalisiert');
     }
-    return repository.finalizeRechnung(rechnungId: rechnungId);
+    return repository.finalizeRechnung(rechnungId: rechnungId, locale: locale);
   }
 
   Future<RechnungItem?> findById(int id) {

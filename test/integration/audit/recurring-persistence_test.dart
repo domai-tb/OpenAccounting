@@ -128,7 +128,7 @@ void main() {
 
       // Finalization must recalculate from positions — not zero out.
       final RechnungenDataSource ds = RechnungenDataSource(db.executor);
-      await ds.finalizeRechnung(rechnungId: rechnungId);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       final List<Map<String, Object?>> after = await db.executor.runSelect(
         'SELECT netto_betrag, ust_betrag, brutto_betrag, typ, status, ist_entwurf FROM rechnungen WHERE id = ?',
         <Object?>[rechnungId],
@@ -202,7 +202,7 @@ void main() {
       );
       expect((hdr.single['brutto_betrag'] as num) > 0, isTrue);
       final RechnungenDataSource ds = RechnungenDataSource(db.executor);
-      await ds.finalizeRechnung(rechnungId: ids.single);
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: ids.single);
       final List<Map<String, Object?>> after = await db.executor.runSelect(
         'SELECT brutto_betrag FROM rechnungen WHERE id = ?',
         <Object?>[ids.single],

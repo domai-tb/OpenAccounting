@@ -20,19 +20,29 @@ abstract final class AppTypography {
     return b.copyWith(fontFamily: 'Inter', fontFeatures: tabularFeatures);
   }
 
-  /// Short date de-DE: 30.08.2026 — no locale assumption in caller.
-  static String formatDate(DateTime date, {String locale = 'de_DE'}) {
-    return DateFormat('dd.MM.yyyy', locale).format(date);
+  static String _requireLocale(String? locale) {
+    final String? value = locale?.trim();
+    if (value == null || value.isEmpty) {
+      throw ArgumentError('An explicit locale is required for pure formatting helpers.');
+    }
+    return value;
   }
 
-  /// Long date de-DE: 30. August 2026.
-  static String formatDateLong(DateTime date, {String locale = 'de_DE'}) {
-    return DateFormat('d. MMMM yyyy', locale).format(date);
+  static String formatDate(DateTime date, {String? locale}) {
+    final String resolved = _requireLocale(locale);
+    return DateFormat(resolved.startsWith('en') ? 'MM/dd/yyyy' : 'dd.MM.yyyy', resolved).format(date);
   }
 
-  /// Convenience for tests — mirrors app_money format.
-  static String formatMoney(num value, {String locale = 'de_DE', String symbol = '€'}) {
-    final NumberFormat fmt = NumberFormat.currency(locale: locale, symbol: symbol, decimalDigits: 2);
-    return fmt.format(value);
+  static String formatDateLong(DateTime date, {String? locale}) {
+    final String resolved = _requireLocale(locale);
+    return DateFormat(resolved.startsWith('en') ? 'MMMM d, yyyy' : 'd. MMMM yyyy', resolved).format(date);
+  }
+
+  static String formatMoney(num value, {String? locale, String symbol = '€'}) {
+    final NumberFormat fmt = NumberFormat.decimalPattern(_requireLocale(locale))
+      ..minimumFractionDigits = 2
+      ..maximumFractionDigits = 2;
+    final String number = fmt.format(value);
+    return symbol.isEmpty ? number : '$number $symbol';
   }
 }

@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 
 /// Provider für WizardService — DB via appDatabaseProvider.
 final wizardServiceProvider = Provider<WizardService>((ref) {
@@ -136,7 +138,8 @@ class _WizardPageState extends State<WizardPage> {
         if (router != null) {
           router.go('/');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup abgeschlossen')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).setupComplete)));
         }
       }
     } on SetupException catch (e) {
@@ -145,7 +148,8 @@ class _WizardPageState extends State<WizardPage> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Setup fehlgeschlagen: $error')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('${appLocalizationsOf(context).setupDatabaseError}: $error')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -162,7 +166,7 @@ class _WizardPageState extends State<WizardPage> {
         if (router != null) {
           router.go('/');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Setup übersprungen')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).actionSkip)));
         }
       }
     } on SetupException catch (e) {
@@ -172,7 +176,7 @@ class _WizardPageState extends State<WizardPage> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Setup überspringen fehlgeschlagen: $error')));
+            .showSnackBar(SnackBar(content: Text('${appLocalizationsOf(context).setupDatabaseError}: $error')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -186,21 +190,22 @@ class _WizardPageState extends State<WizardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final int stepIndex = WizardStep.values.indexOf(_step);
     return AppPage(
-      header: const AppPageHeader(title: 'Setup Wizard'),
+      header: AppPageHeader(title: l10n.setupTitle),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Semantics(
-              label: 'Setup-Fortschritt',
-              value: 'Schritt ${stepIndex + 1} von ${WizardStep.values.length}',
+              label: l10n.setupStep,
+              value: '${l10n.setupStep} ${stepIndex + 1} / ${WizardStep.values.length}',
               child: LinearProgressIndicator(value: (stepIndex + 1) / WizardStep.values.length),
             ),
             const SizedBox(height: 12),
             Text(
-              'Schritt ${stepIndex + 1} von ${WizardStep.values.length}',
+              '${l10n.setupStep} ${stepIndex + 1} / ${WizardStep.values.length}',
               style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: 8),
@@ -216,7 +221,7 @@ class _WizardPageState extends State<WizardPage> {
                         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                       ),
                       child: Text(
-                        s.label,
+                        _localizedStepLabel(l10n, s),
                         textAlign: TextAlign.center,
                         style: TextStyle(fontWeight: s == _step ? FontWeight.w600 : FontWeight.w400, fontSize: 13),
                       ),
@@ -225,18 +230,22 @@ class _WizardPageState extends State<WizardPage> {
               ],
             ),
             const SizedBox(height: 24),
-            _buildStepContent(),
+            _buildStepContent(l10n),
             const SizedBox(height: 24),
             Row(
               children: <Widget>[
                 if (_step != WizardStep.stammdaten)
-                  OutlinedButton(onPressed: _busy ? null : _handleZurueck, child: const Text('Zurück')),
+                  OutlinedButton(onPressed: _busy ? null : _handleZurueck, child: Text(l10n.actionBack)),
                 const Spacer(),
-                TextButton(onPressed: _busy ? null : _skip, child: const Text('Überspringen')),
+                TextButton(onPressed: _busy ? null : _skip, child: Text(l10n.actionSkip)),
                 const SizedBox(width: 12),
                 FilledButton(
                   onPressed: _busy ? null : _handleWeiter,
-                  child: Text(_busy ? 'Wird gespeichert …' : (_step == WizardStep.abschluss ? 'Fertig' : 'Weiter')),
+                  child: Text(
+                    _busy
+                        ? l10n.setupSaving
+                        : (_step == WizardStep.abschluss ? l10n.setupComplete : l10n.actionContinue),
+                  ),
                 ),
               ],
             ),
@@ -246,18 +255,18 @@ class _WizardPageState extends State<WizardPage> {
     );
   }
 
-  Widget _buildStepContent() {
+  Widget _buildStepContent(AppLocalizations l10n) {
     switch (_step) {
       case WizardStep.stammdaten:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text('Stammdaten', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.setupCompanyName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextField(
               controller: _nameCtrl,
               decoration: InputDecoration(
-                labelText: 'Firmenname *',
+                labelText: '${l10n.setupCompanyName} *',
                 errorText: _nameError,
                 border: const OutlineInputBorder(),
               ),
@@ -265,7 +274,7 @@ class _WizardPageState extends State<WizardPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _strasseCtrl,
-              decoration: const InputDecoration(labelText: 'Straße', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l10n.setupCompanyNameHint, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             Row(
@@ -273,7 +282,7 @@ class _WizardPageState extends State<WizardPage> {
                 Expanded(
                   child: TextField(
                     controller: _plzCtrl,
-                    decoration: const InputDecoration(labelText: 'PLZ', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l10n.pdfCustomerNumber, border: const OutlineInputBorder()),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -281,7 +290,7 @@ class _WizardPageState extends State<WizardPage> {
                   flex: 2,
                   child: TextField(
                     controller: _ortCtrl,
-                    decoration: const InputDecoration(labelText: 'Ort', border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: l10n.pdfTo, border: const OutlineInputBorder()),
                   ),
                 ),
               ],
@@ -292,12 +301,12 @@ class _WizardPageState extends State<WizardPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text('Konten', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.sidebarBanking, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             TextField(
               controller: _ibanCtrl,
               decoration: InputDecoration(
-                labelText: 'IBAN *',
+                labelText: '${l10n.setupIban} *',
                 errorText: _ibanError,
                 border: const OutlineInputBorder(),
                 hintText: 'DE89 3704 0044 0532 0130 00',
@@ -306,13 +315,13 @@ class _WizardPageState extends State<WizardPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _bicCtrl,
-              decoration: const InputDecoration(labelText: 'BIC', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l10n.pdfBic, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _kasseCtrl,
               decoration: InputDecoration(
-                labelText: 'Kassenbestand (EUR)',
+                labelText: l10n.setupCashBalance,
                 errorText: _kasseError,
                 border: const OutlineInputBorder(),
                 hintText: '0.00',
@@ -325,7 +334,7 @@ class _WizardPageState extends State<WizardPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text('Kategorien', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.setupCategories, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -333,7 +342,7 @@ class _WizardPageState extends State<WizardPage> {
               children: <Widget>[
                 for (int i = 1; i <= 6; i++)
                   FilterChip(
-                    label: Text('Kategorie $i'),
+                    label: Text('${l10n.setupCategories} $i'),
                     selected: _selectedKategorien.contains(i),
                     onSelected: (bool v) {
                       setState(() {
@@ -361,7 +370,7 @@ class _WizardPageState extends State<WizardPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const Text('Abschluss', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.setupComplete, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Card(
               child: Padding(
@@ -369,16 +378,18 @@ class _WizardPageState extends State<WizardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('Firma: ${_nameCtrl.text.isEmpty ? "Meine Firma" : _nameCtrl.text}'),
-                    Text('IBAN: ${_maskedIban(_ibanCtrl.text)}'),
-                    Text('Kassenbestand: ${_kasseCtrl.text} €'),
-                    Text('Kategorien: ${_selectedKategorien.join(", ")}'),
+                    Text(
+                      '${l10n.setupCompanyName}: ${_nameCtrl.text.isEmpty ? l10n.setupCompanyName : _nameCtrl.text}',
+                    ),
+                    Text('${l10n.setupIban}: ${_maskedIban(_ibanCtrl.text)}'),
+                    Text('${l10n.setupCashBalance}: ${_kasseCtrl.text} €'),
+                    Text('${l10n.setupCategories}: ${_selectedKategorien.join(", ")}'),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Text('Prüfe deine Angaben und klicke auf Fertig.'),
+            Text(l10n.setupRequired),
           ],
         );
     }
@@ -390,6 +401,15 @@ class _WizardPageState extends State<WizardPage> {
     final String compact = value.replaceAll(RegExp(r'\s+'), '');
     if (compact.length <= 4) return '••••';
     return '•••• •••• •••• •••• ${compact.substring(compact.length - 4)}';
+  }
+
+  String _localizedStepLabel(AppLocalizations l10n, WizardStep step) {
+    return switch (step) {
+      WizardStep.stammdaten => l10n.setupCompanyName,
+      WizardStep.konten => l10n.sidebarBanking,
+      WizardStep.kategorien => l10n.setupCategories,
+      WizardStep.abschluss => l10n.setupComplete,
+    };
   }
 }
 
@@ -407,13 +427,17 @@ class ProfileSelectionWidget extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(restartRequired ? 'Profil gespeichert. Bitte neu starten.' : 'Profil ist bereits aktiv.'),
+          content: Text(
+            restartRequired
+                ? appLocalizationsOf(context).setupSaved
+                : appLocalizationsOf(context).workspaceLocalProfile,
+          ),
         ),
       );
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Profil konnte nicht gewählt werden: $error')));
+            .showSnackBar(SnackBar(content: Text('${appLocalizationsOf(context).loadError}: $error')));
       }
     }
   }
@@ -422,7 +446,7 @@ class ProfileSelectionWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final String? effectiveLast = lastUsed;
     return Scaffold(
-      appBar: AppBar(title: const Text(profileSelectionTitle)),
+      appBar: AppBar(title: Text(appLocalizationsOf(context).settingsProfiles)),
       body: ListView.builder(
         itemCount: profiles.length,
         itemBuilder: (BuildContext context, int i) {
@@ -430,7 +454,7 @@ class ProfileSelectionWidget extends StatelessWidget {
           final bool isLast = name == effectiveLast;
           return ListTile(
             title: Text(name),
-            subtitle: isLast ? const Text(lastUsedLabel) : null,
+            subtitle: isLast ? Text(appLocalizationsOf(context).setupSaved) : null,
             selected: isLast,
             selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
             onTap: onSelected == null ? () => unawaited(_selectProfile(context, name)) : () => onSelected!(name),

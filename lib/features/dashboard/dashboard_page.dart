@@ -6,15 +6,15 @@ import 'package:go_router/go_router.dart';
 
 import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
-String _dashboardLoadError(BuildContext context) =>
-    AppLocalizations.of(context)?.backendUnreachable ??
-    'Fehler beim Laden'; // ponytail: 1 key reused, add dashboard.* keys when full i18n needed
+String _dashboardLoadError(BuildContext context) => appLocalizationsOf(context)
+    .backendUnreachable; // ponytail: 1 key reused, add dashboard.* keys when full i18n needed
 
 String _dashboardErrorMessage(BuildContext context, String area, Object error, StackTrace stackTrace) {
   debugPrint('dashboard $area failed: $error\n$stackTrace');
@@ -45,22 +45,25 @@ class DashboardPageImpl extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cfgAsync = ref.watch(dashboardConfigProvider);
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return Scaffold(
       appBar: AppPageHeader(
-        title:
-            AppLocalizations.of(context)?.sidebarOverview ??
-            'Übersicht', // ponytail: reuses sidebarOverview, add dedicated dashboardTitle when needed
+        title: l10n.dashboardTitle, // ponytail: reuses sidebarOverview, add dedicated dashboardTitle when needed
         showFilterToolbar: false,
         actions: <Widget>[
           FilledButton.icon(
             onPressed: () => context.go('/invoices/new'),
             icon: const Icon(Icons.add),
-            label: const Text('Neue Rechnung'),
+            label: Text(l10n.actionNewInvoice),
           ),
-          IconButton(icon: const Icon(Icons.tune), tooltip: 'Anpassen', onPressed: () => _showConfig(context)),
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: l10n.settingsAppearance,
+            onPressed: () => _showConfig(context),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Aktualisieren',
+            tooltip: l10n.actionRefresh,
             onPressed: () => ref.invalidate(dashboardConfigProvider),
           ),
         ],
@@ -146,7 +149,7 @@ class _DashboardConfigSheet extends ConsumerWidget {
                     },
                     itemBuilder: (BuildContext context, int index) {
                       final String id = order[index];
-                      final String title = dashboardWidgetTitles[id] ?? id;
+                      final String title = _dashboardTitle(id, appLocalizationsOf(context));
                       final bool visible = cfg.visibility[id] ?? true;
                       return SwitchListTile(
                         key: ValueKey<String>(id),
@@ -181,7 +184,7 @@ class _WidgetCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<WidgetData?> dataAsync = ref.watch(dashboardWidgetDataProvider(id));
-    final String title = dashboardWidgetTitles[id] ?? id;
+    final String title = _dashboardTitle(id, appLocalizationsOf(context));
     final IconData? icon = dashboardWidgetIcons[id];
     final String? route = dashboardWidgetRoutes[id];
     final bool inventoryUnavailable = id == 'lagerwarnung' || id == 'lagerbestand';
@@ -199,8 +202,8 @@ class _WidgetCard extends ConsumerWidget {
           return DashboardCard(
             title: title,
             icon: icon,
-            emptyMessage: 'Noch nicht verfügbar',
-            subtitle: 'Noch nicht verfügbar',
+            emptyMessage: appLocalizationsOf(context).dashboardInventoryUnavailable,
+            subtitle: appLocalizationsOf(context).dashboardInventoryUnavailable,
           );
         }
         if (data == null) return const SizedBox.shrink();
@@ -226,7 +229,10 @@ class _WidgetCard extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('${d.count ?? 0} Rechnungen', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(
+              '${d.count ?? 0} ${appLocalizationsOf(context).countInvoices}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 4),
             MoneyText(_parseDashboardMoney(d.sum), textAlign: TextAlign.left, obscured: privacyMode),
           ],
@@ -248,7 +254,7 @@ class _WidgetCard extends ConsumerWidget {
         );
       case 'quick_links':
         final List<QuickLink>? links = d.raw as List<QuickLink>?;
-        if (links == null || links.isEmpty) return const Text('Keine Links');
+        if (links == null || links.isEmpty) return Text(appLocalizationsOf(context).emptyResults);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[for (final QuickLink l in links) _QuickLinkRow(link: l)],
@@ -258,7 +264,7 @@ class _WidgetCard extends ConsumerWidget {
       default:
         final List<dynamic>? list = d.raw as List?;
         if (list == null || list.isEmpty) return const SizedBox.shrink();
-        return Text('${d.count} Einträge');
+        return Text('${d.count} ${appLocalizationsOf(context).countRecords}');
     }
   }
 
@@ -320,6 +326,21 @@ class _QuickLinkRow extends StatelessWidget {
   }
 }
 
+String _dashboardTitle(String id, AppLocalizations l10n) {
+  return switch (id) {
+    'offene_rechnungen' || 'ueberfaellige_rechnungen' || 'offene_verbindlichkeiten' => l10n.sidebarInvoices,
+    'zahlungseingaenge' => l10n.sidebarBanking,
+    'lagerwarnung' || 'lagerbestand' => l10n.dashboardInventory,
+    'mahnung_warnung' => l10n.pdfReminder,
+    'fristen' || 'ustva_frist' => l10n.sidebarTaxes,
+    'quick_links' => l10n.actionBackOverview,
+    'einnahmen_ausgaben' => l10n.sidebarReports,
+    'kontostand' => l10n.sidebarBanking,
+    'aktivitaets_log' => l10n.sidebarReports,
+    _ => id,
+  };
+}
+
 num _parseDashboardMoney(String? raw) {
   final String value = raw?.trim().replaceAll('€', '').replaceAll('\u00A0', '').trim() ?? '';
   if (value.isEmpty) {
@@ -372,7 +393,7 @@ class _DashboardErrorState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Erneut versuchen'),
+              label: Text(appLocalizationsOf(context).actionRetry),
             ),
           ],
         ),
