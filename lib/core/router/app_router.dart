@@ -11,6 +11,7 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
@@ -233,6 +234,8 @@ GoRouter createRouter(AppDatabase db) {
     errorBuilder: (context, state) => const NotFoundPage(),
   );
 }
+
+final profileManagerProvider = Provider<ProfileManager>((ref) => ProfileManager());
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -653,20 +656,37 @@ class _SettingsContent extends ConsumerStatefulWidget {
   ConsumerState<_SettingsContent> createState() => _SettingsContentState();
 }
 
+const Duration _profileLoadTimeout = Duration(seconds: 2);
+
 class _SettingsContentState extends ConsumerState<_SettingsContent> {
-  final ProfileManager _profileManager = ProfileManager();
-  late Future<_ProfileSnapshot> _profiles = _loadProfiles();
+  late ProfileManager _profileManager;
+  late Future<_ProfileSnapshot> _profiles;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileManager = ref.read(profileManagerProvider);
+    _profiles = _loadProfiles();
+  }
 
   Future<_ProfileSnapshot> _loadProfiles() async {
-    final String active = await _profileManager.getActiveProfile();
-    final List<String> profiles = await _profileManager.listProfiles();
+    final List<dynamic> results = await Future.wait<dynamic>(<Future<dynamic>>[
+      _profileManager.getActiveProfile(),
+      _profileManager.listProfiles(),
+    ]).timeout(_profileLoadTimeout);
+    final String active = results[0] as String;
+    final List<String> profiles = (results[1] as List).cast<String>();
     if (profiles.contains(active)) {
       return _ProfileSnapshot(active: active, profiles: profiles);
     }
     return _ProfileSnapshot(active: active, profiles: <String>[active, ...profiles]);
   }
 
-  void _reloadProfiles() => setState(() => _profiles = _loadProfiles());
+  void _reloadProfiles() {
+    setState(() {
+      _profiles = _loadProfiles();
+    });
+  }
 
   Future<void> _selectProfile(String name) async {
     try {
@@ -791,7 +811,15 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
                 return const LinearProgressIndicator();
               }
               if (snapshot.hasError) {
-                return Text('Profile konnten nicht geladen werden: ${snapshot.error}');
+                final AppLocalizations? localizations = AppLocalizations.of(context);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(localizations?.profileLoadError ?? 'Profile konnten nicht geladen werden'),
+                    const SizedBox(height: 8),
+                    FilledButton(onPressed: _reloadProfiles, child: Text(localizations?.retry ?? 'Erneut versuchen')),
+                  ],
+                );
               }
               final _ProfileSnapshot value = snapshot.data!;
               return RadioGroup<String>(

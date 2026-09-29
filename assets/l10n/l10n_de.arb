@@ -27,6 +27,7 @@
   "close": "Schließen",
   "backendUnreachable": "Backend nicht erreichbar",
   "retry": "Erneut versuchen",
+  "profileLoadError": "Profile konnten nicht geladen werden",
   "notFound": "Nicht gefunden",
   "invoiceNotFound": "Rechnung nicht gefunden",
   "setupTitle": "Deine Buchhaltung. Lokal auf deinem Gerät.",

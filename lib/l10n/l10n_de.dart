@@ -91,6 +91,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get retry => 'Erneut versuchen';
 
   @override
+  String get profileLoadError => 'Profile konnten nicht geladen werden';
+
+  @override
   String get notFound => 'Nicht gefunden';
 
   @override

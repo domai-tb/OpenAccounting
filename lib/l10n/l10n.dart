@@ -254,6 +254,12 @@ abstract class AppLocalizations {
   /// **'Erneut versuchen'**
   String get retry;
 
+  /// No description provided for @profileLoadError.
+  ///
+  /// In de, this message translates to:
+  /// **'Profile konnten nicht geladen werden'**
+  String get profileLoadError;
+
   /// No description provided for @notFound.
   ///
   /// In de, this message translates to:

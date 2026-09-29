@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/router/app_router.dart';
@@ -42,7 +41,7 @@ Future<void> _openSettings({
   required GoRouter router,
   required AppDatabase db,
   required ProfileManager manager,
-  Locale locale = const Locale('de'),
+  required Locale locale,
 }) async {
   await tester.pumpWidget(_wrapRoute(router: router, db: db, manager: manager, locale: locale));
   router.go('/settings');
@@ -56,7 +55,7 @@ void main() {
     final router = createRouter(db);
     addTearDown(db.close);
 
-    await _openSettings(tester: tester, router: router, db: db, manager: manager);
+    await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
     await tester.pump();
 
     expect(router.state.matchedLocation, '/settings');
@@ -65,7 +64,7 @@ void main() {
     expect(find.text('__settings_injected_profile__'), findsOneWidget);
     expect(manager.activeProfileCalls, 1);
     expect(manager.listProfilesCalls, 1);
-    expect(() => manager.assertUsed(), returnsNormally);
+    expect(manager.assertUsed, returnsNormally);
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
@@ -75,12 +74,8 @@ void main() {
     final router = createRouter(db);
     addTearDown(db.close);
 
-    await _openSettings(tester: tester, router: router, db: db, manager: manager);
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
+    await tester.pumpAndSettle();
 
     expect(router.state.matchedLocation, '/settings');
     expect(find.byType(AppShell), findsOneWidget);
@@ -100,12 +95,8 @@ void main() {
     final router = createRouter(db);
     addTearDown(db.close);
 
-    await _openSettings(tester: tester, router: router, db: db, manager: manager);
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
+    await tester.pumpAndSettle();
 
     expect(router.state.matchedLocation, '/settings');
     expect(find.byType(AppShell), findsOneWidget);
@@ -116,11 +107,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
 
     await tester.tap(find.text('Erneut versuchen'));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await tester.pumpAndSettle();
 
     expect(find.text('Profile konnten nicht geladen werden'), findsNothing);
     expect(find.text('Erneut versuchen'), findsNothing);
@@ -137,12 +124,8 @@ void main() {
     final router = createRouter(db);
     addTearDown(db.close);
 
-    await _openSettings(tester: tester, router: router, db: db, manager: manager);
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Profile konnten nicht geladen werden'), findsOneWidget);
     expect(find.text('Erneut versuchen'), findsOneWidget);
@@ -150,11 +133,7 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
 
     await tester.tap(find.text('Erneut versuchen'));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await tester.pumpAndSettle();
 
     expect(find.text('Profile konnten nicht geladen werden'), findsOneWidget);
     expect(find.text('Erneut versuchen'), findsOneWidget);
@@ -174,11 +153,7 @@ void main() {
     addTearDown(db.close);
 
     await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('de'));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await tester.pumpAndSettle();
 
     expect(router.state.matchedLocation, '/settings');
     expect(find.byType(AppShell), findsOneWidget);
@@ -200,11 +175,7 @@ void main() {
     addTearDown(db.close);
 
     await _openSettings(tester: tester, router: router, db: db, manager: manager, locale: const Locale('en'));
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(milliseconds: 250),
-    );
+    await tester.pumpAndSettle();
 
     expect(router.state.matchedLocation, '/settings');
     expect(find.byType(AppShell), findsOneWidget);
