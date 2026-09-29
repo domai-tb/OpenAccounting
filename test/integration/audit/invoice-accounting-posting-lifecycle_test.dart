@@ -62,6 +62,7 @@ void main() {
       expect(journals.single['beleg_typ'], 'Einnahme');
       expect(double.parse(journals.single['betrag'].toString()), closeTo(119.0, 0.001));
       expect(journals.single['gruppe_id'], journals.single['id']);
+      expect(journals.single['immutable'], 1, reason: 'finalized invoice journal must be GoBD immutable');
 
       final forderungen = await db.executor.runSelect('SELECT * FROM forderungen WHERE rechnung_id = ?', <Object?>[
         rechnungId,
@@ -281,6 +282,7 @@ void main() {
       expect(double.parse(reversalJournals.single['betrag'].toString()), closeTo(-originalBetrag, 0.001));
       expect(reversalJournals.single['beleg_typ'], journalBefore.single['beleg_typ']);
       expect(reversalJournals.single['gruppe_id'], reversalJournals.single['id']);
+      expect(reversalJournals.single['immutable'], 1, reason: 'storno journal must be GoBD immutable');
 
       final reversalForderungen = await db.executor.runSelect(
         'SELECT * FROM forderungen WHERE rechnung_id = ?',

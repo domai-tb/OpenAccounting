@@ -162,8 +162,8 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchUeberfaelligeRechnungen() async {
     final rows = await executor.runSelect(
       "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-      "FROM rechnungen WHERE status != 'bezahlt' AND faelligkeit IS NOT NULL "
-      "AND date(faelligkeit) < date('now')",
+      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'rechnung' AND ist_entwurf = 0 "
+      "AND faelligkeit IS NOT NULL AND date(faelligkeit) < date('now')",
       const <Object?>[],
     );
     final c = (rows.first['c'] as num?)?.toInt() ?? 0;
@@ -228,8 +228,10 @@ class DashboardRepository {
 
   Future<Map<String, Object?>> fetchEinnahmenAusgaben() async {
     final rows = await executor.runSelect(
-      "SELECT COALESCE(SUM(CASE WHEN beleg_typ = 'Einnahme' THEN ABS(betrag) ELSE 0 END),0) as ein, "
-      "COALESCE(SUM(CASE WHEN beleg_typ = 'Ausgabe' THEN ABS(betrag) ELSE 0 END),0) as aus FROM journal",
+      "SELECT COALESCE(SUM(CASE WHEN beleg_typ = 'Einnahme' THEN "
+      "CASE WHEN storno_von IS NOT NULL THEN -ABS(betrag) ELSE ABS(betrag) END ELSE 0 END),0) as ein, "
+      "COALESCE(SUM(CASE WHEN beleg_typ = 'Ausgabe' THEN "
+      "CASE WHEN storno_von IS NOT NULL THEN -ABS(betrag) ELSE ABS(betrag) END ELSE 0 END),0) as aus FROM journal",
       const <Object?>[],
     );
     final ein = money.formatBetrag('${rows.first['ein']}');
@@ -240,7 +242,7 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchOffeneVerbindlichkeiten() async {
     final rows = await executor.runSelect(
       'SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s '
-      "FROM rechnungen WHERE status != 'bezahlt' AND typ = '${RechnungTyp.eingang}'",
+      "FROM rechnungen WHERE status != 'bezahlt' AND typ = '${RechnungTyp.eingang}' AND ist_entwurf = 0",
       const <Object?>[],
     );
     final c = (rows.first['c'] as num?)?.toInt() ?? 0;

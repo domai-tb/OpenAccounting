@@ -192,7 +192,11 @@ class SetupRepository {
       );
       if (rows.isEmpty) throw SetupException('Kategorie $id nicht gefunden');
     }
-    // persist selection as unternehmen.dashboard_config or shared flag — minimal: nothing extra
+    await _addColumnIfMissing('unternehmen', 'setup_kategorie_ids', 'TEXT');
+    final List<int> normalized = ids.toSet().toList()..sort();
+    await executor.runUpdate('UPDATE unternehmen SET setup_kategorie_ids = ? WHERE id = 1', <Object?>[
+      normalized.join(','),
+    ]);
   }
 
   // ---------------------------------------------------------------------------

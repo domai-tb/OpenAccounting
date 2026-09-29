@@ -22,6 +22,7 @@ import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/stammdaten/contact_create_page.dart';
+import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
 
@@ -112,7 +113,20 @@ GoRouter createRouter(AppDatabase db) {
               ),
             ],
           ),
-          GoRoute(path: '/receipts', builder: (context, state) => const ReceiptsPage()),
+          GoRoute(
+            path: '/receipts',
+            builder: (context, state) => const ReceiptsPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => ProductionRecordDetailPage(
+                  table: 'belege',
+                  title: 'Beleg ${state.pathParameters['id']}',
+                  id: state.pathParameters['id']!,
+                ),
+              ),
+            ],
+          ),
           GoRoute(path: '/banking', builder: (context, state) => const BankImportPage()),
           GoRoute(
             path: '/contacts',
@@ -263,7 +277,63 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController(text: '1');
   final TextEditingController _priceController = TextEditingController();
+  List<Kunde> _customers = const <Kunde>[];
+  int? _selectedCustomerId;
+  String? _customerError;
+  bool _customersLoading = true;
   bool _saving = false;
+
+  bool get _isDirty =>
+      _dateController.text.trim() != _todayIsoDate() ||
+      _descriptionController.text.trim().isNotEmpty ||
+      _quantityController.text.trim() != '1' ||
+      _priceController.text.trim().isNotEmpty ||
+      _selectedCustomerId != null;
+
+  Future<bool> _confirmDiscard() async {
+    if (!_isDirty) return true;
+    final bool? discard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Entwurf verwerfen?'),
+        content: const Text('Die eingegebenen Rechnungsdaten gehen verloren.'),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Weiter bearbeiten')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Verwerfen')),
+        ],
+      ),
+    );
+    return discard ?? false;
+  }
+
+  Future<void> _cancelDraft() async {
+    if (_saving || !await _confirmDiscard() || !mounted) return;
+    context.go('/invoices');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCustomers());
+  }
+
+  Future<void> _loadCustomers() async {
+    try {
+      final List<Kunde> customers = await ref.read(appServicesProvider).kunden.list();
+      if (!mounted) return;
+      setState(() {
+        _customers = customers;
+        _customersLoading = false;
+        _customerError = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _customersLoading = false;
+        _customerError = error.toString();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -285,6 +355,7 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
           .rechnungen
           .createDraftRechnung(
             datum: _dateController.text.trim(),
+            kundeId: _selectedCustomerId,
             positionen: <RechnungPositionItem>[
               RechnungPositionItem(
                 bezeichnung: _descriptionController.text.trim(),
@@ -322,76 +393,150 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
     return null;
   }
 
+  String _customerLabel(Kunde customer) {
+    final String company = customer.firma?.trim() ?? '';
+    final String name = customer.name.trim();
+    final String displayName = company.isEmpty ? name : '$company · $name';
+    return '${customer.debitorNr} · $displayName';
+  }
+
+  Widget _buildCustomerSelector(BuildContext context) {
+    if (_customersLoading) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[Text('Kunden werden geladen …'), SizedBox(height: 8), LinearProgressIndicator()],
+      );
+    }
+    if (_customerError != null) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.error_outline),
+          title: const Text('Kunden konnten nicht geladen werden'),
+          subtitle: Text(_customerError!),
+          trailing: TextButton(onPressed: _loadCustomers, child: const Text('Erneut laden')),
+        ),
+      );
+    }
+    if (_customers.isEmpty) {
+      return Card(
+        child: ListTile(
+          leading: const Icon(Icons.people_outline),
+          title: const Text('Noch kein Kunde angelegt'),
+          subtitle: const Text('Eine Rechnung braucht einen Kunden, damit sie korrekt zugeordnet werden kann.'),
+          trailing: TextButton(onPressed: () => context.go('/contacts/new'), child: const Text('Kunde anlegen')),
+        ),
+      );
+    }
+    return DropdownButtonFormField<int>(
+      key: const ValueKey<String>('invoice_draft_customer'),
+      isExpanded: true,
+      initialValue: _customers.any((Kunde customer) => customer.id == _selectedCustomerId) ? _selectedCustomerId : null,
+      decoration: const InputDecoration(labelText: 'Kunde'),
+      hint: const Text('Kunde auswählen'),
+      items: _customers
+          .map(
+            (Kunde customer) => DropdownMenuItem<int>(
+              value: customer.id,
+              child: Text(_customerLabel(customer), overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: _saving
+          ? null
+          : (int? value) => setState(() {
+              _selectedCustomerId = value;
+            }),
+      validator: (int? value) => value == null ? 'Kunde ist erforderlich' : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppPage(
-      header: const AppPageHeader(title: 'Neue Rechnung', showFilterToolbar: false),
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          children: <Widget>[
-            Text('Rechnungsentwurf', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            const Text(
-              'Speichere die erste Position als Entwurf. Weitere Positionen können anschließend ergänzt werden.',
-            ),
-            const SizedBox(height: 24),
-            TextFormField(
-              key: const ValueKey<String>('invoice_draft_date'),
-              controller: _dateController,
-              decoration: const InputDecoration(labelText: 'Datum', hintText: '2026-01-31'),
-              validator: _validateDate,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              key: const ValueKey<String>('invoice_draft_description'),
-              controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Position'),
-              validator: (String? value) => value == null || value.trim().isEmpty ? 'Position ist erforderlich' : null,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextFormField(
-                    key: const ValueKey<String>('invoice_draft_quantity'),
-                    controller: _quantityController,
-                    decoration: const InputDecoration(labelText: 'Menge'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (String? value) => _validatePositiveAmount(value, 'Menge'),
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) unawaited(_cancelDraft());
+      },
+      child: AppPage(
+        header: AppPageHeader(
+          title: 'Neue Rechnung',
+          leading: IconButton(
+            onPressed: _saving ? null : () => unawaited(_cancelDraft()),
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Zurück',
+          ),
+          showFilterToolbar: false,
+        ),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: <Widget>[
+              Text('Rechnungsentwurf', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              const Text('Speichere eine Rechnungsposition als Entwurf.'),
+              const SizedBox(height: 24),
+              _buildCustomerSelector(context),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const ValueKey<String>('invoice_draft_date'),
+                controller: _dateController,
+                decoration: const InputDecoration(labelText: 'Datum', hintText: '2026-01-31'),
+                validator: _validateDate,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                key: const ValueKey<String>('invoice_draft_description'),
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Position'),
+                validator: (String? value) =>
+                    value == null || value.trim().isEmpty ? 'Position ist erforderlich' : null,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: TextFormField(
+                      key: const ValueKey<String>('invoice_draft_quantity'),
+                      controller: _quantityController,
+                      decoration: const InputDecoration(labelText: 'Menge'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (String? value) => _validatePositiveAmount(value, 'Menge'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    key: const ValueKey<String>('invoice_draft_price'),
-                    controller: _priceController,
-                    decoration: const InputDecoration(labelText: 'Einzelpreis netto'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (String? value) => _validatePositiveAmount(value, 'Einzelpreis'),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      key: const ValueKey<String>('invoice_draft_price'),
+                      controller: _priceController,
+                      decoration: const InputDecoration(labelText: 'Einzelpreis netto'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (String? value) => _validatePositiveAmount(value, 'Einzelpreis'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: <Widget>[
-                OutlinedButton(
-                  onPressed: _saving ? null : () => context.go('/invoices'),
-                  child: const Text('Abbrechen'),
-                ),
-                const Spacer(),
-                FilledButton.icon(
-                  key: const ValueKey<String>('save_invoice_draft'),
-                  onPressed: _saving ? null : _saveDraft,
-                  icon: _saving
-                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.save_outlined),
-                  label: const Text('Entwurf speichern'),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: <Widget>[
+                  OutlinedButton(
+                    onPressed: _saving ? null : () => unawaited(_cancelDraft()),
+                    child: const Text('Abbrechen'),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    key: const ValueKey<String>('save_invoice_draft'),
+                    onPressed: _saving || _customersLoading || _customerError != null || _customers.isEmpty
+                        ? null
+                        : _saveDraft,
+                    icon: _saving
+                        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.save_outlined),
+                    label: const Text('Entwurf speichern'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -418,15 +563,13 @@ class ReceiptsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ProductionRoutePage(
+    return const ProductionRoutePage(
       title: 'Belege',
       table: 'belege',
       icon: Icons.receipt_outlined,
       subtitle: 'Eingangsbelege und Ausgaben an einem Ort',
       emptyTitle: 'Noch keine Belege',
-      emptyMessage: 'Importiere einen Beleg oder prüfe deine Banktransaktionen.',
-      emptyActionLabel: 'Beleg importieren',
-      onEmptyAction: () => context.go('/banking'),
+      emptyMessage: 'Noch keine Belege gespeichert. Banktransaktionen findest du unter Bank & Zahlungen.',
     );
   }
 }

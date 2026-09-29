@@ -19,7 +19,7 @@ jobs:
       - name: Install FVM
         run: dart pub global activate fvm
       - name: Install Flutter via FVM
-        run: fvm install || true
+        run: fvm install
       - name: Install dependencies
         run: fvm flutter pub get
       - name: Analyze
@@ -27,5 +27,4 @@ jobs:
       - name: Test
         run: fvm flutter test --dart-define=platform=vm
       - name: Build smoke
-        run: |
-          fvm flutter build linux --debug || echo "build skip - toolchain not installed"
+        run: fvm flutter build linux --debug

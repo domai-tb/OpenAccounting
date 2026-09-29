@@ -88,6 +88,22 @@ void main() {
       await db.close();
     });
 
+    testWidgets('legacy receipt deep link opens receipt detail', (tester) async {
+      final db = await _configuredDb();
+      final int receiptId = await db.executor.runInsert(
+        'INSERT INTO belege (datum, betrag, beschreibung) VALUES (?, ?, ?)',
+        const <Object?>['2026-01-01', '12.50', 'Test Beleg'],
+      );
+      final router = createRouter(db);
+      await tester.pumpWidget(_wrap(router, db));
+      await tester.pumpAndSettle();
+      router.go('/belege/$receiptId');
+      await tester.pumpAndSettle();
+      expect(router.state.matchedLocation, '/receipts/$receiptId');
+      expect(find.text('Test Beleg'), findsWidgets);
+      await db.close();
+    });
+
     testWidgets('deep link with query parameters filters list', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);

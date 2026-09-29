@@ -59,6 +59,30 @@ void main() {
       expect(result['ausgaben'], contains('300'));
     });
 
+    test('test_dashboard_metrics_and_actions_1_2_reversals_reduce_totals', () async {
+      final int incomeId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES (?, ?, ?, ?)',
+        const <Object?>['2026-06-01', 'Sale', '500.00', 'Einnahme'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, storno_von) VALUES (?, ?, ?, ?, ?)',
+        <Object?>['2026-06-01', 'Storno Sale', '-500.00', 'Einnahme', incomeId],
+      );
+      final int expenseId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES (?, ?, ?, ?)',
+        const <Object?>['2026-06-01', 'Rent', '300.00', 'Ausgabe'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, storno_von) VALUES (?, ?, ?, ?, ?)',
+        <Object?>['2026-06-01', 'Storno Rent', '-300.00', 'Ausgabe', expenseId],
+      );
+
+      final result = await repo.fetchEinnahmenAusgaben();
+
+      expect(result['einnahmen'], '0.00');
+      expect(result['ausgaben'], '0.00');
+    });
+
     test('test_dashboard_metrics_and_actions_1_3_filing_deadline_follows_configuration', () async {
       // Without company config, VAT deadline should show unavailable state
       final result = await repo.fetchUstvaFrist();

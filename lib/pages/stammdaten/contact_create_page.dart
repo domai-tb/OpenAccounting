@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +27,36 @@ class _ContactCreatePageState extends ConsumerState<ContactCreatePage> {
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   bool _saving = false;
+
+  bool get _isDirty => <TextEditingController>[
+    _nameController,
+    _companyController,
+    _streetController,
+    _postalCodeController,
+    _cityController,
+    _emailController,
+  ].any((TextEditingController controller) => controller.text.trim().isNotEmpty);
+
+  Future<bool> _confirmDiscard() async {
+    if (!_isDirty) return true;
+    final bool? discard = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Änderungen verwerfen?'),
+        content: const Text('Die eingegebenen Kontaktdaten gehen verloren.'),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Weiter bearbeiten')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Verwerfen')),
+        ],
+      ),
+    );
+    return discard ?? false;
+  }
+
+  Future<void> _cancel() async {
+    if (_saving || !await _confirmDiscard() || !mounted) return;
+    context.go('/contacts');
+  }
 
   @override
   void dispose() {
@@ -66,100 +98,108 @@ class _ContactCreatePageState extends ConsumerState<ContactCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return AppPage(
-      maxWidth: 760,
-      header: AppPageHeader(
-        title: 'Kontakt hinzufügen',
-        leading: IconButton(
-          onPressed: () => context.go('/contacts'),
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Zurück',
+    return PopScope(
+      canPop: !_isDirty,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) unawaited(_cancel());
+      },
+      child: AppPage(
+        maxWidth: 760,
+        header: AppPageHeader(
+          title: 'Kontakt hinzufügen',
+          leading: IconButton(
+            onPressed: _saving ? null : () => unawaited(_cancel()),
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Zurück',
+          ),
+          showFilterToolbar: false,
         ),
-        showFilterToolbar: false,
-      ),
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          children: <Widget>[
-            Text('Grunddaten', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Diese Angaben erscheinen in deinen Rechnungen und Belegen.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Name *', hintText: 'z. B. Anna Müller'),
-              textInputAction: TextInputAction.next,
-              validator: (String? value) => value == null || value.trim().isEmpty ? 'Name ist erforderlich' : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _companyController,
-              decoration: const InputDecoration(labelText: 'Firma', hintText: 'Optional'),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _streetController,
-              decoration: const InputDecoration(labelText: 'Straße und Hausnummer *'),
-              textInputAction: TextInputAction.next,
-              validator: (String? value) => value == null || value.trim().isEmpty ? 'Straße ist erforderlich' : null,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextFormField(
-                    controller: _postalCodeController,
-                    decoration: const InputDecoration(labelText: 'PLZ *'),
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    validator: (String? value) => value == null || value.trim().isEmpty ? 'PLZ ist erforderlich' : null,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: <Widget>[
+              Text('Grunddaten', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Diese Angaben erscheinen in deinen Rechnungen und Belegen.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(labelText: 'Name *', hintText: 'z. B. Anna Müller'),
+                textInputAction: TextInputAction.next,
+                validator: (String? value) => value == null || value.trim().isEmpty ? 'Name ist erforderlich' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _companyController,
+                decoration: const InputDecoration(labelText: 'Firma', hintText: 'Optional'),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _streetController,
+                decoration: const InputDecoration(labelText: 'Straße und Hausnummer *'),
+                textInputAction: TextInputAction.next,
+                validator: (String? value) => value == null || value.trim().isEmpty ? 'Straße ist erforderlich' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: TextFormField(
+                      controller: _postalCodeController,
+                      decoration: const InputDecoration(labelText: 'PLZ *'),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      validator: (String? value) =>
+                          value == null || value.trim().isEmpty ? 'PLZ ist erforderlich' : null,
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _cityController,
-                    decoration: const InputDecoration(labelText: 'Ort *'),
-                    textInputAction: TextInputAction.next,
-                    validator: (String? value) => value == null || value.trim().isEmpty ? 'Ort ist erforderlich' : null,
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(labelText: 'Ort *'),
+                      textInputAction: TextInputAction.next,
+                      validator: (String? value) =>
+                          value == null || value.trim().isEmpty ? 'Ort ist erforderlich' : null,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'E-Mail', hintText: 'Optional'),
-              keyboardType: TextInputType.emailAddress,
-              validator: (String? value) {
-                final String email = value?.trim() ?? '';
-                if (email.isEmpty || email.contains('@')) return null;
-                return 'Bitte eine gültige E-Mail-Adresse eingeben';
-              },
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            Row(
-              children: <Widget>[
-                OutlinedButton(
-                  onPressed: _saving ? null : () => context.go('/contacts'),
-                  child: const Text('Abbrechen'),
-                ),
-                const Spacer(),
-                FilledButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.person_add_alt_1),
-                  label: Text(_saving ? 'Wird gespeichert…' : 'Kontakt speichern'),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'E-Mail', hintText: 'Optional'),
+                keyboardType: TextInputType.emailAddress,
+                validator: (String? value) {
+                  final String email = value?.trim() ?? '';
+                  if (email.isEmpty || RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) return null;
+                  return 'Bitte eine gültige E-Mail-Adresse eingeben';
+                },
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              Row(
+                children: <Widget>[
+                  OutlinedButton(
+                    onPressed: _saving ? null : () => unawaited(_cancel()),
+                    child: const Text('Abbrechen'),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.person_add_alt_1),
+                    label: Text(_saving ? 'Wird gespeichert…' : 'Kontakt speichern'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

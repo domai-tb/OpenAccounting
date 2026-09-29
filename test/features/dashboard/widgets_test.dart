@@ -406,8 +406,24 @@ void main() {
         'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, datum, faelligkeit, brutto_betrag, netto_betrag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>['RE-O', 'rechnung', 'offen', 0, 'netto', kundeId, '2025-01-01', '2025-01-10', '150.00', '126.05'],
       );
+      await db.executor.runInsert(
+        'INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, datum, faelligkeit, brutto_betrag, netto_betrag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'RE-DRAFT',
+          'rechnung',
+          'entwurf',
+          1,
+          'netto',
+          kundeId,
+          '2025-01-01',
+          '2025-01-10',
+          '999.00',
+          '839.50',
+        ],
+      );
       final ue = await repo.fetchUeberfaelligeRechnungen();
-      expect(((ue['count'] as int?) ?? 0) >= 1, isTrue);
+      expect(ue['count'], 1);
+      expect(ue['sum'], contains('150'));
 
       await db.executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ) VALUES (?, ?, ?, ?, ?)',

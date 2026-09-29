@@ -80,6 +80,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   List<int>? _fileBytes;
   String? _fileName;
   String? _errorMessage;
+  String? _pageDataError;
   String? _noticeMessage;
   String? _historyError;
   _ImportOutcome? _outcome;
@@ -172,9 +173,20 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _selectedTemplate = resolvedTemplate;
       _history = history;
       _historyError = null;
+      _pageDataError = dataError;
       _errorMessage = dataError;
       _isLoading = false;
     });
+  }
+
+  Future<void> _retryPageData() async {
+    if (_isBusy || _isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _pageDataError = null;
+      _errorMessage = null;
+    });
+    await _loadPageData();
   }
 
   Future<void> _refreshHistory() async {
@@ -692,8 +704,20 @@ LIMIT 100
       key: const ValueKey<String>('bank-import-workflow'),
       children: <Widget>[
         _buildStageIndicator(),
-        if (_errorMessage != null) _buildMessage(_errorMessage!, isError: true),
-        if (_errorMessage != null)
+        if (_pageDataError != null)
+          _buildMessage(_pageDataError!, isError: true)
+        else if (_errorMessage != null)
+          _buildMessage(_errorMessage!, isError: true),
+        if (_pageDataError != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _isBusy ? null : () => unawaited(_retryPageData()),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Daten erneut laden'),
+            ),
+          )
+        else if (_errorMessage != null)
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(

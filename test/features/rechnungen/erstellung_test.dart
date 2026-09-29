@@ -33,6 +33,30 @@ void main() {
     expect(positions.single.gesamt, 200);
   });
 
+  test('stores the selected customer on a draft invoice', () async {
+    final database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+
+    final int customerId = await database.executor.runInsert(
+      'INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)',
+      const <Object?>['Test Kunde', 'Musterweg 1', '10115', 'Berlin'],
+    );
+    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final invoice = await useCases.createDraftRechnung(
+      datum: '2026-08-30',
+      kundeId: customerId,
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100),
+      ],
+    );
+
+    final rows = await database.executor.runSelect('SELECT kunde_id FROM rechnungen WHERE id = ?', <Object?>[
+      invoice.id,
+    ]);
+    expect(rows.single['kunde_id'], customerId);
+  });
+
   test('rejects a position with an inconsistent total', () async {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);

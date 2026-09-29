@@ -50,6 +50,7 @@ class RechnungenDataSource {
     required List<RechnungPositionItem> positionen,
     String typ = 'rechnung',
     String eingabemodus = 'netto',
+    int? kundeId,
     int? lieferadresseId,
     num? rabattProzent,
     num? rabattBetrag,
@@ -66,8 +67,8 @@ class RechnungenDataSource {
       await transaction.ensureOpen(_NoopTransactionUser());
       final invoiceId = await transaction.runInsert(
         '''
-INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, rabatt_prozent, rabatt_betrag, lieferadresse_id)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, rabatt_prozent, rabatt_betrag, kunde_id, lieferadresse_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ''',
         <Object?>[
           null,
@@ -81,6 +82,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           preview.ustBetragString,
           (rabattProzent ?? 0).toStringAsFixed(2),
           (rabattBetrag ?? 0).toStringAsFixed(2),
+          kundeId,
           lieferadresseId,
         ],
       );
@@ -124,6 +126,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     required String datum,
     required List<RechnungPositionItem> positionen,
     String eingabemodus = 'netto',
+    int? kundeId,
     int? lieferadresseId,
     num? rabattProzent,
     num? rabattBetrag,
@@ -146,8 +149,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         final nummer = await _allocateNumberForTyp(transaction, typ, datum);
         final invoiceId = await transaction.runInsert(
           '''
-INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, lieferadresse_id, nummernkreis_id, ausgegeben_am, original_pdf_pfad)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, kunde_id, lieferadresse_id, nummernkreis_id, ausgegeben_am, original_pdf_pfad)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ''',
           <Object?>[
             nummer.nummer,
@@ -159,6 +162,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             preview.nettoBetragString,
             preview.bruttoBetragString,
             preview.ustBetragString,
+            kundeId,
             lieferadresseId,
             nummer.kreisId,
             DateTime.now().toUtc().toIso8601String(),
@@ -203,6 +207,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       positionen: positionen,
       typ: typ,
       eingabemodus: eingabemodus,
+      kundeId: kundeId,
       lieferadresseId: lieferadresseId,
       rabattProzent: rabattProzent,
       rabattBetrag: rabattBetrag,
@@ -490,7 +495,10 @@ WHERE id = ? AND ist_entwurf = 1
           documentNumber,
         ],
       );
-      await transaction.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[journalId, journalId]);
+      await transaction.runUpdate('UPDATE journal SET gruppe_id = ?, immutable = 1 WHERE id = ?', <Object?>[
+        journalId,
+        journalId,
+      ]);
       if (debugFailAt == 'journal') throw StateError('Induced failure after journal');
       final Object? partnerIdRaw = isIncoming ? lieferantId : kundeId;
       final String partnerTyp = isIncoming ? 'lieferant' : 'kunde';
@@ -743,7 +751,10 @@ WHERE id = ? AND ist_entwurf = 1
           'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id, storno_von) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL, ?)',
           <Object?>[datum, 'Storno $docNo', j['kategorie_id'], reversed, j['beleg_typ'], stornoId, docNo, j['id']],
         );
-        await transaction.runUpdate('UPDATE journal SET gruppe_id = ? WHERE id = ?', <Object?>[revId, revId]);
+        await transaction.runUpdate('UPDATE journal SET gruppe_id = ?, immutable = 1 WHERE id = ?', <Object?>[
+          revId,
+          revId,
+        ]);
         reversalJournalId ??= revId;
       }
       final origForderungen = await transaction.runSelect('SELECT * FROM forderungen WHERE rechnung_id = ?', <Object?>[

@@ -94,6 +94,12 @@ void main() {
       final rows = await db.executor.runSelect('SELECT name FROM unternehmen WHERE id = 1', const []);
       expect(rows.single['name'], 'Muster GmbH');
 
+      final selectedCategories = await db.executor.runSelect(
+        'SELECT setup_kategorie_ids FROM unternehmen WHERE id = 1',
+        const [],
+      );
+      expect(selectedCategories.single['setup_kategorie_ids'], '1,2');
+
       final konten = await db.executor.runSelect('SELECT * FROM konten WHERE kontoart = ?', const ['Kasse']);
       expect(konten.length, 1);
 

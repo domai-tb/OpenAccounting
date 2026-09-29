@@ -19,12 +19,21 @@ import 'package:openaccounting/features/desktop/file_assoc_service.dart';
 import 'package:openaccounting/features/desktop/window_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:openaccounting/features/setup/wizard_page.dart';
 
 DesktopTrayService? _desktopTrayService;
 final _WindowPersistenceListener _windowPersistenceListener = _WindowPersistenceListener();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Preload theme before any runApp path, including profile recovery, to avoid
+  // a flash of the default theme.
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  final String? savedTheme = prefs.getString('openaccounting.theme_mode');
+  final ThemeMode initialTheme = ThemeMode.values.firstWhere(
+    (ThemeMode e) => e.name == savedTheme,
+    orElse: () => ThemeMode.system,
+  );
   if (!kIsWeb) {
     if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
       try {
@@ -35,8 +44,11 @@ Future<void> main() async {
     }
     try {
       final DesktopTrayService tray = createDesktopTrayService();
-      _desktopTrayService = tray;
-      unawaited(tray.init().catchError((Object _) => false));
+      if (await tray.init()) {
+        _desktopTrayService = tray;
+      } else {
+        await tray.dispose();
+      }
     } catch (_) {
       // unsupported platform — continue without tray
     }
@@ -46,16 +58,21 @@ Future<void> main() async {
   try {
     activeProfile = await profileManager.getActiveProfile();
   } on ProfileSelectionRequiredException catch (_) {
-    // ponytail: multiple profiles without valid pointer — use last-used or first.
-    // Full UI via ProfileSelectionService.needsSelection() is available;
-    // this keeps startup non-blocking until profile picker screen lands.
-    final svc = ProfileSelectionService();
+    // Never guess between accounting databases. Keep the picker visible until
+    // the user explicitly repairs the active-profile pointer and restarts.
+    final svc = ProfileSelectionService(baseDir: profileManager.baseDir);
     final last = await svc.getLastUsedProfile();
     final profiles = await svc.listProfiles();
-    activeProfile = (last != null && profiles.contains(last))
-        ? last
-        : (profiles.isNotEmpty ? profiles.first : 'default');
-    await profileManager.setActiveProfile(activeProfile);
+    runApp(
+      MaterialApp(
+        title: 'OpenAccounting',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: initialTheme,
+        home: ProfileSelectionWidget(profiles: profiles, lastUsed: last),
+      ),
+    );
+    return;
   }
   final profileDirectory = profileManager.profileDir(activeProfile);
   await Directory(profileDirectory).create(recursive: true);
@@ -64,27 +81,23 @@ Future<void> main() async {
   final DesktopCapabilityRegistry desktopCapabilities = DesktopCapabilityRegistry();
   // Register tray capability
   final DesktopTrayService? tray = _desktopTrayService;
-  if (tray != null) {
+  if (tray != null && tray.isSupported) {
     desktopCapabilities.register<DesktopTrayService>(SupportedDesktopCapability<DesktopTrayService>(tray));
   } else {
     desktopCapabilities.register<DesktopTrayService>(
       const UnavailableDesktopCapability<DesktopTrayService>('tray not supported on this target'),
     );
   }
-  // Register drop capability with callback placeholder — routing wired in AppScope
-  desktopCapabilities.register<void>(DropCapability(onFileDropped: (_) {}));
-  // Register file association capability
+  // Do not advertise scaffolding as a working desktop integration.
+  desktopCapabilities.register<void>(
+    const UnavailableDesktopCapability<void>('Datei-Drop ist noch nicht an einen Importworkflow angebunden'),
+  );
   desktopCapabilities.register<DesktopFileAssocService>(
-    SupportedDesktopCapability<DesktopFileAssocService>(DesktopFileAssocService(FakeFileAssocBackend())),
+    const UnavailableDesktopCapability<DesktopFileAssocService>(
+      'Dateizuordnungen werden auf diesem Ziel nicht registriert',
+    ),
   );
   final AppServices services = AppServices(db, desktopCapabilities: desktopCapabilities);
-  // Preload theme before runApp to avoid flash — DESIGN §7 System persist.
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
-  final String? savedTheme = prefs.getString('openaccounting.theme_mode');
-  final ThemeMode initialTheme = ThemeMode.values.firstWhere(
-    (ThemeMode e) => e.name == savedTheme,
-    orElse: () => ThemeMode.system,
-  );
   final bool initialPrivacyMode = prefs.getBool('openaccounting.privacy_mode') ?? false;
   final Locale initialLocale = parseAppLocale(prefs.getString(appLocalePreferenceKey));
   runApp(

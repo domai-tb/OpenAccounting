@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/app_services.dart';
+import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_money.dart';
@@ -11,6 +15,7 @@ import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
+import 'package:path/path.dart' as p;
 
 final invoiceByIdProvider = FutureProvider.family<RechnungItem?, int>((ref, id) {
   return ref.watch(appServicesProvider).rechnungen.findById(id);
@@ -48,6 +53,45 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     } finally {
       if (mounted) setState(() => _finalizing = false);
     }
+  }
+
+  Future<void> _savePdf(RechnungItem invoice) async {
+    final String? profileDir = ref.read(appDatabaseProvider).profileDir;
+    final String? relativePath = invoice.originalPdfPath;
+    if (profileDir == null || relativePath == null || relativePath.trim().isEmpty) {
+      _showMessage('Für dieses Dokument ist kein PDF-Artefakt gespeichert.');
+      return;
+    }
+    final String basePath = p.normalize(p.absolute(profileDir));
+    final String sourcePath = p.normalize(p.join(basePath, relativePath));
+    if (!p.isWithin(basePath, sourcePath)) {
+      _showMessage('Der gespeicherte PDF-Pfad ist ungültig.');
+      return;
+    }
+    final File source = File(sourcePath);
+    if (!source.existsSync()) {
+      _showMessage('Das PDF-Artefakt fehlt. Bitte das Dokument erneut erzeugen.');
+      return;
+    }
+    try {
+      final FileSaveLocation? location = await getSaveLocation(
+        acceptedTypeGroups: const <XTypeGroup>[
+          XTypeGroup(label: 'PDF', extensions: <String>['pdf']),
+        ],
+        suggestedName: '${invoice.rechnungsnummer ?? 'rechnung-${invoice.id}'}.pdf',
+        confirmButtonText: 'Speichern',
+      );
+      if (location == null) return;
+      await source.copy(location.path);
+      _showMessage('PDF gespeichert.');
+    } catch (error) {
+      _showMessage('PDF konnte nicht gespeichert werden: $error');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -115,12 +159,18 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
                   : const Icon(Icons.task_alt),
               label: Text(_finalizing ? 'Wird finalisiert…' : 'Finalisieren'),
             )
-          else
+          else ...<Widget>[
+            OutlinedButton.icon(
+              onPressed: () => _savePdf(invoice),
+              icon: const Icon(Icons.save_alt_outlined),
+              label: const Text('PDF speichern'),
+            ),
             FilledButton.icon(
               onPressed: () => _showPreview(context, invoice),
               icon: const Icon(Icons.picture_as_pdf_outlined),
               label: const Text('PDF-Vorschau'),
             ),
+          ],
         ],
       ),
       child: SingleChildScrollView(

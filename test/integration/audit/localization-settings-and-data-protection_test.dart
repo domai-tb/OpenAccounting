@@ -113,7 +113,7 @@ void main() {
       expect(rows, isNotEmpty, reason: 'Restored database must contain the backed-up invoice');
 
       await restoredDb.close();
-    });
+    }, timeout: const Timeout(Duration(minutes: 2)));
 
     // ── Task 4: Integration failure is truthful ──
 

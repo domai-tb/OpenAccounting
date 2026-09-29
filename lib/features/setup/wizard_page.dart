@@ -39,6 +39,7 @@ class _WizardPageState extends State<WizardPage> {
   String? _kategorieError;
   String? _kasseError;
   final Set<int> _selectedKategorien = <int>{1};
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -55,6 +56,7 @@ class _WizardPageState extends State<WizardPage> {
   WizardStep get _step => _service.currentStep;
 
   Future<void> _handleWeiter() async {
+    if (_busy) return;
     setState(() {
       _nameError = null;
       _ibanError = null;
@@ -113,6 +115,8 @@ class _WizardPageState extends State<WizardPage> {
   }
 
   Future<void> _finish() async {
+    if (_busy) return;
+    setState(() => _busy = true);
     try {
       final String iban = _ibanCtrl.text.trim();
       final List<BankAccount> accounts = iban.isEmpty
@@ -139,10 +143,18 @@ class _WizardPageState extends State<WizardPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Setup fehlgeschlagen: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _skip() async {
+    if (_busy) return;
+    setState(() => _busy = true);
     try {
       await _service.skipWizard();
       if (mounted) {
@@ -157,10 +169,18 @@ class _WizardPageState extends State<WizardPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Setup überspringen fehlgeschlagen: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   void _handleZurueck() {
+    if (_busy) return;
     setState(() => _service.back());
   }
 
@@ -210,13 +230,13 @@ class _WizardPageState extends State<WizardPage> {
             Row(
               children: <Widget>[
                 if (_step != WizardStep.stammdaten)
-                  OutlinedButton(onPressed: _handleZurueck, child: const Text('Zurück')),
+                  OutlinedButton(onPressed: _busy ? null : _handleZurueck, child: const Text('Zurück')),
                 const Spacer(),
-                TextButton(onPressed: _skip, child: const Text('Überspringen')),
+                TextButton(onPressed: _busy ? null : _skip, child: const Text('Überspringen')),
                 const SizedBox(width: 12),
                 FilledButton(
-                  onPressed: _handleWeiter,
-                  child: Text(_step == WizardStep.abschluss ? 'Fertig' : 'Weiter'),
+                  onPressed: _busy ? null : _handleWeiter,
+                  child: Text(_busy ? 'Wird gespeichert …' : (_step == WizardStep.abschluss ? 'Fertig' : 'Weiter')),
                 ),
               ],
             ),

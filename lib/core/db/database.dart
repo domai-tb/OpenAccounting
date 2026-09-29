@@ -193,6 +193,7 @@ class AppDatabase {
       'schlusstext_gutschrift': 'TEXT',
       'einleitungstext_storno': 'TEXT',
       'schlusstext_storno': 'TEXT',
+      'setup_kategorie_ids': 'TEXT',
     }.entries) {
       await _addColumnIfMissing('unternehmen', entry.key, entry.value);
     }
