@@ -13,6 +13,7 @@ import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/core/db/rechnung_triggers.dart';
 import 'package:openaccounting/core/db/seed.dart';
+import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 import 'package:openaccounting/pages/stammdaten/artikel_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
@@ -25,9 +26,10 @@ import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 class AppDatabase {
   AppDatabase([QueryExecutor? executor, this.profileDir])
     : _executor = executor ?? driftDatabase(name: 'openaccounting'),
-      _ownsExecutor = executor == null;
+      _ownsExecutor = executor == null,
+      afterFeatureSchemaDdl = null;
 
-  AppDatabase.forTesting(QueryExecutor executor, {this.profileDir})
+  AppDatabase.forTesting(QueryExecutor executor, {this.profileDir, this.afterFeatureSchemaDdl})
     : _executor = _InvoiceErrorMappingExecutor(executor),
       _ownsExecutor = true;
 
@@ -36,6 +38,7 @@ class AppDatabase {
 
   final QueryExecutor _executor;
   final String? profileDir;
+  final Future<void> Function(QueryExecutor executor)? afterFeatureSchemaDdl;
   final bool _ownsExecutor;
   bool _opened = false;
   late final KundenRepository _kundenRepository = KundenRepository(_executor);
@@ -141,7 +144,19 @@ class AppDatabase {
       profileDir: profileDir ?? resolveDefaultBaseDir(),
       requiredTables: allTableNames,
     );
-    await runner.run(createSchema: _createAllTables);
+    try {
+      await runner.run(createSchema: _createAllTables, afterFeatureSchemaDdl: afterFeatureSchemaDdl);
+    } catch (error, stackTrace) {
+      if (error is ForderungenException) rethrow;
+      Error.throwWithStackTrace(
+        ForderungenException(
+          'Datenbankschema konnte nicht migriert werden',
+          code: ForderungenErrorCode.schemaMigrationFailed,
+          cause: error,
+        ),
+        stackTrace,
+      );
+    }
     // Ensure triggers and seed idempotent even when no migration
     await GobdTriggers.install(_executor);
     await RechnungTriggers.install(_executor);
@@ -777,6 +792,7 @@ CREATE TABLE IF NOT EXISTS forderungen (
   kunde_id INTEGER REFERENCES kunden(id),
   rechnung_id INTEGER REFERENCES rechnungen(id),
   betrag NUMERIC(12,2) NOT NULL,
+  anfangsbetrag NUMERIC(12,2),
   status TEXT DEFAULT 'offen',
   faelligkeit TEXT,
   beschreibung TEXT,

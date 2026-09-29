@@ -39,7 +39,7 @@ void main() {
       final database = sqlite3.open(manager.databasePath('Geschäft'));
       try {
         final tables = database.select(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         );
         expect(tables, hasLength(AppDatabase.allTableNames.length));
 

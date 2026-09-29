@@ -16,7 +16,7 @@ void main() {
 
     test('all 39 tables exist after creation', () async {
       final rows = await db.executor.runSelect(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen' ORDER BY name",
         const [],
       );
       final names = rows.map((r) => r['name']?.toString() ?? '').toList()..sort();
@@ -31,7 +31,7 @@ void main() {
       final db2 = AppDatabase.createTestDatabase();
       await db2.ensureOpen();
       final rows = await db2.executor.runSelect(
-        "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         const [],
       );
       expect(rows.first['c'], 39);

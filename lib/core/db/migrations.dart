@@ -11,7 +11,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 7;
+  static const int currentVersion = 8;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -38,12 +38,19 @@ class MigrationRunner {
   }
 
   /// Run migrations if needed. Returns true if migration executed.
-  Future<bool> run({required Future<void> Function() createSchema}) async {
+  Future<bool> run({
+    required Future<void> Function() createSchema,
+    Future<void> Function(QueryExecutor executor)? afterFeatureSchemaDdl,
+  }) async {
     final version = await getUserVersion();
     final hasTables = await hasAnyTables();
 
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
+      if (await _receivableFeatureNeedsRepair()) {
+        await _repairCurrentFeature(afterFeatureSchemaDdl);
+        return true;
+      }
       return false;
     }
 
@@ -55,12 +62,12 @@ class MigrationRunner {
     }
 
     if (version == 0 && !hasTables) {
-      await _createFreshSchema(createSchema);
+      await _createFreshSchema(createSchema, afterFeatureSchemaDdl);
       return false;
     }
 
     if (version == currentVersion && !hasTables) {
-      await _createFreshSchema(createSchema);
+      await _createFreshSchema(createSchema, afterFeatureSchemaDdl);
       return true;
     }
 
@@ -86,6 +93,9 @@ class MigrationRunner {
         try {
           for (var v = version + 1; v <= currentVersion; v++) {
             await _migrateTo(v, createSchema);
+            if (v == currentVersion) {
+              await _runFeatureDdlCallback(afterFeatureSchemaDdl);
+            }
           }
           await _postHooks();
           await _verifyRequiredTables();
@@ -115,10 +125,15 @@ class MigrationRunner {
     return false;
   }
 
-  Future<void> _createFreshSchema(Future<void> Function() createSchema) async {
+  Future<void> _createFreshSchema(
+    Future<void> Function() createSchema,
+    Future<void> Function(QueryExecutor executor)? afterFeatureSchemaDdl,
+  ) async {
     await executor.runCustom('BEGIN');
     try {
       await createSchema();
+      await _migrateReceivableFeature();
+      await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
       await executor.runCustom('COMMIT');
@@ -168,6 +183,129 @@ class MigrationRunner {
       await _migrateInventarbewegungen();
       await _migrateJournalGruppeId();
     }
+    if (version == 8) {
+      // Keep the historical upgrade contract: an outdated profile still runs
+      // the idempotent base-schema hook before the new feature DDL. This also
+      // repairs partially rebuilt legacy tables encountered in old fixtures.
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
+      await _migrateReceivableFeature();
+    }
+  }
+
+  Future<void> _runFeatureDdlCallback(Future<void> Function(QueryExecutor executor)? callback) async {
+    if (callback != null) await callback(executor);
+  }
+
+  Future<void> _repairCurrentFeature(Future<void> Function(QueryExecutor executor)? callback) async {
+    await executor.runCustom('BEGIN');
+    try {
+      await _migrateReceivableFeature();
+      await _runFeatureDdlCallback(callback);
+      await _verifyRequiredTables();
+      await setUserVersion(currentVersion);
+      await executor.runCustom('COMMIT');
+    } catch (error, stackTrace) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<bool> _receivableFeatureNeedsRepair() async {
+    final tableRows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
+      const <Object?>[],
+    );
+    if (tableRows.isEmpty) return true;
+    final columns = await executor.runSelect('PRAGMA table_info(forderung_zahlungen)', const <Object?>[]);
+    const required = <String>{
+      'id',
+      'forderung_id',
+      'journal_id',
+      'betrag',
+      'typ',
+      'datum',
+      'idempotency_key',
+      'requested_betrag_cents',
+      'fingerprint_direction',
+      'fingerprint_date_policy',
+    };
+    return !required.every((name) => columns.any((row) => row['name'] == name));
+  }
+
+  Future<void> _migrateReceivableFeature() async {
+    final tableRows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
+      const <Object?>[],
+    );
+    if (tableRows.isEmpty) {
+      await executor.runCustom(_receivablePaymentTableSql);
+      return;
+    }
+    final columnsRows = await executor.runSelect('PRAGMA table_info(forderung_zahlungen)', const <Object?>[]);
+    final columns = <String>{for (final row in columnsRows) row['name'].toString()};
+    const additions = <String, String>{
+      'requested_betrag_cents': 'INTEGER',
+      'fingerprint_direction': 'TEXT',
+      'fingerprint_date_policy': 'TEXT',
+    };
+    for (final entry in additions.entries) {
+      if (!columns.contains(entry.key)) {
+        await executor.runCustom('ALTER TABLE forderung_zahlungen ADD COLUMN ${entry.key} ${entry.value}');
+      }
+    }
+    final foreignKeys = await executor.runSelect('PRAGMA foreign_key_list(forderung_zahlungen)', const <Object?>[]);
+    final hasForderungForeignKey = foreignKeys.any((row) => row['table'] == 'forderungen');
+    final hasJournalForeignKey = foreignKeys.any((row) => row['table'] == 'journal');
+    if (!hasForderungForeignKey || !hasJournalForeignKey) {
+      await _rebuildReceivablePaymentTable(columns);
+    }
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX IF NOT EXISTS forderung_zahlungen_key_unique '
+      'ON forderung_zahlungen(idempotency_key) WHERE idempotency_key IS NOT NULL',
+    );
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX IF NOT EXISTS forderung_zahlungen_journal_unique ON forderung_zahlungen(journal_id)',
+    );
+    final verified = await executor.runSelect('PRAGMA table_info(forderung_zahlungen)', const <Object?>[]);
+    const required = <String>{
+      'id',
+      'forderung_id',
+      'journal_id',
+      'betrag',
+      'typ',
+      'datum',
+      'idempotency_key',
+      'requested_betrag_cents',
+      'fingerprint_direction',
+      'fingerprint_date_policy',
+    };
+    if (!required.every((name) => verified.any((row) => row['name'] == name))) {
+      throw StateError('Forderungen-Zahlungsschema konnte nicht verifiziert werden');
+    }
+  }
+
+  Future<void> _rebuildReceivablePaymentTable(Set<String> oldColumns) async {
+    await executor.runCustom('ALTER TABLE forderung_zahlungen RENAME TO forderung_zahlungen_legacy');
+    await executor.runCustom(_receivablePaymentTableSql);
+    String expression(String name) => oldColumns.contains(name) ? '"$name"' : 'NULL';
+    await executor.runCustom('''
+INSERT INTO forderung_zahlungen (
+  id, forderung_id, journal_id, betrag, typ, datum, idempotency_key,
+  requested_betrag_cents, fingerprint_direction, fingerprint_date_policy
+)
+SELECT ${expression('id')}, ${expression('forderung_id')}, ${expression('journal_id')}, ${expression('betrag')},
+       ${expression('typ')}, ${expression('datum')}, ${expression('idempotency_key')},
+       ${expression('requested_betrag_cents')}, ${expression('fingerprint_direction')}, ${expression('fingerprint_date_policy')}
+FROM forderung_zahlungen_legacy''');
+    await executor.runCustom('DROP TABLE forderung_zahlungen_legacy');
   }
 
   Future<bool> _pragmaEnabled(String pragma) async {
@@ -376,4 +514,18 @@ CREATE TABLE rechnungen (
   absender_snapshot TEXT,
   ausgegeben_am TEXT,
   mahnstufe_aktuell INTEGER DEFAULT 0
+)''';
+
+const String _receivablePaymentTableSql = '''
+CREATE TABLE IF NOT EXISTS forderung_zahlungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  forderung_id INTEGER NOT NULL REFERENCES forderungen(id),
+  journal_id INTEGER NOT NULL UNIQUE REFERENCES journal(id),
+  betrag NUMERIC(12,2) NOT NULL,
+  typ TEXT NOT NULL CHECK (typ IN ('zahlung','ueberzahlung','ausbuchen')),
+  datum TEXT NOT NULL,
+  idempotency_key TEXT UNIQUE,
+  requested_betrag_cents INTEGER,
+  fingerprint_direction TEXT,
+  fingerprint_date_policy TEXT
 )''';
