@@ -11,7 +11,7 @@ The exact parser matrix is:
 | Input | Row-level failure | Batch-level rejection |
 |---|---|---|
 | CSV | `Datum` cell is invalid or empty; `Betrag` cell is invalid or empty | Empty input; no header; missing required `Datum`/`Betrag` mapping; unclosed quote or otherwise malformed CSV structure |
-| CAMT | A closed `<Ntry>` has an invalid or empty `<Dt>` value; a closed `<Ntry>` has an invalid or empty `<Amt>` value | Empty input; unsupported XML/non-CAMT; missing required `<Amt>` or `<BookgDt>/<ValDt>/<Dt>` element in an `<Ntry>`; nested tag mismatch such as `<BookgDt><Dt>2026-03-15</ValDt></BookgDt>`; unclosed XML/`<Ntry>` tags |
+| CAMT | A closed `<Ntry>` has an invalid or empty `<Dt>` value, including `<Dt/>`; a closed `<Ntry>` has an invalid or empty `<Amt>` value, including `<Amt/>` | Empty input; unsupported XML/non-CAMT; missing required `<Amt>` or `<BookgDt>/<ValDt>/<Dt>` element in an `<Ntry>`; nested tag mismatch such as `<BookgDt><Dt>2026-03-15</ValDt></BookgDt>`; unclosed XML/`<Ntry>` tags |
 | Service/page | — | `kontoId` is missing/non-positive, or the confirmed input row list is empty |
 
 Row-level diagnostics SHALL use the same canonical German categories for CSV, CAMT, and edited review rows: `Datum ungültig` and `Betrag ungültig`. A diagnostic MAY append row/source context, but its category prefix SHALL remain stable. Making `RawTx.datum` nullable for compilation alone does not satisfy this requirement: source identity, raw-field propagation, and safe diagnostic JSON remain separate behavior contracts.
@@ -27,6 +27,12 @@ Row-level diagnostics SHALL use the same canonical German categories for CSV, CA
 - **GIVEN** a CSV fixture with `15.03.2026;10,00;Valid CSV;A`, `16.03.2026;not-a-number;Bad CSV amount;B`, and `17.03.2026;;Empty CSV amount;C`, and a structurally valid CAMT fixture with one closed `<Ntry>` amount `10.00`, one closed `<Ntry>` amount `bad`, and one closed `<Ntry>` containing an empty `<Amt></Amt>` element
 - **WHEN** each fixture is imported into a valid account
 - **THEN** the valid row is persisted, each malformed row is returned as an `ImportRowFailure` with a `Betrag ungültig` diagnostic, the raw amount (including the empty string) is preserved in `raw_betrag`, and no malformed row reaches `bank_transaktionen`
+
+#### Scenario: Self-closing CAMT cells are empty row values
+
+- **GIVEN** a structurally valid CAMT fixture with one closed `<Ntry>` containing a valid amount and date, one closed `<Ntry>` containing `<Amt/>`, and one closed `<Ntry>` containing `<BookgDt><Dt/></BookgDt>`
+- **WHEN** the fixture is imported into a valid account
+- **THEN** parsing returns all three rows; the valid row is persisted; the self-closing amount and date become row-level failures with empty `raw_betrag`/`raw_datum`, source ordinals 2 and 3, and canonical `Betrag ungültig`/`Datum ungültig` diagnostics; the batch is not rejected
 
 #### Scenario: Malformed structure and batch preconditions remain batch rejection
 

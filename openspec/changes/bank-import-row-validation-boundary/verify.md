@@ -48,3 +48,16 @@ fvm flutter test --dart-define=platform=vm
 - `openspec validate --specs --strict` — 53 specs passed, 0 failed.
 
 No database migration or schema change was required. macOS and Windows were not executed; their evidence remains static-only as defined by the package.
+
+## Post-commit self-closing CAMT cleanup
+
+The post-commit verifier finding was resolved by treating self-closing `<Amt/>` and `<Dt/>` elements as present empty cell values. The parser now retains those rows for service-level validation; absent required elements remain batch rejection. The new boundary test passed:
+
+```text
+fvm flutter test --dart-define=platform=vm \
+  test/integration/audit/bank-import-row-validation-boundary_test.dart \
+  --plain-name test_bank_import_row_validation_self_closing_camt_cells_are_empty_row_failures
+1 passed
+```
+
+The prior focused boundary plus existing bank-import suite evidence remains 39 passed, and the prior full Linux/VM suite evidence remains 763 passed. The full VM suite was not rerun after this narrow cleanup. Fresh post-cleanup static and specification gates are recorded in the review round below: analyzer, format, diff-check, strict change validation, and strict spec validation all passed.

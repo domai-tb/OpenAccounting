@@ -801,13 +801,17 @@ class BankImportService {
       final String ntryContent = m.group(1) ?? '';
 
       // Amount — <Amt> with optional attributes
-      final RegExp amtReg = RegExp(r'<\s*(?:\w+:)?Amt\b[^>]*>([^<]*)</\s*(?:\w+:)?Amt\s*>', caseSensitive: false);
+      final RegExp amtReg = RegExp(
+        r'<\s*(?:\w+:)?Amt\b[^>]*>([^<]*)</\s*(?:\w+:)?Amt\s*>'
+        r'|<\s*(?:\w+:)?Amt\b[^>]*/\s*>',
+        caseSensitive: false,
+      );
       RegExpMatch? amtM = amtReg.firstMatch(ntryOuter);
       amtM ??= amtReg.firstMatch(ntryContent);
       if (amtM == null) {
         throw const BankImportException('Betrag fehlt in Ntry');
       }
-      final String amtRaw = amtM.group(1)!.trim();
+      final String amtRaw = amtM.group(1)?.trim() ?? '';
 
       // Credit/Debit indicator
       final RegExp cdtReg = RegExp(
@@ -830,28 +834,37 @@ class BankImportService {
         betrag = _parseBetrag(effective);
       } catch (_) {}
 
-      // Datum — prefer BookgDt/Dt, then ValDt/Dt, then generic Dt
-      final RegExp bookgDtReg = RegExp(
-        r'<\s*(?:\w+:)?BookgDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>',
-        dotAll: true,
-        caseSensitive: false,
-      );
-      final RegExp valDtReg = RegExp(
-        r'<\s*(?:\w+:)?ValDt\s*>.*?<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>',
-        dotAll: true,
-        caseSensitive: false,
-      );
-      final RegExp dtReg = RegExp(r'<\s*(?:\w+:)?Dt\s*>([^<]*)</\s*(?:\w+:)?Dt\s*>', caseSensitive: false);
-      RegExpMatch? dtM = bookgDtReg.firstMatch(ntryContent);
-      dtM ??= valDtReg.firstMatch(ntryContent);
-      dtM ??= dtReg.firstMatch(ntryContent);
-      dtM ??= bookgDtReg.firstMatch(ntryOuter);
-      dtM ??= valDtReg.firstMatch(ntryOuter);
-      dtM ??= dtReg.firstMatch(ntryOuter);
-      if (dtM == null) {
+      // Datum — prefer BookgDt/Dt, then ValDt/Dt, then generic Dt. Present
+      // self-closing Dt elements are empty values, not missing elements.
+      final RegExp dtReg = _camtValueRegExp('Dt');
+      String? dtRaw;
+      for (final String source in <String>[ntryContent, ntryOuter]) {
+        for (final String container in <String>['BookgDt', 'ValDt']) {
+          final RegExp containerReg = RegExp(
+            r'<\s*(?:\w+:)?' + container + r'\b[^>]*>(.*?)</\s*(?:\w+:)?' + container + r'\s*>',
+            dotAll: true,
+            caseSensitive: false,
+          );
+          final RegExpMatch? containerMatch = containerReg.firstMatch(source);
+          final RegExpMatch? nestedDate = containerMatch == null
+              ? null
+              : dtReg.firstMatch(containerMatch.group(1) ?? '');
+          if (nestedDate != null) {
+            dtRaw = nestedDate.group(1)?.trim() ?? '';
+            break;
+          }
+        }
+        if (dtRaw == null) {
+          final RegExpMatch? genericDate = dtReg.firstMatch(source);
+          if (genericDate != null) {
+            dtRaw = genericDate.group(1)?.trim() ?? '';
+          }
+        }
+        if (dtRaw != null) break;
+      }
+      if (dtRaw == null) {
         throw const BankImportException('Datum fehlt in Ntry');
       }
-      final String dtRaw = dtM.group(1)!.trim();
       DateTime? datum;
       try {
         datum = _parseDate(dtRaw, null);
@@ -927,7 +940,7 @@ class BankImportService {
     for (final RegExpMatch match in tagReg.allMatches(withoutComments)) {
       final String name = match.group(2)!.toLowerCase();
       final bool closing = match.group(1) == '/';
-      final bool selfClosing = match.group(3) == '/';
+      final bool selfClosing = match.group(3) == '/' || RegExp(r'/\s*>$').hasMatch(match.group(0)!);
       if (closing) {
         if (stack.isEmpty || stack.removeLast() != name) {
           throw const BankImportException('Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)');
@@ -940,6 +953,12 @@ class BankImportService {
       throw const BankImportException('Ungültiges XML: Tag nicht geschlossen (invalid)');
     }
   }
+
+  RegExp _camtValueRegExp(String elementName) => RegExp(
+    '<\\s*(?:\\w+:)?$elementName\\b[^>]*>([^<]*)</\\s*(?:\\w+:)?$elementName\\s*>'
+    '|<\\s*(?:\\w+:)?$elementName\\b[^>]*/\\s*>',
+    caseSensitive: false,
+  );
 
   String _detectDelimiter(String headerLine) {
     final int semicolon = _countOutsideQuotes(headerLine, ';');

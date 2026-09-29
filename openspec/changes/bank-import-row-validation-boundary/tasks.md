@@ -43,6 +43,7 @@
 - [x] 6.1 Write failing `test_bank_import_row_validation_malformed_structure_is_batch_rejection` from `test-plan.md`; cover empty input, missing header/template/mapping, invalid account, empty confirmed rows, unclosed CSV quote, CAMT unsupported/missing required elements, exact nested `<BookgDt><Dt>2026-03-15</ValDt></BookgDt>`, and unclosed tags. Assert `BankImportException`, no successful row persistence, and no row-level `ImportRowFailure` result.
 - [x] 6.2 Add an explicit CAMT tag-stack/nesting guard and required-element guard before row extraction, preserving page `recordRejectedImport` handling while changing only cell-level date/amount handling; ensure malformed structure and preconditions never create a partial transaction batch.
 - [x] 6.3 Refactor parser error messages/recovery metadata and rerun upload/CAMT regression tests, focused row-boundary tests, and the full VM suite.
+- [x] 6.4 Clarify and test self-closing CAMT `<Amt/>` and `<Dt/>` as present empty row values, preserve absent required elements as batch rejection, and verify the parser, spec, and review contract agree.
 
 ## 7. Cross-platform evidence and handoff
 

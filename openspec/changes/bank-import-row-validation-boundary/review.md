@@ -58,3 +58,21 @@ CHANGES_APPLIED: n/a
 - **Nullable JSON:** fixed with explicit nullable `parsed_datum` and direct `toJson()` red assertion; awaiting reviewer re-check.
 - **Compile prerequisite and batch cases:** task 0.2 is now limited to nullable type/call-site compilation; source identity and JSON/raw behavior move to dedicated red/behavior tasks, while the batch matrix/fixtures remain fixed; awaiting reviewer re-check.
 - **Parse → review → confirm, empty-cell fixtures, structural nesting guard, and dual-invalid precedence:** fixed in `spec.md`, `design.md`, `test-plan.md`, and `tasks.md`; awaiting reviewer re-check.
+
+## Review round 4: fresh independent verification after implementation cleanup
+
+- **Scope:** Resolve the bounded verifier finding for CAMT self-closing `<Amt/>` and `<Dt/>` elements without changing the existing row-versus-batch boundary.
+- **Verification context:** Fresh independent read of the current parser, boundary test, delta spec, test plan, tasks, and verification record after the cleanup change. The prior Round 3 `VERDICT: REVISE` is preserved above as historical review evidence.
+- **Contract decision:** A self-closing `<Amt/>` or `<Dt/>` is a present empty cell and therefore produces a row-level `Betrag ungültig` or `Datum ungültig` failure. An absent required element remains a batch-level `BankImportException`.
+- **Implementation evidence:** The CAMT structure guard recognizes attribute-bearing self-closing tags, and value extraction preserves them as empty raw fields for service validation.
+- **Test evidence:** `test_bank_import_row_validation_self_closing_camt_cells_are_empty_row_failures` passed; the complete boundary audit file passed all 7 tests.
+- **Static/spec evidence:** `fvm flutter analyze`, scoped `fvm dart format --set-exit-if-changed`, `git diff --check`, strict change validation, and strict spec validation passed. The prior focused-plus-bank suite evidence remains 39 passed and the prior full VM evidence remains 763 passed; the full VM suite was not rerun for this narrow cleanup.
+- **Scope check:** No schema migration, mode/payment expansion, route work, or unrelated audit changes were included.
+
+### Verdict
+
+VERDICT: APPROVED
+
+The self-closing CAMT boundary is explicit, tested, implemented, and aligned across the specification, test plan, parser, and verification record. This approval applies to the current post-cleanup artifact state and supersedes the pending re-review requirement from Round 3 while retaining that historical `REVISE` record.
+
+CHANGES_APPLIED: self-closing CAMT empty-cell contract, parser support, boundary test, and verification metadata.

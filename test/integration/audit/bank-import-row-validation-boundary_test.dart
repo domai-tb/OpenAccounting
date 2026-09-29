@@ -74,6 +74,17 @@ String _amountFixtureCamt() {
 </Document>''';
 }
 
+String _selfClosingCellFixtureCamt() {
+  return '''
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt><Stmt>
+    <Ntry><Amt Ccy="EUR">10.00</Amt><BookgDt><Dt>2026-03-15</Dt></BookgDt><Ustrd>Valid CAMT</Ustrd></Ntry>
+    <Ntry><Amt Ccy="EUR"/><BookgDt><Dt>2026-03-16</Dt></BookgDt><Ustrd>Self closing CAMT amount</Ustrd></Ntry>
+    <Ntry><Amt Ccy="EUR">30.00</Amt><BookgDt><Dt/></BookgDt><Ustrd>Self closing CAMT date</Ustrd></Ntry>
+  </Stmt></BkToCstmrStmt>
+</Document>''';
+}
+
 Future<ImportResult> _importCsv(BankImportService service, String csv, BankTemplate template) async {
   final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
   return service.importTransactions(kontoId: _kontoId, rawTxs: rows, template: template);
@@ -130,6 +141,26 @@ void main() {
       expect(result.failedRows.any((ImportRowFailure failure) => failure.transaction.rawBetrag == ''), isTrue);
     }
     expect(await _transactionCount(db), 2, reason: 'Each fixture has exactly one valid row.');
+  });
+
+  test('test_bank_import_row_validation_self_closing_camt_cells_are_empty_row_failures', () async {
+    final AppDatabase db = await _openConfiguredDatabase();
+    addTearDown(db.close);
+    final BankImportService service = BankImportService(db.executor);
+
+    final ImportResult result = await _importCamt(service, _selfClosingCellFixtureCamt());
+
+    expect(result.imported, 1);
+    expect(result.failed, 2);
+    expect(result.status, 'teilweise');
+    expect(result.failedRows, hasLength(2));
+    expect(result.failedRows[0].sourceRowNumber, 2);
+    expect(result.failedRows[0].transaction.rawBetrag, '');
+    expect(result.failedRows[0].diagnostics, <String>['Betrag ungültig']);
+    expect(result.failedRows[1].sourceRowNumber, 3);
+    expect(result.failedRows[1].transaction.rawDatum, '');
+    expect(result.failedRows[1].diagnostics, <String>['Datum ungültig']);
+    expect(await _transactionCount(db), 1);
   });
 
   test('test_bank_import_row_validation_history_status_counts_and_diagnostics', () async {
