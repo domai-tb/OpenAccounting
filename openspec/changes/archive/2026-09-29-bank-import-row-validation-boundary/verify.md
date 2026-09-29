@@ -61,3 +61,19 @@ fvm flutter test --dart-define=platform=vm \
 ```
 
 The prior focused boundary plus existing bank-import suite evidence remains 39 passed, and the prior full Linux/VM suite evidence remains 763 passed. The full VM suite was not rerun after this narrow cleanup. Fresh post-cleanup static and specification gates are recorded in the review round below: analyzer, format, diff-check, strict change validation, and strict spec validation all passed.
+
+## Worker re-verification (2026-09-29, branch `dev`)
+
+Fresh full runs after the cleanup, before archive:
+
+- `fvm flutter test --dart-define=platform=vm test/integration/audit/bank-import-row-validation-boundary_test.dart test/features/bank_import/row_validation_boundary_test.dart` → 7 passed
+- Bank suite (boundary + upload/camt/dedup/failure-accounting/history-fields/parser-dedup-regression/retry-dedup/workflow-integrity) → 40 passed
+- `fvm flutter test --dart-define=platform=vm` → 764 passed, 0 failed, 0 skipped
+- `fvm flutter analyze` → No issues found
+- `fvm dart format --line-length=120 --set-exit-if-changed` on all changed Dart files → clean
+- `git diff --check` → clean
+- `openspec validate bank-import-row-validation-boundary --type change --strict --json` → 1 passed, 0 failed
+
+Tasks 27/27 complete; test-plan 7/7 green; review round 4 fresh `VERDICT: APPROVED` retained as history above.
+
+DECISION: PASS

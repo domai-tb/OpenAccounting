@@ -1,6 +1,6 @@
 # bank-import-row-validation-boundary Specification
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Import rows are validated independently from batch structure
 
