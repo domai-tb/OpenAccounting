@@ -106,18 +106,34 @@ void main() {
     });
 
     test('test_typed_idempotency_conflict_exposes_stable_ordered_fields', () async {
-      final Forderung f = await fixture.forderung();
-      await fixture.repo.zahlungBuchen(forderungId: f.id, betrag: 1, datum: '2026-09-29', idempotencyKey: 'same');
+      final Forderung first = await fixture.forderung();
+      final Forderung second = await fixture.forderung();
+      final List<Object?> before = await fixture.snapshot(first.id);
+      await fixture.repo.zahlungBuchen(
+        forderungId: first.id,
+        betrag: 40,
+        datum: '2026-09-29',
+        idempotencyKey: 'ordered',
+      );
       try {
-        await fixture.repo.zahlungBuchen(forderungId: f.id, betrag: 2, datum: '2026-09-30', idempotencyKey: 'same');
+        // Different target (same direction: both customers), different cents, omitted
+        // date resolving to the injected request day with a different date policy.
+        await fixture.repo.zahlungBuchen(forderungId: second.id, betrag: 50, idempotencyKey: 'ordered');
         fail('expected idempotency conflict');
       } on ForderungenException catch (error) {
         expect(error.code, ForderungenErrorCode.idempotencyConflict);
         expect(error.mismatchFields, <ForderungenMismatchField>[
           ForderungenMismatchField.requestedCents,
+          ForderungenMismatchField.forderungTarget,
+          ForderungenMismatchField.datePolicy,
           ForderungenMismatchField.effectiveDate,
         ]);
       }
+      // Direction matched, so it is absent from the mismatch list; no loser side effects.
+      expect(await fixture.snapshot(first.id), isNot(equals(before)));
+      expect(await _tableCount(fixture.db.executor, 'journal'), 1);
+      expect(await _tableCount(fixture.db.executor, 'forderung_zahlungen'), 1);
+      expect(num.parse((await fixture.snapshot(second.id))[1].toString()), 100);
     });
 
     test('test_public_error_codes_use_explicit_snake_case_wire_values', () {
@@ -292,18 +308,82 @@ void main() {
     });
 
     test('test_persistent_sqlite_lock_exhausts_exactly_three_retries', () async {
-      final Forderung f = await fixture.forderung();
-      final attempts = <int>[];
-      final repo = ForderungenRepository(
-        fixture.db.executor,
-        onPaymentTransactionAttempt: attempts.add,
-        transactionFactory: _AlwaysLockedFactory(),
-      );
-      await expectCode(
-        repo.zahlungBuchen(forderungId: f.id, betrag: 1, idempotencyKey: 'locked'),
-        ForderungenErrorCode.concurrentWriteConflict,
-      );
-      expect(attempts, <int>[1, 2, 3]);
+      final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_lock_payment_');
+      final AppDatabase victimDb = AppDatabase.forProfile(directory.path);
+      final AppDatabase lockerDb = AppDatabase.forProfile(directory.path);
+      try {
+        await victimDb.ensureOpen();
+        await lockerDb.ensureOpen();
+        final ForderungenRepository setupRepo = ForderungenRepository(
+          victimDb.executor,
+          nowUtc: () => DateTime.utc(2026, 9, 30),
+        );
+        await setupRepo.ensureSchema();
+        final int partnerId = await victimDb.executor.runInsert(
+          "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Lock Test', 'A', '10115', 'Berlin', 'DE')",
+          const <Object?>[],
+        );
+        final Forderung f = await setupRepo.create(
+          typ: 'rechnung',
+          betrag: 100,
+          partnerTyp: 'kunde',
+          partnerId: partnerId,
+        );
+        final List<Object?> before = await _accountingSnapshot(victimDb.executor, f.id);
+        final int keyedBefore = await _keyedRelationCount(victimDb.executor, f.id);
+
+        final List<int> attempts = <int>[];
+        final List<_RecordedStatement> recorded = <_RecordedStatement>[];
+        bool inAttempt = false;
+        final ForderungenRepository repo = ForderungenRepository(
+          _PhaseRecordingExecutor(victimDb.executor, recorded, () => inAttempt),
+          nowUtc: () => DateTime.utc(2026, 9, 30),
+          onPaymentTransactionAttempt: (int attempt) {
+            attempts.add(attempt);
+            recorded.add(_RecordedStatement('ATTEMPT_$attempt', inAttempt: true));
+            inAttempt = true;
+          },
+        );
+        await repo.ensureSchema();
+
+        // Fixture setup completed above; a separate file-backed executor now holds the
+        // persistent write lock while the payment command runs its retry window.
+        await lockerDb.executor.runCustom('BEGIN EXCLUSIVE');
+        ForderungenException? conflict;
+        try {
+          await repo.zahlungBuchen(forderungId: f.id, betrag: 5, idempotencyKey: 'locked');
+          fail('expected concurrentWriteConflict while the exclusive lock is held');
+        } on ForderungenException catch (error) {
+          conflict = error;
+        }
+        await lockerDb.executor.runCustom('ROLLBACK');
+
+        expect(attempts, <int>[1, 2, 3]);
+        expect(conflict, isNotNull);
+        expect(conflict.code, ForderungenErrorCode.concurrentWriteConflict);
+        // The failure comes from real SQLite lock contention, not a manufactured error.
+        expect(conflict.cause, isA<SqliteException>());
+        final SqliteException cause = conflict.cause! as SqliteException;
+        expect(cause.resultCode, anyOf(5, 6), reason: 'SQLITE_BUSY or SQLITE_LOCKED expected');
+        expect(cause.extendedResultCode, isNot(517), reason: 'immediate busy, not a deferred snapshot error');
+        // No ensureSchema/DDL/PRAGMA/seed SQL runs during the retry attempts; any setup
+        // SQL is emitted strictly before attempt 1.
+        final List<_RecordedStatement> setupDuringAttempts = recorded
+            .where((_RecordedStatement entry) => entry.inAttempt && _isSetupSql(entry.statement))
+            .toList();
+        expect(setupDuringAttempts, isEmpty);
+        final int firstAttemptIndex = recorded.indexWhere((_RecordedStatement entry) => entry.inAttempt);
+        for (final _RecordedStatement entry in recorded.where((_RecordedStatement e) => _isSetupSql(e.statement))) {
+          expect(recorded.indexOf(entry), lessThan(firstAttemptIndex));
+        }
+        // After lock release the accounting snapshot and keyed relation count are unchanged.
+        expect(await _accountingSnapshot(victimDb.executor, f.id), before);
+        expect(await _keyedRelationCount(victimDb.executor, f.id), keyedBefore);
+      } finally {
+        await victimDb.close();
+        await lockerDb.close();
+        await directory.delete(recursive: true);
+      }
     });
 
     test('test_legacy_key_returns_unknown_fingerprint_conflict', () async {
@@ -359,18 +439,101 @@ void main() {
     });
 
     test('test_persistent_sqlite_lock_exhausts_exactly_three_writeoff_retries', () async {
-      final Forderung f = await fixture.forderung();
-      final attempts = <int>[];
-      final repo = ForderungenRepository(
-        fixture.db.executor,
-        onWriteoffTransactionAttempt: attempts.add,
-        transactionFactory: _AlwaysLockedFactory(),
-      );
-      await expectCode(
-        repo.ausbuchen(forderungId: f.id, grund: 'locked'),
-        ForderungenErrorCode.concurrentWriteConflict,
-      );
-      expect(attempts, <int>[1, 2, 3]);
+      final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_lock_writeoff_');
+      final AppDatabase victimDb = AppDatabase.forProfile(directory.path);
+      final AppDatabase lockerDb = AppDatabase.forProfile(directory.path);
+      try {
+        await victimDb.ensureOpen();
+        await lockerDb.ensureOpen();
+        final ForderungenRepository setupRepo = ForderungenRepository(
+          victimDb.executor,
+          nowUtc: () => DateTime.utc(2026, 9, 30),
+        );
+        await setupRepo.ensureSchema();
+        final int partnerId = await victimDb.executor.runInsert(
+          "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Lock Writeoff', 'A', '10115', 'Berlin', 'DE')",
+          const <Object?>[],
+        );
+        final Forderung f = await setupRepo.create(
+          typ: 'rechnung',
+          betrag: 100,
+          partnerTyp: 'kunde',
+          partnerId: partnerId,
+        );
+        final List<Object?> before = await _accountingSnapshot(victimDb.executor, f.id);
+        final int lossRelationBefore = await _tableCount(victimDb.executor, 'forderung_zahlungen');
+
+        final List<int> attempts = <int>[];
+        final List<_RecordedStatement> recorded = <_RecordedStatement>[];
+        bool inAttempt = false;
+        final ForderungenRepository repo = ForderungenRepository(
+          _PhaseRecordingExecutor(victimDb.executor, recorded, () => inAttempt),
+          nowUtc: () => DateTime.utc(2026, 9, 30),
+          onWriteoffTransactionAttempt: (int attempt) {
+            attempts.add(attempt);
+            recorded.add(_RecordedStatement('ATTEMPT_$attempt', inAttempt: true));
+            inAttempt = true;
+          },
+        );
+        await repo.ensureSchema();
+
+        await lockerDb.executor.runCustom('BEGIN EXCLUSIVE');
+        ForderungenException? conflict;
+        try {
+          await repo.ausbuchen(forderungId: f.id, grund: 'locked');
+          fail('expected concurrentWriteConflict while the exclusive lock is held');
+        } on ForderungenException catch (error) {
+          conflict = error;
+        }
+        await lockerDb.executor.runCustom('ROLLBACK');
+
+        expect(attempts, <int>[1, 2, 3]);
+        expect(conflict, isNotNull);
+        expect(conflict.code, ForderungenErrorCode.concurrentWriteConflict);
+        expect(conflict.cause, isA<SqliteException>());
+        final SqliteException cause = conflict.cause! as SqliteException;
+        expect(cause.resultCode, anyOf(5, 6), reason: 'SQLITE_BUSY or SQLITE_LOCKED expected');
+        expect(cause.extendedResultCode, isNot(517), reason: 'immediate busy, not a deferred snapshot error');
+        // No ensureSchema/DDL/PRAGMA/seed SQL runs during the retry attempts.
+        expect(recorded.where((_RecordedStatement entry) => entry.inAttempt && _isSetupSql(entry.statement)), isEmpty);
+        // Status, balance, and loss-journal/relation counts are unchanged after lock release.
+        expect(await _accountingSnapshot(victimDb.executor, f.id), before);
+        expect(await _tableCount(victimDb.executor, 'forderung_zahlungen'), lossRelationBefore);
+      } finally {
+        await victimDb.close();
+        await lockerDb.close();
+        await directory.delete(recursive: true);
+      }
+    });
+
+    test('test_production_transaction_takes_the_write_lock_immediately', () async {
+      final Directory directory = await Directory.systemTemp.createTemp('openaccounting_receivable_immediate_');
+      final AppDatabase firstDb = AppDatabase.forProfile(directory.path);
+      final AppDatabase secondDb = AppDatabase.forProfile(directory.path);
+      try {
+        await firstDb.ensureOpen();
+        await secondDb.ensureOpen();
+        // The production path opens transactions through executor.beginTransaction().
+        final TransactionExecutor transaction = firstDb.executor.beginTransaction();
+        await transaction.ensureOpen(_TestTransactionUser());
+        Object? competingError;
+        bool exclusiveAcquired = false;
+        try {
+          await secondDb.executor.runCustom('BEGIN EXCLUSIVE');
+          exclusiveAcquired = true;
+        } on SqliteException catch (error) {
+          competingError = error;
+        }
+        if (exclusiveAcquired) await secondDb.executor.runCustom('ROLLBACK');
+        // A competing write lock is denied while the first transaction is open, proving
+        // the default transaction start already holds the write lock (BEGIN IMMEDIATE).
+        expect(competingError, isA<SqliteException>());
+        await transaction.rollback();
+      } finally {
+        await firstDb.close();
+        await secondDb.close();
+        await directory.delete(recursive: true);
+      }
     });
   });
 }
@@ -436,6 +599,12 @@ Future<void> _runObservedBalanceRace() async {
 
     expect(observed, <String>['${f.id}:offen:10000']);
     expect(firstFactory.busySnapshotErrors, 1);
+    // The stale conditional update is bound to the originally observed id/status/observed balance.
+    expect(firstFactory.conditionalUpdates, isNotEmpty);
+    final _ConditionalUpdateCall staleUpdate = firstFactory.conditionalUpdates.first;
+    expect(staleUpdate.statement, contains('WHERE id = ? AND status = ? AND betrag = ?'));
+    expect(staleUpdate.args.sublist(2), <Object?>[f.id, 'offen', '100.00']);
+    expect(_centsOf(staleUpdate.args[4]), 10000, reason: 'observed balance 10000 cents is the bound predicate value');
     expect(firstFactory.deferredAttempts, <int>[1]);
     expect(firstFactory.immediateAttempts, <int>[2]);
     expect(await _tableCount(firstDb.executor, 'journal'), beforeJournalCount + 1);
@@ -478,8 +647,11 @@ Future<void> _runZeroRowPaymentRollbackBranches() async {
       );
       expect(factory.rollbackCount, 1);
       expect(factory.conditionalUpdates, hasLength(1));
-      final List<Object?> bound = factory.conditionalUpdates.single.args;
-      expect(bound.sublist(3), <Object?>[f.id, 'offen', '75.00']);
+      final _ConditionalUpdateCall call = factory.conditionalUpdates.single;
+      expect(call.statement, contains('WHERE id = ? AND status = ? AND betrag = ?'));
+      final List<Object?> bound = call.args;
+      expect(bound.sublist(2), <Object?>[f.id, 'offen', '75.00']);
+      expect(_centsOf(bound[4]), 7500, reason: 'observed balance 7500 cents is the bound predicate value');
       expect(await _accountingSnapshot(db.executor, f.id), before);
       expect(await _orphanRows(db.executor, <String>['Zahlung Forderung #${f.id}']), isEmpty);
     }
@@ -762,6 +934,7 @@ class _DeferredWalTransactionFactory implements ForderungenTransactionFactory {
   int busySnapshotErrors = 0;
   final List<int> deferredAttempts = <int>[];
   final List<int> immediateAttempts = <int>[];
+  final List<_ConditionalUpdateCall> conditionalUpdates = <_ConditionalUpdateCall>[];
 
   @override
   Future<T> run<T>({
@@ -775,12 +948,15 @@ class _DeferredWalTransactionFactory implements ForderungenTransactionFactory {
     }
     if (attempt != 1) {
       immediateAttempts.add(attempt);
-      return _runImmediateTransaction(executor: executor, action: action);
+      return _runImmediateTransaction(
+        executor: executor,
+        action: (QueryExecutor transaction) => action(_RecordingConditionalExecutor(transaction, conditionalUpdates)),
+      );
     }
     deferredAttempts.add(attempt);
     await executor.runCustom('BEGIN DEFERRED');
     try {
-      final T result = await action(executor);
+      final T result = await action(_RecordingConditionalExecutor(executor, conditionalUpdates));
       await executor.runCustom('COMMIT');
       return result;
     } catch (error, stackTrace) {
@@ -982,14 +1158,136 @@ FROM forderungen_legacy''');
   Future<void> close() => db.close();
 }
 
-class _AlwaysLockedFactory implements ForderungenTransactionFactory {
+class _RecordingConditionalExecutor extends QueryExecutor {
+  _RecordingConditionalExecutor(this._delegate, this._calls);
+
+  final QueryExecutor _delegate;
+  final List<_ConditionalUpdateCall> _calls;
+
   @override
-  Future<T> run<T>({
-    required ForderungenTransactionKind kind,
-    required int attempt,
-    required QueryExecutor executor,
-    required Future<T> Function(QueryExecutor transaction) action,
-  }) {
-    throw StateError('database is locked');
+  SqlDialect get dialect => _delegate.dialect;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) =>
+      _delegate.runSelect(statement, args);
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) => _delegate.runInsert(statement, args);
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) {
+    if (statement.startsWith('UPDATE forderungen SET betrag = ?, status = ?')) {
+      _calls.add(_ConditionalUpdateCall(statement, List<Object?>.from(args)));
+    }
+    return _delegate.runUpdate(statement, args);
   }
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) => _delegate.runDelete(statement, args);
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) => _delegate.runCustom(statement, args);
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) => _delegate.runBatched(statements);
+
+  @override
+  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
+
+  @override
+  QueryExecutor beginExclusive() => _delegate.beginExclusive();
+
+  @override
+  Future<void> close() => _delegate.close();
+}
+
+class _RecordedStatement {
+  _RecordedStatement(this.statement, {required this.inAttempt});
+
+  final String statement;
+  final bool inAttempt;
+}
+
+class _PhaseRecordingExecutor extends QueryExecutor {
+  _PhaseRecordingExecutor(this._delegate, this._recorded, this._inAttempt);
+
+  final QueryExecutor _delegate;
+  final List<_RecordedStatement> _recorded;
+  final bool Function() _inAttempt;
+
+  void _record(String statement) => _recorded.add(_RecordedStatement(statement, inAttempt: _inAttempt()));
+
+  @override
+  SqlDialect get dialect => _delegate.dialect;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) => _delegate.ensureOpen(user);
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(String statement, List<Object?> args) {
+    _record(statement);
+    return _delegate.runSelect(statement, args);
+  }
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) {
+    _record(statement);
+    return _delegate.runInsert(statement, args);
+  }
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) {
+    _record(statement);
+    return _delegate.runUpdate(statement, args);
+  }
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) {
+    _record(statement);
+    return _delegate.runDelete(statement, args);
+  }
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) {
+    _record(statement);
+    return _delegate.runCustom(statement, args);
+  }
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) => _delegate.runBatched(statements);
+
+  @override
+  TransactionExecutor beginTransaction() => _delegate.beginTransaction();
+
+  @override
+  QueryExecutor beginExclusive() => _delegate.beginExclusive();
+
+  @override
+  Future<void> close() => _delegate.close();
+}
+
+bool _isSetupSql(String statement) {
+  final String s = statement.trim().toUpperCase();
+  return s.contains('CREATE TABLE') ||
+      s.contains('CREATE INDEX') ||
+      s.contains('CREATE TRIGGER') ||
+      s.contains('ALTER TABLE') ||
+      s.contains('DROP TABLE') ||
+      s.contains('DROP INDEX') ||
+      s.contains('DROP TRIGGER') ||
+      s.startsWith('PRAGMA') ||
+      s.startsWith('INSERT OR IGNORE INTO');
+}
+
+int _centsOf(Object? formatted) => (double.parse(formatted.toString()) * 100).round();
+
+Future<int> _keyedRelationCount(QueryExecutor executor, int forderungId) async {
+  final List<Map<String, Object?>> rows = await executor.runSelect(
+    'SELECT count(*) AS c FROM forderung_zahlungen WHERE forderung_id = ?',
+    <Object?>[forderungId],
+  );
+  return (rows.single['c']! as num).toInt();
 }

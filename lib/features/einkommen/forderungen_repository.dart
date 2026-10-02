@@ -487,8 +487,6 @@ class ForderungenRepository {
   /// Write-off (Forderungsausfall) with Grund required. Atomic via drift transaction.
   Future<Forderung> ausbuchen({required int forderungId, required String grund}) async {
     await ensureSchema();
-    final String reason = grund.trim();
-    if (reason.isEmpty) throw ForderungenException('Grund ist Pflicht');
     if (forderungId <= 0) throw ForderungenException('Forderung-ID ist Pflicht');
     final String now = _dateOnly(_nowUtc().toIso8601String());
     for (int attempt = 1; attempt <= _maxTransactionAttempts; attempt++) {
@@ -498,7 +496,7 @@ class ForderungenRepository {
           kind: ForderungenTransactionKind.writeoff,
           attempt: attempt,
           action: (QueryExecutor transaction) =>
-              _ausbuchenInTransaction(transaction, forderungId: forderungId, reason: reason, datum: now),
+              _ausbuchenInTransaction(transaction, forderungId: forderungId, grund: grund, datum: now),
         );
       } catch (error, stackTrace) {
         if (!_isRetryableLock(error)) Error.throwWithStackTrace(error, stackTrace);
@@ -564,6 +562,26 @@ class ForderungenRepository {
     await afterPaymentStateReadBeforeConditionalUpdate?.call(forderungId, f.status, observedCents);
 
     final int appliedCents = amount.cents < observedCents ? amount.cents : observedCents;
+    final String nextStatus = amount.cents < observedCents ? 'teilbezahlt' : 'bezahlt';
+    final String nextBalance = _fmtCents(observedCents - appliedCents);
+    // Conditional compare-and-set on the observed id/status/balance runs before any
+    // provisional write: a lost race (or stale snapshot) fails on the conditional
+    // update itself and leaves no provisional journal or relation rows behind.
+    final int updated = await transaction.runUpdate(
+      'UPDATE forderungen SET betrag = ?, status = ?, aktualisiert_am = CURRENT_TIMESTAMP '
+      'WHERE id = ? AND status = ? AND betrag = ?',
+      <Object?>[nextBalance, nextStatus, forderungId, f.status, _fmtCents(observedCents)],
+    );
+    if (updated == 0) {
+      throw ForderungenException('Forderung wurde bereits geschlossen', code: ForderungenErrorCode.alreadyClosed);
+    }
+    if (updated != 1) {
+      throw ForderungenException(
+        'Forderungsstatus konnte nicht eindeutig aktualisiert werden',
+        code: ForderungenErrorCode.schemaMigrationFailed,
+      );
+    }
+
     final int paymentJournalId = await transaction.runInsert(
       'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) '
       'VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
@@ -611,22 +629,11 @@ class ForderungenRepository {
       );
     }
 
-    final String nextStatus = amount.cents < observedCents ? 'teilbezahlt' : 'bezahlt';
-    final String nextBalance = _fmtCents(observedCents - appliedCents);
-    final int updated = await transaction.runUpdate(
-      'UPDATE forderungen SET betrag = ?, status = ?, ausgleich_journal_id = ?, aktualisiert_am = CURRENT_TIMESTAMP '
-      'WHERE id = ? AND status = ? AND betrag = ?',
-      <Object?>[nextBalance, nextStatus, paymentJournalId, forderungId, f.status, _fmtCents(observedCents)],
-    );
-    if (updated == 0) {
-      throw ForderungenException('Forderung wurde bereits geschlossen', code: ForderungenErrorCode.alreadyClosed);
-    }
-    if (updated != 1) {
-      throw ForderungenException(
-        'Forderungsstatus konnte nicht eindeutig aktualisiert werden',
-        code: ForderungenErrorCode.schemaMigrationFailed,
-      );
-    }
+    // The closing journal exists now; link it to the closed receivable.
+    await transaction.runUpdate('UPDATE forderungen SET ausgleich_journal_id = ? WHERE id = ?', <Object?>[
+      paymentJournalId,
+      forderungId,
+    ]);
     final Forderung? updatedForderung = await _readForderung(transaction, forderungId);
     if (updatedForderung == null) throw ForderungenException('Forderung konnte nach Zahlung nicht gelesen werden');
     return updatedForderung;
@@ -635,9 +642,12 @@ class ForderungenRepository {
   Future<Forderung> _ausbuchenInTransaction(
     QueryExecutor transaction, {
     required int forderungId,
-    required String reason,
+    required String grund,
     required String datum,
   }) async {
+    // Spec: reason and current open state are validated inside one transaction.
+    final String reason = grund.trim();
+    if (reason.isEmpty) throw ForderungenException('Grund ist Pflicht');
     final Forderung? f = await _readForderung(transaction, forderungId);
     if (f == null) throw ForderungenException('Forderung nicht gefunden');
     final int observedCents = _toCents(f.betrag);

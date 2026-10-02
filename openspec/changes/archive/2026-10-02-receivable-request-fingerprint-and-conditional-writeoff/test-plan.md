@@ -1,7 +1,5 @@
 ## Test Plan
 
-<!-- Blocked until review.md reaches an independently verified APPROVE. -->
-
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Keyed payments persist and compare a canonical request fingerprint | A keyed payment stores its canonical fingerprint and applies once | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_keyed_payment_persists_canonical_fingerprint_and_applies_once | 🟢 green |
@@ -23,7 +21,7 @@
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A reused key with a different target is a typed conflict | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_reused_key_with_different_target_is_typed_conflict | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A reused key with a different effective date or date policy is a typed conflict | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_reused_key_with_different_date_is_typed_conflict | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | Concurrent identical keyed requests commit one effect | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_concurrent_identical_keyed_requests_commit_one_effect | 🟢 green |
-| specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A deferred WAL conflicting-key barrier reloads the loser without changing production locking | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_concurrent_conflicting_key_race_reloads_loser_with_ordered_fields | 🟢 green |
+| specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A concurrent conflicting key race reloads the loser and has no side effects | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_concurrent_conflicting_key_race_reloads_loser_with_ordered_fields | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A deferred WAL SQLITE_BUSY_SNAPSHOT loser reloads and classifies a conflicting key | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_deferred_wal_sqlite_busy_snapshot_reloads_and_classifies_idempotency_conflict | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Idempotent replay is fingerprint-safe | A persistent SQLite lock exhausts exactly three bounded retries | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_persistent_sqlite_lock_exhausts_exactly_three_retries | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Legacy payment rows have an explicit unknown-fingerprint policy | A v7 lazy table migrates without changing legacy rows | test/db/receivable_request_migration_test.dart | test_v7_lazy_table_migrates_without_changing_legacy_rows | 🟢 green |
@@ -39,7 +37,7 @@
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | A second simultaneous write-off returns already-closed | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_two_simultaneous_writeoffs_commit_one_effect | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | Write-off and full payment race without an orphan | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_writeoff_and_full_payment_race_has_one_effect_no_orphan | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | Invalid reason or already-closed state has no write-off effect | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_invalid_or_closed_writeoff_has_no_effect | 🟢 green |
-| specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | A deferred fixture exposes an observed-balance payment race without changing production locking | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_conditional_payment_update_rolls_back_on_observed_balance_race | 🟢 green |
+| specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | A conditional payment update detects an observed-balance race | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_conditional_payment_update_rolls_back_on_observed_balance_race | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | An ordinary zero-row conditional payment update is already-closed for every branch | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_ordinary_zero_row_conditional_payment_update_is_already_closed_for_every_branch | 🟢 green |
 | specs/receivable-request-fingerprint-and-conditional-writeoff/spec.md → Write-off and payment transitions are conditional and atomic | A persistent SQLite lock exhausts exactly three write-off retries | test/features/einkommen/forderungen_request_fingerprint_test.dart | test_persistent_sqlite_lock_exhausts_exactly_three_writeoff_retries | 🟢 green |
 
@@ -57,16 +55,23 @@ WAL fixture separately
 forces extended code 517 through a test-only payment transaction-factory override that opens `BEGIN DEFERRED`, then
 asserts a fresh production `BEGIN IMMEDIATE` reload/classification as `idempotencyConflict`; production, migration,
 startup, and write-off paths never use the override. The observed-balance test uses the same narrowly scoped deferred
-fixture, records the original observed id/status/cents and final `alreadyClosed` result, and asserts no provisional
-payment rows. Migration tests also use a recording executor to prove fresh startup, v7 upgrade, current-v8 repair, and
+fixture, records the original observed id/status/cents and final `alreadyClosed` result, and asserts the stale
+conditional update's bound id/status/observed-balance predicate. Production payment runs the conditional
+compare-and-set before any provisional write, so the stale attempt fails with extended 517 on the conditional
+update itself; no provisional payment rows survive. Migration tests also use a recording executor to prove fresh startup, v7 upgrade, current-v8 repair, and
 injected current-v8 rollback share the current raw `BEGIN`/`COMMIT`/`ROLLBACK` helper without a production migration
 delegate. The ordinary conditional payment test separately forces `runUpdate == 0` under production `BEGIN IMMEDIATE`
-for partial, full, and overpayment branches, records original id/status/cents predicate bindings, and asserts
-`alreadyClosed` with no provisional rows. The persistent-lock tests complete `ensureSchema`/schema setup before acquiring
-`BEGIN EXCLUSIVE`, assert zero setup SQL during attempts, and allow only harmless in-memory parsing/counters while the
-lock is held; they then assert their separate exact attempt sequences
-`[1, 2, 3]`, `concurrentWriteConflict`, rollback, and unchanged snapshots. Existing happy-path tests remain baseline
-only. The plan deliberately excludes credit-item, refund, Gutschrift, and
+for partial, full, and overpayment branches, records the `WHERE id = ? AND status = ? AND betrag = ?` predicate
+bindings with the observed balance in cents, and asserts `alreadyClosed` with no provisional rows. The persistent-lock
+tests complete `ensureSchema`/schema setup on a separate file-backed victim executor, then hold a real
+`BEGIN EXCLUSIVE` on a second `AppDatabase` instance for the whole command. A phase-recording executor asserts that no
+ensureSchema/DDL/PRAGMA/seed SQL runs during any attempt window and that all setup SQL precedes attempt 1; each test
+asserts its exact attempt sequence `[1, 2, 3]`, typed `concurrentWriteConflict`, a real `SqliteException` cause with
+resultCode 5/6 (not extended 517) so the failure comes from genuine SQLite lock contention rather than a
+manufactured error, and unchanged status/balance/journal/relation snapshots after lock release. A supplementary test
+(`test_production_transaction_takes_the_write_lock_immediately`) proves the production transaction path holds the
+write lock immediately by showing a competing `BEGIN EXCLUSIVE` is denied while it is open. Existing happy-path tests
+remain baseline only. The plan deliberately excludes credit-item, refund, Gutschrift, and
 bank-reconciliation policy; the existing overpayment branch is covered only by conditional rollback assertions.
 
 Linux acceptance uses `fvm flutter analyze`, the focused tests, `fvm flutter test --dart-define=platform=vm`, and `fvm flutter build linux --debug`. Static macOS/Windows acceptance records analyzer results plus `fvm flutter build macos --config-only` and `fvm flutter build windows --config-only` when the installed SDK can evaluate those targets; no Linux run is reported as native runtime evidence.

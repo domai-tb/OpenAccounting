@@ -174,7 +174,7 @@ by reload/compare and never mapped as a migration error.
 
 ### Conditional write-off and cross-command race
 
-Inside one transaction, validate the trimmed reason, load the current row, and allow only `offen`/`teilbezahlt` with positive cents. Insert the loss journal and relation, then update with `WHERE id = ? AND status = ? AND betrag = ?`, binding the observed status and canonical observed cents. Require `runUpdate` to affect exactly one row (zero is `alreadyClosed`; anything other than one is `schemaMigrationFailed`), and rollback removes the just-created journal/relation. Payment applies the same exact predicate for every branch: partial (`teilbezahlt`, observed minus requested), full (`bezahlt`, zero), and overpayment (`bezahlt`, zero plus the existing excess journal/relation). A zero-row payment update rolls back all provisional rows and returns `alreadyClosed`. Separate repository instances over separate executors race in tests; the implementation must use the same bounded three-attempt lock retry and never retry after a committed effect.
+Inside one transaction, validate the trimmed reason, load the current row, and allow only `offen`/`teilbezahlt` with positive cents. Insert the loss journal and relation, then update with `WHERE id = ? AND status = ? AND betrag = ?`, binding the observed status and canonical observed cents. Require `runUpdate` to affect exactly one row (zero is `alreadyClosed`; anything other than one is `schemaMigrationFailed`), and rollback removes the just-created journal/relation. Payment applies the same exact predicate for every branch: partial (`teilbezahlt`, observed minus requested), full (`bezahlt`, zero), and overpayment (`bezahlt`, zero plus the existing excess journal/relation). The payment conditional compare-and-set runs before any provisional payment/overpayment write, so a stale snapshot or lost race fails on the conditional update itself and no provisional row is ever left behind; a zero-row payment update therefore leaves no provisional rows and returns `alreadyClosed`. The closing `ausgleich_journal_id` link is applied by a follow-up update inside the same transaction after the closing journal insert, because the foreign key requires the journal row to exist first. Separate repository instances over separate executors race in tests; the implementation must use the same bounded three-attempt lock retry and never retry after a committed effect.
 
 For the observed-balance payment interleaving, `ForderungenRepository` exposes an optional
 `@visibleForTesting` callback
@@ -195,7 +195,9 @@ The ordinary conditional-update red test uses the production `BEGIN IMMEDIATE` r
 executor seam that lets the conditional `runUpdate` execute with its bound arguments but returns affected-row count
 `0`. It runs the partial, full, and existing overpayment branches against Forderung id `11`, observed status
 `offen`, and observed balance `7500` cents. For every branch, the recorded predicate MUST be exactly
-`WHERE id = 11 AND status = 'offen' AND betrag = 7500` (with bound parameters, not interpolated SQL); the command MUST
+`WHERE id = 11 AND status = 'offen' AND betrag = 7500` (with bound parameters, not interpolated SQL); the
+`betrag = 7500` value denotes the observed balance of 7500 cents and is bound as its canonical decimal text
+`'75.00'` (the column stores decimal amounts, so integer cents would not match), never interpolated; the command MUST
 return typed `alreadyClosed`, roll back every provisional payment/overpayment journal and relation, and leave the
 balance and pre-test counts unchanged. This seam does not alter production locking or the deferred snapshot fixture.
 

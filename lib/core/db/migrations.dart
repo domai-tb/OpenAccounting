@@ -264,8 +264,10 @@ class MigrationRunner {
       const <Object?>[],
     );
     if (tableRows.isEmpty) {
+      // Create the table, then fall through to the shared constraint creation and
+      // verification so a freshly created feature table is verified before the
+      // migration transaction commits and `user_version` is raised.
       await executor.runCustom(_receivablePaymentTableSql);
-      return;
     }
     final columnsRows = await executor.runSelect('PRAGMA table_info(forderung_zahlungen)', const <Object?>[]);
     final columns = <String>{for (final row in columnsRows) row['name'].toString()};

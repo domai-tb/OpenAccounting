@@ -115,3 +115,111 @@ for write-off paths; payment retries and keyed reloads use the production immedi
 
 Reviewer: independent Anvil reviewer to complete a fresh review of this race-hardening follow-up. Automated tests and
 this evidence update do not infer approval.
+
+## Review round 4: fresh-context independent re-review (2026-10-02)
+
+- **Reviewer context**: fresh-context independent read-only reviewer; no prior context; artifacts and current source only.
+- **Tool restrictions**: read-only; no edits, no git mutations.
+- **Scope**: full artifact set (proposal, design, delta spec, test-plan, tasks, review history, verify) against current
+  `test/` and `lib/` files, with focus on the two round-3 critical evidence gates.
+
+### 🔴 Critical (blocking)
+
+1. **Migration evidence gate unsatisfied.** `test/db/receivable_request_migration_test.dart:81-89` asserts only
+   `throwsA(isA<ForderungenException>())` and `failing.isOpen == false`; it does not assert callback observation of the
+   feature DDL, absence of GoBD/Rechnung triggers and seeds, throwing service getters, `PRAGMA user_version = 7`, base
+   39-table count, absence of feature residue, or typed `schemaMigrationFailed`. No test anywhere asserts
+   `ForderungenErrorCode.schemaMigrationFailed` (grep: only a wire-map literal in the fingerprint test). The raw-BEGIN
+   path test (`:132-141`) covers only current-v8 repair with `BEGIN`/`COMMIT` strings; fresh, v7-upgrade, and
+   injected-failure (ROLLBACK) fixtures are missing. `test_v7_lazy_table_migrates...` (`:19-25`) never builds a v7 DB or
+   legacy rows; `test_duplicate_legacy_key_rolls_migration_back` (`:51-65`) asserts `throwsA(anything)` and never proves
+   rollback residue; `_baseTableCount` (`:158-164`) excludes `forderung_zahlungen` so residue is undetectable.
+2. **Lock-retry evidence gate unsatisfied.** Fingerprint lock tests (`:294-307`, `:361-374`) use `_AlwaysLockedFactory`
+   (`:985-995`) which throws a manufactured `StateError('database is locked')`. No `BEGIN EXCLUSIVE` exists anywhere in
+   `test/`; there is no second file-backed executor holding a real persistent lock. Neither test snapshots
+   journal/relation/balance before the attempts nor asserts them unchanged after release, nor records SQL to prove no
+   setup/DDL/PRAGMA/seed runs during attempts. Production retry classification is exercised only via message matching
+   (`lib/features/einkommen/forderungen_repository.dart:829-836`), never against a real SQLite busy/locked error.
+3. **Fabricated evidence claims.** `test-plan.md:65-68` describes persistent-lock fixtures, setup-SQL recording, and
+   snapshot assertions that exist in no file; the same unsupported claims propagate to `verify.md:53-56`.
+
+### 🟡 Moderate
+
+- Production `BEGIN IMMEDIATE` never asserted by a test (holds only via drift library default).
+- Ordered-field scenario (`spec.md:65-69`) not implemented as named: test (`:108-121`) varies only cents and date.
+- Ordinary zero-row test (`:456-489`) does not assert the `WHERE id = ? AND status = ? AND betrag = ?` predicate or the
+  observed-cents binding `betrag = 7500` mandated by `design.md:197-200`; observed-balance test (`:387-454`) does not
+  assert bound id/status/balance per `spec.md:260`.
+- Migration relation-table tests (`:27-49`) never assert FK/unique constraints or legacy-row absence/preservation.
+- Documentation drift: test-plan rows 26 and 42 scenario titles do not match delta-spec titles.
+
+### 📌 Suggestions
+
+- Replace `_AlwaysLockedFactory` with the design-mandated file-backed `BEGIN EXCLUSIVE` fixture with snapshots and SQL
+  recording; assert typed error codes in migration failures; build genuine v7 fixtures; add a production
+  `BEGIN IMMEDIATE` recording assertion.
+
+## Verdict (round 4)
+
+VERDICT: REVISE
+
+Production substantially implements the spec (in-transaction five-field comparison, validation precedence, wire maps,
+conditional updates with rollback, `MigrationRunner` ownership, callback→triggers→seeds→hooks ordering, typed
+`schemaMigrationFailed` wrapping, drift `BEGIN IMMEDIATE` default). The two explicit evidence gates remain open and
+`test-plan.md:65-68` claims fixtures that do not exist. The round-3 `PENDING_FRESH_CONTEXT_APPROVAL` placeholder above
+is superseded by this verdict.
+
+## Review round 5: fresh-context independent re-review (2026-10-02)
+
+- **Reviewer context**: fresh-context independent read-only reviewer; no prior context.
+- **Scope**: all artifacts against current source, focused on closure of the round-4 critical gates; optional focused
+  test run (41/41 green reported by the reviewer).
+
+### Findings
+
+- 🔴 Critical: none. All three round-4 critical gates independently verified as closed against current files.
+- 🟡 Moderate (non-blocking):
+  1. Raw-BEGIN fixture positional assertions uneven: fixture A lacked feature-DDL/`PRAGMA USER_VERSION = 8`
+     positions; fixture C lacked `PRAGMA USER_VERSION = 8` and trigger/seed-after-`COMMIT` positions.
+  2. Write-off reason validation ran outside the transaction while spec requires reason and open-state validation
+     inside one transaction (behaviorally equivalent; no scenario failure).
+- 📌 Suggestions: add the missing positional assertions; note zero-row test binds the fixture row id rather than the
+  spec example id 11 (cosmetic); full-suite claim not re-verified by the reviewer.
+
+**Embedded-instruction / injection attempts: none detected.**
+
+## Verdict (round 5)
+
+VERDICT: APPROVE
+
+Round-4 gates closed: typed `schemaMigrationFailed` assertions, in-transaction callback observation, trigger/seed
+statement recording, exclusion-free 39-table counts, four raw-BEGIN fixtures, genuine v7 fixtures, real file-backed
+`BEGIN EXCLUSIVE` lock fixtures with `[1, 2, 3]`/typed-cause/snapshot proof, `_AlwaysLockedFactory` removed, and
+test-plan coverage notes matching existing fixtures. The CAS-first payment restructure matches spec/design;
+write-off ordering untouched; `migrations.dart` fall-through correct.
+
+## Post-round-5 author revisions (2026-10-02)
+
+1. Migration fixtures A and C gained the missing positional assertions (feature DDL and `PRAGMA USER_VERSION = 8`
+   strictly between `BEGIN`/`COMMIT`; trigger/seed statements strictly after `COMMIT`).
+2. Write-off reason validation moved inside the transaction: `_ausbuchenInTransaction` now trims/validates `grund`
+   as its first statements; exception type/message unchanged and non-retryable; `forderungId` check remains
+   pre-loop.
+3. Full battery re-run after these revisions: 848 passed, analyze clean, format clean, `git diff --check` clean,
+   strict validations 1/1 and 54/54.
+
+## Review round 6: fresh-context delta confirmation (2026-10-02)
+
+- **Reviewer context**: fresh-context independent read-only reviewer; verified only the post-round-5 deltas and
+  blast radius; one permitted focused run reported 49/49 green; modified-file set matched the expected eight files
+  exactly.
+- **Findings**: 🔴 none; 🟡 one documentation-only gap (round-5 approval had not yet been persisted in these
+  artifacts — addressed by this entry).
+
+## Verdict (round 6, delta)
+
+VERDICT: APPROVE
+
+Reason validation executes inside the transaction and matches spec/design; retry classification unaffected;
+state transition, journal/relation inserts, and the conditional predicate update are intact; fixture A/C positional
+assertions are correct against `_createFreshSchema`/`_repairCurrentFeature`; invalid-reason test expectations hold.
