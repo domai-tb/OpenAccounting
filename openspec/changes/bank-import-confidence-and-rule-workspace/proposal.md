@@ -8,8 +8,12 @@ The banking page lets users edit categories before import, but it does not show 
 - Expose the profile's automatic/manual import mode and a one-import override; automatic matching may link to an existing journal entry, but this change creates no journal entry or payment.
 - Add a Banking rule-management view for listing, creating, editing, enabling, prioritizing, and deleting the existing category rules.
 - Make import history actionable with detail, failed-row retry under the original import identity, and a filtered view of transactions awaiting review.
+- Persist a versioned, validated retry payload containing every field needed to restore a failed reviewed row; treat legacy diagnostics and rejected whole-file attempts as non-retryable.
+- Define row review state using the existing `bank_transaktionen.status` values `neu`, `geprueft`, and `gebucht`, and derive unresolved counts from `status = 'neu'`.
+- Add the profile mode through ordered migration 9 with a manual default for fresh and existing profiles.
+- Put score, rule, mode, history, retry, and row-review operations behind the typed application-scope Banking use case and repository.
 - Preserve deduplication and partial-failure boundaries; new posting or payment allocation remains governed by the balanced-posting capability.
-- Align `docs/04-bank-import.md` scoring, rules, import modes, recovery, and history details with the maintained OpenSpec contract.
+- Align all of `docs/04-bank-import.md` with maintained OpenSpec and Dart behavior: template/parser claims, no-posting behavior, rule fields/order, 40/30/30 score, dedup hash inputs and schema, ordered mode migration, retry/review semantics, and history query behavior.
 - Apply `DESIGN.md` components, responsive behavior, generated localization, keyboard access, and non-color status cues to the added Banking views.
 
 ## Capabilities
