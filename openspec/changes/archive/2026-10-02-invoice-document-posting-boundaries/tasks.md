@@ -32,4 +32,4 @@
 
 - [x] 6.1 Run focused invoice, receivable, PDF artifact, and inventory tests; flip every passing test-plan row to green and investigate any mismatch.
 - [x] 6.2 Run `fvm flutter analyze`, the full VM test suite, strict OpenSpec change/spec validation, and `git diff --check`; record exact results in `verify.md`.
-- [ ] 6.3 Synchronize the three accepted delta specs into the main documents, accounting, and inventory specs, archive the completed change, and validate the archived result.
+- [x] 6.3 Synchronize the three accepted delta specs into the main documents, accounting, and inventory specs, archive the completed change, and validate the archived result.
