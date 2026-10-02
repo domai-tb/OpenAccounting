@@ -44,10 +44,14 @@ void main() {
       );
     }
 
-    Future<int> seedEingangsRechnung({required int lieferantId, num brutto = 200.00}) async {
+    Future<int> seedEingangsRechnung({
+      required int lieferantId,
+      num brutto = 200.00,
+      String typ = 'rechnung_eingang',
+    }) async {
       return db.executor.runInsert(
-        "INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, brutto_betrag) VALUES (?, 'rechnung_eingang', 'final', 0, 'netto', NULL, ?, '2026-03-01', ?)",
-        ['ER-${DateTime.now().millisecondsSinceEpoch}', lieferantId, brutto],
+        "INSERT INTO rechnungen (rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, brutto_betrag) VALUES (?, ?, 'final', 0, 'netto', NULL, ?, '2026-03-01', ?)",
+        ['ER-${DateTime.now().millisecondsSinceEpoch}', typ, lieferantId, brutto],
       );
     }
 
@@ -62,6 +66,29 @@ void main() {
       expect(f.partnerTyp, 'kunde');
       expect(f.partnerId, kundeId);
       expect(f.rechnungId, rechnungId);
+    });
+
+    test('test_create_for_rechnung_rejects_finalized_offer', () async {
+      final kundeId = await seedKunde();
+      final offerId = await seedRechnung(kundeId: kundeId, typ: 'angebot');
+
+      await expectLater(usecases.forderungFuerRechnung(offerId), throwsA(isA<ForderungenException>()));
+      expect(
+        await db.executor.runSelect('SELECT id FROM forderungen WHERE rechnung_id = ?', <Object?>[offerId]),
+        isEmpty,
+      );
+    });
+
+    test('test_create_for_rechnung_accepts_incoming_alias', () async {
+      final lieferantId = await seedLieferant();
+      final invoiceId = await seedEingangsRechnung(lieferantId: lieferantId, typ: ' EingangsRechnung ');
+
+      final payable = await usecases.forderungFuerRechnung(invoiceId);
+
+      expect(payable, isNotNull);
+      expect(payable!.typ, 'rechnung_eingang');
+      expect(payable.partnerTyp, 'lieferant');
+      expect(payable.partnerId, lieferantId);
     });
 
     test('Forderung Teilzahlung aktualisiert betrag und status teilbezahlt', () async {

@@ -74,12 +74,10 @@ void main() {
       expect(double.parse(forderungen.single['betrag'].toString()), closeTo(119.0, 0.001));
       expect(forderungen.single['journal_id'], journals.single['id']);
 
-      // Outgoing with VAT also creates tax claim in current minimal model — assert presence
       final taxes = await db.executor.runSelect('SELECT * FROM vorsteuer_ansprueche WHERE rechnung_id = ?', <Object?>[
         rechnungId,
       ]);
-      expect(taxes.length, 1);
-      expect(double.parse(taxes.single['betrag'].toString()), closeTo(19.0, 0.001));
+      expect(taxes, isEmpty, reason: 'outgoing VAT must not create an input-tax claim');
     });
 
     test('test_invoice_accounting_posting_lifecycle_1_2_incoming_invoice_creates_input_tax_state', () async {
@@ -244,15 +242,13 @@ void main() {
         'SELECT * FROM vorsteuer_ansprueche WHERE rechnung_id = ?',
         <Object?>[rechnungId],
       );
-      expect(taxBefore.length, 1);
+      expect(taxBefore, isEmpty, reason: 'an outgoing source invoice has no input-tax claim');
 
       // Ensure journal grouping is stable after storno
       final originalGruppeId = journalBefore.single['gruppe_id'];
       final originalJournalId = journalBefore.single['id'];
       final originalBetrag = double.parse(journalBefore.single['betrag'].toString());
       final originalForBetrag = double.parse(forderungBefore.single['betrag'].toString());
-      final originalTaxBetrag = double.parse(taxBefore.single['betrag'].toString());
-
       final int stornoId = await ds.stornoRechnung(rechnungId: rechnungId, grund: 'Korrektur');
 
       final stornoRow = (await db.executor.runSelect(
@@ -298,8 +294,7 @@ void main() {
         'SELECT * FROM vorsteuer_ansprueche WHERE rechnung_id = ?',
         <Object?>[stornoId],
       );
-      expect(reversalTax.length, 1, reason: 'storno must create one reversal tax');
-      expect(double.parse(reversalTax.single['betrag'].toString()), closeTo(-originalTaxBetrag, 0.001));
+      expect(reversalTax, isEmpty, reason: 'Storno cannot reverse a tax claim for an outgoing invoice');
 
       // Net zero check
       final sumJournals = originalBetrag + double.parse(reversalJournals.single['betrag'].toString());

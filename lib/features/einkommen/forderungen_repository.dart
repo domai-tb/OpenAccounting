@@ -354,9 +354,13 @@ class ForderungenRepository {
       throw ForderungenException('Nur finalisierte Rechnungen erzeugen eine Forderung');
     }
     final typRaw = (r['typ'] as String?) ?? 'rechnung';
+    final int? lieferantId = (r['lieferant_id'] as num?)?.toInt();
+    if (!RechnungTyp.isInvoice(typRaw)) {
+      throw ForderungenException('Nur Rechnungen erzeugen eine Forderung');
+    }
     final brutto = _asNum(r['brutto_betrag']) ?? 0;
-    final isEingang = RechnungTyp.isEingang(typRaw) || r['lieferant_id'] != null;
-    final typ = RechnungTyp.forderungTypFor(typ: typRaw, lieferantId: r['lieferant_id'] as int?);
+    final isEingang = RechnungTyp.isIncomingInvoice(typRaw, lieferantId: lieferantId);
+    final typ = RechnungTyp.forderungTypFor(typ: typRaw, lieferantId: lieferantId);
     final partnerTyp = isEingang ? 'lieferant' : 'kunde';
     final partnerId = isEingang ? (r['lieferant_id'] as int?) : (r['kunde_id'] as int?);
     if (partnerId == null) return null;

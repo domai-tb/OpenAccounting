@@ -19,12 +19,17 @@ class RechnungTyp {
 
   static bool isEingang(String? raw) => raw != null && canonicalize(raw) == eingang;
 
+  static bool isInvoice(String? raw) => raw != null && allowed.contains(canonicalize(raw));
+
+  static bool isIncomingInvoice(String? raw, {int? lieferantId}) =>
+      isInvoice(raw) && (isEingang(raw) || lieferantId != null);
+
   // — Posting rules helper: single source for beleg/forderung derivation (no bypass of snapshot/immutable).
 
   /// Derive journal beleg_typ from rechnung typ + lieferant linkage.
   static String belegTypFor({required String typ, int? lieferantId}) =>
-      isEingang(typ) || lieferantId != null ? 'Ausgabe' : 'Einnahme';
+      isIncomingInvoice(typ, lieferantId: lieferantId) ? 'Ausgabe' : 'Einnahme';
 
   static String forderungTypFor({required String typ, int? lieferantId}) =>
-      isEingang(typ) || lieferantId != null ? eingang : rechnung;
+      isIncomingInvoice(typ, lieferantId: lieferantId) ? eingang : rechnung;
 }

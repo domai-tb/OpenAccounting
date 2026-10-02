@@ -247,6 +247,15 @@ WHERE id = ?
         throw StateError('Rechnungsdatum ist ungültig');
       }
       final typ = invoice['typ']?.toString() ?? 'rechnung';
+      final int? lieferantId = _asInt(invoice['lieferant_id']);
+      final bool isInvoice = RechnungTyp.isInvoice(typ);
+      final bool isIncomingInvoice = RechnungTyp.isIncomingInvoice(typ, lieferantId: lieferantId);
+      final bool isOutgoingInvoice = isInvoice && !isIncomingInvoice;
+      const documentOnlyTypes = <String>{'angebot', 'auftrag', 'proforma', 'lieferschein'};
+      final bool isDocumentOnly = documentOnlyTypes.contains(typ.trim().toLowerCase());
+      if (!isInvoice && !isDocumentOnly) {
+        throw StateError('Unbekannter oder für generische Finalisierung nicht unterstützter Dokumenttyp: $typ');
+      }
       final eingabemodus = invoice['eingabemodus']?.toString() ?? 'netto';
       final posRows = await transaction.runSelect(
         'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
@@ -273,7 +282,7 @@ WHERE id = ?
         rabattProzent: rabattProzent == 0 ? null : rabattProzent,
         rabattBetrag: rabattBetrag == 0 ? null : rabattBetrag,
       );
-      final kreisTyp = _nummernkreisTypFor(typ);
+      final kreisTyp = _nummernkreisTypFor(typ, lieferantId: lieferantId);
       final rangeRows = await transaction.runSelect(
         '''
 SELECT id, format, naechste_nummer, aktiv
@@ -343,77 +352,87 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         throw StateError('Rechnungsausgang-Nummernkreis konnte nicht atomar reserviert werden');
       }
 
-      await _ensureInventarTable(transaction);
-      // Validierung: Minusbestand prüfen bevor gebucht wird (atomar)
-      final insufficient = <String>[];
-      final lagerItems = <Map<String, Object?>>[];
-      for (final p in posRows) {
-        final artikelId = p['artikel_id'];
-        if (artikelId == null) continue;
-        final rows = await transaction.runSelect(
-          'SELECT lager_aktiv, bestand, bestand_aktuell, minusbestand_erlaubt, bezeichnung FROM artikel WHERE id = ?',
-          <Object?>[artikelId],
-        );
-        if (rows.isEmpty) continue;
-        final lagerRaw = _asInt(rows.single['lager_aktiv']) == 1;
-        final bestandLegacy = _asNum(rows.single['bestand']);
-        final bestandAktuell = _asNum(rows.single['bestand_aktuell']);
-        final isLegacy = !lagerRaw && bestandAktuell == 0 && bestandLegacy != 0;
-        final lagerAktiv = lagerRaw || isLegacy;
-        if (!lagerAktiv) continue;
-        final effBestand = bestandAktuell != 0 ? bestandAktuell : bestandLegacy;
-        lagerItems.add({...p, '_eff': effBestand, '_isLegacy': isLegacy});
-        final minusErlaubt = _asInt(rows.single['minusbestand_erlaubt']) == 1;
-        final menge = _asNum(p['menge']);
-        if (!minusErlaubt && effBestand - menge < -0.0001) {
-          insufficient.add(rows.single['bezeichnung'].toString());
-        }
-      }
-      if (insufficient.isNotEmpty) {
-        throw StateError('Bestand unzureichend für Artikel: ${insufficient.join(', ')}');
-      }
-      for (final p in lagerItems) {
-        final artikelId = p['artikel_id'];
-        final menge = _asNum(p['menge']);
-        final num eff = _asNum(p['_eff']);
-        final isLegacy = p['_isLegacy'] == true;
-        final newStock = eff - menge;
-        if (isLegacy) {
-          await transaction.runUpdate(
-            'UPDATE artikel SET bestand_aktuell = ?, bestand = ?, lager_aktiv = 1 WHERE id = ?',
-            <Object?>[newStock, newStock, artikelId],
-          );
-        } else {
-          await transaction.runUpdate(
-            'UPDATE artikel SET bestand_aktuell = bestand_aktuell - ?, bestand = bestand - ? WHERE id = ?',
-            <Object?>[menge, menge, artikelId],
+      if (isOutgoingInvoice) {
+        await _ensureInventarTable(transaction);
+        final quantityByArticle = <int, num>{};
+        for (final position in posRows) {
+          final articleId = _asInt(position['artikel_id']);
+          if (articleId == null) continue;
+          quantityByArticle.update(
+            articleId,
+            (quantity) => quantity + _asNum(position['menge']),
+            ifAbsent: () => _asNum(position['menge']),
           );
         }
-        await transaction.runInsert(
-          'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
-          'VALUES (?, ?, ?, ?, ?, ?)',
-          <Object?>[
-            artikelId,
-            invoiceDate.toIso8601String().substring(0, 10),
-            -menge,
-            'Rechnungsausgang $documentNumber',
-            'rechnung',
-            rechnungId,
-          ],
-        );
+
+        final insufficient = <String>[];
+        final lagerItems = <({int artikelId, num menge, num bestand, bool isLegacy})>[];
+        for (final entry in quantityByArticle.entries) {
+          final rows = await transaction.runSelect(
+            'SELECT lager_aktiv, bestand, bestand_aktuell, minusbestand_erlaubt, bezeichnung FROM artikel WHERE id = ?',
+            <Object?>[entry.key],
+          );
+          if (rows.isEmpty) continue;
+          final article = rows.single;
+          final lagerRaw = _asInt(article['lager_aktiv']) == 1;
+          final bestandLegacy = _asNum(article['bestand']);
+          final bestandAktuell = _asNum(article['bestand_aktuell']);
+          final isLegacy = !lagerRaw && bestandAktuell == 0 && bestandLegacy != 0;
+          if (!lagerRaw && !isLegacy) continue;
+          final bestand = isLegacy ? bestandLegacy : bestandAktuell;
+          lagerItems.add((artikelId: entry.key, menge: entry.value, bestand: bestand, isLegacy: isLegacy));
+          final minusErlaubt = _asInt(article['minusbestand_erlaubt']) == 1;
+          if (!minusErlaubt && bestand - entry.value < -0.0001) {
+            insufficient.add(article['bezeichnung'].toString());
+          }
+        }
+        if (insufficient.isNotEmpty) {
+          throw StateError('Bestand unzureichend für Artikel: ${insufficient.join(', ')}');
+        }
+        for (final item in lagerItems) {
+          final newStock = item.bestand - item.menge;
+          if (item.isLegacy) {
+            await transaction.runUpdate(
+              'UPDATE artikel SET bestand_aktuell = ?, bestand = ?, lager_aktiv = 1 WHERE id = ?',
+              <Object?>[newStock, newStock, item.artikelId],
+            );
+          } else {
+            await transaction.runUpdate(
+              'UPDATE artikel SET bestand_aktuell = bestand_aktuell - ?, bestand = bestand - ? WHERE id = ?',
+              <Object?>[item.menge, item.menge, item.artikelId],
+            );
+          }
+          await transaction.runInsert(
+            'INSERT INTO inventarbewegungen (artikel_id, datum, diff, grund, referenz_typ, referenz_id) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            <Object?>[
+              item.artikelId,
+              invoiceDate.toIso8601String().substring(0, 10),
+              -item.menge,
+              'Rechnungsausgang $documentNumber',
+              'rechnung',
+              rechnungId,
+            ],
+          );
+        }
       }
 
       // Generate and write PDF artifact under the active profile — atomic via temp+rename.
       // Snapshot is immutable: built from transaction-captured rows, defensive copy via PdfDocumentSnapshot.from
       final effectiveProfileDir = profileDir?.path ?? this.profileDir;
-      final pdfDir = effectiveProfileDir != null ? Directory('$effectiveProfileDir/pdfs') : null;
+      final pdfDir = effectiveProfileDir != null ? Directory('$effectiveProfileDir/pdfs/documents') : null;
       String pdfPath;
       File? tmpFile;
       if (pdfDir != null) {
         pdfDir.createSync(recursive: true);
-        final pdfFile = File('${pdfDir.path}/$documentNumber.pdf');
-        createdPdfFile = pdfFile;
-        tmpFile = File('${pdfDir.path}/$documentNumber.pdf.tmp');
+        final pdfFile = File('${pdfDir.path}/$rechnungId.pdf');
+        tmpFile = File('${pdfDir.path}/$rechnungId.pdf.tmp');
+        if (pdfFile.existsSync()) {
+          throw FileSystemException('PDF artifact already exists', pdfFile.path);
+        }
+        if (tmpFile.existsSync()) {
+          throw FileSystemException('PDF artifact temporary file already exists', tmpFile.path);
+        }
         try {
           final PdfDocumentSnapshot snapshot = await _buildPdfSnapshot(
             transaction: transaction,
@@ -429,6 +448,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
           final Uint8List pdfBytes = await const PdfGenerator().generate(snapshot, locale: locale);
           tmpFile.writeAsBytesSync(pdfBytes);
           tmpFile.renameSync(pdfFile.path);
+          createdPdfFile = pdfFile;
         } catch (e) {
           try {
             if (tmpFile.existsSync()) tmpFile.deleteSync();
@@ -437,7 +457,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         }
         pdfPath = pdfFile.path;
       } else {
-        pdfPath = 'pdfs/$documentNumber.pdf';
+        pdfPath = 'pdfs/documents/$rechnungId.pdf';
       }
       final invoiceUpdated = await transaction.runUpdate(
         '''
@@ -462,107 +482,103 @@ WHERE id = ? AND ist_entwurf = 1
         throw StateError('Rechnung konnte nicht finalisiert werden');
       }
 
-      // — Atomic accounting postings: journal + receivable + tax in same tx (via RechnungTyp helper — centralized)
-      final kundeId = invoice['kunde_id'];
-      final lieferantId = invoice['lieferant_id'];
-      final bool isIncoming = RechnungTyp.isEingang(typ) || lieferantId != null;
-      final String belegTyp = RechnungTyp.belegTypFor(
-        typ: typ,
-        lieferantId: lieferantId is int ? lieferantId : int.tryParse('${lieferantId ?? ''}'),
-      );
-      final String datumStr = invoiceDate.toIso8601String().substring(0, 10);
-      // Resolve kategorie for journal — first active, fallback 1
-      int? kategorieId;
-      try {
-        final katRows = await transaction.runSelect(
-          'SELECT id FROM kategorien WHERE aktiv = 1 ORDER BY id LIMIT 1',
-          const <Object?>[],
-        );
-        if (katRows.isNotEmpty) {
-          final v = katRows.single['id'];
-          kategorieId = v is int ? v : int.tryParse(v.toString());
-        }
-      } catch (_) {}
-      kategorieId ??= 1;
-      final int journalId = await transaction.runInsert(
-        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL)',
-        <Object?>[
-          datumStr,
-          'Rechnung $documentNumber',
-          kategorieId,
-          preview.bruttoBetragString,
-          belegTyp,
-          rechnungId,
-          documentNumber,
-        ],
-      );
-      await transaction.runUpdate('UPDATE journal SET gruppe_id = ?, immutable = 1 WHERE id = ?', <Object?>[
-        journalId,
-        journalId,
-      ]);
-      if (debugFailAt == 'journal') throw StateError('Induced failure after journal');
-      final Object? partnerIdRaw = isIncoming ? lieferantId : kundeId;
-      final String partnerTyp = isIncoming ? 'lieferant' : 'kunde';
-      int? partnerId;
-      if (partnerIdRaw is int) {
-        partnerId = partnerIdRaw;
-      } else if (partnerIdRaw != null) {
-        partnerId = int.tryParse(partnerIdRaw.toString());
-      }
-      // Receivable — skip only if no partner (keeps journal atomic test green)
-      if (partnerId != null && partnerId > 0) {
-        final String forderungTyp = RechnungTyp.forderungTypFor(
-          typ: typ,
-          lieferantId: lieferantId is int ? lieferantId : int.tryParse('${lieferantId ?? ''}'),
-        );
-        final nowIso = DateTime.now().toIso8601String();
-        final int? legacyKundeId = partnerTyp == 'kunde' ? partnerId : null;
-        // ponytail: anfangsbetrag is added by ForderungenRepository.ensureSchema; base table lacks it, so insert via compatible column set
-        // Try with anfangsbetrag first, fallback without.
+      if (debugFailAt == 'document') throw StateError('Induced failure after document update');
+
+      if (isInvoice) {
+        // — Atomic accounting postings: journal + receivable + tax in same tx (via RechnungTyp helper — centralized)
+        final kundeId = invoice['kunde_id'];
+        final String belegTyp = RechnungTyp.belegTypFor(typ: typ, lieferantId: lieferantId);
+        final String datumStr = invoiceDate.toIso8601String().substring(0, 10);
+        // Resolve kategorie for journal — first active, fallback 1
+        int? kategorieId;
         try {
-          await transaction.runInsert(
-            'INSERT INTO forderungen (typ, status, betrag, anfangsbetrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            <Object?>[
-              forderungTyp,
-              'offen',
-              preview.bruttoBetragString,
-              preview.bruttoBetragString,
-              partnerTyp,
-              partnerId,
-              rechnungId,
-              journalId,
-              nowIso,
-              nowIso,
-              legacyKundeId,
-            ],
+          final katRows = await transaction.runSelect(
+            'SELECT id FROM kategorien WHERE aktiv = 1 ORDER BY id LIMIT 1',
+            const <Object?>[],
           );
-        } catch (_) {
+          if (katRows.isNotEmpty) {
+            final v = katRows.single['id'];
+            kategorieId = v is int ? v : int.tryParse(v.toString());
+          }
+        } catch (_) {}
+        kategorieId ??= 1;
+        final int journalId = await transaction.runInsert(
+          'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL)',
+          <Object?>[
+            datumStr,
+            'Rechnung $documentNumber',
+            kategorieId,
+            preview.bruttoBetragString,
+            belegTyp,
+            rechnungId,
+            documentNumber,
+          ],
+        );
+        await transaction.runUpdate('UPDATE journal SET gruppe_id = ?, immutable = 1 WHERE id = ?', <Object?>[
+          journalId,
+          journalId,
+        ]);
+        if (debugFailAt == 'journal') throw StateError('Induced failure after journal');
+        final Object? partnerIdRaw = isIncomingInvoice ? lieferantId : kundeId;
+        final String partnerTyp = isIncomingInvoice ? 'lieferant' : 'kunde';
+        int? partnerId;
+        if (partnerIdRaw is int) {
+          partnerId = partnerIdRaw;
+        } else if (partnerIdRaw != null) {
+          partnerId = int.tryParse(partnerIdRaw.toString());
+        }
+        // Receivable — skip only if no partner (keeps journal atomic test green)
+        if (partnerId != null && partnerId > 0) {
+          final String forderungTyp = RechnungTyp.forderungTypFor(typ: typ, lieferantId: lieferantId);
+          final nowIso = DateTime.now().toIso8601String();
+          final int? legacyKundeId = partnerTyp == 'kunde' ? partnerId : null;
+          // ponytail: anfangsbetrag is added by ForderungenRepository.ensureSchema; base table lacks it, so insert via compatible column set
+          // Try with anfangsbetrag first, fallback without.
+          try {
+            await transaction.runInsert(
+              'INSERT INTO forderungen (typ, status, betrag, anfangsbetrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              <Object?>[
+                forderungTyp,
+                'offen',
+                preview.bruttoBetragString,
+                preview.bruttoBetragString,
+                partnerTyp,
+                partnerId,
+                rechnungId,
+                journalId,
+                nowIso,
+                nowIso,
+                legacyKundeId,
+              ],
+            );
+          } catch (_) {
+            await transaction.runInsert(
+              'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              <Object?>[
+                forderungTyp,
+                'offen',
+                preview.bruttoBetragString,
+                partnerTyp,
+                partnerId,
+                rechnungId,
+                journalId,
+                nowIso,
+                nowIso,
+                legacyKundeId,
+              ],
+            );
+          }
+        }
+        if (debugFailAt == 'receivable') throw StateError('Induced failure after receivable');
+        // Vorsteuer claims belong only to incoming invoices.
+        if (isIncomingInvoice && preview.ustCents != 0) {
           await transaction.runInsert(
-            'INSERT INTO forderungen (typ, status, betrag, partner_typ, partner_id, rechnung_id, journal_id, erstellt_am, aktualisiert_am, kunde_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            <Object?>[
-              forderungTyp,
-              'offen',
-              preview.bruttoBetragString,
-              partnerTyp,
-              partnerId,
-              rechnungId,
-              journalId,
-              nowIso,
-              nowIso,
-              legacyKundeId,
-            ],
+            'INSERT INTO vorsteuer_ansprueche (rechnung_id, betrag, faelligkeit, status) VALUES (?, ?, ?, ?)',
+            <Object?>[rechnungId, preview.ustBetragString, datumStr, 'offen'],
           );
         }
+        if (debugFailAt == 'tax') throw StateError('Induced failure after tax');
       }
-      if (debugFailAt == 'receivable') throw StateError('Induced failure after receivable');
-      // Tax / input-tax claim — create when VAT present (covers both directions; incoming spec validated)
-      if (preview.ustCents != 0) {
-        await transaction.runInsert(
-          'INSERT INTO vorsteuer_ansprueche (rechnung_id, betrag, faelligkeit, status) VALUES (?, ?, ?, ?)',
-          <Object?>[rechnungId, preview.ustBetragString, datumStr, 'offen'],
-        );
-      }
-      if (debugFailAt == 'tax') throw StateError('Induced failure after tax');
 
       await transaction.send();
       return rechnungId;
@@ -581,7 +597,7 @@ WHERE id = ? AND ist_entwurf = 1
     }
   }
 
-  Future<int> stornoRechnung({required int rechnungId, required String grund}) async {
+  Future<int> stornoRechnung({required int rechnungId, required String grund, String? debugFailAt}) async {
     await _ensureExtraColumns();
     final trimmed = grund.trim();
     if (trimmed.isEmpty) {
@@ -705,9 +721,15 @@ WHERE id = ? AND ist_entwurf = 1
         stornoId,
       ]);
       await _ensureInventarTable(transaction);
-      for (final r in posRows) {
-        if (r['artikel_id'] == null) continue;
-        final aid = r['artikel_id'];
+      final sourceMovements = await transaction.runSelect(
+        "SELECT artikel_id, SUM(-diff) AS menge FROM inventarbewegungen WHERE referenz_typ = 'rechnung' AND referenz_id = ? AND diff < 0 GROUP BY artikel_id",
+        <Object?>[rechnungId],
+      );
+      for (final movement in sourceMovements) {
+        final aid = _asInt(movement['artikel_id']);
+        if (aid == null) continue;
+        final num menge = _asNum(movement['menge']);
+        if (menge <= 0) continue;
         final lagerRows = await transaction.runSelect(
           'SELECT lager_aktiv, bestand, bestand_aktuell FROM artikel WHERE id = ?',
           <Object?>[aid],
@@ -717,11 +739,8 @@ WHERE id = ? AND ist_entwurf = 1
         final bLegacy = _asNum(lagerRows.single['bestand']);
         final bAktuell = _asNum(lagerRows.single['bestand_aktuell']);
         final isLegacy = !lagerRaw && bAktuell == 0 && bLegacy != 0;
-        final lagerAktiv = lagerRaw || isLegacy;
-        if (!lagerAktiv) continue;
-        final menge = _asNum(r['menge']);
-        final eff = bAktuell != 0 ? bAktuell : bLegacy;
-        final newStock = eff + menge;
+        if (!lagerRaw && !isLegacy) continue;
+        final newStock = (isLegacy ? bLegacy : bAktuell) + menge;
         if (isLegacy) {
           await transaction.runUpdate(
             'UPDATE artikel SET bestand_aktuell = ?, bestand = ?, lager_aktiv = 1 WHERE id = ?',
@@ -739,6 +758,7 @@ WHERE id = ? AND ist_entwurf = 1
           <Object?>[aid, datum, menge, 'Storno $docNo', 'storno', stornoId],
         );
       }
+      if (debugFailAt == 'movement') throw StateError('Induced failure after Storno movement');
       // — Reversal postings negated, linked to original (atomic)
       final origJournals = await transaction.runSelect('SELECT * FROM journal WHERE rechnung_id = ?', <Object?>[
         rechnungId,
@@ -1264,8 +1284,11 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     if (upd != 1) throw StateError('Nummernkreis konnte nicht reserviert werden');
   }
 
-  String _nummernkreisTypFor(String typ) {
-    switch (typ) {
+  String _nummernkreisTypFor(String typ, {int? lieferantId}) {
+    if (RechnungTyp.isInvoice(typ)) {
+      return RechnungTyp.isIncomingInvoice(typ, lieferantId: lieferantId) ? 'rechnung_eingang' : 'rechnung_ausgang';
+    }
+    switch (typ.trim().toLowerCase()) {
       case 'rechnung':
         return 'rechnung_ausgang';
       case 'storno':
@@ -1281,7 +1304,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       case 'lieferschein':
         return 'lieferschein';
       default:
-        return typ;
+        return typ.trim().toLowerCase();
     }
   }
 
@@ -1363,13 +1386,20 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     PdfCustomerSnapshot customerSnapshot = const PdfCustomerSnapshot(name: 'Unbekannt');
     final Object? kundeId = invoice['kunde_id'];
     final Object? lieferantId = invoice['lieferant_id'];
+    final bool isIncomingInvoice = RechnungTyp.isIncomingInvoice(typ, lieferantId: _asInt(lieferantId));
     try {
-      if (kundeId != null) {
-        final rows = await transaction.runSelect('SELECT * FROM kunden WHERE id = ?', <Object?>[kundeId]);
+      final Object? counterpartyId = isIncomingInvoice ? lieferantId : (kundeId ?? lieferantId);
+      if (counterpartyId != null && isIncomingInvoice) {
+        final rows = await transaction.runSelect('SELECT * FROM lieferanten WHERE id = ?', <Object?>[counterpartyId]);
+        if (rows.isNotEmpty) {
+          customerSnapshot = _customerFromLieferant(rows.single);
+        }
+      } else if (counterpartyId != null && kundeId != null) {
+        final rows = await transaction.runSelect('SELECT * FROM kunden WHERE id = ?', <Object?>[counterpartyId]);
         if (rows.isNotEmpty) {
           customerSnapshot = _customerFromKunde(rows.single);
         }
-      } else if (lieferantId != null) {
+      } else if (counterpartyId != null) {
         final rows = await transaction.runSelect('SELECT * FROM lieferanten WHERE id = ?', <Object?>[lieferantId]);
         if (rows.isNotEmpty) {
           customerSnapshot = _customerFromLieferant(rows.single);
