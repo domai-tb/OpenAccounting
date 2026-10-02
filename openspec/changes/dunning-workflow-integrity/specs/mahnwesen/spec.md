@@ -2,7 +2,7 @@
 
 ### Requirement: Dunning Level Configuration
 
-The system SHALL provide four protected standard levels and allow custom levels. Each level SHALL configure an escalation wait in days, a fixed currency fee (`gebuehr`), an annual percentage interest rate (`zinssatz`), and a multiplier flag. A multiplier SHALL add the immediately preceding level's configured fixed fee to the current level's fixed fee; it SHALL NOT turn a fee into a percentage. A created Mahnung SHALL snapshot its effective fee and rate so later edits affect only new letters. On a fresh profile, the standard defaults SHALL be: level 1 = 7 days, €5.00, 0%, multiplier off; level 2 = 21 days, €10.00, 5%, off; level 3 = 35 days, €15.00, 8%, off; level 4 = 49 days, €25.00, 8%, off. These configurable sample defaults are not a declaration that the rates are statutory. Existing user-edited values SHALL be preserved during initialization.
+The system SHALL provide four protected standard levels and allow custom levels. Each level SHALL configure an absolute calendar-day offset from the invoice due date, a fixed currency fee (`gebuehr`), an annual percentage interest rate (`zinssatz`), and a multiplier flag. A multiplier SHALL add the immediately preceding level's configured fixed fee to the current level's fixed fee; it SHALL NOT turn a fee into a percentage. A created Mahnung SHALL snapshot its effective fee and interest calculation inputs so later edits affect only new letters. On a fresh profile, the standard defaults SHALL be: level 1 = 7 days, €5.00, 0%, multiplier off; level 2 = 21 days, €10.00, 5%, off; level 3 = 35 days, €15.00, 8%, off; level 4 = 49 days, €25.00, 8%, off. These configurable product defaults are not statutory rates. Existing user-edited values SHALL be preserved during initialization.
 
 #### Scenario: Fresh profile seeds the documented fixed-fee model
 - **GIVEN** a new profile has no dunning levels
@@ -29,9 +29,14 @@ The system SHALL provide four protected standard levels and allow custom levels.
 - **WHEN** dunning initialization runs again
 - **THEN** the customized values SHALL remain unchanged
 
+#### Scenario: Stage date uses one absolute threshold
+- **GIVEN** an invoice is due on 2026-01-01, stage 1 is configured for 7 days after due, and the initial grace setting is 30 days
+- **WHEN** manual or assisted eligibility is evaluated on 2026-01-07 and 2026-01-08
+- **THEN** stage 1 SHALL be ineligible on 2026-01-07 and eligible on 2026-01-08, with no additional grace days added
+
 ### Requirement: Mahnung Snapshot
 
-Each created Mahnung SHALL snapshot the invoice number, invoice due date, customer identity, applicable dunning level, current outstanding principal, effective fixed fee, configured annual percentage rate, interest period, and carried unpaid fees and interest. Snapshot values SHALL be immutable after creation. A Mahnung SHALL NOT be created from an invoice total when its receivable has no positive outstanding balance.
+Each created Mahnung SHALL link to exactly one invoice and snapshot the invoice number, due date, customer identity, applicable dunning level, current outstanding principal, effective fixed fee, ordered interest calculation segments (date range, stage, configured annual rate, and principal), calculated interest total, and carried unpaid fees and interest. Snapshot values SHALL be immutable after creation. A Mahnung SHALL NOT be created from an invoice total when its receivable has no positive outstanding balance.
 
 #### Scenario: Create dunning letter
 - **GIVEN** a finalized invoice has a positive settled outstanding principal and has reached the configured stage date
@@ -50,7 +55,7 @@ Each created Mahnung SHALL snapshot the invoice number, invoice due date, custom
 
 ### Requirement: Dunning Evaluation and Exclusions
 
-The system SHALL evaluate only finalized outgoing invoices whose settled outstanding principal is positive and whose due date plus the configured grace period and next-stage waiting period has elapsed. Manual, assisted, and automatic modes SHALL use the same eligibility rules. Assisted mode SHALL show a reviewable preview and create letters only after confirmation. Automatic mode SHALL respect customer and invoice exclusions and SHALL not bypass an active Mahnsperre. A repeated run SHALL reuse or report an existing unsent Mahnung for the same receivable and stage rather than create a duplicate. An optional consolidated Mahnung SHALL link every included invoice and its balance snapshot to the customer-level letter.
+The system SHALL evaluate only finalized outgoing invoices whose settled outstanding principal is positive and whose current business date is on or after `due_date + stage.days_after_due`. Stage offsets are absolute calendar-day thresholds; `initial_grace_days` SHALL NOT be added to or used to defer them. A later stage SHALL be eligible only after its preceding stage has a transport-accepted Mahnung. This change SHALL support manual and assisted runs only; it SHALL NOT schedule or trigger automatic evaluation from a dashboard load or background task. Assisted mode SHALL show a reviewable preview and create letters only after confirmation. Both modes SHALL respect customer and invoice exclusions and SHALL not bypass an active Mahnsperre. Each Mahnung SHALL reference one invoice; a run MAY group separate letters for review but SHALL NOT create a consolidated customer letter. For each invoice and stage, a repeated run SHALL reuse an existing unsent Mahnung or report an already transport-accepted Mahnung rather than create a duplicate.
 
 #### Scenario: Assisted run creates confirmed eligible reminders
 - **GIVEN** two overdue invoices are eligible and one is excluded from dunning
@@ -59,32 +64,32 @@ The system SHALL evaluate only finalized outgoing invoices whose settled outstan
 
 #### Scenario: Full payment or exclusion prevents a new reminder
 - **GIVEN** an invoice is fully paid, not yet due, or explicitly excluded
-- **WHEN** any dunning mode evaluates it
+- **WHEN** a manual or assisted run evaluates it
 - **THEN** the invoice SHALL not appear among created reminders
+
+#### Scenario: Stage transition is exact and ordered
+- **GIVEN** an invoice is due on 2026-01-01, stage 1 is 7 days after due, stage 2 is 21 days after due, and stage 1 was transport-accepted
+- **WHEN** a run evaluates the invoice on 2026-01-21 and 2026-01-22
+- **THEN** stage 2 SHALL be ineligible on 2026-01-21 and eligible on 2026-01-22
 
 #### Scenario: Repeated run does not duplicate a stage reminder
 - **GIVEN** an unsent Mahnung already exists for an invoice and stage
 - **WHEN** the same stage is evaluated again
-- **THEN** the run SHALL return the existing draft or a typed already-pending result and SHALL not create another Mahnung
-
-#### Scenario: Consolidated letter preserves invoice links
-- **GIVEN** a customer has multiple eligible overdue invoices and consolidation is selected
-- **WHEN** the confirmed run creates a consolidated Mahnung
-- **THEN** the letter SHALL reference every included invoice and preserve each outstanding amount in its snapshot
+- **THEN** the run SHALL reuse the existing unsent draft or report the existing transport-accepted reminder and SHALL not create another Mahnung
 
 ### Requirement: Late-Payment Interest Uses the Settled Open Principal
 
-The system SHALL calculate configured per-stage annual percentage interest only on the invoice's unpaid principal for each elapsed overdue day, using a 365-day year. A posted partial payment SHALL reduce the principal for subsequent days from its effective settlement date; a full payment SHALL stop further accrual. Previously accrued interest and fees SHALL be carried as separate unpaid amounts and SHALL NOT be included in interest principal. Currency rounding SHALL follow the accepted invoice-money contract. The system SHALL NOT describe the configured percentage as a statutory rate unless a separately approved rate-source policy is implemented.
+The system SHALL accrue no interest before the first stage's absolute threshold. For each eligible overdue calendar day through the as-of date, it SHALL use the annual rate of the highest stage whose threshold is on or before that day; rate changes SHALL apply prospectively and SHALL NOT reprice earlier days. It SHALL calculate interest only on unpaid invoice principal using a 365-day year. A posted partial payment SHALL reduce principal starting on its effective settlement date, before that date's accrual; full settlement SHALL stop accrual on that date. Previously accrued interest and fees SHALL remain separate from principal and SHALL NOT compound. The system SHALL accumulate exact decimal daily amounts and round the per-invoice total once to two decimal places using half-up rounding; it SHALL NOT use floating point or round each day. Configured rates SHALL be described as product values, not statutory rates.
 
-#### Scenario: Partial settlement reduces later interest
-- **GIVEN** a €1,000.00 principal accrues at 8% annually and a €400.00 payment settles after 10 overdue days
-- **WHEN** interest is calculated through overdue day 20
-- **THEN** the first 10 days SHALL use €1,000.00 principal and the next 10 days SHALL use €600.00 principal
+#### Scenario: Tier transition and partial payment have deterministic cents
+- **GIVEN** an invoice is due on 2026-01-01, stage 1/2 thresholds are 7/21 days at 0%/5%, its €1,000.00 balance is reduced by a €400.00 settlement effective 2026-01-25, and the as-of date is 2026-01-27
+- **WHEN** interest is calculated
+- **THEN** no interest SHALL accrue before day 7; days 21–23 SHALL use €1,000.00 at 5%; days 24–26 SHALL use €600.00 at 5%; and `(3 × €1,000 × 0.05 + 3 × €600 × 0.05) / 365` SHALL round once from €0.6575… to €0.66
 
-#### Scenario: Full settlement stops later accrual
-- **GIVEN** an overdue invoice is fully settled on a recorded settlement date
-- **WHEN** interest is calculated for a period after that date
-- **THEN** no interest SHALL accrue after the settlement date
+#### Scenario: Full settlement stops accrual on its effective date
+- **GIVEN** an eligible overdue invoice is fully settled on a recorded settlement date
+- **WHEN** interest is calculated for that date and later dates
+- **THEN** no interest SHALL accrue on the settlement date or afterward
 
 #### Scenario: Unpaid fees are not compounded
 - **GIVEN** a prior Mahnung has carried unpaid fees or interest
@@ -93,7 +98,7 @@ The system SHALL calculate configured per-stage annual percentage interest only 
 
 ### Requirement: Dunning Operations Have a Typed Workspace
 
-The application SHALL expose a `/mahnwesen` workspace with typed, searchable dunning records, eligible-run preview, stage configuration, customer and invoice exclusions, customer history, and actionable empty, loading, unavailable, and failure states. The workspace SHALL display outstanding principal, fixed fee, configured annual rate, accrued interest, delivery state, and the linked invoice or invoices. It SHALL not present an unavailable run, PDF, or send action as successful.
+The application SHALL expose a `/mahnwesen` workspace with typed, searchable dunning records, manual/assisted eligible-run preview, stage configuration, customer and invoice exclusions, customer history, and actionable empty, loading, unavailable, and failure states. Each row SHALL display one linked invoice, its outstanding principal, fixed fee, configured annual rate, accrued interest, and transport state. The workspace SHALL not present an unavailable run, PDF, or send action as successful.
 
 #### Scenario: User reviews an eligible dunning run
 - **GIVEN** the profile has eligible overdue receivables
@@ -105,14 +110,33 @@ The application SHALL expose a `/mahnwesen` workspace with typed, searchable dun
 - **WHEN** the user opens `/mahnwesen`
 - **THEN** the workspace SHALL show a retryable unavailable state and SHALL not show an empty list or fabricated zero balances
 
+#### Scenario: Narrow window remains keyboard accessible
+- **GIVEN** the application window is narrower than 900 logical pixels
+- **WHEN** the user opens `/mahnwesen` and navigates its list and invoice detail by keyboard
+- **THEN** the workspace SHALL use a full-width list and focused detail view, preserve logical keyboard order and visible focus, and localize its loading, empty, and failure states
+
+### Requirement: Dunning Balance Source Fails Closed
+
+The dunning monetary path SHALL remain disabled until both `invoice-money-invariants` and `balanced-journal-postings-and-settlement-events` are accepted through independent review. Every operation that needs a current balance or interest SHALL use the settled-receivable projection and dated settlement events from `balanced-journal-postings-and-settlement-events` with the accepted amount/sign rules from `invoice-money-invariants`. If that source is missing, invalid, or conflicting, balance-dependent preview, calculation, reminder creation, PDF/package creation, and any send that needs a current balance or interest SHALL return an actionable typed unavailable result and SHALL perform no persistent write, artifact generation/write, stage-state update, or transport call. The system SHALL NOT fall back to invoice gross/net totals, bank-import rows, or fabricated zero balances.
+
+#### Scenario: Missing or conflicting balance source blocks every balance-dependent operation
+- **GIVEN** the accepted settlement source is unavailable or its projected balance conflicts with its dated events
+- **WHEN** the user requests preview, reminder creation, current-balance PDF generation, package creation, or a balance-dependent send
+- **THEN** each operation SHALL return a retryable actionable unavailable result and SHALL create no reminder/artifact, update no stage state, and call no mail transport
+
+#### Scenario: Invalid settlement event is not replaced by invoice totals
+- **GIVEN** the accepted source contains an invalid or conflicting settlement event for an invoice
+- **WHEN** a dunning calculation is requested
+- **THEN** the operation SHALL fail closed with the source error and SHALL not substitute the invoice gross or net total
+
 ### Requirement: Mail-Versand via SMTP
 
-The system SHALL send a dunning letter only when SMTP is configured and a readable generated PDF artifact is available. It SHALL mark a Mahnung as sent and record its send time only after the mail transport confirms acceptance of the message with the expected attachment. A failed or unavailable send SHALL leave the Mahnung unsent and retryable; it SHALL not advance the invoice's current dunning level.
+The system SHALL send a dunning letter only when SMTP is configured and a readable generated PDF artifact is available. It SHALL record transport acceptance only after the mail transport accepts the message with the expected attachment. UI and history SHALL say “transport accepted” and SHALL NOT claim delivered or read. A failed or unavailable send SHALL leave the Mahnung unsent and retryable; it SHALL not advance the invoice's current dunning level.
 
 #### Scenario: Send dunning letter
 - **GIVEN** SMTP is configured and the Mahnung has a readable PDF artifact
 - **WHEN** the user sends it and the transport accepts the message
-- **THEN** the message SHALL contain the PDF and the Mahnung SHALL record sent status and timestamp
+- **THEN** the message SHALL contain the PDF and the Mahnung SHALL record transport acceptance and its timestamp
 
 #### Scenario: SMTP not configured
 - **GIVEN** SMTP is missing, the PDF is unavailable, or the transport rejects the message
@@ -126,10 +150,10 @@ The system SHALL send a dunning letter only when SMTP is configured and a readab
 
 ### Requirement: Invoice Dunning Level
 
-Each eligible invoice SHALL retain its current dunning level as the highest level with a successfully sent Mahnung. A level SHALL not advance while its letter is only a draft or its send failed. Full settlement SHALL clear the current level; partial settlement SHALL preserve the level while reducing outstanding principal and future interest.
+Each eligible invoice SHALL retain its current dunning level as the highest level with a transport-accepted Mahnung. A level SHALL not advance while its letter is only a draft or its send failed. Full settlement SHALL clear the current level; partial settlement SHALL preserve the level while reducing outstanding principal and future interest.
 
 #### Scenario: Invoice at level 2
-- **GIVEN** an invoice has no current dunning level and a level 1 Mahnung is delivered successfully
+- **GIVEN** an invoice has no current dunning level and the transport accepts a level 1 Mahnung
 - **WHEN** the send operation completes
 - **THEN** the invoice's current dunning level SHALL become level 1
 
@@ -145,7 +169,7 @@ Each eligible invoice SHALL retain its current dunning level as the highest leve
 
 ### Requirement: Collection Package
 
-For a customer selected for collection preparation, the system SHALL produce a customer-linked package containing the current account statement, selected open invoices, previous Mahnungen, and the as-of outstanding balance. Every included artifact SHALL resolve to a readable stored document; an unavailable required artifact SHALL be reported and SHALL not be represented by a placeholder.
+For a customer selected for collection preparation, the system SHALL produce a customer-linked package containing the current account statement, selected open invoices, previous Mahnungen, and the as-of outstanding balance from the accepted settlement source. Every included artifact SHALL resolve to a readable stored document; an unavailable required artifact SHALL be reported and SHALL not be represented by a placeholder. An unavailable, invalid, or conflicting balance source SHALL block package creation without writing an artifact.
 
 #### Scenario: Package contains selected customer evidence
 - **GIVEN** the customer has selected open invoices, prior Mahnungen, and readable artifacts
@@ -161,7 +185,7 @@ For a customer selected for collection preparation, the system SHALL produce a c
 
 ### Requirement: Dunning Reference Documentation Matches the Runtime Contract
 
-The dunning documentation SHALL describe `gebuehr` as a fixed currency amount per level, `zinssatz` as a configurable annual percentage, and `multiplier` as an optional fixed-fee carry into the next configured level. It SHALL use the canonical fresh-profile defaults in `Dunning Level Configuration`, SHALL not show a percentage fee, and SHALL not claim legal compliance from those defaults alone.
+The dunning documentation SHALL describe `gebuehr` as a fixed currency amount per level, `zinssatz` as a configurable annual percentage, `multiplier` as an optional fixed-fee carry, and configured stage days as absolute offsets from the invoice due date. It SHALL use the canonical fresh-profile defaults in `Dunning Level Configuration`, SHALL not show a percentage fee or claim statutory compliance, and SHALL describe rates as configured product values. It SHALL describe this change's scope as manual/assisted with separate invoice letters and SHALL remove or mark unsupported dashboard-triggered or scheduled runs and automatic customer-block/release behavior.
 
 #### Scenario: Documentation exposes the canonical model
 - **GIVEN** the dunning documentation and fresh-profile seed are checked against the specification
@@ -172,3 +196,8 @@ The dunning documentation SHALL describe `gebuehr` as a fixed currency amount pe
 - **GIVEN** the documentation contains a fee expressed as a percent of invoice principal
 - **WHEN** the dunning contract parity check runs
 - **THEN** the check SHALL fail with the mismatched documented field or unit
+
+#### Scenario: Unsupported automation and legal claims are not documented as available
+- **GIVEN** the dunning documentation is checked against this change's scope
+- **WHEN** it claims a dashboard or scheduled automatic run, automatic customer-block release, statutory rate behavior, or consolidated letters are available
+- **THEN** the parity check SHALL fail with the unsupported behavior claim

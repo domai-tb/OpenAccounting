@@ -5,11 +5,13 @@ The dunning specification already chooses fixed per-level fees, percentage inter
 ## What Changes
 
 - Make the existing dunning model explicit and consistent across the base specification, documentation, and fresh-profile defaults: fixed euro fee per level, annual percentage interest per level, and the existing optional multiplier; preserve configurable defaults without claiming they are statutory rates.
-- Add a typed dunning workspace for stage settings, eligible receivables, reminder history, exclusions, and review of proposed runs.
-- Define run eligibility from the settled open balance and due date, prevent duplicate stage reminders, and make interest respond to partial and full payments.
-- Require delivery state to reflect a real successful send; keep failed or unconfigured sends retryable and unsent.
-- Specify optional customer-level consolidation and a collection package containing linked account/invoice/reminder evidence.
-- Keep money calculations blocked until the accepted invoice-money contract and the balanced-posting/settlement-event source are available. Leave statutory rate sourcing and automatic-block release policy explicit for review.
+- Add a typed dunning workspace for stage settings, eligible receivables, reminder history, exclusions, and review of manual or assisted runs.
+- Define exact stage dates and payment-aware interest from the accepted settled-receivable source; fail closed without writes or side effects when that source is missing or invalid.
+- Require delivery state to reflect actual transport acceptance; keep failed or unconfigured sends retryable and unsent.
+- Keep each reminder linked to one invoice with its own immutable balance snapshot. A run may group separate invoice letters for review but SHALL NOT create a consolidated letter.
+- Specify a collection package containing linked account, invoice, and reminder evidence, gated on the accepted balance source.
+- Remove or mark unsupported documentation claims about automatic runs, automatic customer blocking, and statutory rate behavior until each behavior has an accepted contract and working runtime path.
+- Keep the monetary path blocked until both the accepted invoice-money contract and the balanced-posting/settlement-event source are available.
 
 ## Capabilities
 
@@ -19,7 +21,7 @@ None.
 
 ### Modified Capabilities
 
-- `mahnwesen`: clarify the selected fee/interest contract and defaults, add payment-aware eligibility and run behavior, expose reviewable dunning operations, and make delivery and collection evidence truthful.
+- `mahnwesen`: clarify the selected fee/interest contract and defaults, exact stage and payment-aware interest rules, fail-closed source behavior, reviewable manual/assisted operations, and truthful delivery and collection evidence.
 - `typed-route-workspaces`: add the canonical `/mahnwesen` dunning workspace and its typed route states.
 
 ## Impact
