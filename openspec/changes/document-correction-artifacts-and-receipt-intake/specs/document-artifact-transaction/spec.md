@@ -17,12 +17,12 @@ The lifecycle owner SHALL generate bytes from an immutable snapshot, write a uni
 #### Scenario: Process crash before artifact rename is reconciled
 - **GIVEN** the process stops after writing a temporary artifact but before renaming it or committing the document
 - **WHEN** the application next starts
-- **THEN** the document remains unfinalized, owned temporary bytes are removed, and no number, path, or side effect is claimed
+- **THEN** no new finalized target is committed, the source remains at its pre-operation state, owned temporary bytes are removed, and no number, path, or side effect is claimed
 
 #### Scenario: Process crash after rename but before database commit is reconciled
 - **GIVEN** the process stops after renaming a generated artifact but before the document transaction commits
 - **WHEN** the application next starts
-- **THEN** the document remains unfinalized, the unreferenced file under the owned artifact directory is removed, and unrelated files remain unchanged
+- **THEN** no new finalized target is committed, the source remains at its pre-operation state, the unreferenced file under the owned artifact directory is removed, and unrelated files remain unchanged
 
 #### Scenario: Missing committed artifact is reported
 - **GIVEN** a finalized document references a missing or unreadable artifact
@@ -33,6 +33,11 @@ The lifecycle owner SHALL generate bytes from an immutable snapshot, write a uni
 - **GIVEN** an eligible finalized invoice is reversed through the supported correction lifecycle
 - **WHEN** the correction operation succeeds
 - **THEN** the correction has a readable profile-local PDF rendered from its own finalized snapshot, the source relationship and numbering are persisted, and type-specific side effects match the existing lifecycle contract
+
+#### Scenario: Finalized conversion has a readable artifact
+- **GIVEN** a supported source document is converted and the resulting target is explicitly finalized
+- **WHEN** target finalization succeeds
+- **THEN** the target has a readable profile-local PDF rendered from its own snapshot, reciprocal source/target links and numbering are persisted, and type-specific effects match the existing lifecycle contract
 
 #### Scenario: Correction artifact failure leaves no false finalization
 - **GIVEN** a correction or finalized conversion cannot generate or persist its PDF

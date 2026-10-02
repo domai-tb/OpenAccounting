@@ -2,7 +2,7 @@
 
 ### Requirement: Receipts follow an actionable inbox lifecycle
 
-Receipt ingestion MUST create a durable inbox record with review state, source artifact, classification/link fields, and explicit transitions from import to review to association; the receipts route MUST expose those states. Import MUST retain the original source bytes unchanged in storage scoped to the active profile and record verifiable source metadata, including a SHA-256 digest. A receipt MAY be linked to an invoice, existing journal/booking record, customer, supplier, or document package. Creating a new financial posting or applying payment is a separate operation requiring explicit user confirmation and the accepted `balanced-journal-postings-and-settlement-events` capability. The relevant receipt and accounting workflows SHALL allow the user to preview the original source without losing the current record context. Import and association SHALL have recoverable outcomes across the inbox record and stored source artifact; the design SHALL define process-crash reconciliation and SHALL NOT claim a filesystem/database atomic transaction.
+Receipt ingestion MUST create a durable inbox record with review state, source artifact, classification/link fields, and explicit transitions from import to review to association; the receipts route MUST expose those states. Import MUST retain the original source bytes unchanged in storage scoped to the active profile and record verifiable source metadata, including a SHA-256 digest. A receipt MAY be linked to an invoice, existing journal/booking record, customer, supplier, or document package. Creating a new financial posting or applying payment is a separate operation requiring explicit user confirmation and the accepted `balanced-journal-postings-and-settlement-events` capability. The relevant receipt and accounting workflows SHALL allow the user to preview the original source without losing the current record context. Import and association SHALL have recoverable outcomes across the inbox record and stored source artifact; the design SHALL define process-crash reconciliation and SHALL NOT claim a filesystem/database atomic transaction. Deletion SHALL be rejected until every active-profile relationship, including invoice, journal, template, package, customer, and supplier associations, is explicitly removed.
 
 #### Scenario: Receipt is reviewed and linked
 - **GIVEN** a supported receipt file is selected
@@ -24,6 +24,11 @@ Receipt ingestion MUST create a durable inbox record with review state, source a
 - **GIVEN** the source cannot be validated or safely stored
 - **WHEN** import fails
 - **THEN** no inbox record or package association claims a successful import, and no partial artifact remains
+
+#### Scenario: Crash after final source write leaves no orphan on recovery
+- **GIVEN** the process stops after an imported source is renamed to its final path but before the inbox row commits
+- **WHEN** the application next starts
+- **THEN** reconciliation finds the unreferenced importer-owned file, removes it, preserves unrelated files, and shows no successful inbox row
 
 #### Scenario: Source preview failure preserves the record
 - **GIVEN** a receipt is linked to an accounting record but its source artifact is unavailable
