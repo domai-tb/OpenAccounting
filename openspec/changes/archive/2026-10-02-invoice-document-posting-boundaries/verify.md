@@ -30,7 +30,8 @@
 - Warning: the repository-wide archived-task check also reports four unrelated older archives with incomplete tasks.
 
 ### Change Delivery
-- Commit range (if committed): implementation `76b38c1`; specification sync and archive commit pending
+- Feature delivery commit range: `7089e86..ee94416` (proposal, implementation, spec sync, and archive)
+- This final verification-record update is committed separately.
 
 ## Overall Decision
 
