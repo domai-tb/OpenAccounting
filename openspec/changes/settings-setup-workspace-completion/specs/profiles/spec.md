@@ -2,7 +2,7 @@
 
 ### Requirement: Separate databases per profile
 
-Each profile SHALL have its own isolated SQLite database under `<data_dir>/profiles/<profile_name>/`. `profile.json` SHALL store the active profile and the registered profile names. The registered names SHALL define the profiles visible to normal application workflows; unregistered profile directories SHALL remain untouched and SHALL NOT be loaded automatically. When upgrading a legacy pointer-only `profile.json`, the manager SHALL seed the registered names from validated profile directories and preserve every directory and database.
+Each profile SHALL have its own isolated SQLite database under `<data_dir>/profiles/<profile_name>/`. `profile.json` SHALL store the active profile and the registered profile names. The registered names SHALL be the only source used by startup, recovery, Settings, and explicit profile selection during normal operation. Every target SHALL be validated as a safe direct child with a valid profile database before it is opened. Unregistered profile directories SHALL remain untouched and SHALL NOT be listed or loaded automatically. When upgrading a legacy pointer-only `profile.json`, the manager SHALL seed registered names only from validated profile directories and preserve every directory and database.
 
 #### Scenario: New profile creates isolated database
 
@@ -22,17 +22,41 @@ Each profile SHALL have its own isolated SQLite database under `<data_dir>/profi
 - **WHEN** a query runs against one active profile
 - **THEN** it SHALL read only that profile's database and the other profile's invoice SHALL remain isolated
 
-#### Scenario: Legacy profile catalog is recovered without data loss
+#### Scenario: Legacy profile catalog is migrated without data loss
 
 - **GIVEN** `profile.json` has an active pointer but no registered-name list and multiple safe profile directories exist
 - **WHEN** the profile manager loads the catalog
-- **THEN** it SHALL persist those directory names as registered profiles and SHALL NOT delete or move any profile directory or database
+- **THEN** it SHALL persist only safe directories whose databases pass profile validation as registered profiles and SHALL NOT delete or move any profile directory or database
+
+#### Scenario: Profile selection uses the registered catalog
+
+- **GIVEN** a registered profile and an unregistered profile directory both exist
+- **WHEN** startup, the recovery picker, Settings, or explicit profile selection requests the available profiles
+- **THEN** each normal workflow SHALL list only the registered profile and SHALL reject an attempt to open the unregistered directory
+
+#### Scenario: Unregistered active pointer is not loaded after restart
+
+- **GIVEN** `profile.json` points to a profile directory that is not in its registered-name list
+- **WHEN** the application starts
+- **THEN** it SHALL NOT open that directory and SHALL enter the profile recovery flow without changing its database or files
 
 #### Scenario: Corrupted profile.json falls back to default
 
-- **GIVEN** `profile.json` contains invalid JSON and safe profile directories exist
+- **GIVEN** `profile.json` contains invalid JSON and exactly one safe profile database can be validated
 - **WHEN** the application loads profiles
-- **THEN** it SHALL recover a usable catalog from the safe directories, select the first available profile only under the existing recovery rule, and display a warning without changing any profile files
+- **THEN** it SHALL recover a catalog containing that profile, select it as active, and display a warning without changing its database or other profile files
+
+#### Scenario: Corrupted profile catalog with multiple validated profiles
+
+- **GIVEN** `profile.json` is missing or contains invalid JSON and multiple safe profile databases can be validated
+- **WHEN** the application starts
+- **THEN** it SHALL display a dedicated recovery picker containing the validated candidates, SHALL NOT choose or persist an active profile before explicit user selection, and SHALL leave every database and profile directory unchanged
+
+#### Scenario: Invalid profile candidates are preserved but unavailable
+
+- **GIVEN** a profile directory is not a safe direct child or its database fails profile validation
+- **WHEN** the application migrates or recovers the catalog
+- **THEN** that candidate SHALL remain unchanged on disk and SHALL NOT be registered, listed, or opened
 
 ### Requirement: Delete profile
 

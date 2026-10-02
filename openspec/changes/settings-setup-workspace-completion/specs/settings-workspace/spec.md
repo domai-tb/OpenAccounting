@@ -18,7 +18,7 @@ The `/settings` route SHALL render a localized full-page workspace with constrai
 
 ### Requirement: Settings profile actions follow the canonical profile contract
 
-The profile section SHALL expose the profile name, database size, last-modified time, create, rename, select, and confirmed non-destructive removal actions required by `profiles`. It SHALL use the injected profile-management boundary. Removal SHALL update the profile registry while retaining the profile directory and database; the application SHALL NOT infer or perform permanent data erasure. Switching to another profile SHALL persist the active selection and clearly state that restart is required before the new profile becomes active.
+The profile section SHALL be reachable under Allgemein in Settings and SHALL expose the profile name, database size, last-modified time, create, rename, select, and confirmed non-destructive removal actions required by `profiles`. It SHALL use the injected profile-management boundary and display only profiles in the validated registered catalog. Removal SHALL update the profile registry while retaining the profile directory and database; the application SHALL NOT infer or perform permanent data erasure. Switching to another profile SHALL persist the active selection and clearly state that restart is required before the new profile becomes active.
 
 #### Scenario: Profile changes show canonical outcomes
 
@@ -34,7 +34,7 @@ The profile section SHALL expose the profile name, database size, last-modified 
 
 ### Requirement: Backup settings expose completed local-first operations
 
-The Sicherung section SHALL expose supported manual and scheduled backup preferences, local backup creation, eligible external backup targets, and local/encrypted restore through the existing backup capability. It SHALL show the most recent operation's actual completion time, target, and outcome, and SHALL keep local backups below the active profile's canonical data directory. External paths SHALL follow the explicit opt-in and safety rules in `backup`; a restore SHALL require confirmation and a restart notice only after a validated atomic replacement. The UI SHALL NOT claim scheduling, history, encryption, or network success merely because preferences were saved.
+The Sicherung section SHALL expose supported manual and scheduled backup preferences, local backup creation, eligible external backup targets, and local/encrypted restore through the existing backup capability. Scheduling SHALL be profile-scoped, default to `manual-only`, and offer only daily or weekly automatic local backups. It SHALL show the most recent operation's actual completion time, target, and outcome, and SHALL keep local backups below the active profile's canonical data directory. External paths SHALL follow the explicit opt-in and safety rules in `backup`. A confirmed restore SHALL be validated and staged while the app is live, then block writes and require exit/restart; the next startup SHALL apply it before opening the database. Settings SHALL report restore success only after the restarted application validates the restored database. The UI SHALL NOT claim scheduling, history, encryption, or network success merely because preferences were saved.
 
 #### Scenario: Successful local backup is visible
 
