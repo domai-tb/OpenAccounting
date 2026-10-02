@@ -187,5 +187,497 @@
   "actionChooseFile": "Datei auswählen",
   "actionPreview": "Vorschau",
   "actionHistory": "Verlauf",
-  "actionImport": "Importieren"
+  "actionImport": "Importieren",
+  "receiptDetailTitle": "Beleg {id}",
+  "@receiptDetailTitle": {
+    "description": "Detail header for a receipt record.",
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "actionFilter": "Filter",
+  "actionRemoveFilter": "Filter entfernen",
+  "actionResetFilters": "Filter zurücksetzen",
+  "headerViews": "Ansichten",
+  "countResultSingular": "Ergebnis",
+  "journalDetailTitle": "Buchung {id}",
+  "@journalDetailTitle": {
+      "description": "Localized copy for journalDetailTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "filterTypeLabel": "Typ: {value}",
+  "@filterTypeLabel": {
+      "description": "Localized copy for filterTypeLabel.",
+      "placeholders": {
+          "value": {
+              "type": "String"
+          }
+      }
+  },
+  "filterStatusLabel": "Status: {value}",
+  "@filterStatusLabel": {
+      "description": "Localized copy for filterStatusLabel.",
+      "placeholders": {
+          "value": {
+              "type": "String"
+          }
+      }
+  },
+  "draftDiscardTitle": "Entwurf verwerfen?",
+  "draftDiscardMessage": "Die eingegebenen Rechnungsdaten gehen verloren.",
+  "actionKeepEditing": "Weiter bearbeiten",
+  "actionDiscard": "Verwerfen",
+  "draftSaveFailed": "Entwurf konnte nicht gespeichert werden: {error}",
+  "@draftSaveFailed": {
+      "description": "Localized copy for draftSaveFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "errorDateFormat": "Datum im Format JJJJ-MM-TT eingeben",
+  "errorPositiveAmount": "{label} muss größer als 0 sein",
+  "@errorPositiveAmount": {
+      "description": "Localized copy for errorPositiveAmount.",
+      "placeholders": {
+          "label": {
+              "type": "String"
+          }
+      }
+  },
+  "customersLoading": "Kunden werden geladen …",
+  "customersLoadFailed": "Kunden konnten nicht geladen werden",
+  "actionReload": "Erneut laden",
+  "invoiceDraftNoCustomerTitle": "Noch kein Kunde angelegt",
+  "invoiceDraftNoCustomerMessage": "Eine Rechnung braucht einen Kunden, damit sie korrekt zugeordnet werden kann.",
+  "actionCreateCustomer": "Kunde anlegen",
+  "invoiceDraftCustomerLabel": "Kunde",
+  "invoiceDraftCustomerHint": "Kunde auswählen",
+  "errorCustomerRequired": "Kunde ist erforderlich",
+  "invoiceDraftTitle": "Rechnungsentwurf",
+  "invoiceDraftDescription": "Speichere eine Rechnungsposition als Entwurf.",
+  "invoiceDraftPositionLabel": "Position",
+  "errorPositionRequired": "Position ist erforderlich",
+  "invoiceDraftUnitPriceLabel": "Einzelpreis netto",
+  "actionSaveDraft": "Entwurf speichern",
+  "errorInvoiceIdInvalid": "Die Rechnungs-ID ist ungültig.",
+  "contactDetailTitle": "Kontakt {id}",
+  "@contactDetailTitle": {
+      "description": "Localized copy for contactDetailTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "profileSavedRestartHint": "Profil gespeichert. Bitte OpenAccounting neu starten.",
+  "profileAlreadyActive": "Profil ist bereits aktiv.",
+  "profileSelectFailed": "Profil konnte nicht gewählt werden: {error}",
+  "@profileSelectFailed": {
+      "description": "Localized copy for profileSelectFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "profileCreateTitle": "Neues Profil",
+  "profileNameLabel": "Profilname",
+  "actionCreate": "Anlegen",
+  "profileCreated": "Profil angelegt.",
+  "profileCreateFailed": "Profil konnte nicht angelegt werden: {error}",
+  "@profileCreateFailed": {
+      "description": "Localized copy for profileCreateFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "errorRecordIdInvalid": "Die Datensatz-ID ist ungültig.",
+  "errorRecordNotFound": "Der Datensatz mit der ID {id} wurde nicht gefunden.",
+  "@errorRecordNotFound": {
+      "description": "Localized copy for errorRecordNotFound.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "recordIdLabel": "Datensatz-ID {id}",
+  "@recordIdLabel": {
+      "description": "Localized copy for recordIdLabel.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "recordFallbackTitle": "Datensatz #{id}",
+  "@recordFallbackTitle": {
+      "description": "Localized copy for recordFallbackTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "routeErrorSource": "Vorgang: {source}",
+  "@routeErrorSource": {
+      "description": "Localized copy for routeErrorSource.",
+      "placeholders": {
+          "source": {
+              "type": "String"
+          }
+      }
+  },
+  "bankCategoriesLoadFailed": "Kategorien konnten nicht geladen werden. Manuelle Kategorisierung ist derzeit nicht verfügbar.",
+  "bankHistoryLoadFailed": "Importverlauf konnte nicht geladen werden.",
+  "bankUnsupportedFile": "Dieses Dateiformat wird nicht unterstützt. Unterstützt werden CSV und CAMT.053 XML.",
+  "bankFileReadFailed": "Die Datei konnte nicht gelesen werden: {error}",
+  "@bankFileReadFailed": {
+      "description": "Localized copy for bankFileReadFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankFileTooLarge": "Die Datei ist größer als 20 MB. Exportiere einen kleineren Zeitraum und versuche es erneut.",
+  "bankPasteTitle": "CSV-Daten einfügen",
+  "bankPasteContentLabel": "CSV-Inhalt",
+  "bankPasteHint": "Datum;Betrag;Verwendungszweck;Partner",
+  "actionApply": "Übernehmen",
+  "bankPasteFileName": "eingefügter-import.csv",
+  "bankFileProcessFailed": "Die Datei konnte nicht verarbeitet werden: {error}",
+  "@bankFileProcessFailed": {
+      "description": "Localized copy for bankFileProcessFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankConfirmTitle": "Import bestätigen",
+  "bankConfirmMessage": "{count, plural, =1{{count} ausgewählte Zeile} other{{count} ausgewählte Zeilen}} werden in {account} importiert. Duplikate werden standardmäßig übersprungen.",
+  "@bankConfirmMessage": {
+      "description": "Localized copy for bankConfirmMessage.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          },
+          "account": {
+              "type": "String"
+          }
+      }
+  },
+  "bankBackToReview": "Zurück zur Prüfung",
+  "bankImportIncomplete": "Der Import wurde nicht vollständig abgeschlossen: {error}",
+  "@bankImportIncomplete": {
+      "description": "Localized copy for bankImportIncomplete.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankRetryNotice": "Nur die nicht gespeicherten Zeilen werden erneut geprüft. Bereits importierte Zeilen bleiben dedupliziert.",
+  "bankImportAborted": "Import abgebrochen: {diagnostic} Keine Transaktion wurde gespeichert.",
+  "@bankImportAborted": {
+      "description": "Localized copy for bankImportAborted.",
+      "placeholders": {
+          "diagnostic": {
+              "type": "String"
+          }
+      }
+  },
+  "bankImportAbortedHint": "Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.",
+  "bankStatusRejected": "Abgelehnt",
+  "bankStepChooseFile": "1. Datei auswählen",
+  "bankUploadHint": "Unterstützt werden CSV-Dateien und CAMT.053 XML-Exporte. Die Vorschau schreibt noch nichts in die Datenbank.",
+  "bankPathLabel": "Dateipfad",
+  "bankPathHint": "Datei wählen oder Pfad einfügen; Drag & Drop unterstützt",
+  "bankStepAccountTemplate": "2. Konto und Template",
+  "bankNoAccountYet": "Noch kein Bankkonto vorhanden. Lege zuerst ein Konto in den Stammdaten an; ein Import ohne Konto ist gesperrt.",
+  "bankCamtHint": "CAMT.053 wird anhand der XML-Struktur erkannt; ein CSV-Template ist dafür nicht erforderlich.",
+  "bankStepReview": "3. Vorschau prüfen und bearbeiten",
+  "bankRowsDetected": "{count} Zeilen erkannt",
+  "@bankRowsDetected": {
+      "description": "Localized copy for bankRowsDetected.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRowsSelected": "{count} ausgewählt",
+  "@bankRowsSelected": {
+      "description": "Localized copy for bankRowsSelected.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRowsManual": "{count} manuell kategorisiert",
+  "@bankRowsManual": {
+      "description": "Localized copy for bankRowsManual.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankReviewNotice": "Änderungen und manuelle Kategorien werden erst nach deiner ausdrücklichen Importbestätigung gespeichert.",
+  "bankDuplicateOverride": "Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)",
+  "bankConfirmActionCount": "Import bestätigen ({count})",
+  "@bankConfirmActionCount": {
+      "description": "Localized copy for bankConfirmActionCount.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankColPartnerPurpose": "Partner / Zweck",
+  "bankRowLabel": "Zeile {line}",
+  "@bankRowLabel": {
+      "description": "Localized copy for bankRowLabel.",
+      "placeholders": {
+          "line": {
+              "type": "int"
+          }
+      }
+  },
+  "bankColPartner": "Partner",
+  "bankColPurpose": "Verwendungszweck",
+  "bankStepResult": "4. Importergebnis",
+  "bankStatImported": "Importiert",
+  "bankStatDuplicatesSkipped": "Duplikate übersprungen",
+  "bankStatCategorized": "Kategorisiert",
+  "bankStatManualReview": "Manuelle Prüfung",
+  "bankStatFailed": "Fehlgeschlagen",
+  "bankResultAllSaved": "Alle bestätigten neuen Zeilen wurden gespeichert. Der Import ist im Verlauf dokumentiert.",
+  "bankRetryFailedRows": "Fehlgeschlagene Zeilen erneut prüfen",
+  "bankFailureRowsGeneric": "Die Datenbank meldete nicht gespeicherte Zeilen, konnte aber keinen einzelnen Zeilenfehler zurückgeben. Prüfe Konto, Datum und Betrag; ein erneuter Versuch bleibt dedupliziert.",
+  "bankNotSavedFix": "Nicht gespeichert — bitte korrigieren und erneut prüfen:",
+  "bankFailureRowPrefix": "Zeile {line}: {error}",
+  "@bankFailureRowPrefix": {
+      "description": "Localized copy for bankFailureRowPrefix.",
+      "placeholders": {
+          "line": {
+              "type": "int"
+          },
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankWithoutPartner": "ohne Partner",
+  "bankWithoutPurpose": "ohne Verwendungszweck",
+  "bankHistoryTitle": "Importverlauf",
+  "bankHistoryCardSubtitle": "Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.",
+  "bankHistoryRefresh": "Importverlauf aktualisieren",
+  "bankColTime": "Zeitpunkt",
+  "bankColSource": "Quelle",
+  "bankColTemplate": "Template",
+  "bankColAccount": "Konto",
+  "bankColImported": "Importiert",
+  "bankColDuplicates": "Duplikate",
+  "bankColError": "Fehler",
+  "bankColStatus": "Status",
+  "bankStageFile": "Datei",
+  "bankStageReview": "Prüfen",
+  "bankStageResult": "Ergebnis",
+  "bankStageCurrent": "aktuell",
+  "bankStageComplete": "abgeschlossen",
+  "bankStageOpen": "offen",
+  "bankReady": "Bereit: {name} · {size}",
+  "@bankReady": {
+      "description": "Localized copy for bankReady.",
+      "placeholders": {
+          "name": {
+              "type": "String"
+          },
+          "size": {
+              "type": "String"
+          }
+      }
+  },
+  "bankDelimiterSemicolon": "Semikolon",
+  "bankDelimiterComma": "Komma",
+  "bankHeaderSubtitleHistory": "Nachvollziehbarer Importverlauf",
+  "bankHeaderSubtitleImport": "Dateiimport mit Prüfung vor dem Speichern",
+  "bankNoAccountSelected": "kein Konto",
+  "bankAccountFallback": "Konto {id}",
+  "@bankAccountFallback": {
+      "description": "Localized copy for bankAccountFallback.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "bankCategoryFallback": "Kategorie {id}",
+  "@bankCategoryFallback": {
+      "description": "Localized copy for bankCategoryFallback.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "bankUnknownFile": "Unbekannte Datei",
+  "bankStatusPartial": "Teilweise importiert",
+  "bankStatusFailed": "Import fehlgeschlagen",
+  "bankStatusImported": "Importiert",
+  "bankInvalidImportNoDiagnostic": "Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.",
+  "bankRecoveryCheckFileTemplate": "Prüfe Datei und Template und versuche es erneut.",
+  "bankInvalidImportNoAccount": "Ungültiger Import: Kein gültiges Bankkonto ausgewählt.",
+  "bankRecoverySelectAccount": "Wähle ein gültiges Bankkonto und versuche es erneut.",
+  "bankNoTransactionsToImport": "Keine Transaktionen zum Importieren.",
+  "bankRecoverySelectSupportedFile": "Wähle eine unterstützte Datei mit mindestens einer Transaktion.",
+  "bankHistoryNotFinalSaved": "Importhistorie konnte nicht abschließend gespeichert werden.",
+  "bankHistoryCreateFailed": "Importhistorie konnte nicht angelegt werden: {error}",
+  "@bankHistoryCreateFailed": {
+      "description": "Localized copy for bankHistoryCreateFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankRecoveryFixDatabase": "Behebe das Datenbankproblem und versuche es erneut.",
+  "bankRecoveryCheckDuplicates": "Prüfe die vorhandenen Duplikate und versuche es erneut.",
+  "bankUnknownError": "Unbekannter Fehler",
+  "bankInvalidDate": "Datum ungültig",
+  "bankInvalidAmount": "Betrag ungültig",
+  "bankCsvUnclosedQuotes": "Ungültige CSV: Anführungszeichen nicht geschlossen",
+  "bankCsvRowSuffix": " in Zeile {row}",
+  "@bankCsvRowSuffix": {
+      "description": "Localized copy for bankCsvRowSuffix.",
+      "placeholders": {
+          "row": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRecoveryFixCsvRow": "Korrigiere die CSV-Zeile und versuche den Import erneut.",
+  "bankNoTransactionsFound": "Keine Transaktionen gefunden",
+  "bankNoTemplateFound": "Kein passendes Template gefunden. Bitte wähle ein Template.",
+  "bankNoTemplateFoundNoTransactions": "Keine Transaktionen gefunden. Kein passendes Template gefunden. Bitte wähle ein Template.",
+  "bankEmptyFile": "Datei ist leer",
+  "bankNoHeader": "Datei enthält keine Kopfzeile",
+  "bankInvalidXmlNoTag": "Ungültiges XML: kein XML-Tag gefunden (invalid)",
+  "bankInvalidXmlNoClosingTag": "Ungültiges XML: kein schliessendes Tag (invalid)",
+  "bankInvalidXmlDocumentUnclosed": "Ungültiges XML: Document nicht geschlossen (invalid)",
+  "bankInvalidXmlNtryUnclosed": "Ungültiges XML: Ntry nicht geschlossen (invalid)",
+  "bankInvalidXmlMismatched": "Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)",
+  "bankInvalidXmlTagUnclosed": "Ungültiges XML: Tag nicht geschlossen (invalid)",
+  "bankAmountMissingNtry": "Betrag fehlt in Ntry",
+  "bankDateMissingNtry": "Datum fehlt in Ntry",
+  "bankAmountMissing": "Betrag fehlt",
+  "bankDateInvalidRaw": "Datum ungültig: {raw}",
+  "@bankDateInvalidRaw": {
+      "description": "Localized copy for bankDateInvalidRaw.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "bankAmountInvalidRaw": "Betrag ungültig: {raw}",
+  "@bankAmountInvalidRaw": {
+      "description": "Localized copy for bankAmountInvalidRaw.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "bankAmountOutOfRange": "Betrag außerhalb NUMERIC(12,2): {raw}",
+  "@bankAmountOutOfRange": {
+      "description": "Localized copy for bankAmountOutOfRange.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "setupErrorNameRequired": "Name ist Pflicht",
+  "setupErrorAccountRequired": "Mindestens ein Konto erforderlich",
+  "setupErrorIbanInvalid": "IBAN ungültig: {iban}",
+  "@setupErrorIbanInvalid": {
+      "description": "Localized copy for setupErrorIbanInvalid.",
+      "placeholders": {
+          "iban": {
+              "type": "String"
+          }
+      }
+  },
+  "setupErrorCashNegative": "Kassenbestand darf nicht negativ sein",
+  "setupErrorCashInvalid": "Kassenbestand ungültig",
+  "setupErrorCategoryRequired": "Mindestens eine Kategorie erforderlich",
+  "setupErrorDatabaseStatus": "Datenbank konnte für den Setup-Status nicht gelesen werden",
+  "dashboardCustomize": "Dashboard anpassen",
+  "dashboardIncome": "Einnahmen",
+  "dashboardExpenses": "Ausgaben",
+  "dashboardEmptyNoWarnings": "Keine Warnungen",
+  "dashboardEmptyNoStock": "Kein Lagerbestand",
+  "dashboardEmptyNoReminders": "Keine Mahnungen",
+  "dashboardEmptyNoDeadlines": "Keine Fristen",
+  "dashboardEmptyNoActivities": "Keine Aktivitäten",
+  "dashboardEmptyNoPayments": "Keine Zahlungen",
+  "quickLinkUnavailable": "{label} (nicht verfügbar)",
+  "@quickLinkUnavailable": {
+      "description": "Localized copy for quickLinkUnavailable.",
+      "placeholders": {
+          "label": {
+              "type": "String"
+          }
+      }
+  },
+  "dashboardUstvaDue": "UStVA fällig am {date}",
+  "@dashboardUstvaDue": {
+      "description": "Localized copy for dashboardUstvaDue.",
+      "placeholders": {
+          "date": {
+              "type": "String"
+          }
+      }
+  },
+  "quickLinkJournal": "Journal",
+  "quickLinkItems": "Artikel",
+  "dashboardWidgetOpenInvoices": "Offene Rechnungen",
+  "dashboardWidgetIncomingPayments": "Zahlungseingänge",
+  "dashboardWidgetReminderWarning": "Mahnung-Warnung",
+  "dashboardWidgetDeadlines": "Fristen",
+  "dashboardWidgetUstvaDeadline": "UStVA-Frist",
+  "dashboardWidgetQuickLinks": "Schnellzugriff",
+  "dashboardWidgetIncomeExpenses": "Einnahmen/Ausgaben",
+  "dashboardWidgetOverdueInvoices": "Überfällige Rechnungen",
+  "dashboardWidgetOpenLiabilities": "Offene Verbindlichkeiten",
+  "dashboardWidgetBalance": "Kontostand",
+  "dashboardWidgetActivityLog": "Aktivitäts-Log",
+  "bankColImport": "Import",
+  "bankColAmount": "Betrag",
+  "bankColCategory": "Kategorie",
+  "bankPathHintExample": "/Pfad/zum/Kontoauszug.csv",
+  "invoiceDraftNumber": "Entwurf #{number}",
+  "@invoiceDraftNumber": {
+      "description": "Localized copy for invoiceDraftNumber.",
+      "placeholders": {
+          "number": {
+              "type": "int"
+          }
+      }
+  },
+  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required"
 }

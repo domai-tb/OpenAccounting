@@ -115,6 +115,7 @@ void main() {
         companyName: 'Echte GmbH',
         accounts: [const BankAccount(name: 'Girokonto', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         kassenbestand: '1000.00',
+        locale: 'de_DE',
       );
 
       // After completion, hasUnternehmen must return true.
@@ -135,7 +136,11 @@ void main() {
       // But hasUnternehmen should still return false (skip creates defaults, not real config).
       // The router should NOT redirect back to setup — skip means "use defaults, go to dashboard".
       // The key invariant: isCompleted must be true so the router doesn't loop.
-      expect(await wizard.isSetupRequired(db), isFalse, reason: 'Setup must not be required after skip');
+      expect(
+        await wizard.isSetupRequired(db, locale: 'de_DE'),
+        isFalse,
+        reason: 'Setup must not be required after skip',
+      );
     });
 
     // ── Task 3: Opening cash agrees across sources ──
@@ -145,6 +150,7 @@ void main() {
         companyName: 'Cash GmbH',
         accounts: [const BankAccount(name: 'Kasse', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         kassenbestand: '500.00',
+        locale: 'de_DE',
       );
 
       // Check that the kassenkonto exists.
@@ -170,7 +176,7 @@ void main() {
     test('test_setup_onboarding_integrity_2_2_intermediate_failure_rolls_back', () async {
       // Attempt to complete with invalid data (empty company name).
       expect(
-        () => wizard.completeWizard(companyName: '', accounts: []),
+        () => wizard.completeWizard(companyName: '', accounts: [], locale: 'de_DE'),
         throwsA(isA<SetupException>()),
         reason: 'Empty company name must throw SetupException',
       );
@@ -203,12 +209,17 @@ void main() {
 
       // The router uses hasUnternehmen to decide.
       // After skip, isCompleted is true, so setup is not required.
-      expect(await wizard.isSetupRequired(db), isFalse, reason: 'Skip must prevent setup redirect loop');
+      expect(
+        await wizard.isSetupRequired(db, locale: 'de_DE'),
+        isFalse,
+        reason: 'Skip must prevent setup redirect loop',
+      );
 
       // Complete with real name — must be configured.
       await wizard.completeWizard(
         companyName: 'Real GmbH',
         accounts: [const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
+        locale: 'de_DE',
       );
       final configured = await hasUnternehmen(db);
       expect(configured, isTrue, reason: 'Real company name must be recognized as configured');
@@ -221,6 +232,7 @@ void main() {
         companyName: 'Marker GmbH',
         accounts: [const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         kassenbestand: '500.00',
+        locale: 'de_DE',
       );
 
       final openingRows = await db.executor.runSelect(

@@ -34,7 +34,7 @@ void main() {
           '16.03.2026;1234.56;Rechnung 123;Kunde AG\n'
           '17.03.2026;-42,50;Gebühr;Bank\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> rows = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
       expect(rows, hasLength(3));
       expect(rows[0].datum, DateTime(2026, 3, 15));
@@ -56,7 +56,7 @@ void main() {
           '2026-03-15,1234.56,Miete März,Vermieter GmbH\n'
           '2026-03-16,42.50,Gebühr,Bank\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'paypal');
-      final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> rows = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
       expect(rows, hasLength(2));
       expect(rows[0].datum, DateTime(2026, 3, 15));
@@ -71,7 +71,7 @@ void main() {
           'Datum;Betrag;Verwendungszweck;Partner\n'
           '15.03.2026;100,00;Test;Partner\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> rows = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
       expect(rows, hasLength(1));
 
       final List<Map<String, Object?>> dbRows = await db.executor.runSelect(
@@ -87,7 +87,10 @@ void main() {
           '15.03.2026;1234,56;Miete;Partner\n'
           '16.03.2026;42,50;Gebühr;Bank\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      expect(() => service.parseCsv(csv: csv, template: template), throwsA(isA<BankImportException>()));
+      expect(
+        () => service.parseCsv(csv: csv, template: template, locale: 'de_DE'),
+        throwsA(isA<BankImportException>()),
+      );
     });
 
     test('no template matches throws prompt', () {
@@ -97,7 +100,7 @@ void main() {
           '4;5;6\n';
       // No valid datum/betrag header — should prompt template selection.
       expect(
-        () => service.parseCsv(csv: csv),
+        () => service.parseCsv(csv: csv, locale: 'de_DE'),
         throwsA(predicate<Object>((e) => e is BankImportException && e.message.toLowerCase().contains('template'))),
       );
     });
@@ -114,7 +117,7 @@ void main() {
           'Datum;Betrag;Verwendungszweck;Partner\n'
           '15.03.2026;"1.234,56";"Miete; März";"Vermieter, GmbH"\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> rows = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
       expect(rows, hasLength(1));
       expect(rows[0].betrag, '1234.56');

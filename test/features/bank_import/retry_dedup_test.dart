@@ -42,6 +42,7 @@ void main() {
         kontoId: 1,
         rawTxs: <RawTx>[alreadyPersisted, initiallyRejected],
         dateiname: 'partial-import.csv',
+        locale: 'de_DE',
       );
       expect(first.imported, 1);
 
@@ -53,6 +54,7 @@ void main() {
           _testTransaction(purpose: 'Corrected row'),
         ],
         dateiname: 'partial-import-retry.csv',
+        locale: 'de_DE',
       );
 
       expect(retry.imported, 1);

@@ -124,7 +124,7 @@ GoRouter createRouter(AppDatabase db) {
                 path: ':id',
                 builder: (context, state) => ProductionRecordDetailPage(
                   table: 'belege',
-                  title: 'Beleg ${state.pathParameters['id']}',
+                  title: appLocalizationsOf(context).receiptDetailTitle(state.pathParameters['id']!),
                   id: state.pathParameters['id']!,
                 ),
               ),
@@ -154,7 +154,7 @@ GoRouter createRouter(AppDatabase db) {
                 path: ':id',
                 builder: (context, state) => ProductionRecordDetailPage(
                   table: 'journal',
-                  title: 'Buchung ${state.pathParameters['id']}',
+                  title: appLocalizationsOf(context).journalDetailTitle(state.pathParameters['id']!),
                   id: state.pathParameters['id']!,
                 ),
               ),
@@ -254,8 +254,8 @@ class InvoicesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l10n = appLocalizationsOf(context);
     final List<String> filters = <String>[
-      if (filterTyp != null) 'Typ: $filterTyp',
-      if (filterStatus != null) 'Status: $filterStatus',
+      if (filterTyp != null) l10n.filterTypeLabel(filterTyp!),
+      if (filterStatus != null) l10n.filterStatusLabel(filterStatus!),
     ];
     return ProductionRoutePage(
       title: l10n.routeInvoices,
@@ -298,14 +298,15 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
 
   Future<bool> _confirmDiscard() async {
     if (!_isDirty) return true;
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final bool? discard = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('Entwurf verwerfen?'),
-        content: const Text('Die eingegebenen Rechnungsdaten gehen verloren.'),
+        title: Text(l10n.draftDiscardTitle),
+        content: Text(l10n.draftDiscardMessage),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Weiter bearbeiten')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Verwerfen')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.actionKeepEditing)),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.actionDiscard)),
         ],
       ),
     );
@@ -378,7 +379,7 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Entwurf konnte nicht gespeichert werden: $error')));
+          .showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).draftSaveFailed('$error'))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -388,14 +389,14 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
     final String date = value?.trim() ?? '';
     final DateTime? parsed = DateTime.tryParse(date);
     if (parsed == null || date.length != 10 || parsed.toIso8601String().substring(0, 10) != date) {
-      return 'Datum im Format JJJJ-MM-TT eingeben';
+      return appLocalizationsOf(context).errorDateFormat;
     }
     return null;
   }
 
   String? _validatePositiveAmount(String? value, String label) {
     final num? parsed = _parseAmount(value ?? '');
-    if (parsed == null || parsed <= 0) return '$label muss größer als 0 sein';
+    if (parsed == null || parsed <= 0) return appLocalizationsOf(context).errorPositiveAmount(label);
     return null;
   }
 
@@ -407,19 +408,20 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
   }
 
   Widget _buildCustomerSelector(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     if (_customersLoading) {
-      return const Column(
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[Text('Kunden werden geladen …'), SizedBox(height: 8), LinearProgressIndicator()],
+        children: <Widget>[Text(l10n.customersLoading), const SizedBox(height: 8), const LinearProgressIndicator()],
       );
     }
     if (_customerError != null) {
       return Card(
         child: ListTile(
           leading: const Icon(Icons.error_outline),
-          title: const Text('Kunden konnten nicht geladen werden'),
+          title: Text(l10n.customersLoadFailed),
           subtitle: Text(_customerError!),
-          trailing: TextButton(onPressed: _loadCustomers, child: const Text('Erneut laden')),
+          trailing: TextButton(onPressed: _loadCustomers, child: Text(l10n.actionReload)),
         ),
       );
     }
@@ -427,9 +429,9 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
       return Card(
         child: ListTile(
           leading: const Icon(Icons.people_outline),
-          title: const Text('Noch kein Kunde angelegt'),
-          subtitle: const Text('Eine Rechnung braucht einen Kunden, damit sie korrekt zugeordnet werden kann.'),
-          trailing: TextButton(onPressed: () => context.go('/contacts/new'), child: const Text('Kunde anlegen')),
+          title: Text(l10n.invoiceDraftNoCustomerTitle),
+          subtitle: Text(l10n.invoiceDraftNoCustomerMessage),
+          trailing: TextButton(onPressed: () => context.go('/contacts/new'), child: Text(l10n.actionCreateCustomer)),
         ),
       );
     }
@@ -437,8 +439,8 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
       key: const ValueKey<String>('invoice_draft_customer'),
       isExpanded: true,
       initialValue: _customers.any((Kunde customer) => customer.id == _selectedCustomerId) ? _selectedCustomerId : null,
-      decoration: const InputDecoration(labelText: 'Kunde'),
-      hint: const Text('Kunde auswählen'),
+      decoration: InputDecoration(labelText: l10n.invoiceDraftCustomerLabel),
+      hint: Text(l10n.invoiceDraftCustomerHint),
       items: _customers
           .map(
             (Kunde customer) => DropdownMenuItem<int>(
@@ -452,12 +454,13 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
           : (int? value) => setState(() {
               _selectedCustomerId = value;
             }),
-      validator: (int? value) => value == null ? 'Kunde ist erforderlich' : null,
+      validator: (int? value) => value == null ? l10n.errorCustomerRequired : null,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -465,11 +468,11 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
       },
       child: AppPage(
         header: AppPageHeader(
-          title: 'Neue Rechnung',
+          title: l10n.actionNewInvoice,
           leading: IconButton(
             onPressed: _saving ? null : () => unawaited(_cancelDraft()),
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Zurück',
+            tooltip: l10n.actionBack,
           ),
           showFilterToolbar: false,
         ),
@@ -477,25 +480,24 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
           key: _formKey,
           child: ListView(
             children: <Widget>[
-              Text('Rechnungsentwurf', style: Theme.of(context).textTheme.titleLarge),
+              Text(l10n.invoiceDraftTitle, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              const Text('Speichere eine Rechnungsposition als Entwurf.'),
+              Text(l10n.invoiceDraftDescription),
               const SizedBox(height: 24),
               _buildCustomerSelector(context),
               const SizedBox(height: 16),
               TextFormField(
                 key: const ValueKey<String>('invoice_draft_date'),
                 controller: _dateController,
-                decoration: const InputDecoration(labelText: 'Datum', hintText: '2026-01-31'),
+                decoration: InputDecoration(labelText: l10n.dateLabel, hintText: '2026-01-31'),
                 validator: _validateDate,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 key: const ValueKey<String>('invoice_draft_description'),
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Position'),
-                validator: (String? value) =>
-                    value == null || value.trim().isEmpty ? 'Position ist erforderlich' : null,
+                decoration: InputDecoration(labelText: l10n.invoiceDraftPositionLabel),
+                validator: (String? value) => value == null || value.trim().isEmpty ? l10n.errorPositionRequired : null,
               ),
               const SizedBox(height: 16),
               Row(
@@ -504,9 +506,9 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
                     child: TextFormField(
                       key: const ValueKey<String>('invoice_draft_quantity'),
                       controller: _quantityController,
-                      decoration: const InputDecoration(labelText: 'Menge'),
+                      decoration: InputDecoration(labelText: l10n.pdfQuantity),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (String? value) => _validatePositiveAmount(value, 'Menge'),
+                      validator: (String? value) => _validatePositiveAmount(value, l10n.pdfQuantity),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -514,9 +516,9 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
                     child: TextFormField(
                       key: const ValueKey<String>('invoice_draft_price'),
                       controller: _priceController,
-                      decoration: const InputDecoration(labelText: 'Einzelpreis netto'),
+                      decoration: InputDecoration(labelText: l10n.invoiceDraftUnitPriceLabel),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (String? value) => _validatePositiveAmount(value, 'Einzelpreis'),
+                      validator: (String? value) => _validatePositiveAmount(value, l10n.pdfUnitPrice),
                     ),
                   ),
                 ],
@@ -526,7 +528,7 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
                 children: <Widget>[
                   OutlinedButton(
                     onPressed: _saving ? null : () => unawaited(_cancelDraft()),
-                    child: const Text('Abbrechen'),
+                    child: Text(l10n.actionCancel),
                   ),
                   const Spacer(),
                   FilledButton.icon(
@@ -537,7 +539,7 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
                     icon: _saving
                         ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.save_outlined),
-                    label: const Text('Entwurf speichern'),
+                    label: Text(l10n.actionSaveDraft),
                   ),
                 ],
               ),
@@ -558,7 +560,7 @@ class InvoiceDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final int? recordId = int.tryParse(id);
     if (recordId == null) {
-      return const NotFoundPage(message: 'Die Rechnungs-ID ist ungültig.');
+      return NotFoundPage(message: appLocalizationsOf(context).errorInvoiceIdInvalid);
     }
     return InvoiceDocumentPage(id: recordId);
   }
@@ -609,7 +611,11 @@ class ContactDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProductionRecordDetailPage(table: 'kunden', title: 'Kontakt $id', id: id);
+    return ProductionRecordDetailPage(
+      table: 'kunden',
+      title: appLocalizationsOf(context).contactDetailTitle(id),
+      id: id,
+    );
   }
 }
 
@@ -696,42 +702,39 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
   }
 
   Future<void> _selectProfile(String name) async {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     try {
       final bool restartRequired = await _profileManager.setActiveProfile(name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            restartRequired ? 'Profil gespeichert. Bitte OpenAccounting neu starten.' : 'Profil ist bereits aktiv.',
-          ),
-        ),
+        SnackBar(content: Text(restartRequired ? l10n.profileSavedRestartHint : l10n.profileAlreadyActive)),
       );
       _reloadProfiles();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Profil konnte nicht gewählt werden: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileSelectFailed('$error'))));
       }
     }
   }
 
   Future<void> _createProfile() async {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final TextEditingController controller = TextEditingController();
     final String? name = await showDialog<String>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('Neues Profil'),
+        title: Text(l10n.profileCreateTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Profilname'),
+          decoration: InputDecoration(labelText: l10n.profileNameLabel),
           onSubmitted: (String value) => Navigator.of(context).pop(value.trim()),
         ),
         actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.actionCancel)),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Anlegen'),
+            child: Text(l10n.actionCreate),
           ),
         ],
       ),
@@ -742,11 +745,10 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
       await _profileManager.createProfile(name);
       if (!mounted) return;
       _reloadProfiles();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profil angelegt.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileCreated)));
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Profil konnte nicht angelegt werden: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileCreateFailed('$error'))));
       }
     }
   }
@@ -973,9 +975,10 @@ class ProductionRecordDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final int? recordId = int.tryParse(id);
     if (recordId == null) {
-      return const NotFoundPage(message: 'Die Datensatz-ID ist ungültig.');
+      return NotFoundPage(message: l10n.errorRecordIdInvalid);
     }
     final RouteRecordKey key = RouteRecordKey(table: table, id: recordId);
     final AsyncValue<Map<String, Object?>?> record = ref.watch(routeRecordProvider(key));
@@ -993,9 +996,9 @@ class ProductionRecordDetailPage extends ConsumerWidget {
       ),
       data: (Map<String, Object?>? row) {
         if (row == null) {
-          return NotFoundPage(message: 'Der Datensatz mit der ID $id wurde nicht gefunden.');
+          return NotFoundPage(message: l10n.errorRecordNotFound(id));
         }
-        final String recordTitle = _recordTitle(table, row);
+        final String recordTitle = _recordTitle(table, row, l10n);
         final List<_DetailField> fields = _detailFields(table, row);
         return AppPage(
           maxWidth: 860,
@@ -1005,7 +1008,7 @@ class ProductionRecordDetailPage extends ConsumerWidget {
             leading: IconButton(
               onPressed: () => _goBackOrHome(context),
               icon: const Icon(Icons.arrow_back),
-              tooltip: 'Zurück',
+              tooltip: l10n.actionBack,
             ),
           ),
           child: ListView(
@@ -1026,7 +1029,7 @@ class ProductionRecordDetailPage extends ConsumerWidget {
                         children: <Widget>[
                           Text(recordTitle, style: Theme.of(context).textTheme.titleLarge),
                           const SizedBox(height: 4),
-                          Text('Datensatz-ID $id', style: Theme.of(context).textTheme.bodyMedium),
+                          Text(l10n.recordIdLabel(id), style: Theme.of(context).textTheme.bodyMedium),
                         ],
                       ),
                     ),
@@ -1101,10 +1104,11 @@ void _openRecord(BuildContext context, String table, int id, Map<String, Object?
 }
 
 void _showRecordDialog(BuildContext context, String table, Map<String, Object?> row) {
+  final AppLocalizations l10n = appLocalizationsOf(context);
   showDialog<void>(
     context: context,
     builder: (BuildContext context) => AlertDialog(
-      title: Text(_recordTitle(table, row)),
+      title: Text(_recordTitle(table, row, l10n)),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
@@ -1120,7 +1124,7 @@ void _showRecordDialog(BuildContext context, String table, Map<String, Object?> 
           ),
         ),
       ),
-      actions: <Widget>[TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen'))],
+      actions: <Widget>[TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.actionClose))],
     ),
   );
 }
@@ -1131,7 +1135,7 @@ int? _recordId(Map<String, Object?> row) {
   return int.tryParse(value?.toString() ?? '');
 }
 
-String _recordTitle(String table, Map<String, Object?> row) {
+String _recordTitle(String table, Map<String, Object?> row, AppLocalizations l10n) {
   final Object? preferred = switch (table) {
     'rechnungen' => row['rechnungsnummer'] ?? row['typ'],
     'kunden' => row['name'] ?? row['firma'],
@@ -1140,7 +1144,8 @@ String _recordTitle(String table, Map<String, Object?> row) {
     _ => row['name'] ?? row['beschreibung'] ?? row['typ'],
   };
   final String value = _displayValue(preferred);
-  return value == '—' ? 'Datensatz #${_recordId(row) ?? '?'}' : value;
+  final String fallbackId = '${_recordId(row) ?? '?'}';
+  return value == '—' ? l10n.recordFallbackTitle(fallbackId) : value;
 }
 
 String _fieldLabel(String key) {
@@ -1181,7 +1186,7 @@ Widget _routeError(BuildContext context, String source, Object error, StackTrace
             const SizedBox(height: 12),
             Text(AppLocalizations.of(context)?.dataLoadError ?? 'Data could not be loaded'),
             const SizedBox(height: 8),
-            Text('Vorgang: $source'),
+            Text(appLocalizationsOf(context).routeErrorSource(source)),
             const SizedBox(height: 16),
             Wrap(
               alignment: WrapAlignment.center,

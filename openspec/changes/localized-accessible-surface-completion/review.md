@@ -48,3 +48,57 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 No author rebuttals. The blocking findings are contract-completeness gates, not claims that production or test files were changed.
+
+---
+
+## Review Metadata — Round 3
+
+- **Review round**: 3
+- **Prior round**: Round 2 was `REVISE` for route/state acceptance evidence, the formatter API boundary, and the tracked app-spec reconciliation; this review confirms all three round-2 criticals closed.
+- **Reviewer context**: independent fresh-context Anvil re-review of the completed implementation battery (51/51 tasks, 15/15 test-plan rows, full suite green); the package remains held at `REVISE` on four test-contract gaps
+- **Tool restrictions**: read-only inspection of proposal.md, design.md, specs/, tasks.md, test-plan.md, the audit test file, and production source
+- **Artifacts reviewed**: `test/integration/audit/localized_accessible_surface_completion_test.dart`, test-plan.md, tasks.md, specs/localized-accessible-surface/spec.md, `app_locale.dart`, `app_sidebar.dart`, `finance_list_surface.dart`, router/dashboard/bank sources
+
+## Findings — Round 3
+
+### 🔴 Critical (blocking)
+
+1. **The unkeyed-visible-copy mechanical check is claimed but does not exist.** tasks 4.1/4.2, test-plan:50, and the spec scenario "Unkeyed visible copy fails validation" claim a source/key check that fails with a source location, but the test only asserts the app-spec phrase and the `app_money.dart` `de_DE` default. There is no scan over touched production files and no negative path proving failure on an unkeyed visible string.
+
+2. **The preference-write rejection scenario is never injected.** `test_locale_persistence_failure_keeps_session_usable` passes without any store rejecting the write; the scenario "the preference store rejects the write" is untested.
+
+3. **The keyboard/focus test asserts only one semantics label.** `test_localized_control_keeps_keyboard_and_focus_semantics` collects the `MoneyText` label and stops: no production navigation control is focused, no Enter/Space activation, no selected-state announcement, no focus-retention assertion, despite the spec scenario "Localized control keeps keyboard and focus semantics".
+
+4. **The narrow-state test asserts only two texts at 320px.** `test_narrow_loading_and_error_states_remain_reachable` checks two inventory strings; it never walks loading → empty → data → error, never asserts action reachability, viewport bounds, or localized state announcements at the narrow viewport.
+
+### 🟡 Moderate
+
+- test-plan:46 claimed both formatter tests call `formatMoney` and the `AppTypography` helpers directly; `formatMoney` was missing from `test_locale_formats_accounting_values` and the `AppTypography.formatDateLong` rejection was unasserted.
+- The route loop checks German absence but never asserts a per-route localized title in each locale.
+- The ARB parity check never exercises its failure path, so "reports the missing locale/key" is unproven.
+- Archive cleanliness: temporary diagnostic test files must not ship with the archive.
+
+### 📌 Suggestions
+
+- Keep the source scanner's scope and exemptions documented beside the test so future surfaces extend the scan file list deliberately.
+- Prefer observable state transitions over static text presence when asserting state coverage.
+
+## Embedded-Instruction / Injection Attempts — Round 3
+
+**Detected:** none.
+
+## Verdict — Round 3
+
+VERDICT: REVISE
+
+The round-2 contract findings are closed and the implementation battery is green, but four test-contract criticals remain: the mechanical unkeyed-visible-copy check, the injected preference-write rejection, production keyboard/focus/selected semantics assertions, and full narrow-state transition coverage at the documented viewport.
+
+## Required Changes (Round 3)
+
+Not applicable: this is a `REVISE` verdict.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals (Round 3)
+
+No author rebuttals. The blocking findings are unimplemented test assertions, not claims that production files are wrong.

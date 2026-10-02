@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/localization.dart';
+import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
@@ -57,6 +58,14 @@ class _WizardPageState extends State<WizardPage> {
 
   WizardStep get _step => _service.currentStep;
 
+  /// Active locale tag for the service validation messages, mirroring the
+  /// catalog resolution used for this page's copy (German when isolated).
+  String get _activeLocale {
+    final AppLocalizations? provided = AppLocalizations.of(context);
+    if (provided == null) return localeTag(const Locale('de'));
+    return localeTag(Localizations.localeOf(context));
+  }
+
   Future<void> _handleWeiter() async {
     if (_busy) return;
     setState(() {
@@ -66,7 +75,7 @@ class _WizardPageState extends State<WizardPage> {
       _kasseError = null;
     });
     if (_step == WizardStep.stammdaten) {
-      final String? err = _service.validateStammdaten(name: _nameCtrl.text);
+      final String? err = _service.validateStammdaten(name: _nameCtrl.text, locale: _activeLocale);
       if (err != null) {
         setState(() => _nameError = err);
         return;
@@ -85,25 +94,27 @@ class _WizardPageState extends State<WizardPage> {
       final List<BankAccount> accounts = iban.isEmpty
           ? const <BankAccount>[]
           : <BankAccount>[BankAccount(name: 'Giro', iban: iban, bic: _bicCtrl.text.trim())];
-      final String? err = _service.validateKonten(accounts: accounts, kassenbestand: _kasseCtrl.text);
-      if (err != null) {
-        if (err.contains('Kassenbestand')) {
-          setState(() => _kasseError = err);
-        } else {
-          setState(() => _ibanError = err);
-        }
-        return;
-      }
-      final String? kErr = _service.validateKassenbestand(_kasseCtrl.text);
+      // Cash-balance feedback owns its field, so validate it before the
+      // account rules instead of routing by message content.
+      final String? kErr = _service.validateKassenbestand(_kasseCtrl.text, locale: _activeLocale);
       if (kErr != null) {
         setState(() => _kasseError = kErr);
+        return;
+      }
+      final String? err = _service.validateKonten(
+        accounts: accounts,
+        kassenbestand: _kasseCtrl.text,
+        locale: _activeLocale,
+      );
+      if (err != null) {
+        setState(() => _ibanError = err);
         return;
       }
       setState(() => _service.next());
       return;
     }
     if (_step == WizardStep.kategorien) {
-      final String? err = _service.validateKategorien(selectedIds: _selectedKategorien.toList());
+      final String? err = _service.validateKategorien(selectedIds: _selectedKategorien.toList(), locale: _activeLocale);
       if (err != null) {
         setState(() => _kategorieError = err);
         return;
@@ -132,6 +143,7 @@ class _WizardPageState extends State<WizardPage> {
         accounts: accounts,
         kassenbestand: _kasseCtrl.text.trim().isEmpty ? '0.00' : _kasseCtrl.text.trim(),
         kategorieIds: _selectedKategorien.toList(),
+        locale: _activeLocale,
       );
       if (mounted) {
         final GoRouter? router = GoRouter.maybeOf(context);

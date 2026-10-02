@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:openaccounting/app/app_drawer_scope.dart';
+import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/tokens/radius.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 
 /// Consistent page header per DESIGN §5.
 /// Minimal for 1.2: title + optional subtitle + actions.
@@ -22,18 +24,18 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     this.searchController,
     this.onSearchChanged,
     this.showFilterToolbar = true,
-    this.searchLabel = 'Suchen',
-    this.searchHint = 'Suchen…',
-    this.filterButtonLabel = 'Filter',
+    this.searchLabel,
+    this.searchHint,
+    this.filterButtonLabel,
     this.onFilterPressed,
     this.activeFilters = const <String>[],
     this.onFilterRemoved,
-    this.removeFilterLabel = 'Filter entfernen',
+    this.removeFilterLabel,
     this.resultCount,
     this.resultCountLabelBuilder,
-    this.resetFiltersLabel = 'Filter zurücksetzen',
+    this.resetFiltersLabel,
     this.onResetFilters,
-    this.tabsLabel = 'Ansichten',
+    this.tabsLabel,
     super.key,
   });
 
@@ -56,18 +58,18 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
   final TextEditingController? searchController;
   final ValueChanged<String>? onSearchChanged;
   final bool showFilterToolbar;
-  final String searchLabel;
+  final String? searchLabel;
   final String? searchHint;
-  final String filterButtonLabel;
+  final String? filterButtonLabel;
   final VoidCallback? onFilterPressed;
   final List<String> activeFilters;
   final ValueChanged<String>? onFilterRemoved;
-  final String removeFilterLabel;
+  final String? removeFilterLabel;
   final int? resultCount;
   final String Function(int count)? resultCountLabelBuilder;
-  final String resetFiltersLabel;
+  final String? resetFiltersLabel;
   final VoidCallback? onResetFilters;
-  final String tabsLabel;
+  final String? tabsLabel;
 
   static const double _subtitleHeight = AppSpacing.xl;
   static const double _toolbarHeight = AppSpacing.xxxl + AppSpacing.sm;
@@ -120,6 +122,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final AppDrawerScope? drawer = AppDrawerScope.maybeOf(context);
     final Widget? resolvedPrimaryAction = _resolvedPrimaryAction;
     final List<Widget> resolvedActions = <Widget>[
@@ -137,7 +140,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
           leading ??
           (drawer == null
               ? null
-              : IconButton(icon: const Icon(Icons.menu), tooltip: 'Menü', onPressed: drawer.openDrawer)),
+              : IconButton(icon: const Icon(Icons.menu), tooltip: l10n.sidebarMenu, onPressed: drawer.openDrawer)),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       actions: resolvedActions.isEmpty ? null : resolvedActions,
       bottom: PreferredSize(
@@ -146,9 +149,9 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             if (subtitle != null) _buildSubtitle(),
-            if (_hasTabs) _buildTabs(),
-            if (_hasToolbar) _buildToolbar(),
-            if (_hasFilterSummary) _buildFilterSummary(),
+            if (_hasTabs) _buildTabs(l10n),
+            if (_hasToolbar) _buildToolbar(l10n),
+            if (_hasFilterSummary) _buildFilterSummary(l10n),
           ],
         ),
       ),
@@ -177,11 +180,11 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     return initialTabIndex > lastTabIndex ? lastTabIndex : initialTabIndex;
   }
 
-  Widget _buildTabs() {
+  Widget _buildTabs(AppLocalizations l10n) {
     final List<Widget> tabWidgets = tabs!;
     final Widget tabBar = Semantics(
       container: true,
-      label: tabsLabel,
+      label: tabsLabel ?? l10n.headerViews,
       child: SizedBox(
         height: kTextTabBarHeight,
         child: TabBar(
@@ -206,21 +209,24 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildToolbar() {
+  Widget _buildToolbar(AppLocalizations l10n) {
+    final String resolvedSearchLabel = searchLabel ?? l10n.actionSearch;
+    final String resolvedSearchHint = searchHint ?? l10n.searchHint;
+    final String resolvedFilterButtonLabel = filterButtonLabel ?? l10n.actionFilter;
     return SizedBox(
       height: _toolbarHeight,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final Widget? search = _hasSearchControl
               ? Semantics(
-                  label: searchLabel,
+                  label: resolvedSearchLabel,
                   textField: true,
                   child: TextField(
                     controller: searchController,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
-                      hintText: searchHint,
-                      labelText: searchLabel,
+                      hintText: resolvedSearchHint,
+                      labelText: resolvedSearchLabel,
                       prefixIcon: const Icon(Icons.search),
                     ),
                     onChanged: onSearchChanged,
@@ -235,7 +241,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                   ),
                   icon: const Icon(Icons.filter_list),
-                  label: Text(filterButtonLabel),
+                  label: Text(resolvedFilterButtonLabel),
                 )
               : null;
 
@@ -270,16 +276,21 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildFilterSummary() {
+  Widget _buildFilterSummary(AppLocalizations l10n) {
     final List<Widget> children = <Widget>[
       for (final String filter in activeFilters)
         Padding(
           padding: const EdgeInsets.only(right: AppSpacing.sm),
-          child: _buildFilterChip(filter),
+          child: _buildFilterChip(filter, l10n),
         ),
       if (activeFilters.isNotEmpty && resultCount != null) const SizedBox(width: AppSpacing.sm),
       if (resultCount != null)
-        Semantics(container: true, label: _resultCountText, liveRegion: true, child: Text(_resultCountText)),
+        Semantics(
+          container: true,
+          label: _resultCountText(l10n),
+          liveRegion: true,
+          child: Text(_resultCountText(l10n)),
+        ),
       if (onResetFilters != null)
         Padding(
           padding: const EdgeInsets.only(left: AppSpacing.sm),
@@ -288,7 +299,7 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
             style: TextButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.control)),
             ),
-            child: Text(resetFiltersLabel),
+            child: Text(resetFiltersLabel ?? l10n.actionResetFilters),
           ),
         ),
     ];
@@ -305,16 +316,17 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildFilterChip(String filter) {
-    final String semanticLabel = '$removeFilterLabel: $filter';
+  Widget _buildFilterChip(String filter, AppLocalizations l10n) {
+    final String resolvedRemoveFilterLabel = removeFilterLabel ?? l10n.actionRemoveFilter;
+    final String semanticLabel = '$resolvedRemoveFilterLabel: $filter';
     final ValueChanged<String>? removeFilter = onFilterRemoved;
 
     return Semantics(
       container: true,
-      hint: removeFilterLabel,
+      hint: resolvedRemoveFilterLabel,
       label: filter,
       child: FilterChip(
-        deleteButtonTooltipMessage: removeFilterLabel,
+        deleteButtonTooltipMessage: resolvedRemoveFilterLabel,
         deleteIcon: Semantics(button: true, label: semanticLabel, child: const Icon(Icons.close)),
         label: Text(filter),
         onDeleted: removeFilter == null ? null : () => removeFilter(filter),
@@ -326,14 +338,14 @@ class AppPageHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  String get _resultCountText {
+  String _resultCountText(AppLocalizations l10n) {
     final int count = resultCount!;
     final String? localizedText = resultCountLabelBuilder?.call(count);
     if (localizedText != null) {
       return localizedText;
     }
 
-    final String noun = count == 1 ? 'Ergebnis' : 'Ergebnisse';
+    final String noun = count == 1 ? l10n.countResultSingular : l10n.countResults;
     return '$count $noun';
   }
 

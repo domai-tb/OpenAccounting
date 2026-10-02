@@ -110,6 +110,7 @@ class _DashboardConfigSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<DashboardConfig> cfgAsync = ref.watch(dashboardConfigProvider);
+    final AppLocalizations l10n = appLocalizationsOf(context);
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * 0.85,
@@ -119,8 +120,11 @@ class _DashboardConfigSheet extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: <Widget>[
-                  const Expanded(
-                    child: Text('Dashboard anpassen', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Expanded(
+                    child: Text(
+                      l10n.dashboardCustomize,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
                   ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
                 ],
@@ -183,7 +187,8 @@ class _WidgetCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<WidgetData?> dataAsync = ref.watch(dashboardWidgetDataProvider(id));
-    final String title = _dashboardTitle(id, appLocalizationsOf(context));
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final String title = _dashboardWidgetTitle(id, l10n);
     final IconData? icon = dashboardWidgetIcons[id];
     final String? route = dashboardWidgetRoutes[id];
     final bool inventoryUnavailable = id == 'lagerwarnung' || id == 'lagerbestand';
@@ -201,19 +206,22 @@ class _WidgetCard extends ConsumerWidget {
           return DashboardCard(
             title: title,
             icon: icon,
-            emptyMessage: appLocalizationsOf(context).dashboardInventoryUnavailable,
-            subtitle: appLocalizationsOf(context).dashboardInventoryUnavailable,
+            emptyMessage: l10n.dashboardInventoryUnavailable,
+            subtitle: l10n.dashboardInventoryUnavailable,
           );
         }
         if (data == null) return const SizedBox.shrink();
         final Widget content = _buildContent(context, data, privacyMode);
-        final String? empty = _emptyFor(data);
+        final String? empty = _emptyFor(data, l10n);
+        final String? subtitle = data.id == 'ustva_frist' && (data.subtitle?.isNotEmpty ?? false)
+            ? l10n.dashboardUstvaDue(data.subtitle!)
+            : data.subtitle;
         return DashboardCard(
-          title: data.title,
+          title: _dashboardWidgetTitle(data.id, l10n),
           icon: data.icon,
           content: empty == null ? content : null,
           emptyMessage: empty,
-          subtitle: data.subtitle,
+          subtitle: subtitle,
           onTap: route != null && route != '/' ? () => _navigate(context, route) : null,
         );
       },
@@ -221,6 +229,7 @@ class _WidgetCard extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, WidgetData d, bool privacyMode) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     switch (d.id) {
       case 'offene_rechnungen':
       case 'ueberfaellige_rechnungen':
@@ -228,10 +237,7 @@ class _WidgetCard extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              '${d.count ?? 0} ${appLocalizationsOf(context).countInvoices}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            Text('${d.count ?? 0} ${l10n.countInvoices}', style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             MoneyText(_parseDashboardMoney(d.sum), textAlign: TextAlign.left, obscured: privacyMode),
           ],
@@ -247,40 +253,48 @@ class _WidgetCard extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _DashboardMoneyLine(label: 'Einnahmen', amount: _parseDashboardMoney(d.sum), obscured: privacyMode),
-            _DashboardMoneyLine(label: 'Ausgaben', amount: _parseDashboardMoney(d.subtitle), obscured: privacyMode),
+            _DashboardMoneyLine(
+              label: l10n.dashboardIncome,
+              amount: _parseDashboardMoney(d.sum),
+              obscured: privacyMode,
+            ),
+            _DashboardMoneyLine(
+              label: l10n.dashboardExpenses,
+              amount: _parseDashboardMoney(d.subtitle),
+              obscured: privacyMode,
+            ),
           ],
         );
       case 'quick_links':
         final List<QuickLink>? links = d.raw as List<QuickLink>?;
-        if (links == null || links.isEmpty) return Text(appLocalizationsOf(context).emptyResults);
+        if (links == null || links.isEmpty) return Text(l10n.emptyResults);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[for (final QuickLink l in links) _QuickLinkRow(link: l)],
         );
       case 'ustva_frist':
-        return Text(d.subtitle ?? '');
+        return Text(d.subtitle == null || d.subtitle!.isEmpty ? '' : l10n.dashboardUstvaDue(d.subtitle!));
       default:
         final List<dynamic>? list = d.raw as List?;
         if (list == null || list.isEmpty) return const SizedBox.shrink();
-        return Text('${d.count} ${appLocalizationsOf(context).countRecords}');
+        return Text('${d.count} ${l10n.countRecords}');
     }
   }
 
-  String? _emptyFor(WidgetData d) {
-    if (d.id == 'lagerwarnung' && (d.count ?? 0) == 0) return 'Keine Warnungen';
+  String? _emptyFor(WidgetData d, AppLocalizations l10n) {
+    if (d.id == 'lagerwarnung' && (d.count ?? 0) == 0) return l10n.dashboardEmptyNoWarnings;
     if (d.id == 'lagerbestand' && (d.count ?? 0) == 0) {
-      return 'Kein Lagerbestand';
+      return l10n.dashboardEmptyNoStock;
     }
     if (d.id == 'mahnung_warnung' && (d.count ?? 0) == 0) {
-      return 'Keine Mahnungen';
+      return l10n.dashboardEmptyNoReminders;
     }
-    if (d.id == 'fristen' && (d.count ?? 0) == 0) return 'Keine Fristen';
+    if (d.id == 'fristen' && (d.count ?? 0) == 0) return l10n.dashboardEmptyNoDeadlines;
     if (d.id == 'aktivitaets_log' && (d.count ?? 0) == 0) {
-      return 'Keine Aktivitäten';
+      return l10n.dashboardEmptyNoActivities;
     }
     if (d.id == 'zahlungseingaenge' && (d.count ?? 0) == 0) {
-      return 'Keine Zahlungen';
+      return l10n.dashboardEmptyNoPayments;
     }
     return null;
   }
@@ -297,11 +311,18 @@ class _QuickLinkRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
     final bool unavailable = link.route == '/inventory';
     final Color color = unavailable
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : Theme.of(context).colorScheme.primary;
-    final String label = unavailable ? '${link.label} (nicht verfügbar)' : link.label;
+    final String baseLabel = switch (link.route) {
+      '/invoices/new' => l10n.actionNewInvoice,
+      '/reports' => l10n.quickLinkJournal,
+      '/inventory' => l10n.quickLinkItems,
+      _ => link.label,
+    };
+    final String label = unavailable ? l10n.quickLinkUnavailable(baseLabel) : baseLabel;
     return Semantics(
       button: !unavailable,
       label: label,
@@ -323,6 +344,25 @@ class _QuickLinkRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _dashboardWidgetTitle(String id, AppLocalizations l10n) {
+  return switch (id) {
+    'offene_rechnungen' => l10n.dashboardWidgetOpenInvoices,
+    'zahlungseingaenge' => l10n.dashboardWidgetIncomingPayments,
+    'lagerwarnung' => l10n.dashboardInventoryWarning,
+    'mahnung_warnung' => l10n.dashboardWidgetReminderWarning,
+    'fristen' => l10n.dashboardWidgetDeadlines,
+    'ustva_frist' => l10n.dashboardWidgetUstvaDeadline,
+    'quick_links' => l10n.dashboardWidgetQuickLinks,
+    'einnahmen_ausgaben' => l10n.dashboardWidgetIncomeExpenses,
+    'ueberfaellige_rechnungen' => l10n.dashboardWidgetOverdueInvoices,
+    'offene_verbindlichkeiten' => l10n.dashboardWidgetOpenLiabilities,
+    'kontostand' => l10n.dashboardWidgetBalance,
+    'aktivitaets_log' => l10n.dashboardWidgetActivityLog,
+    'lagerbestand' => l10n.dashboardInventoryStock,
+    _ => id,
+  };
 }
 
 String _dashboardTitle(String id, AppLocalizations l10n) {

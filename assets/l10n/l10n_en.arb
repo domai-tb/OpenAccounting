@@ -187,5 +187,497 @@
   "actionChooseFile": "Choose file",
   "actionPreview": "Preview",
   "actionHistory": "History",
-  "actionImport": "Import"
+  "actionImport": "Import",
+  "receiptDetailTitle": "Receipt {id}",
+  "@receiptDetailTitle": {
+    "description": "Detail header for a receipt record.",
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "actionFilter": "Filter",
+  "actionRemoveFilter": "Remove filter",
+  "actionResetFilters": "Reset filters",
+  "headerViews": "Views",
+  "countResultSingular": "Result",
+  "journalDetailTitle": "Entry {id}",
+  "@journalDetailTitle": {
+      "description": "Localized copy for journalDetailTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "filterTypeLabel": "Type: {value}",
+  "@filterTypeLabel": {
+      "description": "Localized copy for filterTypeLabel.",
+      "placeholders": {
+          "value": {
+              "type": "String"
+          }
+      }
+  },
+  "filterStatusLabel": "Status: {value}",
+  "@filterStatusLabel": {
+      "description": "Localized copy for filterStatusLabel.",
+      "placeholders": {
+          "value": {
+              "type": "String"
+          }
+      }
+  },
+  "draftDiscardTitle": "Discard draft?",
+  "draftDiscardMessage": "The entered invoice data will be lost.",
+  "actionKeepEditing": "Keep editing",
+  "actionDiscard": "Discard",
+  "draftSaveFailed": "Draft could not be saved: {error}",
+  "@draftSaveFailed": {
+      "description": "Localized copy for draftSaveFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "errorDateFormat": "Enter the date in YYYY-MM-DD format",
+  "errorPositiveAmount": "{label} must be greater than 0",
+  "@errorPositiveAmount": {
+      "description": "Localized copy for errorPositiveAmount.",
+      "placeholders": {
+          "label": {
+              "type": "String"
+          }
+      }
+  },
+  "customersLoading": "Loading customers…",
+  "customersLoadFailed": "Customers could not be loaded",
+  "actionReload": "Reload",
+  "invoiceDraftNoCustomerTitle": "No customer created yet",
+  "invoiceDraftNoCustomerMessage": "An invoice needs a customer so it can be assigned correctly.",
+  "actionCreateCustomer": "Create customer",
+  "invoiceDraftCustomerLabel": "Customer",
+  "invoiceDraftCustomerHint": "Select customer",
+  "errorCustomerRequired": "Customer is required",
+  "invoiceDraftTitle": "Invoice draft",
+  "invoiceDraftDescription": "Save an invoice line as a draft.",
+  "invoiceDraftPositionLabel": "Line item",
+  "errorPositionRequired": "Line item is required",
+  "invoiceDraftUnitPriceLabel": "Unit price net",
+  "actionSaveDraft": "Save draft",
+  "errorInvoiceIdInvalid": "The invoice ID is invalid.",
+  "contactDetailTitle": "Contact {id}",
+  "@contactDetailTitle": {
+      "description": "Localized copy for contactDetailTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "profileSavedRestartHint": "Profile saved. Please restart OpenAccounting.",
+  "profileAlreadyActive": "The profile is already active.",
+  "profileSelectFailed": "The profile could not be selected: {error}",
+  "@profileSelectFailed": {
+      "description": "Localized copy for profileSelectFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "profileCreateTitle": "New profile",
+  "profileNameLabel": "Profile name",
+  "actionCreate": "Create",
+  "profileCreated": "Profile created.",
+  "profileCreateFailed": "The profile could not be created: {error}",
+  "@profileCreateFailed": {
+      "description": "Localized copy for profileCreateFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "errorRecordIdInvalid": "The record ID is invalid.",
+  "errorRecordNotFound": "The record with ID {id} was not found.",
+  "@errorRecordNotFound": {
+      "description": "Localized copy for errorRecordNotFound.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "recordIdLabel": "Record ID {id}",
+  "@recordIdLabel": {
+      "description": "Localized copy for recordIdLabel.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "recordFallbackTitle": "Record #{id}",
+  "@recordFallbackTitle": {
+      "description": "Localized copy for recordFallbackTitle.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "routeErrorSource": "Operation: {source}",
+  "@routeErrorSource": {
+      "description": "Localized copy for routeErrorSource.",
+      "placeholders": {
+          "source": {
+              "type": "String"
+          }
+      }
+  },
+  "bankCategoriesLoadFailed": "Categories could not be loaded. Manual categorization is not available right now.",
+  "bankHistoryLoadFailed": "Import history could not be loaded.",
+  "bankUnsupportedFile": "This file format is not supported. CSV and CAMT.053 XML are supported.",
+  "bankFileReadFailed": "The file could not be read: {error}",
+  "@bankFileReadFailed": {
+      "description": "Localized copy for bankFileReadFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankFileTooLarge": "The file is larger than 20 MB. Export a shorter period and try again.",
+  "bankPasteTitle": "Paste CSV data",
+  "bankPasteContentLabel": "CSV content",
+  "bankPasteHint": "Date;Amount;Purpose;Partner",
+  "actionApply": "Apply",
+  "bankPasteFileName": "pasted-import.csv",
+  "bankFileProcessFailed": "The file could not be processed: {error}",
+  "@bankFileProcessFailed": {
+      "description": "Localized copy for bankFileProcessFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankConfirmTitle": "Confirm import",
+  "bankConfirmMessage": "{count, plural, =1{{count} selected row} other{{count} selected rows}} will be imported into {account}. Duplicates are skipped by default.",
+  "@bankConfirmMessage": {
+      "description": "Localized copy for bankConfirmMessage.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          },
+          "account": {
+              "type": "String"
+          }
+      }
+  },
+  "bankBackToReview": "Back to review",
+  "bankImportIncomplete": "The import did not complete fully: {error}",
+  "@bankImportIncomplete": {
+      "description": "Localized copy for bankImportIncomplete.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankRetryNotice": "Only unsaved rows are checked again. Already imported rows stay deduplicated.",
+  "bankImportAborted": "Import aborted: {diagnostic} No transaction was saved.",
+  "@bankImportAborted": {
+      "description": "Localized copy for bankImportAborted.",
+      "placeholders": {
+          "diagnostic": {
+              "type": "String"
+          }
+      }
+  },
+  "bankImportAbortedHint": "Fix the file or choose a matching template and try again.",
+  "bankStatusRejected": "Rejected",
+  "bankStepChooseFile": "1. Choose file",
+  "bankUploadHint": "CSV files and CAMT.053 XML exports are supported. The preview writes nothing to the database yet.",
+  "bankPathLabel": "File path",
+  "bankPathHint": "Choose a file or paste a path; drag & drop supported",
+  "bankStepAccountTemplate": "2. Account and template",
+  "bankNoAccountYet": "No bank account yet. Create an account in the master data first; import without an account is blocked.",
+  "bankCamtHint": "CAMT.053 is detected from the XML structure; a CSV template is not required for it.",
+  "bankStepReview": "3. Review and edit the preview",
+  "bankRowsDetected": "{count} rows detected",
+  "@bankRowsDetected": {
+      "description": "Localized copy for bankRowsDetected.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRowsSelected": "{count} selected",
+  "@bankRowsSelected": {
+      "description": "Localized copy for bankRowsSelected.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRowsManual": "{count} categorized manually",
+  "@bankRowsManual": {
+      "description": "Localized copy for bankRowsManual.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankReviewNotice": "Changes and manual categories are only saved after you explicitly confirm the import.",
+  "bankDuplicateOverride": "Re-import already imported duplicates (only enable deliberately)",
+  "bankConfirmActionCount": "Confirm import ({count})",
+  "@bankConfirmActionCount": {
+      "description": "Localized copy for bankConfirmActionCount.",
+      "placeholders": {
+          "count": {
+              "type": "int"
+          }
+      }
+  },
+  "bankColPartnerPurpose": "Partner / purpose",
+  "bankRowLabel": "Row {line}",
+  "@bankRowLabel": {
+      "description": "Localized copy for bankRowLabel.",
+      "placeholders": {
+          "line": {
+              "type": "int"
+          }
+      }
+  },
+  "bankColPartner": "Partner",
+  "bankColPurpose": "Purpose",
+  "bankStepResult": "4. Import result",
+  "bankStatImported": "Imported",
+  "bankStatDuplicatesSkipped": "Duplicates skipped",
+  "bankStatCategorized": "Categorized",
+  "bankStatManualReview": "Manual review",
+  "bankStatFailed": "Failed",
+  "bankResultAllSaved": "All confirmed new rows were saved. The import is documented in the history.",
+  "bankRetryFailedRows": "Re-check failed rows",
+  "bankFailureRowsGeneric": "The database reported unsaved rows but could not return a single row error. Check account, date and amount; another attempt stays deduplicated.",
+  "bankNotSavedFix": "Not saved — fix and check again:",
+  "bankFailureRowPrefix": "Row {line}: {error}",
+  "@bankFailureRowPrefix": {
+      "description": "Localized copy for bankFailureRowPrefix.",
+      "placeholders": {
+          "line": {
+              "type": "int"
+          },
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankWithoutPartner": "without partner",
+  "bankWithoutPurpose": "without purpose",
+  "bankHistoryTitle": "Import history",
+  "bankHistoryCardSubtitle": "Source, template, counts and result status stay traceable here.",
+  "bankHistoryRefresh": "Refresh import history",
+  "bankColTime": "Timestamp",
+  "bankColSource": "Source",
+  "bankColTemplate": "Template",
+  "bankColAccount": "Account",
+  "bankColImported": "Imported",
+  "bankColDuplicates": "Duplicates",
+  "bankColError": "Errors",
+  "bankColStatus": "Status",
+  "bankStageFile": "File",
+  "bankStageReview": "Review",
+  "bankStageResult": "Result",
+  "bankStageCurrent": "current",
+  "bankStageComplete": "complete",
+  "bankStageOpen": "open",
+  "bankReady": "Ready: {name} · {size}",
+  "@bankReady": {
+      "description": "Localized copy for bankReady.",
+      "placeholders": {
+          "name": {
+              "type": "String"
+          },
+          "size": {
+              "type": "String"
+          }
+      }
+  },
+  "bankDelimiterSemicolon": "Semicolon",
+  "bankDelimiterComma": "Comma",
+  "bankHeaderSubtitleHistory": "Traceable import history",
+  "bankHeaderSubtitleImport": "File import with review before saving",
+  "bankNoAccountSelected": "no account",
+  "bankAccountFallback": "Account {id}",
+  "@bankAccountFallback": {
+      "description": "Localized copy for bankAccountFallback.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "bankCategoryFallback": "Category {id}",
+  "@bankCategoryFallback": {
+      "description": "Localized copy for bankCategoryFallback.",
+      "placeholders": {
+          "id": {
+              "type": "String"
+          }
+      }
+  },
+  "bankUnknownFile": "Unknown file",
+  "bankStatusPartial": "Partially imported",
+  "bankStatusFailed": "Import failed",
+  "bankStatusImported": "Imported",
+  "bankInvalidImportNoDiagnostic": "Invalid import: no error diagnosis was provided.",
+  "bankRecoveryCheckFileTemplate": "Check the file and template and try again.",
+  "bankInvalidImportNoAccount": "Invalid import: no valid bank account selected.",
+  "bankRecoverySelectAccount": "Choose a valid bank account and try again.",
+  "bankNoTransactionsToImport": "No transactions to import.",
+  "bankRecoverySelectSupportedFile": "Choose a supported file with at least one transaction.",
+  "bankHistoryNotFinalSaved": "Import history could not be saved in the end.",
+  "bankHistoryCreateFailed": "Import history could not be created: {error}",
+  "@bankHistoryCreateFailed": {
+      "description": "Localized copy for bankHistoryCreateFailed.",
+      "placeholders": {
+          "error": {
+              "type": "String"
+          }
+      }
+  },
+  "bankRecoveryFixDatabase": "Fix the database problem and try again.",
+  "bankRecoveryCheckDuplicates": "Check the existing duplicates and try again.",
+  "bankUnknownError": "Unknown error",
+  "bankInvalidDate": "Invalid date",
+  "bankInvalidAmount": "Invalid amount",
+  "bankCsvUnclosedQuotes": "Invalid CSV: quotes not closed",
+  "bankCsvRowSuffix": " in row {row}",
+  "@bankCsvRowSuffix": {
+      "description": "Localized copy for bankCsvRowSuffix.",
+      "placeholders": {
+          "row": {
+              "type": "int"
+          }
+      }
+  },
+  "bankRecoveryFixCsvRow": "Fix the CSV row and run the import again.",
+  "bankNoTransactionsFound": "No transactions found",
+  "bankNoTemplateFound": "No matching template found. Please choose a template.",
+  "bankNoTemplateFoundNoTransactions": "No transactions found. No matching template found. Please choose a template.",
+  "bankEmptyFile": "File is empty",
+  "bankNoHeader": "File contains no header row",
+  "bankInvalidXmlNoTag": "Invalid XML: no XML tag found (invalid)",
+  "bankInvalidXmlNoClosingTag": "Invalid XML: no closing tag found (invalid)",
+  "bankInvalidXmlDocumentUnclosed": "Invalid XML: Document not closed (invalid)",
+  "bankInvalidXmlNtryUnclosed": "Invalid XML: Ntry not closed (invalid)",
+  "bankInvalidXmlMismatched": "Invalid XML: nested tags do not match (invalid)",
+  "bankInvalidXmlTagUnclosed": "Invalid XML: tag not closed (invalid)",
+  "bankAmountMissingNtry": "Amount missing in Ntry",
+  "bankDateMissingNtry": "Date missing in Ntry",
+  "bankAmountMissing": "Amount missing",
+  "bankDateInvalidRaw": "Invalid date: {raw}",
+  "@bankDateInvalidRaw": {
+      "description": "Localized copy for bankDateInvalidRaw.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "bankAmountInvalidRaw": "Invalid amount: {raw}",
+  "@bankAmountInvalidRaw": {
+      "description": "Localized copy for bankAmountInvalidRaw.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "bankAmountOutOfRange": "Amount outside NUMERIC(12,2): {raw}",
+  "@bankAmountOutOfRange": {
+      "description": "Localized copy for bankAmountOutOfRange.",
+      "placeholders": {
+          "raw": {
+              "type": "String"
+          }
+      }
+  },
+  "setupErrorNameRequired": "Name is required",
+  "setupErrorAccountRequired": "At least one account is required",
+  "setupErrorIbanInvalid": "Invalid IBAN: {iban}",
+  "@setupErrorIbanInvalid": {
+      "description": "Localized copy for setupErrorIbanInvalid.",
+      "placeholders": {
+          "iban": {
+              "type": "String"
+          }
+      }
+  },
+  "setupErrorCashNegative": "Cash balance must not be negative",
+  "setupErrorCashInvalid": "Invalid cash balance",
+  "setupErrorCategoryRequired": "At least one category is required",
+  "setupErrorDatabaseStatus": "The database could not be read for the setup status",
+  "dashboardCustomize": "Customize dashboard",
+  "dashboardIncome": "Income",
+  "dashboardExpenses": "Expenses",
+  "dashboardEmptyNoWarnings": "No warnings",
+  "dashboardEmptyNoStock": "No stock",
+  "dashboardEmptyNoReminders": "No reminders",
+  "dashboardEmptyNoDeadlines": "No deadlines",
+  "dashboardEmptyNoActivities": "No activities",
+  "dashboardEmptyNoPayments": "No payments",
+  "quickLinkUnavailable": "{label} (not available)",
+  "@quickLinkUnavailable": {
+      "description": "Localized copy for quickLinkUnavailable.",
+      "placeholders": {
+          "label": {
+              "type": "String"
+          }
+      }
+  },
+  "dashboardUstvaDue": "VAT return due on {date}",
+  "@dashboardUstvaDue": {
+      "description": "Localized copy for dashboardUstvaDue.",
+      "placeholders": {
+          "date": {
+              "type": "String"
+          }
+      }
+  },
+  "quickLinkJournal": "Journal",
+  "quickLinkItems": "Items",
+  "dashboardWidgetOpenInvoices": "Open invoices",
+  "dashboardWidgetIncomingPayments": "Incoming payments",
+  "dashboardWidgetReminderWarning": "Reminder warning",
+  "dashboardWidgetDeadlines": "Deadlines",
+  "dashboardWidgetUstvaDeadline": "VAT return deadline",
+  "dashboardWidgetQuickLinks": "Quick links",
+  "dashboardWidgetIncomeExpenses": "Income/Expenses",
+  "dashboardWidgetOverdueInvoices": "Overdue invoices",
+  "dashboardWidgetOpenLiabilities": "Open liabilities",
+  "dashboardWidgetBalance": "Account balance",
+  "dashboardWidgetActivityLog": "Activity log",
+  "bankColImport": "Import",
+  "bankColAmount": "Amount",
+  "bankColCategory": "Category",
+  "bankPathHintExample": "/path/to/bank-statement.csv",
+  "invoiceDraftNumber": "Draft #{number}",
+  "@invoiceDraftNumber": {
+      "description": "Localized copy for invoiceDraftNumber.",
+      "placeholders": {
+          "number": {
+              "type": "int"
+          }
+      }
+  },
+  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required"
 }

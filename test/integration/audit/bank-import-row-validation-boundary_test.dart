@@ -86,13 +86,13 @@ String _selfClosingCellFixtureCamt() {
 }
 
 Future<ImportResult> _importCsv(BankImportService service, String csv, BankTemplate template) async {
-  final List<RawTx> rows = service.parseCsv(csv: csv, template: template);
-  return service.importTransactions(kontoId: _kontoId, rawTxs: rows, template: template);
+  final List<RawTx> rows = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
+  return service.importTransactions(kontoId: _kontoId, rawTxs: rows, template: template, locale: 'de_DE');
 }
 
 Future<ImportResult> _importCamt(BankImportService service, String xml) async {
-  final List<RawTx> rows = service.parseCamtXml(xml);
-  return service.importTransactions(kontoId: _kontoId, rawTxs: rows);
+  final List<RawTx> rows = service.parseCamtXml(xml, locale: 'de_DE');
+  return service.importTransactions(kontoId: _kontoId, rawTxs: rows, locale: 'de_DE');
 }
 
 void main() {
@@ -222,11 +222,13 @@ void main() {
           '15.03.2026;10,00;Already valid;A\n'
           'not-a-date;20,00;Correct me;B\n',
       template: template,
+      locale: 'de_DE',
     );
     final ImportResult first = await service.importTransactions(
       kontoId: _kontoId,
       rawTxs: firstRows,
       template: template,
+      locale: 'de_DE',
     );
     expect(first.imported, 1);
     expect(first.failedRows, hasLength(1));
@@ -236,6 +238,7 @@ void main() {
       kontoId: _kontoId,
       rawTxs: <RawTx>[firstRows.first, corrected],
       template: template,
+      locale: 'de_DE',
     );
     expect(retry.imported, 1);
     expect(retry.duplicatesSkipped, 1);
@@ -258,32 +261,40 @@ void main() {
     const String validXmlSuffix = '</Stmt></BkToCstmrStmt></Document>';
     const String validNtry = '<Ntry><Amt>10.00</Amt><BookgDt><Dt>2026-03-15</Dt></BookgDt></Ntry>';
     final List<void Function()> parserCases = <void Function()>[
-      () => service.parseCsv(csv: '', template: template),
-      () => service.parseCamtXml(''),
-      () => service.parseCsv(csv: '15.03.2026;10,00;No header;A\n', template: template),
-      () => service.parseCsv(csv: 'Foo;Bar\n1;2\n', template: template),
+      () => service.parseCsv(csv: '', template: template, locale: 'de_DE'),
+      () => service.parseCamtXml('', locale: 'de_DE'),
+      () => service.parseCsv(csv: '15.03.2026;10,00;No header;A\n', template: template, locale: 'de_DE'),
+      () => service.parseCsv(csv: 'Foo;Bar\n1;2\n', template: template, locale: 'de_DE'),
       () => service.parseCsv(
         csv: 'Datum;Betrag;Verwendungszweck;Partner\n"15.03.2026;10,00;Broken;A\n',
         template: template,
+        locale: 'de_DE',
       ),
-      () => service.parseCamtXml('<Document><BkToCstmrStmt><Ntry><Amt>10.00</Amt></Ntry></BkToCstmrStmt></Document>'),
-      () => service.parseCamtXml('$validXmlPrefix<Ntry><BookgDt><Dt>2026-03-15</Dt></BookgDt></Ntry>$validXmlSuffix'),
+      () => service.parseCamtXml(
+        '<Document><BkToCstmrStmt><Ntry><Amt>10.00</Amt></Ntry></BkToCstmrStmt></Document>',
+        locale: 'de_DE',
+      ),
+      () => service.parseCamtXml(
+        '$validXmlPrefix<Ntry><BookgDt><Dt>2026-03-15</Dt></BookgDt></Ntry>$validXmlSuffix',
+        locale: 'de_DE',
+      ),
       () => service.parseCamtXml(
         '$validXmlPrefix<Ntry><Amt>10.00</Amt><BookgDt><Dt>2026-03-15</ValDt></BookgDt></Ntry>$validXmlSuffix',
+        locale: 'de_DE',
       ),
-      () => service.parseCamtXml('$validXmlPrefix$validNtry'),
-      () => service.parseCamtXml('<Document><BkToCstmrStmt><Stmt><Ntry><Amt>10.00</Amt>'),
+      () => service.parseCamtXml('$validXmlPrefix$validNtry', locale: 'de_DE'),
+      () => service.parseCamtXml('<Document><BkToCstmrStmt><Stmt><Ntry><Amt>10.00</Amt>', locale: 'de_DE'),
     ];
     for (final void Function() parserCase in parserCases) {
       expect(parserCase, throwsA(isA<BankImportException>()));
     }
     final RawTx valid = RawTx(datum: DateTime(2026, 3, 15), betrag: '10.00', verwendungszweck: 'Valid', partner: 'A');
     await expectLater(
-      service.importTransactions(kontoId: 0, rawTxs: <RawTx>[valid]),
+      service.importTransactions(kontoId: 0, rawTxs: <RawTx>[valid], locale: 'de_DE'),
       throwsA(isA<BankImportException>()),
     );
     await expectLater(
-      service.importTransactions(kontoId: _kontoId, rawTxs: const <RawTx>[]),
+      service.importTransactions(kontoId: _kontoId, rawTxs: const <RawTx>[], locale: 'de_DE'),
       throwsA(isA<BankImportException>()),
     );
     expect(await _transactionCount(db), 0);

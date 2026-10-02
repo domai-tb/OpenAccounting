@@ -10,6 +10,7 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
+import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_status_chip.dart';
@@ -96,6 +97,15 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
 
   AppLocalizations get _l10n => appLocalizationsOf(context);
 
+  /// Locale tag handed to the service, mirroring [appLocalizationsOf]: an
+  /// isolated embedding without the generated delegate resolves to the German
+  /// catalog, so service messages match the copy rendered on this page.
+  String get _activeLocale {
+    final AppLocalizations? provided = AppLocalizations.of(context);
+    if (provided == null) return localeTag(const Locale('de'));
+    return localeTag(Localizations.localeOf(context));
+  }
+
   BankImportService get _service => widget.service ?? ref.read(bankImportServiceProvider);
 
   @override
@@ -149,7 +159,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       );
     } catch (error, stackTrace) {
       debugPrint('bank_import categories failed: $error\n$stackTrace');
-      dataError ??= 'Kategorien konnten nicht geladen werden. Manuelle Kategorisierung ist derzeit nicht verfügbar.';
+      dataError ??= _l10n.bankCategoriesLoadFailed;
     }
 
     final List<_HistoryEntry> history = await _readHistory();
@@ -168,10 +178,10 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
         ..addAll(templates);
       _accounts
         ..clear()
-        ..addAll(accountRows.map(_BankAccountOption.fromRow));
+        ..addAll(accountRows.map((Map<String, Object?> row) => _BankAccountOption.fromRow(row, l10n: _l10n)));
       _categories
         ..clear()
-        ..addAll(categoryRows.map(_BankCategoryOption.fromRow));
+        ..addAll(categoryRows.map((Map<String, Object?> row) => _BankCategoryOption.fromRow(row, l10n: _l10n)));
       _selectedAccountId = _accounts.isEmpty ? null : _accounts.first.id;
       _selectedTemplate = resolvedTemplate;
       _history = history;
@@ -237,7 +247,8 @@ LIMIT 100
       }
       final List<_HistoryEntry> entries = rows
           .map(
-            (Map<String, Object?> row) => _HistoryEntry.fromRow(row, outcome: _outcomesByImportId[_asInt(row['id'])]),
+            (Map<String, Object?> row) =>
+                _HistoryEntry.fromRow(row, outcome: _outcomesByImportId[_asInt(row['id'])], l10n: _l10n),
           )
           .toList();
       entries.addAll(_rejectedAttempts);
@@ -247,7 +258,7 @@ LIMIT 100
       debugPrint('bank_import history failed: $error\n$stackTrace');
       if (mounted) {
         setState(() {
-          _historyError = 'Importverlauf konnte nicht geladen werden.';
+          _historyError = _l10n.bankHistoryLoadFailed;
         });
       }
       return List<_HistoryEntry>.from(_rejectedAttempts);
@@ -263,10 +274,7 @@ LIMIT 100
 
     final String fileName = _baseName(path);
     if (!_isSupportedFileName(fileName)) {
-      await _rejectInput(
-        fileName,
-        'Dieses Dateiformat wird nicht unterstützt. Unterstützt werden CSV und CAMT.053 XML.',
-      );
+      await _rejectInput(fileName, _l10n.bankUnsupportedFile);
       return;
     }
 
@@ -281,9 +289,9 @@ LIMIT 100
       final List<int> bytes = await reader(path);
       await _acceptFile(fileName, bytes);
     } on FileSystemException catch (error) {
-      await _rejectInput(fileName, 'Die Datei konnte nicht gelesen werden: ${error.message}');
+      await _rejectInput(fileName, _l10n.bankFileReadFailed(error.message));
     } catch (error) {
-      await _rejectInput(fileName, 'Die Datei konnte nicht gelesen werden: ${_safeError(error)}');
+      await _rejectInput(fileName, _l10n.bankFileReadFailed(_safeError(error)));
     }
   }
 
@@ -305,10 +313,7 @@ LIMIT 100
 
   Future<void> _acceptFile(String fileName, List<int> bytes) async {
     if (bytes.length > _maxImportFileBytes) {
-      await _rejectInput(
-        fileName,
-        'Die Datei ist größer als 20 MB. Exportiere einen kleineren Zeitraum und versuche es erneut.',
-      );
+      await _rejectInput(fileName, _l10n.bankFileTooLarge);
       return;
     }
     if (!mounted) return;
@@ -326,11 +331,12 @@ LIMIT 100
 
   Future<void> _pasteCsv() async {
     final TextEditingController controller = TextEditingController();
+    final AppLocalizations l10n = _l10n;
     final String? content = await showDialog<String>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('CSV-Daten einfügen'),
+          title: Text(l10n.bankPasteTitle),
           content: SizedBox(
             width: 700,
             child: TextField(
@@ -338,18 +344,18 @@ LIMIT 100
               autofocus: true,
               minLines: 8,
               maxLines: 16,
-              decoration: const InputDecoration(
-                labelText: 'CSV-Inhalt',
-                hintText: 'Datum;Betrag;Verwendungszweck;Partner',
+              decoration: InputDecoration(
+                labelText: l10n.bankPasteContentLabel,
+                hintText: l10n.bankPasteHint,
                 alignLabelWithHint: true,
               ),
             ),
           ),
           actions: <Widget>[
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Abbrechen')),
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.actionCancel)),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('Übernehmen'),
+              child: Text(l10n.actionApply),
             ),
           ],
         );
@@ -361,7 +367,7 @@ LIMIT 100
       _showError(_l10n.emptyResults);
       return;
     }
-    await _acceptFile('eingefügter-import.csv', utf8.encode(content));
+    await _acceptFile(_l10n.bankPasteFileName, utf8.encode(content));
   }
 
   Future<void> _parseLoadedFile() async {
@@ -385,10 +391,10 @@ LIMIT 100
     try {
       final String content = _decodeBytes(bytes, _selectedTemplate);
       final List<RawTx> parsed = _isCamtFile(fileName)
-          ? _service.parseCamtXml(content)
-          : _service.parseCsv(csv: content, template: _selectedTemplate);
+          ? _service.parseCamtXml(content, locale: _activeLocale)
+          : _service.parseCsv(csv: content, template: _selectedTemplate, locale: _activeLocale);
       if (parsed.isEmpty) {
-        throw const BankImportException('Keine Transaktionen gefunden.');
+        throw BankImportException(_l10n.bankNoTransactionsFound);
       }
       _disposeRows();
       _rows.addAll(
@@ -407,7 +413,7 @@ LIMIT 100
     } on BankImportException catch (error) {
       await _rejectInput(fileName, error.message, recoveryAction: error.recoveryAction);
     } catch (error) {
-      await _rejectInput(fileName, 'Die Datei konnte nicht verarbeitet werden: ${_safeError(error)}');
+      await _rejectInput(fileName, _l10n.bankFileProcessFailed(_safeError(error)));
     }
   }
 
@@ -425,21 +431,13 @@ LIMIT 100
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
+        final AppLocalizations l10n = appLocalizationsOf(dialogContext);
         return AlertDialog(
-          title: const Text('Import bestätigen'),
-          content: Text(
-            '$selectedCount ausgewählte Zeile${selectedCount == 1 ? '' : 'n'} werden in '
-            '$_selectedAccountName importiert. Duplikate werden standardmäßig übersprungen.',
-          ),
+          title: Text(l10n.bankConfirmTitle),
+          content: Text(l10n.bankConfirmMessage(selectedCount, _selectedAccountName)),
           actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Zurück zur Prüfung'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Import bestätigen'),
-            ),
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.bankBackToReview)),
+            FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.bankConfirmTitle)),
           ],
         );
       },
@@ -476,6 +474,7 @@ LIMIT 100
         allowDuplicateOverride: _allowDuplicateOverride,
         dateiname: fileName,
         template: _selectedTemplate,
+        locale: _activeLocale,
       );
       final List<_FailedEditableRow> failedRows = _mapFailedRows(preparedRows, serviceResult.failedRows);
       final int categorized = await _loadCategorizedCount(serviceResult.importId);
@@ -487,7 +486,7 @@ LIMIT 100
         failed: serviceResult.failed,
         failedRows: failedRows,
         importId: serviceResult.importId,
-        status: _historyStatus(serviceResult.status),
+        status: _historyStatus(serviceResult.status, _l10n),
         detail: detail,
       );
       if (serviceResult.importId != null) {
@@ -514,7 +513,7 @@ LIMIT 100
             .map((_EditableBankRow row) => _FailedEditableRow(row: row, error: _safeError(error)))
             .toList(),
         status: 'fehlgeschlagen',
-        detail: 'Der Import wurde nicht vollständig abgeschlossen: ${_safeError(error)}',
+        detail: _l10n.bankImportIncomplete(_safeError(error)),
       );
       if (!mounted) return;
       setState(() {
@@ -567,8 +566,7 @@ LIMIT 100
       _outcome = null;
       _allowDuplicateOverride = false;
       _errorMessage = null;
-      _noticeMessage =
-          'Nur die nicht gespeicherten Zeilen werden erneut geprüft. Bereits importierte Zeilen bleiben dedupliziert.';
+      _noticeMessage = _l10n.bankRetryNotice;
     });
   }
 
@@ -580,8 +578,8 @@ LIMIT 100
       _isBusy = false;
       _stage = _BankImportStage.upload;
       _outcome = null;
-      _errorMessage = 'Import abgebrochen: $diagnostic Keine Transaktion wurde gespeichert.';
-      _noticeMessage = 'Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.';
+      _errorMessage = _l10n.bankImportAborted(diagnostic);
+      _noticeMessage = _l10n.bankImportAbortedHint;
     });
   }
 
@@ -595,6 +593,7 @@ LIMIT 100
           diagnostic: reason,
           dateiname: fileName,
           template: _selectedTemplate,
+          locale: _activeLocale,
         );
         historyId = result.importId;
       } catch (error, stackTrace) {
@@ -651,7 +650,7 @@ LIMIT 100
       imported: 0,
       duplicates: 0,
       failed: 0,
-      status: 'Abgelehnt',
+      status: _l10n.bankStatusRejected,
       detail: reason,
     );
     if (!mounted) return;
@@ -742,21 +741,19 @@ LIMIT 100
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _buildSectionCard(
-          title: '1. Datei auswählen',
+          title: _l10n.bankStepChooseFile,
           icon: Icons.upload_file,
           children: <Widget>[
-            const Text(
-              'Unterstützt werden CSV-Dateien und CAMT.053 XML-Exporte. Die Vorschau schreibt noch nichts in die Datenbank.',
-            ),
+            Text(_l10n.bankUploadHint),
             const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: _pathController,
               enabled: !_isBusy,
-              decoration: const InputDecoration(
-                labelText: 'Dateipfad',
-                hintText: '/Pfad/zum/Kontoauszug.csv',
-                prefixIcon: Icon(Icons.folder_open),
-                helperText: 'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt',
+              decoration: InputDecoration(
+                labelText: _l10n.bankPathLabel,
+                hintText: _l10n.bankPathHintExample,
+                prefixIcon: const Icon(Icons.folder_open),
+                helperText: _l10n.bankPathHint,
               ),
               onSubmitted: (_) => unawaited(_loadFileFromPath()),
             ),
@@ -786,7 +783,7 @@ LIMIT 100
         ),
         const SizedBox(height: AppSpacing.lg),
         _buildSectionCard(
-          title: '2. Konto und Template',
+          title: _l10n.bankStepAccountTemplate,
           icon: Icons.tune,
           children: <Widget>[
             LayoutBuilder(
@@ -803,18 +800,14 @@ LIMIT 100
               },
             ),
             if (_accounts.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.md),
-                child: Text(
-                  'Noch kein Bankkonto vorhanden. Lege zuerst ein Konto in den Stammdaten an; ein Import ohne Konto ist gesperrt.',
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.md),
+                child: Text(_l10n.bankNoAccountYet),
               ),
             if (_isCamtFile(_fileName))
-              const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.md),
-                child: Text(
-                  'CAMT.053 wird anhand der XML-Struktur erkannt; ein CSV-Template ist dafür nicht erforderlich.',
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.md),
+                child: Text(_l10n.bankCamtHint),
               ),
             const SizedBox(height: AppSpacing.lg),
             Align(
@@ -840,7 +833,7 @@ LIMIT 100
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _buildSectionCard(
-          title: '3. Vorschau prüfen und bearbeiten',
+          title: _l10n.bankStepReview,
           icon: Icons.fact_check,
           children: <Widget>[
             Wrap(
@@ -848,9 +841,9 @@ LIMIT 100
               runSpacing: AppSpacing.sm,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
-                Text('${_rows.length} Zeilen erkannt'),
-                Text('$selectedCount ausgewählt'),
-                Text('$manualCategoryCount manuell kategorisiert'),
+                Text(_l10n.bankRowsDetected(_rows.length)),
+                Text(_l10n.bankRowsSelected(selectedCount)),
+                Text(_l10n.bankRowsManual(manualCategoryCount)),
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : _startOver,
                   icon: const Icon(Icons.arrow_back),
@@ -859,9 +852,7 @@ LIMIT 100
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            const Text(
-              'Änderungen und manuelle Kategorien werden erst nach deiner ausdrücklichen Importbestätigung gespeichert.',
-            ),
+            Text(_l10n.bankReviewNotice),
             const SizedBox(height: AppSpacing.md),
             Row(
               children: <Widget>[
@@ -869,7 +860,7 @@ LIMIT 100
                   value: _allowDuplicateOverride,
                   onChanged: _isBusy ? null : (bool? value) => setState(() => _allowDuplicateOverride = value ?? false),
                 ),
-                const Expanded(child: Text('Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)')),
+                Expanded(child: Text(_l10n.bankDuplicateOverride)),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -881,7 +872,7 @@ LIMIT 100
                 FilledButton.icon(
                   onPressed: _isBusy ? null : () => unawaited(_confirmImport()),
                   icon: const Icon(Icons.check_circle_outline),
-                  label: Text('Import bestätigen ($selectedCount)'),
+                  label: Text(_l10n.bankConfirmActionCount(selectedCount)),
                 ),
               ],
             ),
@@ -905,12 +896,12 @@ LIMIT 100
             dataRowMinHeight: 112,
             dataRowMaxHeight: 128,
             headingRowHeight: 48,
-            columns: const <DataColumn>[
-              DataColumn(label: Text('Import')),
-              DataColumn(label: Text('Datum')),
-              DataColumn(label: Text('Betrag')),
-              DataColumn(label: Text('Partner / Zweck')),
-              DataColumn(label: Text('Kategorie')),
+            columns: <DataColumn>[
+              DataColumn(label: Text(_l10n.bankColImport)),
+              DataColumn(label: Text(_l10n.dateLabel)),
+              DataColumn(label: Text(_l10n.bankColAmount)),
+              DataColumn(label: Text(_l10n.bankColPartnerPurpose)),
+              DataColumn(label: Text(_l10n.bankColCategory)),
             ],
             rows: _rows.map(_buildReviewRow).toList(),
           ),
@@ -934,7 +925,7 @@ LIMIT 100
             child: TextField(
               controller: row.dateController,
               enabled: !_isBusy,
-              decoration: InputDecoration(labelText: 'Zeile ${row.lineNumber}'),
+              decoration: InputDecoration(labelText: _l10n.bankRowLabel(row.lineNumber)),
             ),
           ),
         ),
@@ -958,13 +949,13 @@ LIMIT 100
                 TextField(
                   controller: row.partnerController,
                   enabled: !_isBusy,
-                  decoration: const InputDecoration(labelText: 'Partner'),
+                  decoration: InputDecoration(labelText: _l10n.bankColPartner),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 TextField(
                   controller: row.purposeController,
                   enabled: !_isBusy,
-                  decoration: const InputDecoration(labelText: 'Verwendungszweck'),
+                  decoration: InputDecoration(labelText: _l10n.bankColPurpose),
                 ),
               ],
             ),
@@ -1010,7 +1001,7 @@ LIMIT 100
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _buildSectionCard(
-          title: '4. Importergebnis',
+          title: _l10n.bankStepResult,
           icon: hasFailure ? Icons.warning_amber : Icons.check_circle,
           children: <Widget>[
             AppStatusChip(status: hasFailure ? AppStatus.warning : AppStatus.paid, label: outcome.status),
@@ -1019,11 +1010,11 @@ LIMIT 100
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: <Widget>[
-                _buildResultStat('Importiert', outcome.imported, Icons.save_alt),
-                _buildResultStat('Duplikate übersprungen', outcome.duplicates, Icons.copy_all),
-                _buildResultStat('Kategorisiert', outcome.categorized, Icons.label_outline),
-                _buildResultStat('Manuelle Prüfung', outcome.manualReview, Icons.rate_review),
-                _buildResultStat('Fehlgeschlagen', outcome.failed, Icons.error_outline),
+                _buildResultStat(_l10n.bankStatImported, outcome.imported, Icons.save_alt),
+                _buildResultStat(_l10n.bankStatDuplicatesSkipped, outcome.duplicates, Icons.copy_all),
+                _buildResultStat(_l10n.bankStatCategorized, outcome.categorized, Icons.label_outline),
+                _buildResultStat(_l10n.bankStatManualReview, outcome.manualReview, Icons.rate_review),
+                _buildResultStat(_l10n.bankStatFailed, outcome.failed, Icons.error_outline),
               ],
             ),
             if (outcome.detail != null) ...<Widget>[
@@ -1034,11 +1025,9 @@ LIMIT 100
               const SizedBox(height: AppSpacing.lg),
               _buildFailureRows(outcome.failedRows),
             ] else
-              const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.lg),
-                child: Text(
-                  'Alle bestätigten neuen Zeilen wurden gespeichert. Der Import ist im Verlauf dokumentiert.',
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.lg),
+                child: Text(_l10n.bankResultAllSaved),
               ),
             const SizedBox(height: AppSpacing.lg),
             Wrap(
@@ -1050,7 +1039,7 @@ LIMIT 100
                   OutlinedButton.icon(
                     onPressed: _isBusy ? null : () => unawaited(_retryFailedRows()),
                     icon: const Icon(Icons.replay),
-                    label: const Text('Fehlgeschlagene Zeilen erneut prüfen'),
+                    label: Text(_l10n.bankRetryFailedRows),
                   ),
                 OutlinedButton.icon(
                   onPressed: _isBusy ? null : _startOver,
@@ -1077,31 +1066,31 @@ LIMIT 100
 
   Widget _buildFailureRows(List<_FailedEditableRow> rows) {
     if (rows.isEmpty) {
-      return const Text(
-        'Die Datenbank meldete nicht gespeicherte Zeilen, konnte aber keinen einzelnen Zeilenfehler zurückgeben. Prüfe Konto, Datum und Betrag; ein erneuter Versuch bleibt dedupliziert.',
-      );
+      return Text(_l10n.bankFailureRowsGeneric);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const Text(
-          'Nicht gespeichert — bitte korrigieren und erneut prüfen:',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
+        Text(_l10n.bankNotSavedFix, style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: AppSpacing.sm),
         ...rows.map(
           (_FailedEditableRow failure) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-            child: Text(
-              'Zeile ${failure.row.lineNumber}: ${failure.error} · '
-              '${failure.row.partnerController.text.trim().isEmpty ? 'ohne Partner' : failure.row.partnerController.text.trim()} · '
-              '${failure.row.amountController.text.trim()} € · '
-              '${failure.row.purposeController.text.trim().isEmpty ? 'ohne Verwendungszweck' : failure.row.purposeController.text.trim()}',
-            ),
+            child: Text(_failureRowText(failure)),
           ),
         ),
       ],
     );
+  }
+
+  String _failureRowText(_FailedEditableRow failure) {
+    final String partner = failure.row.partnerController.text.trim();
+    final String purpose = failure.row.purposeController.text.trim();
+    final String amount = failure.row.amountController.text.trim();
+    final String prefix = _l10n.bankFailureRowPrefix(failure.row.lineNumber, failure.error);
+    final String partnerText = partner.isEmpty ? _l10n.bankWithoutPartner : partner;
+    final String purposeText = purpose.isEmpty ? _l10n.bankWithoutPurpose : purpose;
+    return '$prefix · $partnerText · $amount € · $purposeText';
   }
 
   Widget _buildHistoryView() {
@@ -1109,16 +1098,14 @@ LIMIT 100
       key: const ValueKey<String>('bank-import-history'),
       children: <Widget>[
         _buildSectionCard(
-          title: 'Importverlauf',
+          title: _l10n.bankHistoryTitle,
           icon: Icons.history,
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Expanded(
-                  child: Text('Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.'),
-                ),
+                Expanded(child: Text(_l10n.bankHistoryCardSubtitle)),
                 IconButton(
-                  tooltip: 'Importverlauf aktualisieren',
+                  tooltip: _l10n.bankHistoryRefresh,
                   onPressed: _historyLoading ? null : () => unawaited(_refreshHistory()),
                   icon: const Icon(Icons.refresh),
                 ),
@@ -1138,15 +1125,15 @@ LIMIT 100
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                   columnSpacing: AppSpacing.lg,
-                  columns: const <DataColumn>[
-                    DataColumn(label: Text('Zeitpunkt')),
-                    DataColumn(label: Text('Quelle')),
-                    DataColumn(label: Text('Template')),
-                    DataColumn(label: Text('Konto')),
-                    DataColumn(label: Text('Importiert')),
-                    DataColumn(label: Text('Duplikate')),
-                    DataColumn(label: Text('Fehler')),
-                    DataColumn(label: Text('Status')),
+                  columns: <DataColumn>[
+                    DataColumn(label: Text(_l10n.bankColTime)),
+                    DataColumn(label: Text(_l10n.bankColSource)),
+                    DataColumn(label: Text(_l10n.bankColTemplate)),
+                    DataColumn(label: Text(_l10n.bankColAccount)),
+                    DataColumn(label: Text(_l10n.bankColImported)),
+                    DataColumn(label: Text(_l10n.bankColDuplicates)),
+                    DataColumn(label: Text(_l10n.bankColError)),
+                    DataColumn(label: Text(_l10n.bankColStatus)),
                   ],
                   rows: _history.map(_buildHistoryRow).toList(),
                 ),
@@ -1193,9 +1180,9 @@ LIMIT 100
 
   Widget _buildStageIndicator() {
     final List<_StageDescriptor> stages = <_StageDescriptor>[
-      (label: 'Datei', icon: Icons.upload_file, stage: _BankImportStage.upload),
-      (label: 'Prüfen', icon: Icons.fact_check, stage: _BankImportStage.review),
-      (label: 'Ergebnis', icon: Icons.task_alt, stage: _BankImportStage.result),
+      (label: _l10n.bankStageFile, icon: Icons.upload_file, stage: _BankImportStage.upload),
+      (label: _l10n.bankStageReview, icon: Icons.fact_check, stage: _BankImportStage.review),
+      (label: _l10n.bankStageResult, icon: Icons.task_alt, stage: _BankImportStage.result),
     ];
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
@@ -1207,13 +1194,14 @@ LIMIT 100
     final bool active = _stage == stage.stage;
     final bool complete = _stage.index > stage.stage.index;
     final Color color = active || complete ? Theme.of(context).colorScheme.primary : Theme.of(context).disabledColor;
+    final AppLocalizations l10n = _l10n;
+    final String state = active
+        ? l10n.bankStageCurrent
+        : complete
+        ? l10n.bankStageComplete
+        : l10n.bankStageOpen;
     return Semantics(
-      label:
-          '${stage.label}: ${active
-              ? 'aktuell'
-              : complete
-              ? 'abgeschlossen'
-              : 'offen'}',
+      label: '${stage.label}: $state',
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -1242,7 +1230,7 @@ LIMIT 100
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'Bereit: $_fileName · ${_formatBytes(bytes)}',
+              _l10n.bankReady(_fileName ?? '', _formatBytes(bytes)),
               style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
             ),
           ),
@@ -1295,7 +1283,9 @@ LIMIT 100
           .map(
             (BankTemplate template) => DropdownMenuItem<BankTemplate>(
               value: template,
-              child: Text('${template.name} · ${template.delimiter == ';' ? 'Semikolon' : 'Komma'}'),
+              child: Text(
+                '${template.name} · ${template.delimiter == ';' ? _l10n.bankDelimiterSemicolon : _l10n.bankDelimiterComma}',
+              ),
             ),
           )
           .toList(),
@@ -1390,9 +1380,7 @@ LIMIT 100
       maxWidth: 1400,
       header: AppPageHeader(
         title: _l10n.sidebarBanking,
-        subtitle: _view == _BankImportView.history
-            ? 'Nachvollziehbarer Importverlauf'
-            : 'Dateiimport mit Prüfung vor dem Speichern',
+        subtitle: _view == _BankImportView.history ? _l10n.bankHeaderSubtitleHistory : _l10n.bankHeaderSubtitleImport,
         showFilterToolbar: false,
         actions: <Widget>[
           TextButton.icon(
@@ -1414,7 +1402,7 @@ LIMIT 100
     for (final _BankAccountOption account in _accounts) {
       if (account.id == _selectedAccountId) return account.label;
     }
-    return 'kein Konto';
+    return _l10n.bankNoAccountSelected;
   }
 }
 
@@ -1506,10 +1494,11 @@ class _ImportOutcome {
 class _BankAccountOption {
   const _BankAccountOption({required this.id, required this.name, this.iban, this.currency});
 
-  factory _BankAccountOption.fromRow(Map<String, Object?> row) {
+  factory _BankAccountOption.fromRow(Map<String, Object?> row, {required AppLocalizations l10n}) {
+    final String rawName = _asString(row['name']);
     return _BankAccountOption(
       id: _asInt(row['id']) ?? 0,
-      name: _asString(row['name']).isEmpty ? 'Konto ${_asInt(row['id']) ?? ''}' : _asString(row['name']),
+      name: rawName.isEmpty ? l10n.bankAccountFallback('${_asInt(row['id']) ?? ''}') : rawName,
       iban: _asString(row['iban']).isEmpty ? null : _asString(row['iban']),
       currency: _asString(row['waehrung']).isEmpty ? null : _asString(row['waehrung']),
     );
@@ -1529,12 +1518,10 @@ class _BankAccountOption {
 class _BankCategoryOption {
   const _BankCategoryOption({required this.id, required this.name});
 
-  factory _BankCategoryOption.fromRow(Map<String, Object?> row) {
+  factory _BankCategoryOption.fromRow(Map<String, Object?> row, {required AppLocalizations l10n}) {
     final int id = _asInt(row['id']) ?? 0;
-    return _BankCategoryOption(
-      id: id,
-      name: _asString(row['bezeichnung']).isEmpty ? 'Kategorie $id' : _asString(row['bezeichnung']),
-    );
+    final String rawName = _asString(row['bezeichnung']);
+    return _BankCategoryOption(id: id, name: rawName.isEmpty ? l10n.bankCategoryFallback('$id') : rawName);
   }
 
   final int id;
@@ -1555,23 +1542,24 @@ class _HistoryEntry {
     this.detail,
   });
 
-  factory _HistoryEntry.fromRow(Map<String, Object?> row, {_ImportOutcome? outcome}) {
+  factory _HistoryEntry.fromRow(Map<String, Object?> row, {_ImportOutcome? outcome, required AppLocalizations l10n}) {
     final int imported =
         outcome?.imported ?? (_asInt(row['anzahl_importiert']) ?? _asInt(row['anzahl_transaktionen']) ?? 0);
     final int duplicates = outcome?.duplicates ?? (_asInt(row['duplikate']) ?? 0);
     final int failed = outcome?.failed ?? (_asInt(row['anzahl_fehlgeschlagen']) ?? 0);
     final String rawStatus = _asString(row['status']);
     final String? detail = outcome?.detail ?? _diagnosticText(_asString(row['fehler_details']));
+    final String rawFileName = _asString(row['dateiname']);
     return _HistoryEntry(
       id: _asInt(row['id']),
-      fileName: _asString(row['dateiname']).isEmpty ? 'Unbekannte Datei' : _asString(row['dateiname']),
+      fileName: rawFileName.isEmpty ? l10n.bankUnknownFile : rawFileName,
       date: DateTime.tryParse(_asString(row['datum'])) ?? DateTime.now(),
       template: _asString(row['template_typ']).isEmpty ? '—' : _asString(row['template_typ']),
       account: _asString(row['konto_name']).isEmpty ? '—' : _asString(row['konto_name']),
       imported: imported,
       duplicates: duplicates,
       failed: failed,
-      status: outcome?.status ?? _historyStatus(rawStatus),
+      status: outcome?.status ?? _historyStatus(rawStatus, l10n),
       detail: detail,
     );
   }
@@ -1646,29 +1634,28 @@ bool _isValidDate(int year, int month, int day) {
   return candidate.year == year && candidate.month == month && candidate.day == day;
 }
 
-String _historyStatus(String raw) {
+String _historyStatus(String raw, AppLocalizations l10n) {
   final String lower = raw.toLowerCase();
   if (lower.startsWith('abgelehnt') || lower.startsWith('unsupported')) {
-    return 'Abgelehnt';
+    return l10n.bankStatusRejected;
   }
   if (lower.startsWith('teilweise') || lower.startsWith('partial')) {
-    return 'Teilweise importiert';
+    return l10n.bankStatusPartial;
   }
   if (lower.startsWith('fehlgeschlagen') || lower.startsWith('failed')) {
-    return 'Import fehlgeschlagen';
+    return l10n.bankStatusFailed;
   }
   if (lower.startsWith('importiert') || lower.startsWith('success')) {
-    return 'Importiert';
+    return l10n.bankStatusImported;
   }
-  return raw.isEmpty ? 'Unbekannt' : raw;
+  return raw.isEmpty ? l10n.statusUnknown : raw;
 }
 
 String? _diagnosticText(String raw) => raw.isEmpty ? null : raw;
 
 String _safeError(Object error) {
   if (error is BankImportException) return error.message;
-  final String text = error.toString();
-  return text.startsWith('Exception: ') ? text.substring('Exception: '.length) : text;
+  return error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
 }
 
 int? _asInt(Object? value) {

@@ -166,13 +166,14 @@ void main() {
         '15.03.2026;10,00;Erste Zahlung;Alpha GmbH\n'
         '16.03.2026;20,00;Zweite Zahlung;Beta GmbH\n'
         '15.03.2026;10,00;Erste Zahlung;Alpha GmbH\n';
-    final List<RawTx> transactions = service.parseCsv(csv: csv, template: template);
+    final List<RawTx> transactions = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
     final ImportResult result = await service.importTransactions(
       kontoId: _kontoId,
       rawTxs: transactions,
       dateiname: 'maerz-2026.csv',
       template: template,
+      locale: 'de_DE',
     );
     final List<Map<String, Object?>> persisted = await db.executor.runSelect(
       'SELECT datum, betrag, dedupe_hash FROM bank_transaktionen WHERE konto_id = ? ORDER BY id',
@@ -222,6 +223,7 @@ END
       ],
       dateiname: 'row-failure.csv',
       template: template,
+      locale: 'de_DE',
     );
     final List<Map<String, Object?>> persisted = await db.executor.runSelect(
       'SELECT verwendungszweck FROM bank_transaktionen WHERE konto_id = ? ORDER BY id',
@@ -262,6 +264,7 @@ END
       rawTxs: firstAttempt,
       dateiname: 'retry.csv',
       template: template,
+      locale: 'de_DE',
     );
     await db.executor.runCustom('DROP TRIGGER fail_selected_bank_import_row');
 
@@ -273,6 +276,7 @@ END
       ],
       dateiname: 'retry.csv',
       template: template,
+      locale: 'de_DE',
     );
     final List<Map<String, Object?>> persisted = await db.executor.runSelect(
       'SELECT dedupe_hash, verwendungszweck FROM bank_transaktionen WHERE konto_id = ? ORDER BY id',

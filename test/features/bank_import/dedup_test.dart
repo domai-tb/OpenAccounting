@@ -55,9 +55,9 @@ void main() {
           'Datum;Betrag;Verwendungszweck;Partner\n'
           '15.03.2026;100,00;Netflix Abo;Netflix\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> raw = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> raw = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
-      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r1.imported, 1);
       expect(r1.duplicatesSkipped, 0);
       // dedupe_hash computed and stored
@@ -72,7 +72,7 @@ void main() {
       expect(storedHash, expectedHash);
 
       // second import same CSV same konto -> duplicate skipped
-      final ImportResult r2 = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final ImportResult r2 = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r2.imported, 0);
       expect(r2.duplicatesSkipped, 1);
       final List<Map<String, Object?>> after = await db.executor.runSelect(
@@ -94,10 +94,10 @@ void main() {
           'Datum;Betrag;Verwendungszweck;Partner\n'
           '15.03.2026;100,00;Netflix Abo;Netflix\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> raw = service.parseCsv(csv: csv, template: template);
-      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final List<RawTx> raw = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
+      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r1.imported, 1);
-      final ImportResult r2 = await service.importTransactions(kontoId: 2, rawTxs: raw);
+      final ImportResult r2 = await service.importTransactions(kontoId: 2, rawTxs: raw, locale: 'de_DE');
       expect(r2.imported, 1);
       expect(r2.duplicatesSkipped, 0);
     });
@@ -108,8 +108,8 @@ void main() {
           '15.03.2026;12,99;Netflix Monatsabo;Netflix\n'
           '16.03.2026;20,00;Supermarkt Einkauf;Edeka\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> raw = service.parseCsv(csv: csv, template: template);
-      final ImportResult result = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final List<RawTx> raw = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
+      final ImportResult result = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(result.imported, 2);
       expect(result.autoCategorized, 1);
       expect(result.manualReview, 1);
@@ -134,17 +134,22 @@ void main() {
           'Datum;Betrag;Verwendungszweck;Partner\n'
           '15.03.2026;100,00;Netflix Abo;Netflix\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> raw = service.parseCsv(csv: csv, template: template);
+      final List<RawTx> raw = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
 
-      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final ImportResult r1 = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r1.imported, 1);
 
-      final ImportResult r2 = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final ImportResult r2 = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r2.duplicatesSkipped, 1);
       expect(r2.imported, 0);
 
       // override -> should import with suffix hash
-      final ImportResult r3 = await service.importTransactions(kontoId: 1, rawTxs: raw, allowDuplicateOverride: true);
+      final ImportResult r3 = await service.importTransactions(
+        kontoId: 1,
+        rawTxs: raw,
+        allowDuplicateOverride: true,
+        locale: 'de_DE',
+      );
       expect(r3.imported, 1);
       expect(r3.duplicatesSkipped, 0);
 
@@ -201,7 +206,11 @@ void main() {
       // manual mode -> journal_id stays null even with high score
       await db.executor.runCustom('DELETE FROM bank_transaktionen');
       await db.executor.runCustom('DELETE FROM bank_imports');
-      final ImportResult manual = await service.importTransactions(kontoId: 1, rawTxs: <RawTx>[txForImport]);
+      final ImportResult manual = await service.importTransactions(
+        kontoId: 1,
+        rawTxs: <RawTx>[txForImport],
+        locale: 'de_DE',
+      );
       expect(manual.imported, 1);
       final List<Map<String, Object?>> manualRows = await db.executor.runSelect(
         'SELECT journal_id FROM bank_transaktionen',
@@ -216,6 +225,7 @@ void main() {
         kontoId: 1,
         rawTxs: <RawTx>[txForImport],
         mode: 'automatisch',
+        locale: 'de_DE',
       );
       expect(auto.imported, 1);
       final List<Map<String, Object?>> autoRows = await db.executor.runSelect(
@@ -233,8 +243,8 @@ void main() {
           '16.03.2026;20,00;Edeka Einkauf;Edeka\n'
           '17.03.2026;30,00;Amazon Bestellung;Amazon\n';
       final BankTemplate template = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
-      final List<RawTx> raw = service.parseCsv(csv: csv, template: template);
-      final ImportResult r = await service.importTransactions(kontoId: 1, rawTxs: raw);
+      final List<RawTx> raw = service.parseCsv(csv: csv, template: template, locale: 'de_DE');
+      final ImportResult r = await service.importTransactions(kontoId: 1, rawTxs: raw, locale: 'de_DE');
       expect(r.imported, 3);
       expect(r.duplicatesSkipped, 0);
       // Netflix and Amazon match -> 2 auto, 1 manual

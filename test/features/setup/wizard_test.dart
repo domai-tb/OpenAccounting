@@ -16,23 +16,25 @@ void main() {
   group('Setup Wizard - Validierung & Ablauf', () {
     test('Schritt 1: Firmenname ist Pflichtfeld', () {
       final service = WizardService();
-      expect(service.validateStammdaten(name: ''), isNotNull);
-      expect(service.validateStammdaten(name: '   '), isNotNull);
-      expect(service.validateStammdaten(name: 'Muster GmbH'), isNull);
+      expect(service.validateStammdaten(name: '', locale: 'de_DE'), isNotNull);
+      expect(service.validateStammdaten(name: '   ', locale: 'de_DE'), isNotNull);
+      expect(service.validateStammdaten(name: 'Muster GmbH', locale: 'de_DE'), isNull);
     });
 
     test('Schritt 2: mindestens ein Konto mit gültiger IBAN erforderlich', () {
       final service = WizardService();
-      expect(service.validateKonten(accounts: const <BankAccount>[]), isNotNull);
+      expect(service.validateKonten(accounts: const <BankAccount>[], locale: 'de_DE'), isNotNull);
       expect(
         service.validateKonten(
           accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'INVALID', bic: '')],
+          locale: 'de_DE',
         ),
         isNotNull,
       );
       expect(
         service.validateKonten(
           accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
+          locale: 'de_DE',
         ),
         isNull,
       );
@@ -47,17 +49,17 @@ void main() {
 
     test('Schritt 3: mindestens eine Kategorie erforderlich', () {
       final service = WizardService();
-      expect(service.validateKategorien(selectedIds: const <int>[]), isNotNull);
-      expect(service.validateKategorien(selectedIds: <int>[1]), isNull);
+      expect(service.validateKategorien(selectedIds: const <int>[], locale: 'de_DE'), isNotNull);
+      expect(service.validateKategorien(selectedIds: <int>[1], locale: 'de_DE'), isNull);
     });
 
     test('Kassenbestand: negativer Betrag abgelehnt', () {
       final service = WizardService();
-      expect(service.validateKassenbestand('-10.00'), isNotNull);
-      expect(service.validateKassenbestand('-0.01'), isNotNull);
-      expect(service.validateKassenbestand('0.00'), isNull);
-      expect(service.validateKassenbestand('150.00'), isNull);
-      expect(service.validateKassenbestand(''), isNull);
+      expect(service.validateKassenbestand('-10.00', locale: 'de_DE'), isNotNull);
+      expect(service.validateKassenbestand('-0.01', locale: 'de_DE'), isNotNull);
+      expect(service.validateKassenbestand('0.00', locale: 'de_DE'), isNull);
+      expect(service.validateKassenbestand('150.00', locale: 'de_DE'), isNull);
+      expect(service.validateKassenbestand('', locale: 'de_DE'), isNull);
     });
 
     test('Wizard hat genau 4 Schritte in korrekter Reihenfolge', () {
@@ -89,6 +91,7 @@ void main() {
         ort: 'Berlin',
         accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
         kategorieIds: <int>[1, 2],
+        locale: 'de_DE',
       );
 
       final rows = await db.executor.runSelect('SELECT name FROM unternehmen WHERE id = 1', const []);
@@ -149,13 +152,13 @@ void main() {
       await db.ensureOpen();
       final service = WizardService(repository: SetupRepository(db.executor));
       // fresh DB empty or 'Meine Firma' -> should require setup
-      expect(await service.isSetupRequired(db), isTrue);
+      expect(await service.isSetupRequired(db, locale: 'de_DE'), isTrue);
 
       // insert real company (ensure row exists first)
       await db.executor.runInsert('INSERT OR REPLACE INTO unternehmen (id, name) VALUES (1, ?)', const [
         'Echte Firma GmbH',
       ]);
-      expect(await service.isSetupRequired(db), isFalse);
+      expect(await service.isSetupRequired(db, locale: 'de_DE'), isFalse);
       await db.close();
     });
 
@@ -176,8 +179,8 @@ void main() {
       final service = WizardService(repository: SetupRepository(db.executor));
       const account = BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX');
 
-      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account]);
-      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account]);
+      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account], locale: 'de_DE');
+      await service.completeWizard(companyName: 'Muster GmbH', accounts: <BankAccount>[account], locale: 'de_DE');
 
       final accounts = await db.executor.runSelect('SELECT id FROM konten WHERE iban = ?', const <Object?>[
         'DE89370400440532013000',
@@ -193,7 +196,7 @@ void main() {
       await db.executor.runCustom('DROP TABLE unternehmen');
       final service = WizardService(repository: SetupRepository(db.executor));
 
-      await expectLater(service.isSetupRequired(db), throwsA(isA<SetupDatabaseException>()));
+      await expectLater(service.isSetupRequired(db, locale: 'de_DE'), throwsA(isA<SetupDatabaseException>()));
       await db.close();
     });
   });

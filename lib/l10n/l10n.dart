@@ -1219,6 +1219,1176 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Importieren'**
   String get actionImport;
+
+  /// Detail header for a receipt record.
+  ///
+  /// In de, this message translates to:
+  /// **'Beleg {id}'**
+  String receiptDetailTitle(String id);
+
+  /// No description provided for @actionFilter.
+  ///
+  /// In de, this message translates to:
+  /// **'Filter'**
+  String get actionFilter;
+
+  /// No description provided for @actionRemoveFilter.
+  ///
+  /// In de, this message translates to:
+  /// **'Filter entfernen'**
+  String get actionRemoveFilter;
+
+  /// No description provided for @actionResetFilters.
+  ///
+  /// In de, this message translates to:
+  /// **'Filter zurücksetzen'**
+  String get actionResetFilters;
+
+  /// No description provided for @headerViews.
+  ///
+  /// In de, this message translates to:
+  /// **'Ansichten'**
+  String get headerViews;
+
+  /// No description provided for @countResultSingular.
+  ///
+  /// In de, this message translates to:
+  /// **'Ergebnis'**
+  String get countResultSingular;
+
+  /// Localized copy for journalDetailTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchung {id}'**
+  String journalDetailTitle(String id);
+
+  /// Localized copy for filterTypeLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Typ: {value}'**
+  String filterTypeLabel(String value);
+
+  /// Localized copy for filterStatusLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Status: {value}'**
+  String filterStatusLabel(String value);
+
+  /// No description provided for @draftDiscardTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf verwerfen?'**
+  String get draftDiscardTitle;
+
+  /// No description provided for @draftDiscardMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Die eingegebenen Rechnungsdaten gehen verloren.'**
+  String get draftDiscardMessage;
+
+  /// No description provided for @actionKeepEditing.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiter bearbeiten'**
+  String get actionKeepEditing;
+
+  /// No description provided for @actionDiscard.
+  ///
+  /// In de, this message translates to:
+  /// **'Verwerfen'**
+  String get actionDiscard;
+
+  /// Localized copy for draftSaveFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf konnte nicht gespeichert werden: {error}'**
+  String draftSaveFailed(String error);
+
+  /// No description provided for @errorDateFormat.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum im Format JJJJ-MM-TT eingeben'**
+  String get errorDateFormat;
+
+  /// Localized copy for errorPositiveAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'{label} muss größer als 0 sein'**
+  String errorPositiveAmount(String label);
+
+  /// No description provided for @customersLoading.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden werden geladen …'**
+  String get customersLoading;
+
+  /// No description provided for @customersLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden konnten nicht geladen werden'**
+  String get customersLoadFailed;
+
+  /// No description provided for @actionReload.
+  ///
+  /// In de, this message translates to:
+  /// **'Erneut laden'**
+  String get actionReload;
+
+  /// No description provided for @invoiceDraftNoCustomerTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Kunde angelegt'**
+  String get invoiceDraftNoCustomerTitle;
+
+  /// No description provided for @invoiceDraftNoCustomerMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Eine Rechnung braucht einen Kunden, damit sie korrekt zugeordnet werden kann.'**
+  String get invoiceDraftNoCustomerMessage;
+
+  /// No description provided for @actionCreateCustomer.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde anlegen'**
+  String get actionCreateCustomer;
+
+  /// No description provided for @invoiceDraftCustomerLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde'**
+  String get invoiceDraftCustomerLabel;
+
+  /// No description provided for @invoiceDraftCustomerHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde auswählen'**
+  String get invoiceDraftCustomerHint;
+
+  /// No description provided for @errorCustomerRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde ist erforderlich'**
+  String get errorCustomerRequired;
+
+  /// No description provided for @invoiceDraftTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnungsentwurf'**
+  String get invoiceDraftTitle;
+
+  /// No description provided for @invoiceDraftDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichere eine Rechnungsposition als Entwurf.'**
+  String get invoiceDraftDescription;
+
+  /// No description provided for @invoiceDraftPositionLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Position'**
+  String get invoiceDraftPositionLabel;
+
+  /// No description provided for @errorPositionRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Position ist erforderlich'**
+  String get errorPositionRequired;
+
+  /// No description provided for @invoiceDraftUnitPriceLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Einzelpreis netto'**
+  String get invoiceDraftUnitPriceLabel;
+
+  /// No description provided for @actionSaveDraft.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf speichern'**
+  String get actionSaveDraft;
+
+  /// No description provided for @errorInvoiceIdInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Rechnungs-ID ist ungültig.'**
+  String get errorInvoiceIdInvalid;
+
+  /// Localized copy for contactDetailTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontakt {id}'**
+  String contactDetailTitle(String id);
+
+  /// No description provided for @profileSavedRestartHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil gespeichert. Bitte OpenAccounting neu starten.'**
+  String get profileSavedRestartHint;
+
+  /// No description provided for @profileAlreadyActive.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil ist bereits aktiv.'**
+  String get profileAlreadyActive;
+
+  /// Localized copy for profileSelectFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil konnte nicht gewählt werden: {error}'**
+  String profileSelectFailed(String error);
+
+  /// No description provided for @profileCreateTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Neues Profil'**
+  String get profileCreateTitle;
+
+  /// No description provided for @profileNameLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Profilname'**
+  String get profileNameLabel;
+
+  /// No description provided for @actionCreate.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlegen'**
+  String get actionCreate;
+
+  /// No description provided for @profileCreated.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil angelegt.'**
+  String get profileCreated;
+
+  /// Localized copy for profileCreateFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil konnte nicht angelegt werden: {error}'**
+  String profileCreateFailed(String error);
+
+  /// No description provided for @errorRecordIdInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datensatz-ID ist ungültig.'**
+  String get errorRecordIdInvalid;
+
+  /// Localized copy for errorRecordNotFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Datensatz mit der ID {id} wurde nicht gefunden.'**
+  String errorRecordNotFound(String id);
+
+  /// Localized copy for recordIdLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Datensatz-ID {id}'**
+  String recordIdLabel(String id);
+
+  /// Localized copy for recordFallbackTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Datensatz #{id}'**
+  String recordFallbackTitle(String id);
+
+  /// Localized copy for routeErrorSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorgang: {source}'**
+  String routeErrorSource(String source);
+
+  /// No description provided for @bankCategoriesLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorien konnten nicht geladen werden. Manuelle Kategorisierung ist derzeit nicht verfügbar.'**
+  String get bankCategoriesLoadFailed;
+
+  /// No description provided for @bankHistoryLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Importverlauf konnte nicht geladen werden.'**
+  String get bankHistoryLoadFailed;
+
+  /// No description provided for @bankUnsupportedFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Dateiformat wird nicht unterstützt. Unterstützt werden CSV und CAMT.053 XML.'**
+  String get bankUnsupportedFile;
+
+  /// Localized copy for bankFileReadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei konnte nicht gelesen werden: {error}'**
+  String bankFileReadFailed(String error);
+
+  /// No description provided for @bankFileTooLarge.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei ist größer als 20 MB. Exportiere einen kleineren Zeitraum und versuche es erneut.'**
+  String get bankFileTooLarge;
+
+  /// No description provided for @bankPasteTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'CSV-Daten einfügen'**
+  String get bankPasteTitle;
+
+  /// No description provided for @bankPasteContentLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'CSV-Inhalt'**
+  String get bankPasteContentLabel;
+
+  /// No description provided for @bankPasteHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum;Betrag;Verwendungszweck;Partner'**
+  String get bankPasteHint;
+
+  /// No description provided for @actionApply.
+  ///
+  /// In de, this message translates to:
+  /// **'Übernehmen'**
+  String get actionApply;
+
+  /// No description provided for @bankPasteFileName.
+  ///
+  /// In de, this message translates to:
+  /// **'eingefügter-import.csv'**
+  String get bankPasteFileName;
+
+  /// Localized copy for bankFileProcessFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datei konnte nicht verarbeitet werden: {error}'**
+  String bankFileProcessFailed(String error);
+
+  /// No description provided for @bankConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Import bestätigen'**
+  String get bankConfirmTitle;
+
+  /// Localized copy for bankConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{{count} ausgewählte Zeile} other{{count} ausgewählte Zeilen}} werden in {account} importiert. Duplikate werden standardmäßig übersprungen.'**
+  String bankConfirmMessage(int count, String account);
+
+  /// No description provided for @bankBackToReview.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück zur Prüfung'**
+  String get bankBackToReview;
+
+  /// Localized copy for bankImportIncomplete.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Import wurde nicht vollständig abgeschlossen: {error}'**
+  String bankImportIncomplete(String error);
+
+  /// No description provided for @bankRetryNotice.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur die nicht gespeicherten Zeilen werden erneut geprüft. Bereits importierte Zeilen bleiben dedupliziert.'**
+  String get bankRetryNotice;
+
+  /// Localized copy for bankImportAborted.
+  ///
+  /// In de, this message translates to:
+  /// **'Import abgebrochen: {diagnostic} Keine Transaktion wurde gespeichert.'**
+  String bankImportAborted(String diagnostic);
+
+  /// No description provided for @bankImportAbortedHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.'**
+  String get bankImportAbortedHint;
+
+  /// No description provided for @bankStatusRejected.
+  ///
+  /// In de, this message translates to:
+  /// **'Abgelehnt'**
+  String get bankStatusRejected;
+
+  /// No description provided for @bankStepChooseFile.
+  ///
+  /// In de, this message translates to:
+  /// **'1. Datei auswählen'**
+  String get bankStepChooseFile;
+
+  /// No description provided for @bankUploadHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Unterstützt werden CSV-Dateien und CAMT.053 XML-Exporte. Die Vorschau schreibt noch nichts in die Datenbank.'**
+  String get bankUploadHint;
+
+  /// No description provided for @bankPathLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Dateipfad'**
+  String get bankPathLabel;
+
+  /// No description provided for @bankPathHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt'**
+  String get bankPathHint;
+
+  /// No description provided for @bankStepAccountTemplate.
+  ///
+  /// In de, this message translates to:
+  /// **'2. Konto und Template'**
+  String get bankStepAccountTemplate;
+
+  /// No description provided for @bankNoAccountYet.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Bankkonto vorhanden. Lege zuerst ein Konto in den Stammdaten an; ein Import ohne Konto ist gesperrt.'**
+  String get bankNoAccountYet;
+
+  /// No description provided for @bankCamtHint.
+  ///
+  /// In de, this message translates to:
+  /// **'CAMT.053 wird anhand der XML-Struktur erkannt; ein CSV-Template ist dafür nicht erforderlich.'**
+  String get bankCamtHint;
+
+  /// No description provided for @bankStepReview.
+  ///
+  /// In de, this message translates to:
+  /// **'3. Vorschau prüfen und bearbeiten'**
+  String get bankStepReview;
+
+  /// Localized copy for bankRowsDetected.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} Zeilen erkannt'**
+  String bankRowsDetected(int count);
+
+  /// Localized copy for bankRowsSelected.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} ausgewählt'**
+  String bankRowsSelected(int count);
+
+  /// Localized copy for bankRowsManual.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} manuell kategorisiert'**
+  String bankRowsManual(int count);
+
+  /// No description provided for @bankReviewNotice.
+  ///
+  /// In de, this message translates to:
+  /// **'Änderungen und manuelle Kategorien werden erst nach deiner ausdrücklichen Importbestätigung gespeichert.'**
+  String get bankReviewNotice;
+
+  /// No description provided for @bankDuplicateOverride.
+  ///
+  /// In de, this message translates to:
+  /// **'Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)'**
+  String get bankDuplicateOverride;
+
+  /// Localized copy for bankConfirmActionCount.
+  ///
+  /// In de, this message translates to:
+  /// **'Import bestätigen ({count})'**
+  String bankConfirmActionCount(int count);
+
+  /// No description provided for @bankColPartnerPurpose.
+  ///
+  /// In de, this message translates to:
+  /// **'Partner / Zweck'**
+  String get bankColPartnerPurpose;
+
+  /// Localized copy for bankRowLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeile {line}'**
+  String bankRowLabel(int line);
+
+  /// No description provided for @bankColPartner.
+  ///
+  /// In de, this message translates to:
+  /// **'Partner'**
+  String get bankColPartner;
+
+  /// No description provided for @bankColPurpose.
+  ///
+  /// In de, this message translates to:
+  /// **'Verwendungszweck'**
+  String get bankColPurpose;
+
+  /// No description provided for @bankStepResult.
+  ///
+  /// In de, this message translates to:
+  /// **'4. Importergebnis'**
+  String get bankStepResult;
+
+  /// No description provided for @bankStatImported.
+  ///
+  /// In de, this message translates to:
+  /// **'Importiert'**
+  String get bankStatImported;
+
+  /// No description provided for @bankStatDuplicatesSkipped.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplikate übersprungen'**
+  String get bankStatDuplicatesSkipped;
+
+  /// No description provided for @bankStatCategorized.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorisiert'**
+  String get bankStatCategorized;
+
+  /// No description provided for @bankStatManualReview.
+  ///
+  /// In de, this message translates to:
+  /// **'Manuelle Prüfung'**
+  String get bankStatManualReview;
+
+  /// No description provided for @bankStatFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehlgeschlagen'**
+  String get bankStatFailed;
+
+  /// No description provided for @bankResultAllSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle bestätigten neuen Zeilen wurden gespeichert. Der Import ist im Verlauf dokumentiert.'**
+  String get bankResultAllSaved;
+
+  /// No description provided for @bankRetryFailedRows.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehlgeschlagene Zeilen erneut prüfen'**
+  String get bankRetryFailedRows;
+
+  /// No description provided for @bankFailureRowsGeneric.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Datenbank meldete nicht gespeicherte Zeilen, konnte aber keinen einzelnen Zeilenfehler zurückgeben. Prüfe Konto, Datum und Betrag; ein erneuter Versuch bleibt dedupliziert.'**
+  String get bankFailureRowsGeneric;
+
+  /// No description provided for @bankNotSavedFix.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht gespeichert — bitte korrigieren und erneut prüfen:'**
+  String get bankNotSavedFix;
+
+  /// Localized copy for bankFailureRowPrefix.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeile {line}: {error}'**
+  String bankFailureRowPrefix(int line, String error);
+
+  /// No description provided for @bankWithoutPartner.
+  ///
+  /// In de, this message translates to:
+  /// **'ohne Partner'**
+  String get bankWithoutPartner;
+
+  /// No description provided for @bankWithoutPurpose.
+  ///
+  /// In de, this message translates to:
+  /// **'ohne Verwendungszweck'**
+  String get bankWithoutPurpose;
+
+  /// No description provided for @bankHistoryTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Importverlauf'**
+  String get bankHistoryTitle;
+
+  /// No description provided for @bankHistoryCardSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.'**
+  String get bankHistoryCardSubtitle;
+
+  /// No description provided for @bankHistoryRefresh.
+  ///
+  /// In de, this message translates to:
+  /// **'Importverlauf aktualisieren'**
+  String get bankHistoryRefresh;
+
+  /// No description provided for @bankColTime.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeitpunkt'**
+  String get bankColTime;
+
+  /// No description provided for @bankColSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle'**
+  String get bankColSource;
+
+  /// No description provided for @bankColTemplate.
+  ///
+  /// In de, this message translates to:
+  /// **'Template'**
+  String get bankColTemplate;
+
+  /// No description provided for @bankColAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Konto'**
+  String get bankColAccount;
+
+  /// No description provided for @bankColImported.
+  ///
+  /// In de, this message translates to:
+  /// **'Importiert'**
+  String get bankColImported;
+
+  /// No description provided for @bankColDuplicates.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplikate'**
+  String get bankColDuplicates;
+
+  /// No description provided for @bankColError.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehler'**
+  String get bankColError;
+
+  /// No description provided for @bankColStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Status'**
+  String get bankColStatus;
+
+  /// No description provided for @bankStageFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei'**
+  String get bankStageFile;
+
+  /// No description provided for @bankStageReview.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfen'**
+  String get bankStageReview;
+
+  /// No description provided for @bankStageResult.
+  ///
+  /// In de, this message translates to:
+  /// **'Ergebnis'**
+  String get bankStageResult;
+
+  /// No description provided for @bankStageCurrent.
+  ///
+  /// In de, this message translates to:
+  /// **'aktuell'**
+  String get bankStageCurrent;
+
+  /// No description provided for @bankStageComplete.
+  ///
+  /// In de, this message translates to:
+  /// **'abgeschlossen'**
+  String get bankStageComplete;
+
+  /// No description provided for @bankStageOpen.
+  ///
+  /// In de, this message translates to:
+  /// **'offen'**
+  String get bankStageOpen;
+
+  /// Localized copy for bankReady.
+  ///
+  /// In de, this message translates to:
+  /// **'Bereit: {name} · {size}'**
+  String bankReady(String name, String size);
+
+  /// No description provided for @bankDelimiterSemicolon.
+  ///
+  /// In de, this message translates to:
+  /// **'Semikolon'**
+  String get bankDelimiterSemicolon;
+
+  /// No description provided for @bankDelimiterComma.
+  ///
+  /// In de, this message translates to:
+  /// **'Komma'**
+  String get bankDelimiterComma;
+
+  /// No description provided for @bankHeaderSubtitleHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Nachvollziehbarer Importverlauf'**
+  String get bankHeaderSubtitleHistory;
+
+  /// No description provided for @bankHeaderSubtitleImport.
+  ///
+  /// In de, this message translates to:
+  /// **'Dateiimport mit Prüfung vor dem Speichern'**
+  String get bankHeaderSubtitleImport;
+
+  /// No description provided for @bankNoAccountSelected.
+  ///
+  /// In de, this message translates to:
+  /// **'kein Konto'**
+  String get bankNoAccountSelected;
+
+  /// Localized copy for bankAccountFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Konto {id}'**
+  String bankAccountFallback(String id);
+
+  /// Localized copy for bankCategoryFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie {id}'**
+  String bankCategoryFallback(String id);
+
+  /// No description provided for @bankUnknownFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekannte Datei'**
+  String get bankUnknownFile;
+
+  /// No description provided for @bankStatusPartial.
+  ///
+  /// In de, this message translates to:
+  /// **'Teilweise importiert'**
+  String get bankStatusPartial;
+
+  /// No description provided for @bankStatusFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Import fehlgeschlagen'**
+  String get bankStatusFailed;
+
+  /// No description provided for @bankStatusImported.
+  ///
+  /// In de, this message translates to:
+  /// **'Importiert'**
+  String get bankStatusImported;
+
+  /// No description provided for @bankInvalidImportNoDiagnostic.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.'**
+  String get bankInvalidImportNoDiagnostic;
+
+  /// No description provided for @bankRecoveryCheckFileTemplate.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfe Datei und Template und versuche es erneut.'**
+  String get bankRecoveryCheckFileTemplate;
+
+  /// No description provided for @bankInvalidImportNoAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.'**
+  String get bankInvalidImportNoAccount;
+
+  /// No description provided for @bankRecoverySelectAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Wähle ein gültiges Bankkonto und versuche es erneut.'**
+  String get bankRecoverySelectAccount;
+
+  /// No description provided for @bankNoTransactionsToImport.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Transaktionen zum Importieren.'**
+  String get bankNoTransactionsToImport;
+
+  /// No description provided for @bankRecoverySelectSupportedFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Wähle eine unterstützte Datei mit mindestens einer Transaktion.'**
+  String get bankRecoverySelectSupportedFile;
+
+  /// No description provided for @bankHistoryNotFinalSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Importhistorie konnte nicht abschließend gespeichert werden.'**
+  String get bankHistoryNotFinalSaved;
+
+  /// Localized copy for bankHistoryCreateFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Importhistorie konnte nicht angelegt werden: {error}'**
+  String bankHistoryCreateFailed(String error);
+
+  /// No description provided for @bankRecoveryFixDatabase.
+  ///
+  /// In de, this message translates to:
+  /// **'Behebe das Datenbankproblem und versuche es erneut.'**
+  String get bankRecoveryFixDatabase;
+
+  /// No description provided for @bankRecoveryCheckDuplicates.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfe die vorhandenen Duplikate und versuche es erneut.'**
+  String get bankRecoveryCheckDuplicates;
+
+  /// No description provided for @bankUnknownError.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekannter Fehler'**
+  String get bankUnknownError;
+
+  /// No description provided for @bankInvalidDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum ungültig'**
+  String get bankInvalidDate;
+
+  /// No description provided for @bankInvalidAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag ungültig'**
+  String get bankInvalidAmount;
+
+  /// No description provided for @bankCsvUnclosedQuotes.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültige CSV: Anführungszeichen nicht geschlossen'**
+  String get bankCsvUnclosedQuotes;
+
+  /// Localized copy for bankCsvRowSuffix.
+  ///
+  /// In de, this message translates to:
+  /// **' in Zeile {row}'**
+  String bankCsvRowSuffix(int row);
+
+  /// No description provided for @bankRecoveryFixCsvRow.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrigiere die CSV-Zeile und versuche den Import erneut.'**
+  String get bankRecoveryFixCsvRow;
+
+  /// No description provided for @bankNoTransactionsFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Transaktionen gefunden'**
+  String get bankNoTransactionsFound;
+
+  /// No description provided for @bankNoTemplateFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein passendes Template gefunden. Bitte wähle ein Template.'**
+  String get bankNoTemplateFound;
+
+  /// No description provided for @bankNoTemplateFoundNoTransactions.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Transaktionen gefunden. Kein passendes Template gefunden. Bitte wähle ein Template.'**
+  String get bankNoTemplateFoundNoTransactions;
+
+  /// No description provided for @bankEmptyFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei ist leer'**
+  String get bankEmptyFile;
+
+  /// No description provided for @bankNoHeader.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei enthält keine Kopfzeile'**
+  String get bankNoHeader;
+
+  /// No description provided for @bankInvalidXmlNoTag.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: kein XML-Tag gefunden (invalid)'**
+  String get bankInvalidXmlNoTag;
+
+  /// No description provided for @bankInvalidXmlNoClosingTag.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: kein schliessendes Tag (invalid)'**
+  String get bankInvalidXmlNoClosingTag;
+
+  /// No description provided for @bankInvalidXmlDocumentUnclosed.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: Document nicht geschlossen (invalid)'**
+  String get bankInvalidXmlDocumentUnclosed;
+
+  /// No description provided for @bankInvalidXmlNtryUnclosed.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: Ntry nicht geschlossen (invalid)'**
+  String get bankInvalidXmlNtryUnclosed;
+
+  /// No description provided for @bankInvalidXmlMismatched.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)'**
+  String get bankInvalidXmlMismatched;
+
+  /// No description provided for @bankInvalidXmlTagUnclosed.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges XML: Tag nicht geschlossen (invalid)'**
+  String get bankInvalidXmlTagUnclosed;
+
+  /// No description provided for @bankAmountMissingNtry.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag fehlt in Ntry'**
+  String get bankAmountMissingNtry;
+
+  /// No description provided for @bankDateMissingNtry.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum fehlt in Ntry'**
+  String get bankDateMissingNtry;
+
+  /// No description provided for @bankAmountMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag fehlt'**
+  String get bankAmountMissing;
+
+  /// Localized copy for bankDateInvalidRaw.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum ungültig: {raw}'**
+  String bankDateInvalidRaw(String raw);
+
+  /// Localized copy for bankAmountInvalidRaw.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag ungültig: {raw}'**
+  String bankAmountInvalidRaw(String raw);
+
+  /// Localized copy for bankAmountOutOfRange.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag außerhalb NUMERIC(12,2): {raw}'**
+  String bankAmountOutOfRange(String raw);
+
+  /// No description provided for @setupErrorNameRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Name ist Pflicht'**
+  String get setupErrorNameRequired;
+
+  /// No description provided for @setupErrorAccountRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Mindestens ein Konto erforderlich'**
+  String get setupErrorAccountRequired;
+
+  /// Localized copy for setupErrorIbanInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'IBAN ungültig: {iban}'**
+  String setupErrorIbanInvalid(String iban);
+
+  /// No description provided for @setupErrorCashNegative.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbestand darf nicht negativ sein'**
+  String get setupErrorCashNegative;
+
+  /// No description provided for @setupErrorCashInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbestand ungültig'**
+  String get setupErrorCashInvalid;
+
+  /// No description provided for @setupErrorCategoryRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Mindestens eine Kategorie erforderlich'**
+  String get setupErrorCategoryRequired;
+
+  /// No description provided for @setupErrorDatabaseStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Datenbank konnte für den Setup-Status nicht gelesen werden'**
+  String get setupErrorDatabaseStatus;
+
+  /// No description provided for @dashboardCustomize.
+  ///
+  /// In de, this message translates to:
+  /// **'Dashboard anpassen'**
+  String get dashboardCustomize;
+
+  /// No description provided for @dashboardIncome.
+  ///
+  /// In de, this message translates to:
+  /// **'Einnahmen'**
+  String get dashboardIncome;
+
+  /// No description provided for @dashboardExpenses.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgaben'**
+  String get dashboardExpenses;
+
+  /// No description provided for @dashboardEmptyNoWarnings.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Warnungen'**
+  String get dashboardEmptyNoWarnings;
+
+  /// No description provided for @dashboardEmptyNoStock.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Lagerbestand'**
+  String get dashboardEmptyNoStock;
+
+  /// No description provided for @dashboardEmptyNoReminders.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Mahnungen'**
+  String get dashboardEmptyNoReminders;
+
+  /// No description provided for @dashboardEmptyNoDeadlines.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Fristen'**
+  String get dashboardEmptyNoDeadlines;
+
+  /// No description provided for @dashboardEmptyNoActivities.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Aktivitäten'**
+  String get dashboardEmptyNoActivities;
+
+  /// No description provided for @dashboardEmptyNoPayments.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Zahlungen'**
+  String get dashboardEmptyNoPayments;
+
+  /// Localized copy for quickLinkUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'{label} (nicht verfügbar)'**
+  String quickLinkUnavailable(String label);
+
+  /// Localized copy for dashboardUstvaDue.
+  ///
+  /// In de, this message translates to:
+  /// **'UStVA fällig am {date}'**
+  String dashboardUstvaDue(String date);
+
+  /// No description provided for @quickLinkJournal.
+  ///
+  /// In de, this message translates to:
+  /// **'Journal'**
+  String get quickLinkJournal;
+
+  /// No description provided for @quickLinkItems.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel'**
+  String get quickLinkItems;
+
+  /// No description provided for @dashboardWidgetOpenInvoices.
+  ///
+  /// In de, this message translates to:
+  /// **'Offene Rechnungen'**
+  String get dashboardWidgetOpenInvoices;
+
+  /// No description provided for @dashboardWidgetIncomingPayments.
+  ///
+  /// In de, this message translates to:
+  /// **'Zahlungseingänge'**
+  String get dashboardWidgetIncomingPayments;
+
+  /// No description provided for @dashboardWidgetReminderWarning.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnung-Warnung'**
+  String get dashboardWidgetReminderWarning;
+
+  /// No description provided for @dashboardWidgetDeadlines.
+  ///
+  /// In de, this message translates to:
+  /// **'Fristen'**
+  String get dashboardWidgetDeadlines;
+
+  /// No description provided for @dashboardWidgetUstvaDeadline.
+  ///
+  /// In de, this message translates to:
+  /// **'UStVA-Frist'**
+  String get dashboardWidgetUstvaDeadline;
+
+  /// No description provided for @dashboardWidgetQuickLinks.
+  ///
+  /// In de, this message translates to:
+  /// **'Schnellzugriff'**
+  String get dashboardWidgetQuickLinks;
+
+  /// No description provided for @dashboardWidgetIncomeExpenses.
+  ///
+  /// In de, this message translates to:
+  /// **'Einnahmen/Ausgaben'**
+  String get dashboardWidgetIncomeExpenses;
+
+  /// No description provided for @dashboardWidgetOverdueInvoices.
+  ///
+  /// In de, this message translates to:
+  /// **'Überfällige Rechnungen'**
+  String get dashboardWidgetOverdueInvoices;
+
+  /// No description provided for @dashboardWidgetOpenLiabilities.
+  ///
+  /// In de, this message translates to:
+  /// **'Offene Verbindlichkeiten'**
+  String get dashboardWidgetOpenLiabilities;
+
+  /// No description provided for @dashboardWidgetBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontostand'**
+  String get dashboardWidgetBalance;
+
+  /// No description provided for @dashboardWidgetActivityLog.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktivitäts-Log'**
+  String get dashboardWidgetActivityLog;
+
+  /// No description provided for @bankColImport.
+  ///
+  /// In de, this message translates to:
+  /// **'Import'**
+  String get bankColImport;
+
+  /// No description provided for @bankColAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag'**
+  String get bankColAmount;
+
+  /// No description provided for @bankColCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get bankColCategory;
+
+  /// No description provided for @bankPathHintExample.
+  ///
+  /// In de, this message translates to:
+  /// **'/Pfad/zum/Kontoauszug.csv'**
+  String get bankPathHintExample;
+
+  /// Localized copy for invoiceDraftNumber.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf #{number}'**
+  String invoiceDraftNumber(int number);
+
+  /// No description provided for @bankDuplicateOverrideLimit.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplicate override limit reached (100) — manual cleanup required'**
+  String get bankDuplicateOverrideLimit;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

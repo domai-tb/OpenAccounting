@@ -40,6 +40,7 @@ void main() {
           _testTransaction(purpose: 'Reject this row'),
         ],
         dateiname: 'failure-accounting.csv',
+        locale: 'de_DE',
       );
 
       expect(result.imported, 1);
@@ -67,6 +68,7 @@ void main() {
         kontoId: 1,
         rawTxs: <RawTx>[_testTransaction(purpose: 'Reject this row')],
         dateiname: 'failure-status.csv',
+        locale: 'de_DE',
       );
 
       expect(result.failed, 1);

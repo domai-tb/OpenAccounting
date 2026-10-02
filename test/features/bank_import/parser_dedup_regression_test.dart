@@ -35,13 +35,23 @@ void main() {
       final BankTemplate sparkasse = BankTemplate.predefined.firstWhere((t) => t.typ == 'sparkasse');
       final BankTemplate paypal = BankTemplate.predefined.firstWhere((t) => t.typ == 'paypal');
 
-      final List<RawTx> germanRows = service.parseCsv(csv: germanCsv, template: sparkasse);
-      final List<RawTx> isoRows = service.parseCsv(csv: isoCsv, template: paypal);
+      final List<RawTx> germanRows = service.parseCsv(csv: germanCsv, template: sparkasse, locale: 'de_DE');
+      final List<RawTx> isoRows = service.parseCsv(csv: isoCsv, template: paypal, locale: 'de_DE');
       expect(germanRows.single.betrag, '1234.50');
       expect(isoRows.single.betrag, '1234.50');
 
-      final ImportResult first = await service.importTransactions(kontoId: 1, rawTxs: germanRows, template: sparkasse);
-      final ImportResult second = await service.importTransactions(kontoId: 1, rawTxs: isoRows, template: paypal);
+      final ImportResult first = await service.importTransactions(
+        kontoId: 1,
+        rawTxs: germanRows,
+        template: sparkasse,
+        locale: 'de_DE',
+      );
+      final ImportResult second = await service.importTransactions(
+        kontoId: 1,
+        rawTxs: isoRows,
+        template: paypal,
+        locale: 'de_DE',
+      );
 
       expect(first.imported, 1);
       expect(second.imported, 0);

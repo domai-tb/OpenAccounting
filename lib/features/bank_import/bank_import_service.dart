@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 
 /// BankImportService — upload + dedup + auto-rules + score.
 /// ponytail ultra: stdlib split + crypto SHA256 + string money, no csv/xml deps.
@@ -14,6 +15,9 @@ class BankImportService {
   BankImportService(this.executor);
 
   final QueryExecutor executor;
+
+  /// Resolves the catalog for an explicit BCP-47 style locale tag.
+  AppLocalizations _l10nFor(String locale) => lookupAppLocalizations(Locale(locale.split('_').first));
 
   /// Predefined templates via in-code map + DB fallback.
   List<BankTemplate> get predefinedTemplates => BankTemplate.predefined;
@@ -221,8 +225,10 @@ class BankImportService {
     bool allowDuplicateOverride = false,
     String dateiname = 'import.csv',
     BankTemplate? template,
+    required String locale,
   }) async {
-    _validateImport(kontoId: kontoId, rawTxs: rawTxs);
+    final AppLocalizations l10n = _l10nFor(locale);
+    _validateImport(kontoId: kontoId, rawTxs: rawTxs, l10n: l10n);
 
     int imported = 0;
     int duplicates = 0;
@@ -232,7 +238,7 @@ class BankImportService {
 
     // History first: obtain importId before child rows so every persisted row
     // remains linked to an auditable import. Do not import without history.
-    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template);
+    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template, l10n: l10n);
 
     // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters)
     List<Map<String, Object?>> journals = <Map<String, Object?>>[];
@@ -248,7 +254,7 @@ class BankImportService {
 
       try {
         // String money: normalize betrag via money helper to 2 decimals for hash + storage.
-        final ({List<String> diagnostics, String? normalizedAmount}) validation = _validateRow(tx);
+        final ({List<String> diagnostics, String? normalizedAmount}) validation = _validateRow(tx, l10n);
         if (validation.diagnostics.isNotEmpty) {
           final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
           final ImportRowFailure failure = ImportRowFailure(
@@ -270,7 +276,7 @@ class BankImportService {
         }
 
         if (isDuplicate && allowDuplicateOverride) {
-          hash = await _uniqueOverrideHash(kontoId: kontoId, hash: hash);
+          hash = await _uniqueOverrideHash(kontoId: kontoId, hash: hash, l10n: l10n);
         }
 
         // A reviewed category is authoritative. Only a rule result contributes
@@ -329,7 +335,7 @@ class BankImportService {
         // A unique-index race is a duplicate outcome, not a failed row.
         bool becameDuplicate = false;
         try {
-          final String normalized = _normalizeBetragForStorage(tx.betrag);
+          final String normalized = _normalizeBetragForStorage(tx.betrag, l10n);
           becameDuplicate = await _hasDuplicate(kontoId: kontoId, hash: _hashFor(tx, normalized));
         } catch (_) {
           // Keep the original insert failure as the actionable diagnostic.
@@ -343,7 +349,7 @@ class BankImportService {
         final ImportRowFailure failure = ImportRowFailure(
           rowNumber: rowNumber,
           transaction: failureTransaction,
-          error: _errorMessage(error),
+          error: _errorMessage(error, l10n),
         );
         failures.add(failure);
         debugPrint('bank_import row ${failure.rowNumber} insert failed: ${failure.error}');
@@ -366,7 +372,7 @@ class BankImportService {
       status: status,
     );
     if (!historyUpdated) {
-      diagnostics.add('Importhistorie konnte nicht abschließend gespeichert werden.');
+      diagnostics.add(l10n.bankHistoryNotFinalSaved);
     }
 
     return ImportResult(
@@ -393,22 +399,18 @@ class BankImportService {
     required String diagnostic,
     String dateiname = 'import.csv',
     BankTemplate? template,
+    required String locale,
   }) async {
+    final AppLocalizations l10n = _l10nFor(locale);
     final String message = diagnostic.trim();
     if (message.isEmpty) {
-      throw const BankImportException(
-        'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.',
-        recoveryAction: 'Prüfen Sie Datei und Template und versuchen Sie es erneut.',
-      );
+      throw BankImportException(l10n.bankInvalidImportNoDiagnostic, recoveryAction: l10n.bankRecoveryCheckFileTemplate);
     }
     if (kontoId <= 0) {
-      throw const BankImportException(
-        'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.',
-        recoveryAction: 'Wählen Sie ein gültiges Bankkonto und versuchen Sie es erneut.',
-      );
+      throw BankImportException(l10n.bankInvalidImportNoAccount, recoveryAction: l10n.bankRecoverySelectAccount);
     }
 
-    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template);
+    final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template, l10n: l10n);
     final List<ImportRowFailure> noFailedRows = <ImportRowFailure>[];
     final List<String> diagnostics = <String>[message];
     final bool historyUpdated = await _finalizeHistory(
@@ -423,7 +425,7 @@ class BankImportService {
       diagnosticsOverride: diagnostics,
     );
     if (!historyUpdated) {
-      diagnostics.add('Importhistorie konnte nicht abschließend gespeichert werden.');
+      diagnostics.add(l10n.bankHistoryNotFinalSaved);
     }
     return ImportResult(
       imported: 0,
@@ -437,22 +439,21 @@ class BankImportService {
     );
   }
 
-  void _validateImport({required int kontoId, required List<RawTx> rawTxs}) {
+  void _validateImport({required int kontoId, required List<RawTx> rawTxs, required AppLocalizations l10n}) {
     if (kontoId <= 0) {
-      throw const BankImportException(
-        'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.',
-        recoveryAction: 'Wählen Sie ein gültiges Bankkonto und versuchen Sie es erneut.',
-      );
+      throw BankImportException(l10n.bankInvalidImportNoAccount, recoveryAction: l10n.bankRecoverySelectAccount);
     }
     if (rawTxs.isEmpty) {
-      throw const BankImportException(
-        'Keine Transaktionen zum Importieren.',
-        recoveryAction: 'Wählen Sie eine unterstützte Datei mit mindestens einer Transaktion.',
-      );
+      throw BankImportException(l10n.bankNoTransactionsToImport, recoveryAction: l10n.bankRecoverySelectSupportedFile);
     }
   }
 
-  Future<int> _createHistory({required int kontoId, required String dateiname, required BankTemplate? template}) async {
+  Future<int> _createHistory({
+    required int kontoId,
+    required String dateiname,
+    required BankTemplate? template,
+    required AppLocalizations l10n,
+  }) async {
     final String now = DateTime.now().toIso8601String();
     try {
       return await executor.runInsert(
@@ -480,8 +481,8 @@ class BankImportService {
         } catch (minimalError, minimalStackTrace) {
           Error.throwWithStackTrace(
             BankImportException(
-              'Importhistorie konnte nicht angelegt werden: ${_errorMessage(minimalError)}',
-              recoveryAction: 'Beheben Sie das Datenbankproblem und versuchen Sie es erneut.',
+              l10n.bankHistoryCreateFailed(_errorMessage(minimalError, l10n)),
+              recoveryAction: l10n.bankRecoveryFixDatabase,
             ),
             minimalStackTrace,
           );
@@ -568,15 +569,16 @@ class BankImportService {
     return existing.isNotEmpty;
   }
 
-  Future<String> _uniqueOverrideHash({required int kontoId, required String hash}) async {
+  Future<String> _uniqueOverrideHash({
+    required int kontoId,
+    required String hash,
+    required AppLocalizations l10n,
+  }) async {
     for (int suffix = 1; suffix <= 100; suffix++) {
       final String candidate = '$hash-$suffix';
       if (!await _hasDuplicate(kontoId: kontoId, hash: candidate)) return candidate;
     }
-    throw const BankImportException(
-      'Duplicate override limit reached (100) — manual cleanup required',
-      recoveryAction: 'Prüfen Sie die vorhandenen Duplikate und versuchen Sie es erneut.',
-    );
+    throw BankImportException(l10n.bankDuplicateOverrideLimit, recoveryAction: l10n.bankRecoveryCheckDuplicates);
   }
 
   String _hashFor(RawTx tx, String normalizedAmount) {
@@ -595,9 +597,9 @@ class BankImportService {
     return '$status: ${diagnostics.join(' | ')}';
   }
 
-  String _errorMessage(Object error) {
+  String _errorMessage(Object error, AppLocalizations l10n) {
     final String message = error.toString().trim();
-    return message.isEmpty ? 'Unbekannter Fehler' : message;
+    return message.isEmpty ? l10n.bankUnknownError : message;
   }
 
   bool _isValidDate(DateTime value) {
@@ -610,31 +612,32 @@ class BankImportService {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  String _normalizeBetragForStorage(String raw) {
-    return _parseBetrag(raw);
+  String _normalizeBetragForStorage(String raw, AppLocalizations l10n) {
+    return _parseBetrag(raw, l10n);
   }
 
-  ({List<String> diagnostics, String? normalizedAmount}) _validateRow(RawTx tx) {
+  ({List<String> diagnostics, String? normalizedAmount}) _validateRow(RawTx tx, AppLocalizations l10n) {
     final List<String> diagnostics = <String>[];
     if (tx.datum == null || !_isValidDate(tx.datum!)) {
-      diagnostics.add('Datum ungültig');
+      diagnostics.add(l10n.bankInvalidDate);
     }
 
     String? normalizedAmount;
     try {
-      normalizedAmount = _normalizeBetragForStorage(tx.betrag);
+      normalizedAmount = _normalizeBetragForStorage(tx.betrag, l10n);
     } catch (_) {
-      diagnostics.add('Betrag ungültig');
+      diagnostics.add(l10n.bankInvalidAmount);
     }
     return (diagnostics: diagnostics, normalizedAmount: normalizedAmount);
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.
   /// Throws [BankImportException] on invalid file / no template match.
-  List<RawTx> parseCsv({required String csv, BankTemplate? template}) {
+  List<RawTx> parseCsv({required String csv, BankTemplate? template, required String locale}) {
+    final AppLocalizations l10n = _l10nFor(locale);
     final String trimmed = csv.trim();
     if (trimmed.isEmpty) {
-      throw const BankImportException('Datei ist leer');
+      throw BankImportException(l10n.bankEmptyFile);
     }
     // Normalize BOM.
     String normalized = csv;
@@ -653,17 +656,17 @@ class BankImportService {
       break;
     }
     if (headerIdx == -1 || headerLine == null) {
-      throw const BankImportException('Datei enthält keine Kopfzeile');
+      throw BankImportException(l10n.bankNoHeader);
     }
     // Header must not be BOM-only.
     headerLine = headerLine.trim();
     if (headerLine.startsWith('\uFEFF')) {
       headerLine = headerLine.substring(1);
     }
-    final String delimiter = template?.delimiter ?? _detectDelimiter(headerLine);
-    final List<String> headerCols = _splitCsvLine(headerLine, delimiter);
+    final String delimiter = template?.delimiter ?? _detectDelimiter(headerLine, l10n);
+    final List<String> headerCols = _splitCsvLine(headerLine, delimiter, l10n: l10n);
     if (headerCols.isEmpty || headerCols.every((c) => c.trim().isEmpty)) {
-      throw const BankImportException('Datei enthält keine Kopfzeile');
+      throw BankImportException(l10n.bankNoHeader);
     }
 
     // Build column index map via template mapping + alias fallback.
@@ -676,14 +679,14 @@ class BankImportService {
     final int? idxGegen = _findIdx(headerCols, 'gegenkonto', mapping);
 
     if (idxDatum == null || idxBetrag == null) {
-      throw const BankImportException('Kein passendes Template gefunden. Bitte wählen Sie ein Template.');
+      throw BankImportException(l10n.bankNoTemplateFound);
     }
 
     final List<RawTx> out = <RawTx>[];
     for (int i = headerIdx + 1; i < rawLines.length; i++) {
       final String line = rawLines[i];
       if (line.trim().isEmpty) continue;
-      final List<String> cols = _splitCsvLine(line, delimiter, rowNumber: i + 1);
+      final List<String> cols = _splitCsvLine(line, delimiter, rowNumber: i + 1, l10n: l10n);
       // Skip rows where all cols empty.
       if (cols.every((c) => c.trim().isEmpty)) continue;
       // If row has fewer columns than header, pad with empty.
@@ -692,13 +695,13 @@ class BankImportService {
       final String betragRaw = idxBetrag < cols.length ? cols[idxBetrag].trim() : '';
       DateTime? datum;
       try {
-        datum = _parseDate(datumRaw, template?.dateFormat);
+        datum = _parseDate(datumRaw, template?.dateFormat, l10n);
       } catch (_) {
         datum = null;
       }
       String betrag = betragRaw;
       try {
-        betrag = _parseBetrag(betragRaw);
+        betrag = _parseBetrag(betragRaw, l10n);
       } catch (_) {}
 
       String verwendungszweck = '';
@@ -733,9 +736,7 @@ class BankImportService {
       // ponytail: empty file after header — treat as invalid for upload step.
       // Spec zero-transaction summary belongs to import step, not upload parse.
       // For upload, surface as template/parse error to block advancement.
-      throw const BankImportException(
-        'Keine Transaktionen gefunden. Kein passendes Template gefunden. Bitte wählen Sie ein Template.',
-      );
+      throw BankImportException(l10n.bankNoTemplateFoundNoTransactions);
     }
     return out;
   }
@@ -746,16 +747,17 @@ class BankImportService {
   /// ponytail: regex ceiling — `<Ntry>` blocks + `<Amt>`/`<Dt>`/`<Ustrd>`/`<Nm>`/`<IBAN>`.
   /// Handles comma/dot amounts and CdtDbtInd DBIT/CRDT. Throws [BankImportException]
   /// for non-CAMT (unsupported) or invalid/malformed XML.
-  List<RawTx> parseCamtXml(String xml) {
+  List<RawTx> parseCamtXml(String xml, {required String locale}) {
+    final AppLocalizations l10n = _l10nFor(locale);
     final String trimmed = xml.trim();
     if (trimmed.isEmpty) {
-      throw const BankImportException('Datei ist leer');
+      throw BankImportException(l10n.bankEmptyFile);
     }
     if (!trimmed.contains('<') || !trimmed.contains('>')) {
-      throw const BankImportException('Ungültiges XML: kein XML-Tag gefunden (invalid)');
+      throw BankImportException(l10n.bankInvalidXmlNoTag);
     }
     if (!trimmed.contains('</')) {
-      throw const BankImportException('Ungültiges XML: kein schliessendes Tag (invalid)');
+      throw BankImportException(l10n.bankInvalidXmlNoClosingTag);
     }
 
     final bool hasDocument = trimmed.contains('<Document') || trimmed.contains(':Document');
@@ -770,10 +772,10 @@ class BankImportService {
       throw const BankImportException('Unsupported XML format: Not CAMT');
     }
 
-    _validateCamtStructure(trimmed);
+    _validateCamtStructure(trimmed, l10n);
 
     if (hasDocument && !trimmed.contains('</Document') && !trimmed.contains('</document')) {
-      throw const BankImportException('Ungültiges XML: Document nicht geschlossen (invalid)');
+      throw BankImportException(l10n.bankInvalidXmlDocumentUnclosed);
     }
 
     final RegExp ntryReg = RegExp(
@@ -784,15 +786,15 @@ class BankImportService {
     final int openingNtries = RegExp(r'<\s*(?:\w+:)?Ntry\b[^>]*>', caseSensitive: false).allMatches(trimmed).length;
     final int closingNtries = RegExp(r'</\s*(?:\w+:)?Ntry\s*>', caseSensitive: false).allMatches(trimmed).length;
     if (openingNtries != closingNtries) {
-      throw const BankImportException('Ungültiges XML: Ntry nicht geschlossen (invalid)');
+      throw BankImportException(l10n.bankInvalidXmlNtryUnclosed);
     }
 
     final Iterable<RegExpMatch> matches = ntryReg.allMatches(trimmed);
     if (matches.isEmpty) {
       if (trimmed.contains('<Ntry') || trimmed.contains(':Ntry')) {
-        throw const BankImportException('Ungültiges XML: Ntry nicht geschlossen (invalid)');
+        throw BankImportException(l10n.bankInvalidXmlNtryUnclosed);
       }
-      throw const BankImportException('Keine Transaktionen gefunden');
+      throw BankImportException(l10n.bankNoTransactionsFound);
     }
 
     final List<RawTx> out = <RawTx>[];
@@ -809,7 +811,7 @@ class BankImportService {
       RegExpMatch? amtM = amtReg.firstMatch(ntryOuter);
       amtM ??= amtReg.firstMatch(ntryContent);
       if (amtM == null) {
-        throw const BankImportException('Betrag fehlt in Ntry');
+        throw BankImportException(l10n.bankAmountMissingNtry);
       }
       final String amtRaw = amtM.group(1)?.trim() ?? '';
 
@@ -831,7 +833,7 @@ class BankImportService {
         } else if (cdt == 'CRDT') {
           effective = stripped;
         }
-        betrag = _parseBetrag(effective);
+        betrag = _parseBetrag(effective, l10n);
       } catch (_) {}
 
       // Datum — prefer BookgDt/Dt, then ValDt/Dt, then generic Dt. Present
@@ -863,11 +865,11 @@ class BankImportService {
         if (dtRaw != null) break;
       }
       if (dtRaw == null) {
-        throw const BankImportException('Datum fehlt in Ntry');
+        throw BankImportException(l10n.bankDateMissingNtry);
       }
       DateTime? datum;
       try {
-        datum = _parseDate(dtRaw, null);
+        datum = _parseDate(dtRaw, null, l10n);
       } catch (_) {
         datum = null;
       }
@@ -926,12 +928,12 @@ class BankImportService {
     }
 
     if (out.isEmpty) {
-      throw const BankImportException('Keine Transaktionen gefunden');
+      throw BankImportException(l10n.bankNoTransactionsFound);
     }
     return out;
   }
 
-  void _validateCamtStructure(String xml) {
+  void _validateCamtStructure(String xml, AppLocalizations l10n) {
     final String withoutComments = xml
         .replaceAll(RegExp('<!--.*?-->', dotAll: true), '')
         .replaceAll(RegExp(r'<\?.*?\?>', dotAll: true), '');
@@ -943,14 +945,14 @@ class BankImportService {
       final bool selfClosing = match.group(3) == '/' || RegExp(r'/\s*>$').hasMatch(match.group(0)!);
       if (closing) {
         if (stack.isEmpty || stack.removeLast() != name) {
-          throw const BankImportException('Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)');
+          throw BankImportException(l10n.bankInvalidXmlMismatched);
         }
       } else if (!selfClosing) {
         stack.add(name);
       }
     }
     if (stack.isNotEmpty) {
-      throw const BankImportException('Ungültiges XML: Tag nicht geschlossen (invalid)');
+      throw BankImportException(l10n.bankInvalidXmlTagUnclosed);
     }
   }
 
@@ -960,11 +962,11 @@ class BankImportService {
     caseSensitive: false,
   );
 
-  String _detectDelimiter(String headerLine) {
+  String _detectDelimiter(String headerLine, AppLocalizations l10n) {
     final int semicolon = _countOutsideQuotes(headerLine, ';');
     final int comma = _countOutsideQuotes(headerLine, ',');
     if (semicolon == 0 && comma == 0) {
-      throw const BankImportException('Kein passendes Template gefunden. Bitte wählen Sie ein Template.');
+      throw BankImportException(l10n.bankNoTemplateFound);
     }
     return semicolon >= comma ? ';' : ',';
   }
@@ -1049,7 +1051,7 @@ class BankImportService {
     return null;
   }
 
-  List<String> _splitCsvLine(String line, String delimiter, {int? rowNumber}) {
+  List<String> _splitCsvLine(String line, String delimiter, {int? rowNumber, required AppLocalizations l10n}) {
     final List<String> result = <String>[];
     final StringBuffer cur = StringBuffer();
     bool inQuotes = false;
@@ -1070,11 +1072,11 @@ class BankImportService {
       }
     }
     if (inQuotes) {
-      final String suffix = rowNumber == null ? '' : ' in Zeile $rowNumber';
+      final String suffix = rowNumber == null ? '' : l10n.bankCsvRowSuffix(rowNumber);
       throw BankImportException(
-        'Ungültige CSV: Anführungszeichen nicht geschlossen$suffix',
+        '${l10n.bankCsvUnclosedQuotes}$suffix',
         rowNumber: rowNumber,
-        recoveryAction: 'Korrigieren Sie die CSV-Zeile und versuchen Sie den Import erneut.',
+        recoveryAction: l10n.bankRecoveryFixCsvRow,
       );
     }
     result.add(_unquote(cur.toString()));
@@ -1089,7 +1091,7 @@ class BankImportService {
     return t.trim();
   }
 
-  DateTime _parseDate(String raw, String? templateFormat) {
+  DateTime _parseDate(String raw, String? templateFormat, AppLocalizations l10n) {
     String t = raw.trim();
     // Strip time part if present.
     if (t.contains('T')) t = t.split('T').first.trim();
@@ -1121,7 +1123,7 @@ class BankImportService {
       final DateTime? parsed = DateTime.tryParse(t);
       if (parsed != null) return DateTime(parsed.year, parsed.month, parsed.day);
     }
-    throw BankImportException('Datum ungültig: $raw');
+    throw BankImportException(l10n.bankDateInvalidRaw(raw));
   }
 
   DateTime? _tryDdMmYyyy(String t) {
@@ -1186,17 +1188,17 @@ class BankImportService {
     return value;
   }
 
-  String _parseBetrag(String raw) {
+  String _parseBetrag(String raw, AppLocalizations l10n) {
     String t = raw.trim();
     // Remove common currency noise.
     t = t.replaceAll('€', '').replaceAll('EUR', '').replaceAll('eur', '').trim();
     t = t.replaceAll('\u00A0', '').replaceAll(' ', '').replaceAll("'", '').trim();
-    if (t.isEmpty) throw const BankImportException('Betrag fehlt');
+    if (t.isEmpty) throw BankImportException(l10n.bankAmountMissing);
     final bool isNeg = t.startsWith('-');
     final bool isPos = t.startsWith('+');
     String unsigned = t;
     if (isNeg || isPos) unsigned = t.substring(1);
-    if (unsigned.isEmpty) throw BankImportException('Betrag ungültig: $raw');
+    if (unsigned.isEmpty) throw BankImportException(l10n.bankAmountInvalidRaw(raw));
     // Normalize thousand/decimal.
     if (unsigned.contains('.') && unsigned.contains(',')) {
       final int lastDot = unsigned.lastIndexOf('.');
@@ -1215,7 +1217,7 @@ class BankImportService {
       }
     }
     if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(unsigned)) {
-      throw BankImportException('Betrag ungültig: $raw');
+      throw BankImportException(l10n.bankAmountInvalidRaw(raw));
     }
     final String normalized = isNeg ? '-$unsigned' : unsigned;
     // Range check before cents conversion: integer part <=10 digits, < 10^10.
@@ -1224,10 +1226,10 @@ class BankImportService {
     final String intNoLead = intRaw.replaceFirst(RegExp('^0+'), '');
     final String effInt = intNoLead.isEmpty ? '0' : intNoLead;
     if (effInt.length > 10) {
-      throw BankImportException('Betrag außerhalb NUMERIC(12,2): $raw');
+      throw BankImportException(l10n.bankAmountOutOfRange(raw));
     }
     if (effInt.length == 10 && effInt.compareTo('9999999999') > 0) {
-      throw BankImportException('Betrag außerhalb NUMERIC(12,2): $raw');
+      throw BankImportException(l10n.bankAmountOutOfRange(raw));
     }
     // Use money helpers for cents truncation/padding to 2 decimals.
     final int cents = money.toCents(normalized);

@@ -45,7 +45,7 @@ void main() {
   </BkToCstmrStmt>
 </Document>
 ''';
-      final List<RawTx> txs = service.parseCamtXml(xml);
+      final List<RawTx> txs = service.parseCamtXml(xml, locale: 'de_DE');
 
       expect(txs, hasLength(1));
       expect(txs.first.datum, DateTime(2025, 8, 15));
@@ -77,7 +77,7 @@ void main() {
   </BkToCstmrStmt>
 </Document>
 ''';
-      final List<RawTx> txs = service.parseCamtXml(xml);
+      final List<RawTx> txs = service.parseCamtXml(xml, locale: 'de_DE');
 
       expect(txs, hasLength(1));
       expect(txs.first.datum, DateTime(2025, 8, 15));
@@ -108,7 +108,7 @@ void main() {
   </BkToCstmrStmt>
 </Document>
 ''';
-      final List<RawTx> txs = service.parseCamtXml(xml);
+      final List<RawTx> txs = service.parseCamtXml(xml, locale: 'de_DE');
 
       expect(txs, hasLength(2));
       expect(txs[0].datum, DateTime(2025, 8, 15));
@@ -141,7 +141,7 @@ void main() {
   </BkToCstmrStmt>
 </Document>
 ''';
-      final List<RawTx> txs = service.parseCamtXml(xmlComma);
+      final List<RawTx> txs = service.parseCamtXml(xmlComma, locale: 'de_DE');
 
       expect(txs, hasLength(2));
       expect(txs[0].betrag, '123.45');
@@ -151,7 +151,7 @@ void main() {
     test('non-CAMT XML throws unsupported', () {
       const String xml = '<root><data>hello</data></root>';
       expect(
-        () => service.parseCamtXml(xml),
+        () => service.parseCamtXml(xml, locale: 'de_DE'),
         throwsA(predicate<Object>((e) => e is BankImportException && e.message.toLowerCase().contains('unsupported'))),
       );
     });
@@ -159,24 +159,24 @@ void main() {
     test('non-CAMT Document without CAMT markers throws unsupported', () {
       const String xml = '<Document><Foo>bar</Foo></Document>';
       expect(
-        () => service.parseCamtXml(xml),
+        () => service.parseCamtXml(xml, locale: 'de_DE'),
         throwsA(predicate<Object>((e) => e is BankImportException && e.message.toLowerCase().contains('unsupported'))),
       );
     });
 
     test('invalid XML throws BankImportException', () {
       const String xml = 'not xml at all <<<';
-      expect(() => service.parseCamtXml(xml), throwsA(isA<BankImportException>()));
+      expect(() => service.parseCamtXml(xml, locale: 'de_DE'), throwsA(isA<BankImportException>()));
     });
 
     test('malformed CAMT with unclosed Ntry throws invalid', () {
       const String xml = '<Document><BkToCstmrStmt><Stmt><Ntry><Amt>123.45</Amt>';
-      expect(() => service.parseCamtXml(xml), throwsA(isA<BankImportException>()));
+      expect(() => service.parseCamtXml(xml, locale: 'de_DE'), throwsA(isA<BankImportException>()));
     });
 
     test('empty XML throws', () {
-      expect(() => service.parseCamtXml(''), throwsA(isA<BankImportException>()));
-      expect(() => service.parseCamtXml('   '), throwsA(isA<BankImportException>()));
+      expect(() => service.parseCamtXml('', locale: 'de_DE'), throwsA(isA<BankImportException>()));
+      expect(() => service.parseCamtXml('   ', locale: 'de_DE'), throwsA(isA<BankImportException>()));
     });
   });
 }

@@ -2,9 +2,11 @@
 
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
+import 'package:openaccounting/l10n/l10n.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -54,6 +56,9 @@ class WizardService {
 
   WizardStep currentStep = WizardStep.stammdaten;
 
+  /// Resolves the catalog for an explicit BCP-47 style locale tag.
+  AppLocalizations _l10nFor(String locale) => lookupAppLocalizations(Locale(locale.split('_').first));
+
   // Stammdaten Felder
   String _stammdatenName = '';
   String get stammdatenName => _stammdatenName;
@@ -91,37 +96,39 @@ class WizardService {
   // Validierung
   // ---------------------------------------------------------------------------
 
-  String? validateStammdaten({required String name}) {
-    if (name.trim().isEmpty) return 'Name ist Pflicht';
+  String? validateStammdaten({required String name, required String locale}) {
+    if (name.trim().isEmpty) return _l10nFor(locale).setupErrorNameRequired;
     return null;
   }
 
-  String? validateKonten({required List<BankAccount> accounts, String? kassenbestand}) {
+  String? validateKonten({required List<BankAccount> accounts, String? kassenbestand, required String locale}) {
     // kassenbestand negativ check delegates
-    final String? kErr = validateKassenbestand(kassenbestand ?? '');
+    final String? kErr = validateKassenbestand(kassenbestand ?? '', locale: locale);
     if (kErr != null) return kErr;
-    if (accounts.isEmpty) return 'Mindestens ein Konto erforderlich';
+    final AppLocalizations l10n = _l10nFor(locale);
+    if (accounts.isEmpty) return l10n.setupErrorAccountRequired;
     for (final BankAccount a in accounts) {
       if (!SetupRepository.isValidIban(a.iban)) {
-        return 'IBAN ungültig: ${a.iban}';
+        return l10n.setupErrorIbanInvalid(a.iban);
       }
     }
     return null;
   }
 
-  String? validateKassenbestand(String raw) {
+  String? validateKassenbestand(String raw, {required String locale}) {
+    final AppLocalizations l10n = _l10nFor(locale);
     final String t = raw.trim().replaceAll(',', '.');
     if (t.isEmpty) return null;
-    if (t.startsWith('-')) return 'Kassenbestand darf nicht negativ sein';
+    if (t.startsWith('-')) return l10n.setupErrorCashNegative;
     // numeric check
     final double? v = double.tryParse(t);
-    if (v == null) return 'Kassenbestand ungültig';
-    if (v < 0) return 'Kassenbestand darf nicht negativ sein';
+    if (v == null) return l10n.setupErrorCashInvalid;
+    if (v < 0) return l10n.setupErrorCashNegative;
     return null;
   }
 
-  String? validateKategorien({required List<int> selectedIds}) {
-    if (selectedIds.isEmpty) return 'Mindestens eine Kategorie erforderlich';
+  String? validateKategorien({required List<int> selectedIds, required String locale}) {
+    if (selectedIds.isEmpty) return _l10nFor(locale).setupErrorCategoryRequired;
     return null;
   }
 
@@ -150,7 +157,7 @@ class WizardService {
   }
 
   /// Prüft ob Setup erforderlich (leere DB).
-  Future<bool> isSetupRequired(AppDatabase db) async {
+  Future<bool> isSetupRequired(AppDatabase db, {required String locale}) async {
     try {
       final List<Map<String, Object?>> rows = await db.executor.runSelect('SELECT name FROM unternehmen', const []);
       if (rows.isEmpty) return true;
@@ -165,7 +172,7 @@ class WizardService {
       return !(await isCompleted());
     } catch (error, stackTrace) {
       Error.throwWithStackTrace(
-        SetupDatabaseException('Datenbank konnte für den Setup-Status nicht gelesen werden', cause: error),
+        SetupDatabaseException(_l10nFor(locale).setupErrorDatabaseStatus, cause: error),
         stackTrace,
       );
     }
@@ -182,12 +189,13 @@ class WizardService {
     List<BankAccount> accounts = const <BankAccount>[],
     String kassenbestand = '0.00',
     List<int> kategorieIds = const <int>[1],
+    required String locale,
   }) async {
-    final String? err1 = validateStammdaten(name: companyName);
+    final String? err1 = validateStammdaten(name: companyName, locale: locale);
     if (err1 != null) throw SetupException(err1);
-    final String? err2 = validateKonten(accounts: accounts, kassenbestand: kassenbestand);
+    final String? err2 = validateKonten(accounts: accounts, kassenbestand: kassenbestand, locale: locale);
     if (err2 != null) throw SetupException(err2);
-    final String? err3 = validateKategorien(selectedIds: kategorieIds);
+    final String? err3 = validateKategorien(selectedIds: kategorieIds, locale: locale);
     if (err3 != null) throw SetupException(err3);
 
     if (_repository != null) {

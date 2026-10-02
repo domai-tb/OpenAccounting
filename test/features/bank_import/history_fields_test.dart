@@ -41,12 +41,14 @@ void main() {
         rawTxs: batch,
         dateiname: 'sparkasse-march.csv',
         template: template,
+        locale: 'de_DE',
       );
       final ImportResult second = await service.importTransactions(
         kontoId: 1,
         rawTxs: batch,
         dateiname: 'sparkasse-march.csv',
         template: template,
+        locale: 'de_DE',
       );
 
       expect(first.imported, 1);

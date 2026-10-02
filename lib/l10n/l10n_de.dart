@@ -572,4 +572,679 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get actionImport => 'Importieren';
+
+  @override
+  String receiptDetailTitle(String id) {
+    return 'Beleg $id';
+  }
+
+  @override
+  String get actionFilter => 'Filter';
+
+  @override
+  String get actionRemoveFilter => 'Filter entfernen';
+
+  @override
+  String get actionResetFilters => 'Filter zurücksetzen';
+
+  @override
+  String get headerViews => 'Ansichten';
+
+  @override
+  String get countResultSingular => 'Ergebnis';
+
+  @override
+  String journalDetailTitle(String id) {
+    return 'Buchung $id';
+  }
+
+  @override
+  String filterTypeLabel(String value) {
+    return 'Typ: $value';
+  }
+
+  @override
+  String filterStatusLabel(String value) {
+    return 'Status: $value';
+  }
+
+  @override
+  String get draftDiscardTitle => 'Entwurf verwerfen?';
+
+  @override
+  String get draftDiscardMessage => 'Die eingegebenen Rechnungsdaten gehen verloren.';
+
+  @override
+  String get actionKeepEditing => 'Weiter bearbeiten';
+
+  @override
+  String get actionDiscard => 'Verwerfen';
+
+  @override
+  String draftSaveFailed(String error) {
+    return 'Entwurf konnte nicht gespeichert werden: $error';
+  }
+
+  @override
+  String get errorDateFormat => 'Datum im Format JJJJ-MM-TT eingeben';
+
+  @override
+  String errorPositiveAmount(String label) {
+    return '$label muss größer als 0 sein';
+  }
+
+  @override
+  String get customersLoading => 'Kunden werden geladen …';
+
+  @override
+  String get customersLoadFailed => 'Kunden konnten nicht geladen werden';
+
+  @override
+  String get actionReload => 'Erneut laden';
+
+  @override
+  String get invoiceDraftNoCustomerTitle => 'Noch kein Kunde angelegt';
+
+  @override
+  String get invoiceDraftNoCustomerMessage =>
+      'Eine Rechnung braucht einen Kunden, damit sie korrekt zugeordnet werden kann.';
+
+  @override
+  String get actionCreateCustomer => 'Kunde anlegen';
+
+  @override
+  String get invoiceDraftCustomerLabel => 'Kunde';
+
+  @override
+  String get invoiceDraftCustomerHint => 'Kunde auswählen';
+
+  @override
+  String get errorCustomerRequired => 'Kunde ist erforderlich';
+
+  @override
+  String get invoiceDraftTitle => 'Rechnungsentwurf';
+
+  @override
+  String get invoiceDraftDescription => 'Speichere eine Rechnungsposition als Entwurf.';
+
+  @override
+  String get invoiceDraftPositionLabel => 'Position';
+
+  @override
+  String get errorPositionRequired => 'Position ist erforderlich';
+
+  @override
+  String get invoiceDraftUnitPriceLabel => 'Einzelpreis netto';
+
+  @override
+  String get actionSaveDraft => 'Entwurf speichern';
+
+  @override
+  String get errorInvoiceIdInvalid => 'Die Rechnungs-ID ist ungültig.';
+
+  @override
+  String contactDetailTitle(String id) {
+    return 'Kontakt $id';
+  }
+
+  @override
+  String get profileSavedRestartHint => 'Profil gespeichert. Bitte OpenAccounting neu starten.';
+
+  @override
+  String get profileAlreadyActive => 'Profil ist bereits aktiv.';
+
+  @override
+  String profileSelectFailed(String error) {
+    return 'Profil konnte nicht gewählt werden: $error';
+  }
+
+  @override
+  String get profileCreateTitle => 'Neues Profil';
+
+  @override
+  String get profileNameLabel => 'Profilname';
+
+  @override
+  String get actionCreate => 'Anlegen';
+
+  @override
+  String get profileCreated => 'Profil angelegt.';
+
+  @override
+  String profileCreateFailed(String error) {
+    return 'Profil konnte nicht angelegt werden: $error';
+  }
+
+  @override
+  String get errorRecordIdInvalid => 'Die Datensatz-ID ist ungültig.';
+
+  @override
+  String errorRecordNotFound(String id) {
+    return 'Der Datensatz mit der ID $id wurde nicht gefunden.';
+  }
+
+  @override
+  String recordIdLabel(String id) {
+    return 'Datensatz-ID $id';
+  }
+
+  @override
+  String recordFallbackTitle(String id) {
+    return 'Datensatz #$id';
+  }
+
+  @override
+  String routeErrorSource(String source) {
+    return 'Vorgang: $source';
+  }
+
+  @override
+  String get bankCategoriesLoadFailed =>
+      'Kategorien konnten nicht geladen werden. Manuelle Kategorisierung ist derzeit nicht verfügbar.';
+
+  @override
+  String get bankHistoryLoadFailed => 'Importverlauf konnte nicht geladen werden.';
+
+  @override
+  String get bankUnsupportedFile =>
+      'Dieses Dateiformat wird nicht unterstützt. Unterstützt werden CSV und CAMT.053 XML.';
+
+  @override
+  String bankFileReadFailed(String error) {
+    return 'Die Datei konnte nicht gelesen werden: $error';
+  }
+
+  @override
+  String get bankFileTooLarge =>
+      'Die Datei ist größer als 20 MB. Exportiere einen kleineren Zeitraum und versuche es erneut.';
+
+  @override
+  String get bankPasteTitle => 'CSV-Daten einfügen';
+
+  @override
+  String get bankPasteContentLabel => 'CSV-Inhalt';
+
+  @override
+  String get bankPasteHint => 'Datum;Betrag;Verwendungszweck;Partner';
+
+  @override
+  String get actionApply => 'Übernehmen';
+
+  @override
+  String get bankPasteFileName => 'eingefügter-import.csv';
+
+  @override
+  String bankFileProcessFailed(String error) {
+    return 'Die Datei konnte nicht verarbeitet werden: $error';
+  }
+
+  @override
+  String get bankConfirmTitle => 'Import bestätigen';
+
+  @override
+  String bankConfirmMessage(int count, String account) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ausgewählte Zeilen',
+      one: '$count ausgewählte Zeile',
+    );
+    return '$_temp0 werden in $account importiert. Duplikate werden standardmäßig übersprungen.';
+  }
+
+  @override
+  String get bankBackToReview => 'Zurück zur Prüfung';
+
+  @override
+  String bankImportIncomplete(String error) {
+    return 'Der Import wurde nicht vollständig abgeschlossen: $error';
+  }
+
+  @override
+  String get bankRetryNotice =>
+      'Nur die nicht gespeicherten Zeilen werden erneut geprüft. Bereits importierte Zeilen bleiben dedupliziert.';
+
+  @override
+  String bankImportAborted(String diagnostic) {
+    return 'Import abgebrochen: $diagnostic Keine Transaktion wurde gespeichert.';
+  }
+
+  @override
+  String get bankImportAbortedHint => 'Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.';
+
+  @override
+  String get bankStatusRejected => 'Abgelehnt';
+
+  @override
+  String get bankStepChooseFile => '1. Datei auswählen';
+
+  @override
+  String get bankUploadHint =>
+      'Unterstützt werden CSV-Dateien und CAMT.053 XML-Exporte. Die Vorschau schreibt noch nichts in die Datenbank.';
+
+  @override
+  String get bankPathLabel => 'Dateipfad';
+
+  @override
+  String get bankPathHint => 'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt';
+
+  @override
+  String get bankStepAccountTemplate => '2. Konto und Template';
+
+  @override
+  String get bankNoAccountYet =>
+      'Noch kein Bankkonto vorhanden. Lege zuerst ein Konto in den Stammdaten an; ein Import ohne Konto ist gesperrt.';
+
+  @override
+  String get bankCamtHint =>
+      'CAMT.053 wird anhand der XML-Struktur erkannt; ein CSV-Template ist dafür nicht erforderlich.';
+
+  @override
+  String get bankStepReview => '3. Vorschau prüfen und bearbeiten';
+
+  @override
+  String bankRowsDetected(int count) {
+    return '$count Zeilen erkannt';
+  }
+
+  @override
+  String bankRowsSelected(int count) {
+    return '$count ausgewählt';
+  }
+
+  @override
+  String bankRowsManual(int count) {
+    return '$count manuell kategorisiert';
+  }
+
+  @override
+  String get bankReviewNotice =>
+      'Änderungen und manuelle Kategorien werden erst nach deiner ausdrücklichen Importbestätigung gespeichert.';
+
+  @override
+  String get bankDuplicateOverride => 'Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)';
+
+  @override
+  String bankConfirmActionCount(int count) {
+    return 'Import bestätigen ($count)';
+  }
+
+  @override
+  String get bankColPartnerPurpose => 'Partner / Zweck';
+
+  @override
+  String bankRowLabel(int line) {
+    return 'Zeile $line';
+  }
+
+  @override
+  String get bankColPartner => 'Partner';
+
+  @override
+  String get bankColPurpose => 'Verwendungszweck';
+
+  @override
+  String get bankStepResult => '4. Importergebnis';
+
+  @override
+  String get bankStatImported => 'Importiert';
+
+  @override
+  String get bankStatDuplicatesSkipped => 'Duplikate übersprungen';
+
+  @override
+  String get bankStatCategorized => 'Kategorisiert';
+
+  @override
+  String get bankStatManualReview => 'Manuelle Prüfung';
+
+  @override
+  String get bankStatFailed => 'Fehlgeschlagen';
+
+  @override
+  String get bankResultAllSaved =>
+      'Alle bestätigten neuen Zeilen wurden gespeichert. Der Import ist im Verlauf dokumentiert.';
+
+  @override
+  String get bankRetryFailedRows => 'Fehlgeschlagene Zeilen erneut prüfen';
+
+  @override
+  String get bankFailureRowsGeneric =>
+      'Die Datenbank meldete nicht gespeicherte Zeilen, konnte aber keinen einzelnen Zeilenfehler zurückgeben. Prüfe Konto, Datum und Betrag; ein erneuter Versuch bleibt dedupliziert.';
+
+  @override
+  String get bankNotSavedFix => 'Nicht gespeichert — bitte korrigieren und erneut prüfen:';
+
+  @override
+  String bankFailureRowPrefix(int line, String error) {
+    return 'Zeile $line: $error';
+  }
+
+  @override
+  String get bankWithoutPartner => 'ohne Partner';
+
+  @override
+  String get bankWithoutPurpose => 'ohne Verwendungszweck';
+
+  @override
+  String get bankHistoryTitle => 'Importverlauf';
+
+  @override
+  String get bankHistoryCardSubtitle => 'Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.';
+
+  @override
+  String get bankHistoryRefresh => 'Importverlauf aktualisieren';
+
+  @override
+  String get bankColTime => 'Zeitpunkt';
+
+  @override
+  String get bankColSource => 'Quelle';
+
+  @override
+  String get bankColTemplate => 'Template';
+
+  @override
+  String get bankColAccount => 'Konto';
+
+  @override
+  String get bankColImported => 'Importiert';
+
+  @override
+  String get bankColDuplicates => 'Duplikate';
+
+  @override
+  String get bankColError => 'Fehler';
+
+  @override
+  String get bankColStatus => 'Status';
+
+  @override
+  String get bankStageFile => 'Datei';
+
+  @override
+  String get bankStageReview => 'Prüfen';
+
+  @override
+  String get bankStageResult => 'Ergebnis';
+
+  @override
+  String get bankStageCurrent => 'aktuell';
+
+  @override
+  String get bankStageComplete => 'abgeschlossen';
+
+  @override
+  String get bankStageOpen => 'offen';
+
+  @override
+  String bankReady(String name, String size) {
+    return 'Bereit: $name · $size';
+  }
+
+  @override
+  String get bankDelimiterSemicolon => 'Semikolon';
+
+  @override
+  String get bankDelimiterComma => 'Komma';
+
+  @override
+  String get bankHeaderSubtitleHistory => 'Nachvollziehbarer Importverlauf';
+
+  @override
+  String get bankHeaderSubtitleImport => 'Dateiimport mit Prüfung vor dem Speichern';
+
+  @override
+  String get bankNoAccountSelected => 'kein Konto';
+
+  @override
+  String bankAccountFallback(String id) {
+    return 'Konto $id';
+  }
+
+  @override
+  String bankCategoryFallback(String id) {
+    return 'Kategorie $id';
+  }
+
+  @override
+  String get bankUnknownFile => 'Unbekannte Datei';
+
+  @override
+  String get bankStatusPartial => 'Teilweise importiert';
+
+  @override
+  String get bankStatusFailed => 'Import fehlgeschlagen';
+
+  @override
+  String get bankStatusImported => 'Importiert';
+
+  @override
+  String get bankInvalidImportNoDiagnostic => 'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.';
+
+  @override
+  String get bankRecoveryCheckFileTemplate => 'Prüfe Datei und Template und versuche es erneut.';
+
+  @override
+  String get bankInvalidImportNoAccount => 'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.';
+
+  @override
+  String get bankRecoverySelectAccount => 'Wähle ein gültiges Bankkonto und versuche es erneut.';
+
+  @override
+  String get bankNoTransactionsToImport => 'Keine Transaktionen zum Importieren.';
+
+  @override
+  String get bankRecoverySelectSupportedFile => 'Wähle eine unterstützte Datei mit mindestens einer Transaktion.';
+
+  @override
+  String get bankHistoryNotFinalSaved => 'Importhistorie konnte nicht abschließend gespeichert werden.';
+
+  @override
+  String bankHistoryCreateFailed(String error) {
+    return 'Importhistorie konnte nicht angelegt werden: $error';
+  }
+
+  @override
+  String get bankRecoveryFixDatabase => 'Behebe das Datenbankproblem und versuche es erneut.';
+
+  @override
+  String get bankRecoveryCheckDuplicates => 'Prüfe die vorhandenen Duplikate und versuche es erneut.';
+
+  @override
+  String get bankUnknownError => 'Unbekannter Fehler';
+
+  @override
+  String get bankInvalidDate => 'Datum ungültig';
+
+  @override
+  String get bankInvalidAmount => 'Betrag ungültig';
+
+  @override
+  String get bankCsvUnclosedQuotes => 'Ungültige CSV: Anführungszeichen nicht geschlossen';
+
+  @override
+  String bankCsvRowSuffix(int row) {
+    return ' in Zeile $row';
+  }
+
+  @override
+  String get bankRecoveryFixCsvRow => 'Korrigiere die CSV-Zeile und versuche den Import erneut.';
+
+  @override
+  String get bankNoTransactionsFound => 'Keine Transaktionen gefunden';
+
+  @override
+  String get bankNoTemplateFound => 'Kein passendes Template gefunden. Bitte wähle ein Template.';
+
+  @override
+  String get bankNoTemplateFoundNoTransactions =>
+      'Keine Transaktionen gefunden. Kein passendes Template gefunden. Bitte wähle ein Template.';
+
+  @override
+  String get bankEmptyFile => 'Datei ist leer';
+
+  @override
+  String get bankNoHeader => 'Datei enthält keine Kopfzeile';
+
+  @override
+  String get bankInvalidXmlNoTag => 'Ungültiges XML: kein XML-Tag gefunden (invalid)';
+
+  @override
+  String get bankInvalidXmlNoClosingTag => 'Ungültiges XML: kein schliessendes Tag (invalid)';
+
+  @override
+  String get bankInvalidXmlDocumentUnclosed => 'Ungültiges XML: Document nicht geschlossen (invalid)';
+
+  @override
+  String get bankInvalidXmlNtryUnclosed => 'Ungültiges XML: Ntry nicht geschlossen (invalid)';
+
+  @override
+  String get bankInvalidXmlMismatched => 'Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)';
+
+  @override
+  String get bankInvalidXmlTagUnclosed => 'Ungültiges XML: Tag nicht geschlossen (invalid)';
+
+  @override
+  String get bankAmountMissingNtry => 'Betrag fehlt in Ntry';
+
+  @override
+  String get bankDateMissingNtry => 'Datum fehlt in Ntry';
+
+  @override
+  String get bankAmountMissing => 'Betrag fehlt';
+
+  @override
+  String bankDateInvalidRaw(String raw) {
+    return 'Datum ungültig: $raw';
+  }
+
+  @override
+  String bankAmountInvalidRaw(String raw) {
+    return 'Betrag ungültig: $raw';
+  }
+
+  @override
+  String bankAmountOutOfRange(String raw) {
+    return 'Betrag außerhalb NUMERIC(12,2): $raw';
+  }
+
+  @override
+  String get setupErrorNameRequired => 'Name ist Pflicht';
+
+  @override
+  String get setupErrorAccountRequired => 'Mindestens ein Konto erforderlich';
+
+  @override
+  String setupErrorIbanInvalid(String iban) {
+    return 'IBAN ungültig: $iban';
+  }
+
+  @override
+  String get setupErrorCashNegative => 'Kassenbestand darf nicht negativ sein';
+
+  @override
+  String get setupErrorCashInvalid => 'Kassenbestand ungültig';
+
+  @override
+  String get setupErrorCategoryRequired => 'Mindestens eine Kategorie erforderlich';
+
+  @override
+  String get setupErrorDatabaseStatus => 'Datenbank konnte für den Setup-Status nicht gelesen werden';
+
+  @override
+  String get dashboardCustomize => 'Dashboard anpassen';
+
+  @override
+  String get dashboardIncome => 'Einnahmen';
+
+  @override
+  String get dashboardExpenses => 'Ausgaben';
+
+  @override
+  String get dashboardEmptyNoWarnings => 'Keine Warnungen';
+
+  @override
+  String get dashboardEmptyNoStock => 'Kein Lagerbestand';
+
+  @override
+  String get dashboardEmptyNoReminders => 'Keine Mahnungen';
+
+  @override
+  String get dashboardEmptyNoDeadlines => 'Keine Fristen';
+
+  @override
+  String get dashboardEmptyNoActivities => 'Keine Aktivitäten';
+
+  @override
+  String get dashboardEmptyNoPayments => 'Keine Zahlungen';
+
+  @override
+  String quickLinkUnavailable(String label) {
+    return '$label (nicht verfügbar)';
+  }
+
+  @override
+  String dashboardUstvaDue(String date) {
+    return 'UStVA fällig am $date';
+  }
+
+  @override
+  String get quickLinkJournal => 'Journal';
+
+  @override
+  String get quickLinkItems => 'Artikel';
+
+  @override
+  String get dashboardWidgetOpenInvoices => 'Offene Rechnungen';
+
+  @override
+  String get dashboardWidgetIncomingPayments => 'Zahlungseingänge';
+
+  @override
+  String get dashboardWidgetReminderWarning => 'Mahnung-Warnung';
+
+  @override
+  String get dashboardWidgetDeadlines => 'Fristen';
+
+  @override
+  String get dashboardWidgetUstvaDeadline => 'UStVA-Frist';
+
+  @override
+  String get dashboardWidgetQuickLinks => 'Schnellzugriff';
+
+  @override
+  String get dashboardWidgetIncomeExpenses => 'Einnahmen/Ausgaben';
+
+  @override
+  String get dashboardWidgetOverdueInvoices => 'Überfällige Rechnungen';
+
+  @override
+  String get dashboardWidgetOpenLiabilities => 'Offene Verbindlichkeiten';
+
+  @override
+  String get dashboardWidgetBalance => 'Kontostand';
+
+  @override
+  String get dashboardWidgetActivityLog => 'Aktivitäts-Log';
+
+  @override
+  String get bankColImport => 'Import';
+
+  @override
+  String get bankColAmount => 'Betrag';
+
+  @override
+  String get bankColCategory => 'Kategorie';
+
+  @override
+  String get bankPathHintExample => '/Pfad/zum/Kontoauszug.csv';
+
+  @override
+  String invoiceDraftNumber(int number) {
+    return 'Entwurf #$number';
+  }
+
+  @override
+  String get bankDuplicateOverrideLimit => 'Duplicate override limit reached (100) — manual cleanup required';
 }

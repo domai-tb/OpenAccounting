@@ -151,7 +151,7 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
 
   Widget _documentPage(BuildContext context, RechnungItem invoice) {
     final String locale = localeTag(Localizations.localeOf(context));
-    final String heading = invoice.rechnungsnummer ?? 'Entwurf #${invoice.id}';
+    final String heading = invoice.rechnungsnummer ?? appLocalizationsOf(context).invoiceDraftNumber(invoice.id);
     final num total = invoice.positionen.fold<num>(0, (num sum, RechnungPositionItem p) => sum + p.gesamt);
     final bool isDraft = invoice.istEntwurf || invoice.status.toLowerCase() == 'entwurf';
     return AppPage(
@@ -345,7 +345,7 @@ class _InvoicePaper extends StatelessWidget {
                   _documentLabel(invoice.typ, l10n),
                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                 ),
-                Text(invoice.rechnungsnummer ?? 'Entwurf #${invoice.id}'),
+                Text(invoice.rechnungsnummer ?? l10n.invoiceDraftNumber(invoice.id)),
               ],
             ),
           ],

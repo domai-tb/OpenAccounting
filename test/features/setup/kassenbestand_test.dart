@@ -64,9 +64,9 @@ void main() {
 
     test('WizardService validiert negativen Kassenbestand', () {
       final svc = WizardService();
-      expect(svc.validateKassenbestand('-5'), isNotNull);
-      expect(svc.validateKassenbestand('0'), isNull);
-      expect(svc.validateKassenbestand(''), isNull);
+      expect(svc.validateKassenbestand('-5', locale: 'de_DE'), isNotNull);
+      expect(svc.validateKassenbestand('0', locale: 'de_DE'), isNull);
+      expect(svc.validateKassenbestand('', locale: 'de_DE'), isNull);
     });
 
     test('Kassen-Konto wird in konten-Tabelle mit kontoart=Kasse angelegt', () async {
@@ -119,6 +119,7 @@ void main() {
         accounts: <BankAccount>[const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: '')],
         kassenbestand: '150.00',
         kategorieIds: <int>[1],
+        locale: 'de_DE',
       );
 
       final konten = await db.executor.runSelect('SELECT id FROM konten WHERE kontoart = ?', const ['Kasse']);
