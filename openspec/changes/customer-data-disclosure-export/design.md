@@ -1,0 +1,48 @@
+## Context
+
+Feature-map item 72 places data disclosure/export under customer information (`pasted-text-1.txt:1244-1254`). Production relationships include `rechnungen.kunde_id` and `lieferadresse_id`, invoice correction/conversion self-links (`storno_von`, `gutschrift_von`, `ersatz_fuer`, `ersatzrechnung_id`, `konvertiert_von`, and `konvertiert_zu`), `rechnungspositionen.rechnung_id`, `mahnungen.kunde_id`/`rechnung_id`, `forderungen.kunde_id`/`rechnung_id`, its `journal_id`/`ausgleich_journal_id`, and `forderung_zahlungen.forderung_id`; `kunden_lieferadressen.kunde_id`; `kunden_belege.kunde_id` to `belege`; `rechnungsvorlagen.kunde_id` and `rechnungen.vorlage_id`; `rechnungsvorlagen.auftrag_id` to its source invoice; `rechnungsvorlagen_occurrences.vorlage_id`/`rechnung_id`; `journal.rechnung_id`; and `vorsteuer_ansprueche.rechnung_id`. `buchungsvorlagen_occurrences` also points to generated invoices and journal rows, but its unrelated booking-template reference is not traversed. Invoice PDFs use `rechnungen.original_pdf_pfad`, while evidence files use `belege.dateipfad`. The current app has no customer-scoped disclosure workflow. Whole-profile portability is a separate owner-controlled archive and includes other parties' data.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Export one selected customer's typed record and its explicitly linked accounting/document records from a consistent active-profile snapshot.
+- Include customer-linked profile-local evidence when the relationship and file path are verifiable.
+- Make relationship scope, file status, and exclusions visible in a versioned manifest.
+- Avoid exposing unrelated customers' or suppliers' records through broad profile export.
+
+**Non-Goals:**
+
+- Export every row that might mention the customer in unstructured notes, bank counterparty text, email, or attachments without an approved relationship.
+- Claim legal or regulatory compliance, determine third-party disclosure eligibility, or define redaction rules for mixed-party documents.
+- Delete or anonymize customer data, change record retention, or modify source records.
+- Replace the full-profile export or general document-package export.
+
+## Decisions
+
+1. **Start from one canonical customer ID.** Add the action to the customer detail workspace, not to a free-text search result or profile settings. The operation resolves exactly one persisted customer and fails when it is missing or ambiguous.
+2. **Traverse the explicit relationship inventory.** Include the `kunden` row; that customer's `kunden_lieferadressen`; `rechnungen` directly linked by `kunde_id` or by `lieferadresse_id` to one of those addresses; and the connected invoice correction/conversion lineage through `storno_von`, `gutschrift_von`, `ersatz_fuer`, `ersatzrechnung_id`, `konvertiert_von`, and `konvertiert_zu`. Traverse lineage in both directions until no new linked invoice is found, and verify that `konvertiert_zu` and `konvertiert_von` pointers agree whenever both are populated. Positions follow the included invoice IDs; dunning and receivable rows follow `kunde_id` or included `rechnung_id`; receivable journal pointers and `forderung_zahlungen` follow included receivables; templates follow `rechnungsvorlagen.kunde_id` or a verified `rechnungen.vorlage_id`; source invoices referenced by those templates' `auftrag_id`, generated invoices, and occurrence rows follow those customer-owned templates; invoice-linked `journal` rows and `vorsteuer_ansprueche` follow included invoices; customer `kunden_belege` links lead to their `belege`; and `buchungsvorlagen_occurrences` are included only when their `rechnung_id` or `journal_id` already belongs to the selected invoice set. Include that occurrence as a projected event row and omit its unrelated `vorlage_id`. Do not traverse from an invoice into an unrelated booking template. Every lineage-linked invoice with a populated `kunde_id` SHALL resolve to the selected customer; a delivery address SHALL resolve through `kunden_lieferadressen.kunde_id` to that same customer. Every invoice reached through a recurring template's `auftrag_id` SHALL also be checked for a conflicting customer or delivery-address identity. Missing or conflicting lineage, customer, supplier, or address identities SHALL cause the affected record to be excluded, identified in the manifest, and make the archive incomplete. Preserve verified relationship paths. Do not infer a relationship from name, free-text note, bank counterparty, or matching amount.
+3. **Use versioned field allowlists.** Every exported table has a fixed projection for the current schema version; unknown columns are never serialized. Explicitly omit cross-party references such as `rechnungen.lieferant_id`, `belege.lieferant_id`, `journal.vorlage_id`, `vorsteuer_ansprueche.beleg_id`, and unrelated template identifiers. Retain `forderungen.partner_typ`/`partner_id` only when they resolve to the selected customer. Retain `journal.beleg_id` only when it resolves to evidence already linked to the selected customer. If an omitted field contains a non-empty value that cannot be proven outside the disclosure scope, list that field in the manifest and mark the package incomplete. If a required relationship contradicts the selected customer (for example, a receivable resolves to a supplier), report it as unsupported and do not claim completeness.
+4. **Keep the package scoped and typed.** Exclude unrelated master-data rows and unrelated bank transactions. Unknown feature-owned record types, non-empty unclassified fields, or relationship paths are reported as unsupported; the result cannot be marked complete until their projection has been reviewed.
+5. **Protect mixed-party evidence.** Resolve linked receipt and invoice files only inside the active profile's canonical data root. If a linked document contains unreviewed third-party data or the exporter cannot establish a safe projection, list it as excluded/unsupported and mark the package incomplete. Do not redact accounting source documents automatically or claim the result is a legally sufficient disclosure.
+6. **Use one consistent snapshot.** Capture customer and linked records from one database snapshot before serializing. Store only relative archive paths and hashes for copied evidence; never include absolute host paths. A missing or unreadable linked file makes the package incomplete.
+7. **Keep this distinct from deletion and profile portability.** Export does not mutate source records or mark a request completed. No deletion/anonymization action, retention rule, or legal deadline is inferred. The whole-profile archive remains a separate capability and must not be offered as the response to a single-customer request.
+8. **Use the existing contact detail surface.** Show a labeled disclosure-export action with explicit scope, confirmation before selecting a destination, progress, completion/incomplete/failure/cancelled status, and an export manifest. Follow DESIGN.md's semantic keyboard operation, visible focus, locale-aware dates, bilingual catalogs, and narrow-window states.
+
+## Risks / Trade-offs
+
+- [Risk] A direct relationship misses an indirect customer-linked record. → Mitigation: maintain the relationship inventory with schema changes and require the exporter to compare it against declared feature-owned foreign-key paths.
+- [Risk] A linked receipt includes a supplier or another customer's data. → Mitigation: do not claim complete disclosure while mixed-party review/redaction policy is unresolved; report the excluded artifact precisely.
+- [Risk] Users confuse a scoped disclosure archive with the profile backup/export. → Mitigation: use a customer-specific name and show the included relationship scope in the manifest and confirmation.
+- [Risk] A name-based match exposes unrelated people or omits a variant. → Mitigation: follow stable foreign-key relationships only; do not infer joins from names or free text.
+
+## Migration Plan
+
+No database migration is needed for the current relationship inventory. Add typed projection and snapshot export use cases behind the contact service. Require any new customer-linked table or foreign-key path to update the inventory before the exporter can report complete. Keep the action unavailable if the selected customer cannot be resolved, the snapshot cannot be verified, or an unsupported relationship/data class remains in scope. Rollback may hide the action but must preserve source records and user-created archives.
+
+## Open Questions
+
+- Which linked documents may be included when they contain supplier, employee, or other third-party information, and which redaction rules have been approved?
+- Should bank transactions or journal records without a direct customer foreign key be mapped to customers through a reviewed allocation model? This proposal does not infer such a mapping.
+- What export format and customer-facing status/history are required beyond the proposed versioned structured archive?
+- Which record classes and deadlines will an approved retention policy govern? This proposal supplies no deletion or retention decision.
