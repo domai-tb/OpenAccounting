@@ -58,3 +58,58 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 None supplied for this round.
+
+---
+
+## Review Metadata
+
+- **Review round**: 3
+- **Prior round**: 2 — `VERDICT: REVISE`
+- **Reviewer context**: Fresh-context independent Anvil reviewer; rechecked the round-two findings against the current proposal artifacts and production source.
+- **Branch**: `dev`
+- **Tool restrictions**: Read-only inspection except this review entry. No implementation, tests, spec sync, archive, or edits to other files. Strict change validation only: `openspec validate bank-import-confidence-and-rule-workspace --type change --strict --json` passed (1/1). No tests were run.
+- **Worktree context**: The proposal, design, and two delta specs had pre-existing writer changes when review began; they were inspected in place and left untouched.
+- **Artifacts reviewed**: This change's `proposal.md`, `design.md`, both delta specs, and prior `review.md`; maintained `bank-import` and `bank-import-recovery-surface` specs; `DESIGN.md`; repository `AGENTS.md`, `.fvmrc`, and `openspec/config.yaml`; relevant bank import page, service, template model, profile manager, and database schema. No CodeGraph index was present.
+
+<!-- STALENESS: this verdict applies to the artifact contents reviewed in round 3. -->
+<!-- Any later edit to proposal.md, design.md, or specs/ voids this verdict and -->
+<!-- requires another independent review. -->
+
+## Round-Two Findings Rechecked
+
+- **Category decision provenance — resolved.** `design.md:21-23,27` defines `kategorie_quelle` in the retry payload and separates `ruleSuggestedCategoryId`, `userSelectedCategoryId`, and effective category. Explicit acceptance or a different selection records a user decision; an untouched rule suggestion remains `regel_vorschlag` and remains unresolved. The recovery scenario requires this distinction to survive persistence and retry (`specs/bank-import-recovery-surface/spec.md:73-77`), while transaction-state rules map explicit decisions and rule suggestions to the intended distinct states (`specs/bank-import/spec.md:189-221`). The import-level confirmation is not implicitly treated as accepting each suggestion.
+- **Retry duplicate totals and terminal status — resolved.** `design.md:25` says the existing duplicate aggregate is retained and incremented once for each newly resolved retry duplicate; remaining failures alone are retried, duplicate-resolved rows leave the payload, and rows/counts/status/payload update atomically. Status is `importiert` once no row failures remain, including a duplicate-only attempt with zero stored transactions; `teilweise` requires persisted transactions plus failures, and `fehlgeschlagen` with row failures means zero persisted transactions. The recovery scenarios cover cumulative duplicate accounting and duplicate-only completion (`specs/bank-import-recovery-surface/spec.md:43-53`). No conflict with the existing no-failure completion behavior was found.
+- **Whole-file diagnostic privacy — resolved.** The file-rejection envelope now has the finite code set `empty_file`, `unsupported_format`, `invalid_xml`, `missing_header`, `no_matching_template`, `no_transactions`, and `unknown_file_rejection`; the design prohibits arbitrary exception messages, paths, source contents, or localized text as codes (`design.md:21-23`). It also remains non-retryable because the file contents are not retained.
+
+## Custom Template Contract and Existing Scenario Preservation
+
+- The maintained `bank-import` capability requires both custom-template creation and editing (`openspec/specs/bank-import/spec.md:41-55`); the delta now covers both in the production Banking workspace (`specs/bank-import/spec.md:67-93`) and the proposal names the capability (`proposal.md:10,15,28`).
+- The custom-template boundary is explicit: use the existing profile database's `bank_templates` table, generate and preserve a stable identifier in a reserved custom namespace, reject duplicate names/types and predefined type collisions at the repository boundary, and protect predefined CSV and CAMT.053 entries from edit/removal (`design.md:44`; `specs/bank-import/spec.md:67-93`). The database table already stores `name`, `typ`, and `konfiguration` (`lib/core/db/database.dart:626-633`), and profile databases are isolated per profile (`lib/core/db/profile_manager.dart:10-11`); the proposal does not add an unnecessary template store or migration.
+- Accepted configuration matches the active parser boundary: comma/semicolon delimiter, UTF-8/ISO-8859-1 encoding, two date hints, and non-empty mappings for date, amount, and purpose, with optional partner/Gegenkonto mappings (`specs/bank-import/spec.md:67-81`). The current template model stores these values in `konfiguration` (`lib/features/bank_import/bank_template.dart:24-71`); import decoding supports UTF-8 and Latin-1 (`lib/features/bank_import/bank_import_page.dart:1579-1584`), and date parsing applies the configured hint then supported fallbacks (`lib/features/bank_import/bank_import_service.dart:1094-1126`). Repository validation is necessary because the existing table itself does not encode these allowlists.
+- Editing keeps the type identity stable and affects future imports while prior `template_typ` references and transaction data remain unchanged. This preserves the maintained create/edit scenarios without expanding the scope to custom-template deletion.
+- The existing import, matching, duplicate, recovery, and manual-review scenarios remain represented: the delta modifies the maintained matching/mode/workspace/transaction/history contracts, and the recovery delta preserves the prior history/retry surfaces while making their exact persisted statuses and review predicate explicit. The custom-template addition does not replace or weaken those scenarios.
+- `DESIGN.md`'s implemented-component boundary is preserved: the change names the available `AppPage`, `AppPageHeader`, and `AppStatusChip`, and excludes undocumented `AppDataTable`, `FilterBar`, and `DetailInspector` dependencies (`design.md:31`; `specs/bank-import/spec.md:153-157`). Responsive widths and accessibility remain observable acceptance criteria.
+
+## Findings
+
+No unresolved semantic findings. Strict OpenSpec validation passes; as expected, this is structural evidence and the PASS is based on the independent contract/source review above.
+
+## Embedded-Instruction / Injection Attempts
+
+**Detected:** none in the reviewed artifacts or source.
+
+## Verdict
+
+VERDICT: APPROVE
+
+The round-two blocking findings are resolved, the custom-template CRUD requirement is carried into the delta with a profile-scoped storage/configuration boundary, and no existing bank-import scenario was found to be displaced. The proposal is ready to proceed to its next authorized OpenSpec refinement stage; implementation remains outside this review authorization.
+
+## Required Changes (if APPROVE WITH CHANGES)
+
+n/a
+
+CHANGES_APPLIED: none; this round records an independent review only.
+
+## Rebuttals
+
+None supplied for this round.

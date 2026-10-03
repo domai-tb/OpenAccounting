@@ -64,6 +64,34 @@ The system SHALL provide a localized, keyboard-accessible Banking view for persi
 - **WHEN** the user disables or deletes it
 - **THEN** it no longer classifies later imports and previously imported rows remain unchanged
 
+### Requirement: Custom Template Creation
+
+The Banking workspace SHALL allow a user to create and edit profile-scoped custom CSV templates stored in `bank_templates`. A template SHALL define a trimmed display name, a stable unique type identifier, either comma or semicolon delimiter, UTF-8 or ISO-8859-1 encoding, a `dd.MM.yyyy` or `yyyy-MM-dd` date-format hint, and source-header mappings for `datum`, `betrag`, and `verwendungszweck`; `partner` and `gegenkonto` mappings MAY be optional. The repository SHALL reject blank names, duplicate names within the active profile, unsupported delimiters/encodings/date formats, missing required mappings, duplicate type identifiers, and type identifiers that collide case-insensitively with predefined template types. The application SHALL generate the custom type identifier in a reserved namespace, and it SHALL remain stable when the display name or configuration is edited. Custom templates SHALL be reusable by later imports. Editing configuration SHALL affect future imports only; it MUST NOT rewrite existing import history or transactions. Predefined templates, including the CAMT.053 template, SHALL not be edited or removed through custom-template controls. Existing import rows SHALL retain their associated type when a custom template is edited.
+
+#### Scenario: Create custom template
+
+- **GIVEN** the user is in Banking template management
+- **WHEN** the user saves a unique name, supported CSV delimiter/encoding/date hint, and mappings for date, amount, and purpose
+- **THEN** the custom template is persisted in the active profile and is selectable for a later CSV import
+
+#### Scenario: Reject invalid or colliding custom template
+
+- **GIVEN** a custom template has a blank or duplicate name, missing required mapping, unsupported configuration, or a type identifier colliding with an existing/predefined template
+- **WHEN** the repository validates the save
+- **THEN** it returns a localized field-specific error and persists no template change
+
+#### Scenario: Edit existing template
+
+- **GIVEN** an existing custom template has prior import history
+- **WHEN** the user edits its display name, delimiter, encoding, date hint, or field mapping
+- **THEN** its stable type identifier remains unchanged, later imports use the saved configuration, and prior history/transactions remain unchanged
+
+#### Scenario: Predefined templates are protected
+
+- **GIVEN** the user opens template management
+- **WHEN** predefined CSV or CAMT.053 templates are listed
+- **THEN** they can be selected for imports but have no custom edit or removal action
+
 ### Requirement: Manual vs Automatic Mode
 
 The active profile SHALL persist its mode in `unternehmen.bank_import_manuell` as integer `1` for manual and `0` for automatic. The column SHALL be `NOT NULL`, constrained to `0` or `1`, and default to `1`. Fresh schema creation SHALL include it at schema version 9. The ordered migration from version 8 to 9 SHALL add the column with manual default while preserving company data. No runtime workflow or post-migration `ensureOpen` fallback may create the column. A profile without a company row or without a resolved setting SHALL use manual mode. The Banking route SHALL obtain and change the mode through the application-scope use case and repository.
