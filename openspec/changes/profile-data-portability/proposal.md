@@ -5,7 +5,7 @@ Settings currently has no complete profile export, and its active workspace prop
 ## What Changes
 
 - Add a profile-scoped export action under Settings → Daten & Datenschutz that creates a versioned, portable archive from a consistent local snapshot.
-- Include the fixed inventory of all 39 current profile database tables, their relationships, and the currently persisted profile-local file references with a manifest that identifies scope and missing files.
+- Include the fixed inventory of 42 known production tables: the 39 base registry tables, migration-managed `forderung_zahlungen`, and the two lazy feature tables `buchungsvorlagen_occurrences` and `rechnungsvorlagen_occurrences`. Record expected versus optional table presence explicitly, and include every present table with its relationships and currently persisted profile-local files.
 - Define this as profile-owner-controlled portability; it does not provide a subject-scoped disclosure for an individual customer or supplier.
 - Exclude secrets and unrelated machine configuration; never describe a report, backup, or partial archive as a complete profile export.
 - Keep export read-only and non-destructive. Deletion, anonymization, and retention scheduling remain unavailable until their separate policy is approved.
@@ -19,7 +19,7 @@ Settings currently has no complete profile export, and its active workspace prop
 
 ### Modified Capabilities
 
-- `db`: Reconcile the maintained database table inventory with the 39 names already registered and created by production runtime, while allowing only explicitly specified feature tables as additive schema.
+- `db`: Reconcile the maintained database inventory with 39 registered base tables and three known feature-owned tables created outside that base registry; require an audited runtime inventory for both sets and allow only explicitly specified future feature tables as additive schema.
 
 ## Impact
 
