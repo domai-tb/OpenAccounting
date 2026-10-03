@@ -2,13 +2,19 @@
 
 ### Requirement: Global search palette
 
-The application SHALL open a global search palette from `Ctrl+K` on Windows/Linux and `Cmd+K` on macOS. The palette SHALL search typed projections from supported invoices, contacts, receipts, and bank transactions, and SHALL offer only implemented settings destinations and commands. Results SHALL be scoped to the active local profile, show a useful type and identifying summary, and navigate through a canonical typed route or invoke the selected supported command. Search SHALL be read-only and SHALL NOT reveal secret settings values or arbitrary database columns.
+The application SHALL open a global search palette from `Ctrl+K` on Windows/Linux and `Cmd+K` on macOS. The palette SHALL search typed projections from supported invoices, contacts, receipts, and bank transactions, and SHALL offer only implemented settings destinations and commands. Results SHALL be scoped to the active local profile and show a useful type and identifying summary. Selecting an invoice, contact, or receipt SHALL navigate to its canonical typed record route. Selecting a bank transaction SHALL navigate to `/banking?transactionId=<id>` and select that typed transaction in the banking workspace. Search SHALL be read-only and SHALL NOT reveal secret settings values or arbitrary database columns.
 
 #### Scenario: Find and open a business record
 - **GIVEN** a matching invoice or contact exists in the active profile
 - **WHEN** the user opens global search and enters a matching number or name
 - **THEN** a typed result with its record type and identifying summary SHALL appear
 - **AND** selecting it SHALL open the canonical route for that record
+
+#### Scenario: Find and select a bank transaction
+- **GIVEN** a typed bank transaction exists in the active profile
+- **WHEN** the user selects its global search result
+- **THEN** the application SHALL navigate to `/banking?transactionId=<id>` for that transaction
+- **AND** the banking workspace SHALL show the selected transaction's typed details
 
 #### Scenario: Search includes supported destination and command
 - **GIVEN** a Settings destination or command is registered as searchable
