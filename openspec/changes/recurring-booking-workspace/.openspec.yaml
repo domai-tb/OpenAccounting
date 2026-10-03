@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-10-03
+goal: Make recurring booking templates usable without bypassing the accepted
+  shared accounting posting contract.
