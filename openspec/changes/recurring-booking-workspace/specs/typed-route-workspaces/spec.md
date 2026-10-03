@@ -2,7 +2,7 @@
 
 ### Requirement: Canonical route inventory
 
-The application SHALL expose typed pages for exactly these canonical routes: `/`, `/invoices`, `/invoices/new`, `/invoices/:id`, `/receipts`, `/banking`, `/contacts`, `/taxes`, `/reports`, `/settings`, `/help`, `/setup`, `/inventory`, and `/recurring`. Each route SHALL implement the service owner, typed projection/actions, and empty/unavailable boundary in the route matrix. Each route SHALL define loading, populated, empty, and failure states plus a primary action or explicit read-only/unavailable boundary. German aliases SHALL preserve IDs and the complete query string when redirecting.
+The application SHALL expose typed pages for exactly these canonical routes: `/`, `/invoices`, `/invoices/new`, `/invoices/:id`, `/receipts`, `/banking`, `/contacts`, `/mahnwesen`, `/taxes`, `/reports`, `/assets`, `/settings`, `/help`, `/setup`, `/inventory`, and `/recurring`. Each route SHALL implement the service owner, typed projection/actions, and empty/unavailable boundary in the route matrix. Each route SHALL define loading, populated, empty, and failure states plus a primary action or explicit read-only/unavailable boundary. German aliases SHALL preserve IDs and the complete query string when redirecting.
 
 #### Scenario: Every canonical route has a useful surface
 - **GIVEN** an active profile is available
