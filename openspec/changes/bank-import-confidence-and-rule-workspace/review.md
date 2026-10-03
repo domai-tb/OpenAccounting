@@ -67,7 +67,7 @@ None supplied for this round.
 - **Prior round**: 2 — `VERDICT: REVISE`
 - **Reviewer context**: Fresh-context independent Anvil reviewer; rechecked the round-two findings against the current proposal artifacts and production source.
 - **Branch**: `dev`
-- **Tool restrictions**: Read-only inspection except this review entry. No implementation, tests, spec sync, archive, or edits to other files. Strict change validation only: `openspec validate bank-import-confidence-and-rule-workspace --type change --strict --json` passed (1/1). No tests were run.
+- **Tool restrictions**: Read-only inspection except this review entry. No implementation, tests, spec sync, archive, or edits to other files. `openspec context --json` and `openspec list --json` were captured; strict change validation `openspec validate bank-import-confidence-and-rule-workspace --type change --strict --json` passed (1/1). No tests were run.
 - **Worktree context**: The proposal, design, and two delta specs had pre-existing writer changes when review began; they were inspected in place and left untouched.
 - **Artifacts reviewed**: This change's `proposal.md`, `design.md`, both delta specs, and prior `review.md`; maintained `bank-import` and `bank-import-recovery-surface` specs; `DESIGN.md`; repository `AGENTS.md`, `.fvmrc`, and `openspec/config.yaml`; relevant bank import page, service, template model, profile manager, and database schema. No CodeGraph index was present.
 
