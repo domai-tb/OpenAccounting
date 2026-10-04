@@ -4,10 +4,10 @@ Feature-map item 73 requires contextual explanations for accounting and tax-rela
 
 ## What Changes
 
-- Add a reviewed, German/English explanation catalog for supported accounting and tax terms and decisions.
+- Add a reviewed, German/English explanation catalog for the finite stable-ID inventory in `design.md`; no other field or status is in the first release.
 - Attach explanations to relevant fields and status controls through a typed, keyboard-accessible context-help affordance; expose the same entries in a searchable Help glossary.
 - Explain what a choice means in this application and what downstream workflow it affects; do not recommend a tax treatment, infer a user's eligibility, or present the content as tax advice.
-- Require an unavailable or review-needed state for guidance when no approved explanation exists, while keeping otherwise supported fields available; explain unresolved feature behavior without presenting it as supported.
+- Keep missing/review-needed states in a maintainer-facing coverage inventory only. Render a help affordance only for reviewed entries; keep otherwise supported fields available without end-user missing-help warnings.
 - Follow `DESIGN.md` form labels, help-content width, keyboard focus, accessibility, localization, and narrow-window behavior.
 
 ## Capabilities
@@ -22,4 +22,4 @@ Feature-map item 73 requires contextual explanations for accounting and tax-rela
 
 ## Impact
 
-The shared form/help presentation API, `/help` page, supported accounting and tax forms/statuses, German and English ARB catalogs, and contributor guidance for new accounting/tax controls. No business data, tax calculation, category mapping, or posting behavior changes.
+The shared form/help presentation API, `/help` page, the finite accounting/tax control inventory in `design.md`, German and English ARB catalogs, reviewer ownership, and contributor guidance for new accounting/tax controls. No business data, tax calculation, category mapping, or posting behavior changes.

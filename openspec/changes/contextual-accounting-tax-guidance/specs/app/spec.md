@@ -2,7 +2,7 @@
 
 ### Requirement: Help workspace
 
-The `/help` route SHALL provide a typed, localized Help workspace. It SHALL include a searchable glossary of reviewed accounting and tax guidance entries and SHALL use the same stable entry content as in-context field explanations. It SHALL show an honest empty state when no reviewed entries match and SHALL not present static placeholder tiles as accounting guidance.
+The `/help` route SHALL provide a typed, localized Help workspace. It SHALL include a searchable glossary of reviewed accounting and tax guidance entries and SHALL use the same stable entry content as in-context field explanations. Missing or review-needed coverage states are maintainer-only and SHALL NOT appear as end-user missing-help warnings or placeholder affordances. The workspace SHALL show an honest empty state when no reviewed entries match and SHALL not present static placeholder tiles as accounting guidance.
 
 #### Scenario: Help opens with reviewed contextual entries
 

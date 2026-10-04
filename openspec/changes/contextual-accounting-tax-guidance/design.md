@@ -24,7 +24,27 @@ Feature-map item 73 asks for explanations of VAT treatment, GoBD concepts, tax c
 2. **Keep guidance next to the decision.** Relevant controls and statuses use a labeled `Erklärung`/`Why this matters` affordance or short helper text that opens a nearby detail surface. Do not rely on hover, color, or an unlabeled icon. The same stable entry is listed in Help, searchable by its localized terms and grouped by workflow.
 3. **Explain product behavior, not user eligibility.** Content may define the application's supported meaning, required inputs, and consequences of a choice. It SHALL NOT recommend a rate/category, infer a tax status from profile text, promise legal compliance, or describe an unimplemented action as available. Where policy is unresolved, the entry states the limitation and points to the relevant review/unavailable state.
 4. **Tie explanations to accepted behavior.** Each entry references the reviewed capability contract for the behavior it describes. If the contract changes, the entry returns to review-needed until its text is reconciled. No official tax-year claim is included without an approved source and version.
-5. **Cover the initial feature-map vocabulary.** The initial inventory SHALL include VAT/tax treatment, tax categories, invoice lifecycle statuses, GoBD immutability and correction terms, and supported special accounting situations. Each supported form field or status within those topics SHALL identify its help ID; unsupported topics SHALL be identified as gaps rather than implied coverage.
+5. **Bound the first release inventory.** The initial coverage inventory has exactly these stable IDs; it is a maintainer-facing artifact and each begins `missing` until reviewed German/English copy is approved. IDs are anchored to the named maintained capability requirement, so later controls require an explicit inventory addition rather than silently expanding scope.
+
+| Stable help ID | Owning capability requirement | Initial state |
+|---|---|---|
+| `accounting.category.skr-mapping` | `accounting` → Kategorien | missing |
+| `accounting.journal.immutability` | `accounting` → Journal Entries | missing |
+| `accounting.journal.storno` | `accounting` → Storno Correction | missing |
+| `accounting.journal.group` | `accounting` → Journal Entries | missing |
+| `accounting.euer.input-tax-claim` | `accounting` → Input-tax claim direction during generic finalization | review-needed |
+| `einkommen.forderung.status` | `einkommen` → Forderungen table for open items | missing |
+| `einkommen.forderung.overpayment` | `einkommen` → Überzahlungs-Protokoll | missing |
+| `einkommen.verbindlichkeit.payment` | `einkommen` → Verbindlichkeiten | missing |
+| `mahnwesen.fee-interest` | `mahnwesen` → Mahngebühr Tracking and Verzugszinsen Tracking | review-needed |
+| `bank-import.match-status` | `bank-import` → Score-Based Matching | missing |
+| `bank-import.classification` | `bank-import` → Transaction Classification Override | missing |
+| `documents.angebot.status` | `documents` → Angebot status lifecycle | missing |
+| `documents.auftrag.status` | `documents` → Auftrag status lifecycle | missing |
+| `accounting.correction.credit-sign` | `correction-document-accounting-integrity` → Correction totals preserve signed VAT mathematics | review-needed |
+| `accounting.tax.special-25a` | `accounting` → Differenzbesteuerung §25a Accounting | review-needed |
+
+No other field or status receives contextual help in the first release. `missing` and `review-needed` rows stay in the repository coverage inventory only; they do not render placeholders or warnings in the app. Entries whose text depends on law must record primary source, jurisdiction/provision, version or tax year, retrieval date, applicability period, and owning spec revision. The German Accounting and Tax Domain Reviewer approves source-language meaning; the English Localization Reviewer approves the translation. Contract/source changes and an annual pre-release review move the entry to `review-needed` until both approvals are recorded.
 6. **Follow `DESIGN.md`.** Keep inline help short, use a labeled accessible control for longer content, preserve logical keyboard order and visible focus, localize all text, support text scaling and narrow windows, and constrain glossary text to approximately 720 px.
 
 ## Risks / Trade-offs
