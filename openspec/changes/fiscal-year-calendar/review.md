@@ -127,3 +127,12 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 3
 
 None.
+
+---
+
+## Implementation Note (not a review round)
+
+- Implemented without spec edits: v11 migration (fresh + ordered upgrade with
+  rollback), typed fiscal service/repository, calendar-only EÜR fiscal gate,
+  Settings company control with localized keyboard-safe form. No postings,
+  statutory periods, or snapshots change. Round verdict stands.

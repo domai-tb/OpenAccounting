@@ -2749,6 +2749,48 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Keine vollständige Buchhaltungsquelle'**
   String get incomeTaxBlockerSource;
+
+  /// No description provided for @fiscalYearTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftsjahr'**
+  String get fiscalYearTitle;
+
+  /// No description provided for @fiscalYearStartMonth.
+  ///
+  /// In de, this message translates to:
+  /// **'Startmonat des Geschäftsjahres'**
+  String get fiscalYearStartMonth;
+
+  /// No description provided for @fiscalYearHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Legt die Grenzen historischer und künftiger Geschäftsjahresberichte fest. Buchungen und Exporte bleiben unverändert.'**
+  String get fiscalYearHint;
+
+  /// No description provided for @fiscalYearSave.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern'**
+  String get fiscalYearSave;
+
+  /// No description provided for @fiscalYearSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftsjahr gespeichert'**
+  String get fiscalYearSaved;
+
+  /// No description provided for @fiscalYearError.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern fehlgeschlagen. Erneut versuchen.'**
+  String get fiscalYearError;
+
+  /// No description provided for @fiscalYearInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Monat muss zwischen 1 und 12 liegen'**
+  String get fiscalYearInvalid;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

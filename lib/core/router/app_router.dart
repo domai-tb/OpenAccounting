@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/app_locale.dart';
 import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/features/fiscal_year/fiscal_year_repository.dart';
+import 'package:openaccounting/features/fiscal_year/fiscal_year_settings_section.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_schedules_view.dart';
 import 'package:openaccounting/core/app_services.dart';
@@ -829,6 +831,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             value: ref.watch(privacyModeProvider),
             onChanged: (bool value) => unawaited(ref.read(privacyModeProvider.notifier).setEnabled(enabled: value)),
           ),
+          const SizedBox(height: 16),
           const SizedBox(height: 32),
           Row(
             children: <Widget>[
@@ -879,6 +882,8 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
               );
             },
           ),
+          const SizedBox(height: 16),
+          FiscalYearSettingsSection(repository: FiscalYearRepository(ref.read(appDatabaseProvider).executor)),
           const SizedBox(height: 16),
           Text(l10n.settingsPrivacyDescription),
           const SizedBox(height: 16),

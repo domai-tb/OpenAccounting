@@ -30,15 +30,24 @@ void main() {
       await legacy.ensureOpen();
       addTearDown(legacy.close);
       await legacy.executor.runInsert('INSERT INTO unternehmen (name) VALUES (?)', const <Object?>['Bestand GmbH']);
-      // Rebuild unternehmen in its version-9 shape (without the mode column).
+      // Rebuild unternehmen in its version-9 shape from the real DDL
+      // minus the mode column, preserving every other definition.
+      final ddlRows = await legacy.executor.runSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'unternehmen'",
+        const [],
+      );
+      final String ddl = ddlRows.single['sql']! as String;
+      const String modeLine =
+          ',\n  bank_import_manuell INTEGER NOT NULL DEFAULT 1 CHECK (bank_import_manuell IN (0, 1))';
+      expect(ddl, contains('bank_import_manuell'));
+      final String legacyDdl = ddl.replaceFirst(modeLine, '');
       final info = await legacy.executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
       final keep = <String>[
         for (final row in info)
           if (row['name'] != 'bank_import_manuell') row['name'].toString(),
       ];
-      expect(keep, isNotEmpty);
       await legacy.executor.runCustom('ALTER TABLE unternehmen RENAME TO unternehmen_legacy');
-      await legacy.executor.runCustom('CREATE TABLE unternehmen (${keep.join(', ')})');
+      await legacy.executor.runCustom(legacyDdl);
       await legacy.executor.runCustom(
         'INSERT INTO unternehmen (${keep.join(', ')}) SELECT ${keep.join(', ')} FROM unternehmen_legacy',
       );
@@ -48,7 +57,7 @@ void main() {
       await runner.setUserVersion(9);
       await runner.run(createSchema: () async {});
 
-      expect(await runner.getUserVersion(), 10);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
       final cols = await legacy.executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
       final mode = cols.where((c) => c['name'] == 'bank_import_manuell').toList(growable: false);
       expect(mode, hasLength(1));

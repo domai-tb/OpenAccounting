@@ -13,7 +13,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 10;
+  static const int currentVersion = 11;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -137,6 +137,7 @@ class MigrationRunner {
       await _migrateReceivableFeature();
       await _migrateCategoryProvenance();
       await _migrateBankImportMode();
+      await _migrateFiscalYearStart();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -216,6 +217,17 @@ class MigrationRunner {
       await _migrateReceivableFeature();
       await _migrateCategoryProvenance();
       await _migrateBankImportMode();
+    }
+    if (version == 11) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
+      await _migrateReceivableFeature();
+      await _migrateCategoryProvenance();
+      await _migrateBankImportMode();
+      await _migrateFiscalYearStart();
     }
   }
 
@@ -626,6 +638,39 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     final notNull = col.single['notnull'];
     if (notNull is! num || notNull == 0) {
       throw StateError('Bankimport-Modus muss NOT NULL sein');
+    }
+  }
+
+  /// Company fiscal-year start month (v11). Adds strict
+  /// `unternehmen.geschaeftsjahr_startmonat` (1–12, default January) and
+  /// backfills existing company rows to January without touching other
+  /// fields. Any DDL/verification failure rolls back with the version.
+  Future<void> _migrateFiscalYearStart() async {
+    final columns = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    if (columns.isEmpty) {
+      throw StateError('Geschäftsjahr braucht die Tabelle unternehmen');
+    }
+    if (!columns.any((c) => c['name'] == 'geschaeftsjahr_startmonat')) {
+      await executor.runCustom(
+        'ALTER TABLE unternehmen ADD COLUMN geschaeftsjahr_startmonat INTEGER NOT NULL DEFAULT 1 '
+        'CHECK (geschaeftsjahr_startmonat BETWEEN 1 AND 12)',
+      );
+    }
+    final verify = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    final col = verify.where((c) => c['name'] == 'geschaeftsjahr_startmonat').toList(growable: false);
+    if (col.isEmpty) {
+      throw StateError('Geschäftsjahr-Startmonat konnte nicht verifiziert werden');
+    }
+    final notNull = col.single['notnull'];
+    if (notNull is! num || notNull == 0) {
+      throw StateError('Geschäftsjahr-Startmonat muss NOT NULL sein');
+    }
+    final bad = await executor.runSelect(
+      'SELECT COUNT(*) AS c FROM unternehmen WHERE geschaeftsjahr_startmonat NOT BETWEEN 1 AND 12',
+      const <Object?>[],
+    );
+    if (_asInt(bad.single['c']) != 0) {
+      throw StateError('Ungültiger Geschäftsjahr-Startmonat gefunden');
     }
   }
 

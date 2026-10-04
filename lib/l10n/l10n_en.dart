@@ -1421,4 +1421,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get incomeTaxBlockerSource => 'No complete accounting source';
+
+  @override
+  String get fiscalYearTitle => 'Fiscal year';
+
+  @override
+  String get fiscalYearStartMonth => 'Fiscal year start month';
+
+  @override
+  String get fiscalYearHint =>
+      'Sets historical and future business-year report boundaries. Postings and exports stay unchanged.';
+
+  @override
+  String get fiscalYearSave => 'Save';
+
+  @override
+  String get fiscalYearSaved => 'Fiscal year saved';
+
+  @override
+  String get fiscalYearError => 'Save failed. Please retry.';
+
+  @override
+  String get fiscalYearInvalid => 'Month must be between 1 and 12';
 }

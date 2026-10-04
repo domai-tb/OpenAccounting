@@ -739,5 +739,12 @@
   "incomeTaxBlockerForm": "No accepted form and source contract",
   "incomeTaxBlockerPeriod": "No accepted period contract",
   "incomeTaxBlockerClassification": "No accepted classification",
-  "incomeTaxBlockerSource": "No complete accounting source"
+  "incomeTaxBlockerSource": "No complete accounting source",
+  "fiscalYearTitle": "Fiscal year",
+  "fiscalYearStartMonth": "Fiscal year start month",
+  "fiscalYearHint": "Sets historical and future business-year report boundaries. Postings and exports stay unchanged.",
+  "fiscalYearSave": "Save",
+  "fiscalYearSaved": "Fiscal year saved",
+  "fiscalYearError": "Save failed. Please retry.",
+  "fiscalYearInvalid": "Month must be between 1 and 12"
 }

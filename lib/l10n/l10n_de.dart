@@ -1428,4 +1428,26 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get incomeTaxBlockerSource => 'Keine vollständige Buchhaltungsquelle';
+
+  @override
+  String get fiscalYearTitle => 'Geschäftsjahr';
+
+  @override
+  String get fiscalYearStartMonth => 'Startmonat des Geschäftsjahres';
+
+  @override
+  String get fiscalYearHint =>
+      'Legt die Grenzen historischer und künftiger Geschäftsjahresberichte fest. Buchungen und Exporte bleiben unverändert.';
+
+  @override
+  String get fiscalYearSave => 'Speichern';
+
+  @override
+  String get fiscalYearSaved => 'Geschäftsjahr gespeichert';
+
+  @override
+  String get fiscalYearError => 'Speichern fehlgeschlagen. Erneut versuchen.';
+
+  @override
+  String get fiscalYearInvalid => 'Monat muss zwischen 1 und 12 liegen';
 }

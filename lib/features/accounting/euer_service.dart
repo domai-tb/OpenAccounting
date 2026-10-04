@@ -372,6 +372,25 @@ class EuerService {
 
   static String _snapshotJson(EuerResult result) => jsonEncode(result.provenanceSnapshot);
 
+  /// Fiscal-year EÜR request for [fiscalYearLabel] with company [startMonth].
+  /// The calendar-only calculation cannot serve alternate fiscal years: any
+  /// non-January start month fails closed with an unavailable result instead
+  /// of relabeling a calendar-year computation. January delegates to the
+  /// explicit calendar-year calculation unchanged.
+  Future<EuerResult> generateForFiscalYear({
+    required int fiscalYearLabel,
+    required int startMonth,
+    DateTime? cutoverDatum,
+  }) async {
+    if (startMonth < 1 || startMonth > 12) {
+      throw EuerException('EÜR Wirtschaftsjahr $fiscalYearLabel unverfügbar: ungültiger Startmonat');
+    }
+    if (startMonth != 1) {
+      throw EuerException('EÜR Wirtschaftsjahr $fiscalYearLabel unverfügbar: nur Kalenderjahre werden unterstützt');
+    }
+    return generate(jahr: fiscalYearLabel, cutoverDatum: cutoverDatum);
+  }
+
   Future<Set<String>> _tableColumns(String table) async {
     final List<Map<String, Object?>> rows = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
     return <String>{

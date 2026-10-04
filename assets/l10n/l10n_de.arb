@@ -739,5 +739,12 @@
   "incomeTaxBlockerForm": "Kein akzeptierter Formular- und Quellvertrag",
   "incomeTaxBlockerPeriod": "Kein akzeptierter Zeitraumvertrag",
   "incomeTaxBlockerClassification": "Keine akzeptierte Klassifizierung",
-  "incomeTaxBlockerSource": "Keine vollständige Buchhaltungsquelle"
+  "incomeTaxBlockerSource": "Keine vollständige Buchhaltungsquelle",
+  "fiscalYearTitle": "Geschäftsjahr",
+  "fiscalYearStartMonth": "Startmonat des Geschäftsjahres",
+  "fiscalYearHint": "Legt die Grenzen historischer und künftiger Geschäftsjahresberichte fest. Buchungen und Exporte bleiben unverändert.",
+  "fiscalYearSave": "Speichern",
+  "fiscalYearSaved": "Geschäftsjahr gespeichert",
+  "fiscalYearError": "Speichern fehlgeschlagen. Erneut versuchen.",
+  "fiscalYearInvalid": "Monat muss zwischen 1 und 12 liegen"
 }
