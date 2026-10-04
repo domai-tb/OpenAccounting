@@ -2,9 +2,9 @@
 
 ### Requirement: Kunden-Belege
 
-Each customer MAY have associated Belege (customer documents: contracts, certificates, etc.). Each Beleg has id,
-kunde_id FK, dateiname, original_name, mime_type, dateigroesse, sha256, hochgeladen_am, and loeschdatum (DATE,
-nullable for DSGVO). The system MUST provide upload, inline preview, rename, and delete operations. Removing a customer
+Each customer MAY have associated Belege (customer documents: contracts, certificates, etc.). The Beleg record is
+stored in `belege`; customer associations are stored in `kunden_belege(kunde_id, beleg_id, rolle)`. A Beleg has no
+`kunde_id` column. The system MUST provide upload, inline preview, rename, and delete operations. Removing a customer
 document from the customer record SHALL remove only its `kunden_belege` association and SHALL NOT delete shared Beleg
 metadata or source bytes. Deleting the underlying Beleg SHALL require all customer, supplier, invoice, journal, template,
 and package relationships to be explicitly removed first, as defined by the `documents` capability. Documents past
