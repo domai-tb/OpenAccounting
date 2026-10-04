@@ -4,10 +4,11 @@ The product feature map requires optional modules to be individually activatable
 
 ## What Changes
 
-- Define a stable, per-business module catalog with explicit availability and enabled state.
+- Define catalog version 1 with exactly three maintained modules: `profile_manager`, `inventory`, and `guv`; record each module's provider, dependency rule, default, and activation policy.
+- Persist the per-business module state in versioned `unternehmen.feature_modules_json`, with an additive migration that backfills existing profile, inventory, and GuV flags when present.
 - Expose supported module controls in the Settings section navigation described by `DESIGN.md` §19.
-- Apply module state consistently to navigation, dashboard widgets, shortcuts, and actions while retaining all existing records.
-- Keep unavailable or dependency-blocked modules disabled with a clear reason; do not infer enablement from revenue thresholds or other undocumented rules.
+- Apply effective module state consistently to navigation, dashboard widgets, shortcuts, and module-owned actions while retaining all existing records and required invoice stock effects.
+- Preserve the maintained GuV threshold auto-activation through the catalog; no independent `guv_aktiv` runtime setting remains.
 
 ## Capabilities
 
@@ -17,8 +18,12 @@ The product feature map requires optional modules to be individually activatable
 
 ### Modified Capabilities
 
-- None.
+- `db`: Add the durable company-scoped module-state column and coordinated additive migration.
+- `accounting`: Resolve GuV activation through the catalog and retain the maintained threshold auto-activation rule.
+- `inventory`: Gate inventory entry points, article stock controls, and dashboard and invoice warnings through the catalog without disabling invoice stock movements.
+- `profiles`: Resolve Profile Manager visibility through the catalog while retaining the multiple-profile visibility override.
+- `stammdaten`: Make versioned company module state the durable source and define legacy-flag migration.
 
 ## Impact
 
-Settings, application navigation and route guards, dashboard widgets/shortcuts, company-scoped settings persistence, and German/English localization. The existing Settings workspace proposal may host the new section when implemented; this change owns module-state behavior and the section's acceptance contract. No module-specific accounting behavior is introduced.
+Settings, application navigation and route guards, dashboard widgets/shortcuts, company-scoped settings persistence, an additive schema migration, and German/English localization. The existing Settings workspace proposal may host the new section when implemented; this change owns module-state behavior and the section's acceptance contract. GuV auto-activation remains the existing accounting rule; no other module-specific accounting behavior is introduced.
