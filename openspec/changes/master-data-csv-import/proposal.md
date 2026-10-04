@@ -8,6 +8,7 @@ Users moving existing customer, supplier, and article data into a profile curren
 - Provide explicit header handling, manual source-to-field mapping, a row preview, field validation, and a reviewable import summary before any record is written.
 - Let users save and reuse profile-local mapping templates without retaining uploaded source files or row contents.
 - Define duplicate handling and row-level outcomes so ambiguous or invalid rows cannot silently update or create records.
+- Keep article updates from changing selling prices: any supplied selling-price or derivation field produces a row-level unsupported-field error, while existing prices are preserved.
 - Keep imported data within the existing master-data capabilities; do not create business documents, journal entries, payments, or inventory movements.
 
 ## Capabilities
