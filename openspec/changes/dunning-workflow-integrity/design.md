@@ -37,7 +37,7 @@ Any balance-dependent preview, calculation, reminder creation, PDF/package creat
 
 ### Use exact due-date thresholds and deterministic interest
 
-Each configured stage's `days_after_due` is an absolute calendar-day offset from the invoice due date. Stage N becomes eligible on `due_date + days_after_due`; the singleton `initial_grace_days` is not added to or used to defer that threshold. With defaults, stages 1–4 become eligible on days 7, 21, 35, and 49 after the due date. The day before a threshold is ineligible; the threshold date is eligible if the preceding stage was transport-accepted. Later stages cannot skip an unaccepted preceding stage.
+Each configured stage's `days_after_due` is an absolute calendar-day offset from the invoice due date. Stage N becomes eligible on `due_date + days_after_due`; the singleton `initial_grace_days` is not added to or used to defer that threshold. With defaults, stages 1–4 become eligible on days 7, 21, 35, and 49 after the due date. The day before a threshold is ineligible; the threshold date is eligible if the preceding stage was transport-accepted. Later stages cannot skip an unaccepted preceding stage. Retain legacy `initial_grace_days` values for compatibility, but deprecate the setting: it is not an active control and never changes a stage threshold.
 
 No interest accrues before stage 1's threshold. For each overdue calendar day from that threshold through the as-of date, select the highest stage whose absolute threshold is on or before that day and use that stage's configured annual percentage for that day. A rate change is forward-only; it does not reprice earlier days. Apply settlement events effective on a date before that date's interest accrual, so a partial payment reduces principal starting on its effective date and full settlement prevents accrual on that date and later dates. Fees and prior interest remain separate from principal and do not compound. Accumulate exact decimal daily amounts using a 365-day year, then round the per-invoice total once to two decimal places using half-up rounding; do not use floating point or round each day.
 
@@ -70,7 +70,7 @@ Build the package as a manifest of selected, readable artifacts and an as-of bal
 ## Migration Plan
 
 1. Accept the invoice-money contract and balanced journal/settlement-event source through their independent review gates; keep dunning amount work disabled until both are available.
-2. Sync the accepted dunning contract and update `docs/05-mahnwesen.md`; document absolute stage thresholds, configured non-statutory rates, manual/assisted scope, and unsupported automatic behavior accurately.
+2. Sync the accepted dunning contract and update `docs/05-mahnwesen.md`; document absolute stage thresholds, the deprecated non-operative grace value, stage progression only after transport acceptance, configured non-statutory rates, manual/assisted scope, and unsupported automatic behavior accurately.
 3. Implement the typed dunning use case and `/mahnwesen` workspace against the accepted receivable source, then add exclusions and per-invoice idempotency.
 4. Wire PDF generation through the accepted document-artifact lifecycle and connect an actually configured SMTP transport. Keep those actions unavailable until their prerequisites are present.
 5. Add the collection-package manifest and verify every referenced artifact is readable and linked to the selected customer.

@@ -181,11 +181,30 @@ For a customer selected for collection preparation, the system SHALL produce a c
 - **WHEN** the user creates a collection package
 - **THEN** the system SHALL report the missing artifact and SHALL not label the package complete
 
+### Requirement: Mahnwesen Settings Singleton
+
+The system SHALL continue storing `initial_grace_days`, `email_template`, and `default_interest_rate` in the singleton for profile compatibility. `initial_grace_days` SHALL be deprecated and non-operative: no dunning eligibility, preview, calculation, creation, or send SHALL use it, and the dunning settings UI SHALL NOT present it as an active control. Stage eligibility SHALL use only the absolute `due_date + days_after_due` threshold. Existing values SHALL be preserved during initialization.
+
+#### Scenario: Configure grace period
+
+- **GIVEN** an existing profile stores `initial_grace_days = 14` and stage 1 is configured for 7 days after an invoice due date
+- **WHEN** manual or assisted eligibility is evaluated on the day before and on the absolute stage threshold
+- **THEN** the invoice SHALL be ineligible before `due_date + 7` and eligible on that threshold when other stage rules are met
+- **AND** the stored 14-day compatibility value SHALL NOT defer eligibility
+- **AND** the settings UI SHALL show the saved value only as deprecated, non-editable compatibility data
+
+#### Scenario: Default settings on fresh install
+
+- **GIVEN** a fresh database has no dunning settings
+- **WHEN** the system initializes the singleton
+- **THEN** it SHALL create default settings with `initial_grace_days = 0` and the documented default interest rate
+- **AND** the zero grace value SHALL remain non-operative
+
 ## ADDED Requirements
 
 ### Requirement: Dunning Reference Documentation Matches the Runtime Contract
 
-The dunning documentation SHALL describe `gebuehr` as a fixed currency amount per level, `zinssatz` as a configurable annual percentage, `multiplier` as an optional fixed-fee carry, and configured stage days as absolute offsets from the invoice due date. It SHALL use the canonical fresh-profile defaults in `Dunning Level Configuration`, SHALL not show a percentage fee or claim statutory compliance, and SHALL describe rates as configured product values. It SHALL describe this change's scope as manual/assisted with separate invoice letters and SHALL remove or mark unsupported dashboard-triggered or scheduled runs and automatic customer-block/release behavior.
+The dunning documentation SHALL describe `gebuehr` as a fixed currency amount per level, `zinssatz` as a configurable annual percentage, `multiplier` as an optional fixed-fee carry, and configured stage days as absolute offsets from the invoice due date. It SHALL use the canonical fresh-profile defaults in `Dunning Level Configuration`, SHALL not show a percentage fee or claim statutory compliance, and SHALL describe rates as configured product values. It SHALL describe this change's scope as manual/assisted with separate invoice letters and SHALL remove or mark unsupported dashboard-triggered or scheduled runs and automatic customer-block/release behavior. It SHALL state that invoice stage advances only after transport acceptance; creating a draft or a failed send does not advance the stage.
 
 #### Scenario: Documentation exposes the canonical model
 - **GIVEN** the dunning documentation and fresh-profile seed are checked against the specification
@@ -196,6 +215,13 @@ The dunning documentation SHALL describe `gebuehr` as a fixed currency amount pe
 - **GIVEN** the documentation contains a fee expressed as a percent of invoice principal
 - **WHEN** the dunning contract parity check runs
 - **THEN** the check SHALL fail with the mismatched documented field or unit
+
+#### Scenario: Documentation describes stage progression
+
+- **GIVEN** the dunning documentation describes when an invoice advances to another stage
+- **WHEN** the dunning contract parity check runs
+- **THEN** it SHALL state that transport acceptance advances the stage
+- **AND** it SHALL state that a draft or failed send does not advance the stage
 
 #### Scenario: Unsupported automation and legal claims are not documented as available
 - **GIVEN** the dunning documentation is checked against this change's scope
