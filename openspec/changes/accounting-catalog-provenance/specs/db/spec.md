@@ -11,6 +11,13 @@ Fresh database creation SHALL seed `ust_saetze` (0%, 7%, 19%), `nummernkreise` (
 - **THEN** no category is created with a generated SKR03, SKR04, EÜR, or EKS mapping
 - **AND** the profile reports category accounting setup as unconfigured
 
+#### Scenario: Fresh Profile Without Approved Catalog Has No Preconfigured Mappings
+
+- **GIVEN** a fresh database is created and no approved accounting-catalog manifest is bundled
+- **WHEN** seed data is inserted
+- **THEN** no category SHALL be created with a generated SKR03, SKR04, EÜR, or EKS mapping
+- **AND** the profile SHALL report category accounting setup as unconfigured
+
 #### Scenario: USt-Sätze Seeded
 
 - **GIVEN** a fresh database is created

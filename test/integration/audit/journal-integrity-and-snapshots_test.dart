@@ -20,12 +20,12 @@ void main() {
       await db.executor.runCustom('DELETE FROM kategorien');
       await db.executor.runCustom('DELETE FROM ust_saetze');
       await db.executor.runCustom(
-        'INSERT INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, typ) '
-        "VALUES (1, 'Büromaterial', '6800', '6800', 12, 'Ausgabe')",
+        'INSERT INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, typ, mapping_status, catalog_source_reference, catalog_source_version) '
+        "VALUES (1, 'Büromaterial', '6800', '6800', 12, 'Ausgabe', 'catalog_verified', 'TEST', '1')",
       );
       await db.executor.runCustom(
-        'INSERT INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, typ) '
-        "VALUES (2, 'Umsatzerlöse', '8400', '8400', 1, 'Einnahme')",
+        'INSERT INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, typ, mapping_status, catalog_source_reference, catalog_source_version) '
+        "VALUES (2, 'Umsatzerlöse', '8400', '8400', 1, 'Einnahme', 'catalog_verified', 'TEST', '1')",
       );
 
       // Seed ust_saetze

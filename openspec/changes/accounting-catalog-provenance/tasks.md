@@ -21,12 +21,12 @@
 - [x] 1.19 Write failing test `test_accounting_catalog_007_legacy_category_values_are_retained_but_untrusted` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Legacy category values are retained but untrusted" (assert the expected failure).
 - [x] 1.20 Implement the specified behavior for "Legacy category values are retained but untrusted" to pass the test.
 - [x] 1.21 Refactor this behavior; rerun `test_accounting_catalog_007_legacy_category_values_are_retained_but_untrusted` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.22 Write failing test `test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before_review` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Legacy mapping cannot drive a new posting before review" (assert the expected failure).
-- [ ] 1.23 Implement the specified behavior for "Legacy mapping cannot drive a new posting before review" to pass the test.
-- [ ] 1.24 Refactor this behavior; rerun `test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before_review` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.25 Write failing test `test_accounting_catalog_009_unmapped_category_labels_an_independently_balanced_posting` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped category labels an independently balanced posting" (assert the expected failure).
-- [ ] 1.26 Implement the specified behavior for "Unmapped category labels an independently balanced posting" to pass the test.
-- [ ] 1.27 Refactor this behavior; rerun `test_accounting_catalog_009_unmapped_category_labels_an_independently_balanced_posting` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.22 Write failing test `test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before_review` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Legacy mapping cannot drive a new posting before review" (assert the expected failure).
+- [x] 1.23 Implement the specified behavior for "Legacy mapping cannot drive a new posting before review" to pass the test.
+- [x] 1.24 Refactor this behavior; rerun `test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before_review` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.25 Write failing test `test_accounting_catalog_009_unmapped_category_labels_an_independently_balanced_posting` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped category labels an independently balanced posting" (assert the expected failure).
+- [x] 1.26 Implement the specified behavior for "Unmapped category labels an independently balanced posting" to pass the test.
+- [x] 1.27 Refactor this behavior; rerun `test_accounting_catalog_009_unmapped_category_labels_an_independently_balanced_posting` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 - [x] 1.28 Write failing test `test_accounting_catalog_010_inactive_category` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Inactive category" (assert the expected failure).
 - [x] 1.29 Implement the specified behavior for "Inactive category" to pass the test.
 - [x] 1.30 Refactor this behavior; rerun `test_accounting_catalog_010_inactive_category` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
@@ -42,15 +42,15 @@
 - [x] 1.40 Write failing test `test_accounting_catalog_014_category_review_is_unavailable_until_its_workspace_is_accepted` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Category review is unavailable until its workspace is accepted" (assert the expected failure).
 - [x] 1.41 Implement the specified behavior for "Category review is unavailable until its workspace is accepted" to pass the test.
 - [x] 1.42 Refactor this behavior; rerun `test_accounting_catalog_014_category_review_is_unavailable_until_its_workspace_is_accepted` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.43 Write failing test `test_accounting_catalog_015_inactive_category_warning_does_not_replace_mapping_review` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Inactive category warning does not replace mapping review" (assert the expected failure).
-- [ ] 1.44 Implement the specified behavior for "Inactive category warning does not replace mapping review" to pass the test.
-- [ ] 1.45 Refactor this behavior; rerun `test_accounting_catalog_015_inactive_category_warning_does_not_replace_mapping_review` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.46 Write failing test `test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_warning_policy` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Eligible inactive category keeps the recurring warning policy" (assert the expected failure).
-- [ ] 1.47 Implement the specified behavior for "Eligible inactive category keeps the recurring warning policy" to pass the test.
-- [ ] 1.48 Refactor this behavior; rerun `test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_warning_policy` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.49 Write failing test `test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without_category_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped inactive category is used only without category mappings" (assert the expected failure).
-- [ ] 1.50 Implement the specified behavior for "Unmapped inactive category is used only without category mappings" to pass the test.
-- [ ] 1.51 Refactor this behavior; rerun `test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without_category_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.43 Write failing test `test_accounting_catalog_015_inactive_category_warning_does_not_replace_mapping_review` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Inactive category warning does not replace mapping review" (assert the expected failure).
+- [x] 1.44 Implement the specified behavior for "Inactive category warning does not replace mapping review" to pass the test.
+- [x] 1.45 Refactor this behavior; rerun `test_accounting_catalog_015_inactive_category_warning_does_not_replace_mapping_review` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.46 Write failing test `test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_warning_policy` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Eligible inactive category keeps the recurring warning policy" (assert the expected failure).
+- [x] 1.47 Implement the specified behavior for "Eligible inactive category keeps the recurring warning policy" to pass the test.
+- [x] 1.48 Refactor this behavior; rerun `test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_warning_policy` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.49 Write failing test `test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without_category_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped inactive category is used only without category mappings" (assert the expected failure).
+- [x] 1.50 Implement the specified behavior for "Unmapped inactive category is used only without category mappings" to pass the test.
+- [x] 1.51 Refactor this behavior; rerun `test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without_category_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 
 ## 2. EÜR and DATEV disclose or reject category mapping provenance (specs/accounting/spec.md)
 
@@ -112,9 +112,13 @@
 ## 4. Table Definitions (specs/db/spec.md)
 
 > Ownership note (executed reassignment): this change ships the category part as v9.
-> Deferred to the v9-owner change (no approved DDL): 036 (pre-v9 validity marker wording),
-> 040 (shared markers + mileage tables), 042 (unknown lazy-table state).
-> Codified here from existing v8 behavior: 035, 037, 038, 039, 043, 044, 045.
+> Deferred to the v9-owner change (no approved DDL for markers/mileage, no
+> schema-health API): 035 (fresh-install inventory incl. markers), 036
+> (pre-v9 validity marker wording), 038 (missing-payment stop conflicts with
+> the implemented transactional repair behavior - needs migration/receivable
+> owner decision), 040 (shared markers + mileage tables), 042 (unknown
+> lazy-table state), 044 (unknown-table health needs a health-check API).
+> Implemented here: 037, 039, 043, 045.
 
 - [ ] 4.1 Write failing test `test_accounting_catalog_035_all_tables_created_on_fresh_install` in `test/db/accounting_catalog_migration_test.dart` for scenario "All Tables Created on Fresh Install" (assert the expected failure).
 - [ ] 4.2 Implement the specified behavior for "All Tables Created on Fresh Install" to pass the test.
@@ -122,15 +126,15 @@
 - [ ] 4.4 Write failing test `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` for scenario "Pre-v9 profile is valid before later feature migrations" (assert the expected failure).
 - [ ] 4.5 Implement the specified behavior for "Pre-v9 profile is valid before later feature migrations" to pass the test.
 - [ ] 4.6 Refactor this behavior; rerun `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.7 Write failing test `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing v7 payment table is created by the v7-to-v8 migration" (assert the expected failure).
-- [ ] 4.8 Implement the specified behavior for "Missing v7 payment table is created by the v7-to-v8 migration" to pass the test.
-- [ ] 4.9 Refactor this behavior; rerun `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.7 Write failing test `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing v7 payment table is created by the v7-to-v8 migration" (assert the expected failure).
+- [x] 4.8 Implement the specified behavior for "Missing v7 payment table is created by the v7-to-v8 migration" to pass the test.
+- [x] 4.9 Refactor this behavior; rerun `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [ ] 4.10 Write failing test `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing payment table at v8 or later preserves the incomplete signal" (assert the expected failure).
 - [ ] 4.11 Implement the specified behavior for "Missing payment table at v8 or later preserves the incomplete signal" to pass the test.
 - [ ] 4.12 Refactor this behavior; rerun `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.13 Write failing test `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` for scenario "Current payment table repair preserves existing rows" (assert the expected failure).
-- [ ] 4.14 Implement the specified behavior for "Current payment table repair preserves existing rows" to pass the test.
-- [ ] 4.15 Refactor this behavior; rerun `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.13 Write failing test `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` for scenario "Current payment table repair preserves existing rows" (assert the expected failure).
+- [x] 4.14 Implement the specified behavior for "Current payment table repair preserves existing rows" to pass the test.
+- [x] 4.15 Refactor this behavior; rerun `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [ ] 4.16 Write failing test `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` for scenario "V8-to-v9 migration adds shared markers and mileage tables" (assert the expected failure).
 - [ ] 4.17 Implement the specified behavior for "V8-to-v9 migration adds shared markers and mileage tables" to pass the test.
 - [ ] 4.18 Refactor this behavior; rerun `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
@@ -140,15 +144,15 @@
 - [ ] 4.22 Write failing test `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown lazy-table state is not repaired by initialization" (assert the expected failure).
 - [ ] 4.23 Implement the specified behavior for "Unknown lazy-table state is not repaired by initialization" to pass the test.
 - [ ] 4.24 Refactor this behavior; rerun `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.25 Write failing test `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` for scenario "Table Count Verification" (assert the expected failure).
-- [ ] 4.26 Implement the specified behavior for "Table Count Verification" to pass the test.
-- [ ] 4.27 Refactor this behavior; rerun `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.25 Write failing test `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` for scenario "Table Count Verification" (assert the expected failure).
+- [x] 4.26 Implement the specified behavior for "Table Count Verification" to pass the test.
+- [x] 4.27 Refactor this behavior; rerun `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [ ] 4.28 Write failing test `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown or malformed application tables fail schema health" (assert the expected failure).
 - [ ] 4.29 Implement the specified behavior for "Unknown or malformed application tables fail schema health" to pass the test.
 - [ ] 4.30 Refactor this behavior; rerun `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.31 Write failing test `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing Table Detection" (assert the expected failure).
-- [ ] 4.32 Implement the specified behavior for "Missing Table Detection" to pass the test.
-- [ ] 4.33 Refactor this behavior; rerun `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.31 Write failing test `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing Table Detection" (assert the expected failure).
+- [x] 4.32 Implement the specified behavior for "Missing Table Detection" to pass the test.
+- [x] 4.33 Refactor this behavior; rerun `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 
 ## 5. Category mapping provenance is persisted (specs/db/spec.md)
 
@@ -164,6 +168,6 @@
 
 ## 6. Docs and maintained specs sync (missing coverage)
 
-- [ ] 6.1 Update maintained `openspec/specs/accounting/spec.md` and `openspec/specs/db/spec.md` to remove synthetic catalog claims and describe provenance states.
-- [ ] 6.2 Update `docs/02-buchhaltung.md` and `docs/03-kunden-stammdaten.md` to describe unconfigured state and user-confirmed vs catalog-verified output.
-- [ ] 6.3 Run `openspec validate accounting-catalog-provenance --type change --strict` and `openspec validate --specs --strict` and keep both green.
+- [x] 6.1 Update maintained `openspec/specs/accounting/spec.md` and `openspec/specs/db/spec.md` to remove synthetic catalog claims and describe provenance states.
+- [x] 6.2 Update `docs/02-buchhaltung.md` and `docs/03-kunden-stammdaten.md` to describe unconfigured state and user-confirmed vs catalog-verified output.
+- [x] 6.3 Run `openspec validate accounting-catalog-provenance --type change --strict` and `openspec validate --specs --strict` and keep both green.

@@ -244,7 +244,11 @@ Certificate pinning: First connection stores SHA-256 fingerprint. Subsequent con
 
 ## Kategorien (Accounting Categories)
 
-65+ predefined categories with SKR03/SKR04 and EÜR mapping:
+Categories with optional SKR03/SKR04 and EÜR mapping plus provenance status
+(see `02-buchhaltung.md` for the `catalog_verified` / `user_confirmed` /
+`legacy_unverified` / `review_required` / `unmapped` contract). Fresh profiles
+start unconfigured until an approved catalog is imported or the user defines
+and reviews their own mappings:
 
 ```json
 {
@@ -258,14 +262,15 @@ Certificate pinning: First connection stores SHA-256 fingerprint. Subsequent con
   "ust_satz_standard": 19,
   "vorsteuer_prozent": 100,
   "aktiv": true,
-  "beschreibung": "Erlöse aus dem gewöhnlichen Geschäftsbetrieb"
+  "beschreibung": "Erlöse aus dem gewöhnlichen Geschäftsbetrieb",
+  "mapping_status": "catalog_verified"
 }
 ```
 
 ### Customization
 
-- Users can modify `konto_skr03`/`konto_skr04` (tracked via `user_modified_skr03`/`user_modified_skr04`)
-- `aktiv` flag hides categories from selection dropdowns without deleting
+- Users can modify `konto_skr03`/`konto_skr04`; any mapping edit sets `review_required` and explicit review sets `user_confirmed`
+- `aktiv` flag hides categories from selection dropdowns without deleting and without changing provenance
 - `beschreibung` supports inline editing and usage hints
 
 ---

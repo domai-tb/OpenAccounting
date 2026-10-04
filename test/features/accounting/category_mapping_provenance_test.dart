@@ -5,6 +5,8 @@ import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/datev_entity.dart';
 import 'package:openaccounting/features/accounting/datev_service.dart';
 import 'package:openaccounting/features/accounting/euer_service.dart';
+import 'package:openaccounting/features/accounting/journal_entity.dart';
+import 'package:openaccounting/features/accounting/journal_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 
 /// Category mapping provenance: accounting behavior scenarios
@@ -458,6 +460,112 @@ void main() {
       expect(gegenkonto['category_id'], verified.id);
       expect(gegenkonto['category_history_id'], isNotNull);
       expect(rows.last['id'], result.exportLogId);
+    });
+  });
+
+  group('Posting gate for untrusted mappings', () {
+    late AppDatabase db;
+    late JournalRepository journal;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      journal = JournalRepository(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<int> addLegacy({String skr03 = '8100'}) {
+      return db.executor.runInsert(
+        'INSERT INTO kategorien (bezeichnung, konto_skr03, euer_zeile, aktiv) VALUES (?, ?, ?, 1)',
+        <Object?>['Altbestand', skr03, 11],
+      );
+    }
+
+    test('test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before_review', () async {
+      final legacyId = await addLegacy();
+      await expectLater(
+        journal.create(
+          datum: DateTime(2026, 5, 10),
+          bezeichnung: 'Legacy¹',
+          kategorieId: legacyId,
+          betrag: '100.00',
+          art: 'Einnahme',
+        ),
+        throwsA(
+          isA<JournalException>().having(
+            (e) => e.toString(),
+            'message',
+            allOf(contains('$legacyId'), contains('Mapping')),
+          ),
+        ),
+      );
+    });
+
+    test('test_accounting_catalog_009_unmapped_category_labels_an_independently_balanced_posting', () async {
+      final unmapped = await db.kategorienRepository.create(bezeichnung: 'Etikett');
+      final entry = await journal.create(
+        datum: DateTime(2026, 5, 10),
+        bezeichnung: 'Ausgeglichen',
+        kategorieId: unmapped.id,
+        betrag: '100.00',
+        art: 'Einnahme',
+        kontoSkr03: '1200',
+        kontoSkr04: '4200',
+      );
+      expect(entry.kategorieId, unmapped.id);
+      expect(entry.kontoSkr03, '1200');
+      final stored = await db.kategorienRepository.findById(unmapped.id);
+      expect(stored?.mappingStatus, CategoryMappingStatus.unmapped);
+    });
+
+    test('test_accounting_catalog_015_inactive_category_warning_does_not_replace_mapping_review', () async {
+      expect(
+        decidePostingUse(CategoryMappingStatus.legacyUnverified, requiresMapping: true),
+        CategoryPostingDecision.blockedUntrusted,
+      );
+      expect(
+        decidePostingUse(CategoryMappingStatus.reviewRequired, requiresMapping: true),
+        CategoryPostingDecision.blockedUntrusted,
+      );
+    });
+
+    test('test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_warning_policy', () async {
+      final verified = (await db.kategorienRepository.importApprovedManifest(
+        const CategoryCatalogManifest(
+          sourceReference: 'TEST-SKR03',
+          sourceVersion: '2026-test.1',
+          reviewApproved: true,
+          entries: <CategoryCatalogEntry>[CategoryCatalogEntry(key: 'DTV-016', bezeichnung: 'V', kontoSkr03: '8400')],
+        ),
+      )).single;
+      final deactivated = await db.kategorienRepository.update(verified.id, <String, dynamic>{'aktiv': false});
+      expect(deactivated.aktiv, isFalse);
+      expect(deactivated.mappingStatus, CategoryMappingStatus.catalogVerified);
+      expect(decidePostingUse(deactivated.mappingStatus, requiresMapping: true), CategoryPostingDecision.allowed);
+    });
+
+    test('test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without_category_mappings', () async {
+      expect(
+        decidePostingUse(CategoryMappingStatus.unmapped, requiresMapping: false),
+        CategoryPostingDecision.allowedUnmappedLabel,
+      );
+      final unmapped = await db.kategorienRepository.create(bezeichnung: 'Inaktiv-Etikett', aktiv: false);
+      final entry = await journal.create(
+        datum: DateTime(2026, 5, 10),
+        bezeichnung: 'Unabhaengig',
+        kategorieId: unmapped.id,
+        betrag: '75.00',
+        art: 'Ausgabe',
+        kontoSkr03: '1200',
+        kontoSkr04: '4200',
+      );
+      expect(entry.kategorieId, unmapped.id);
+      final stored = await db.kategorienRepository.findById(unmapped.id);
+      expect(stored?.mappingStatus, CategoryMappingStatus.unmapped);
+      expect(stored?.kontoSkr03, isNull);
     });
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/journal_entity.dart';
 import 'package:openaccounting/features/accounting/journal_repository.dart';
+import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 
 void main() {
   group('Journal Entries + GoBD', () {
@@ -12,10 +13,24 @@ void main() {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
       repo = JournalRepository(db.executor);
-      // No categories are preseeded; create explicit fixtures (ids 1..5).
-      for (var i = 1; i <= 5; i++) {
-        await db.kategorienRepository.create(bezeichnung: 'Testkategorie $i');
-      }
+      // No categories are preseeded; import verified fixtures (ids 1..5) so
+      // entries may resolve account snapshots from eligible mappings.
+      await db.kategorienRepository.importApprovedManifest(
+        CategoryCatalogManifest(
+          sourceReference: 'TEST-JOURNAL',
+          sourceVersion: '2026-test.1',
+          reviewApproved: true,
+          entries: <CategoryCatalogEntry>[
+            for (var i = 1; i <= 5; i++)
+              CategoryCatalogEntry(
+                key: 'TEST-J-$i',
+                bezeichnung: 'Testkategorie $i',
+                kontoSkr03: '840$i',
+                kontoSkr04: '440$i',
+              ),
+          ],
+        ),
+      );
     });
 
     tearDown(() async {

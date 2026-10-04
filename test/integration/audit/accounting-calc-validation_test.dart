@@ -31,8 +31,8 @@ void main() {
 
     Future<void> insertKategorie({required int id, required int zeile}) async {
       await db.executor.runInsert(
-        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv) VALUES (?, ?, ?, ?, ?, 1)',
-        <Object?>[id, 'K$zeile', '800$zeile', '400$zeile', zeile],
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[id, 'K$zeile', '800$zeile', '400$zeile', zeile, 'catalog_verified', 'TEST', '1'],
       );
     }
 
@@ -377,8 +377,8 @@ void main() {
 
     Future<void> insertKategorieDatev({required int id, required String skr03}) async {
       await db.executor.runInsert(
-        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv) VALUES (?, ?, ?, ?, ?, 1)',
-        <Object?>[id, 'K $skr03', skr03, '4400', 15],
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[id, 'K $skr03', skr03, '4400', 15, 'catalog_verified', 'TEST', '1'],
       );
     }
 
@@ -416,7 +416,7 @@ void main() {
       // fix fixture — update betrag to valid
       await db.executor.runCustom('DELETE FROM journal');
       await insertJournalDatev(kategorieId: 901, betrag: '119.00', datum: '2025-03-15', bezeichnung: 'Erlös Test');
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains('EXTF'), isTrue);
       expect(csv.contains('119,00'), isTrue);
       final int afterPass =
@@ -434,7 +434,7 @@ void main() {
 
       await db.executor.runCustom('DELETE FROM journal');
       await insertJournalDatev(kategorieId: 902, betrag: '100.00', datum: '2025-04-01');
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains('01.04.2025'), isTrue);
     });
 
@@ -449,7 +449,7 @@ void main() {
 
       await db.executor.runCustom('DELETE FROM journal');
       await insertJournalDatev(kategorieId: 903, betrag: '10.00', datum: '2025-05-01', belegNr: boundary);
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains(boundary), isTrue);
     });
 
@@ -465,7 +465,7 @@ void main() {
       final String withUmlauts = 'Müller Ärger Übergröße Grüße — äöü ÄÖÜ ß €';
       // ponytail: UTF-8 CSV — umlauts must survive; DATEV CP1252 conversion is one-liner if reader requires latin1
       await insertJournalDatev(kategorieId: 904, betrag: '20.00', datum: '2025-06-01', bezeichnung: withUmlauts);
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains('Müller'), isTrue);
       expect(csv.contains('Ärger'), isTrue);
       expect(csv.contains('Übergröße'), isTrue);
@@ -477,7 +477,8 @@ void main() {
       final Directory dir = await Directory.systemTemp.createTemp('datev-umlauts-');
       addTearDown(() => dir.delete(recursive: true));
       final String path = '${dir.path}/buchung.csv';
-      final String csv2 = await DatevService(db.executor).exportCsv(jahr: 2025, destinationPath: path);
+      final String csv2 = await DatevService(db.executor)
+          .exportCsv(jahr: 2025, destinationPath: path, kontoBankFallback: '1200');
       final String fileContent = await File(path).readAsString();
       expect(fileContent, csv2);
       expect(fileContent.contains('Müller'), isTrue);
@@ -486,7 +487,7 @@ void main() {
       await db.executor.runCustom('DELETE FROM journal');
       final String exactly60 = 'B' * 60;
       await insertJournalDatev(kategorieId: 904, betrag: '30.00', datum: '2025-06-02', bezeichnung: exactly60);
-      final String csv3 = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv3 = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv3.contains(exactly60), isTrue);
     });
 
@@ -498,7 +499,7 @@ void main() {
       await expectLater(DatevService(db.executor).exportCsv(jahr: 2025), throwsA(isA<DatevException>()));
 
       await upsertUnternehmen(berater: '12345', mandant: '678', kontoBank: '1200');
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains('1200'), isTrue);
     });
 
@@ -523,7 +524,7 @@ void main() {
       );
 
       // valid header passes
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.startsWith('EXTF'), isTrue);
       // header must have 17 fields
       expect(csv.split('\r\n').first.split(';').length, 17);
@@ -540,7 +541,7 @@ void main() {
         belegNr: 'RE001',
       );
 
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025);
+      final String csv = await DatevService(db.executor).exportCsv(jahr: 2025, kontoBankFallback: '1200');
       final List<String> lines = csv.split('\r\n');
       expect(lines.length, greaterThanOrEqualTo(3));
       expect(lines[0].startsWith('EXTF;700;21;Buchungsstapel'), isTrue);

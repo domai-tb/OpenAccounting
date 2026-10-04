@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices provides double-entry bookkeeping with a journal-based ledger, pre-configured SKR03/SKR04 chart of accounts, and German tax authority reporting (EÜR, UStVA, EKS, GuV, ZM). All journal entries are GoBD-immutable once posted.
+OpenInvoices provides double-entry bookkeeping with a journal-based ledger, category mapping provenance for SKR03/SKR04 account assignments, and German tax authority reporting (EÜR, UStVA, EKS, GuV, ZM). All journal entries are GoBD-immutable once posted.
 
 ---
 
@@ -45,7 +45,14 @@ The central ledger table (`journal`) records every financial transaction:
 
 ## Kategorien (Chart of Accounts Mapping)
 
-65+ predefined categories, each mapping to SKR03 and SKR04 account numbers:
+Categories carry optional SKR03/SKR04/EÜR/EKS mappings plus mapping provenance
+(`catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`,
+`unmapped`). No preconfigured chart ships without an approved catalog manifest;
+fresh profiles report an explicit unconfigured state. Only `catalog_verified`
+mappings came from an approved source; `user_confirmed` mappings are
+user-configured and identified as not source-verified in output. Unresolved
+mappings block new postings and mapped reports/exports instead of inventing
+account numbers.
 
 ```json
 {
@@ -58,7 +65,9 @@ The central ledger table (`journal`) records every financial transaction:
   "eks_kategorie": null,
   "ust_satz_standard": 19,
   "aktiv": true,
-  "beschreibung": "Erlöse aus dem gewöhnlichen Geschäftsbetrieb"
+  "beschreibung": "Erlöse aus dem gewöhnlichen Geschäftsbetrieb",
+  "mapping_status": "catalog_verified",
+  "catalog_source_version": "2026.1"
 }
 ```
 
@@ -68,15 +77,20 @@ The central ledger table (`journal`) records every financial transaction:
 |-------|---------|
 | `konto_skr03` | SKR03 Kontonummer for DATEV export |
 | `konto_skr04` | SKR04 Kontonummer for DATEV export |
-| `user_modified_skr03` | User override of default SKR03 account |
-| `user_modified_skr04` | User override of default SKR04 account |
+| `mapping_status` | Provenance: catalog_verified, user_confirmed, legacy_unverified, review_required, unmapped |
+| `catalog_entry_key` | Stable key of the approved catalog entry (if any) |
+| `catalog_source_reference` / `catalog_source_version` | Approved source release (baseline, kept after user edits) |
+| `mapping_reviewed_at` | UTC timestamp of the last explicit mapping review |
 | `euer_zeile` | Line number in Anlage EÜR (60+ items) |
 | `eks_kategorie` | EKS field code (B6_5, C14, etc.) |
 | `vorsteuer_prozent` | Vorsteuer deduction percentage (e.g. 70% for Bewirtung) |
 
 ### Migration Pattern
 
-Categories updated via `_migrate_kategorien()` which runs at every startup (idempotent). New categories added to `neue` list. Existing DBs get updates without version-gated migrations.
+Category provenance arrives through the versioned v9 migration: existing rows
+keep their values and are classified `legacy_unverified` with a history record;
+editing any mapping field sets `review_required`; explicit review sets
+`user_confirmed`. Categories with history are deactivated rather than deleted.
 
 ---
 

@@ -100,7 +100,8 @@ void main() {
       addTearDown(() => directory.delete(recursive: true));
       final String path = '${directory.path}/buchungsstapel.csv';
 
-      final String csv = await DatevService(db.executor).exportCsv(jahr: 2026, destinationPath: path);
+      final String csv = await DatevService(db.executor)
+          .exportCsv(jahr: 2026, destinationPath: path, kontoBankFallback: '1200');
       final File artifact = File(path);
 
       expect(artifact.existsSync(), isTrue);
@@ -201,8 +202,18 @@ Future<void> _insertKategorie(
 }) async {
   await db.executor.runInsert(
     'INSERT OR REPLACE INTO kategorien '
-    '(id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, eks_kategorie) VALUES (?, ?, ?, ?, ?, 1, ?)',
-    <Object?>[id, bezeichnung, skr03 ?? '8400', skr03 ?? '8400', euerZeile, eksKategorie],
+    '(id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, eks_kategorie, mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)',
+    <Object?>[
+      id,
+      bezeichnung,
+      skr03 ?? '8400',
+      skr03 ?? '8400',
+      euerZeile,
+      eksKategorie,
+      'catalog_verified',
+      'TEST',
+      '1',
+    ],
   );
 }
 

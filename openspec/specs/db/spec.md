@@ -72,20 +72,21 @@ AND no floating-point artifacts SHALL appear
 
 ### Requirement: Table Definitions
 
-The database SHALL contain exactly 38 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`.
+The database SHALL contain exactly 39 base tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`, and `inventarbewegungen`. The feature-owned `category_mapping_history` table (append-only mapping provenance, required at schema version 9 or later) and the feature-owned `forderung_zahlungen` table (required at schema version 8 or later) exist in addition to the 39 base tables. SQLite internal objects whose names begin with sqlite_ are excluded from this inventory.
 
 #### Scenario: All Tables Created on Fresh Install
 
 GIVEN the app runs for the first time with an empty database
 WHEN schema creation completes
-THEN all 38 tables SHALL exist
+THEN all 39 base tables SHALL exist
+AND `category_mapping_history` and `forderung_zahlungen` SHALL exist
 AND each table SHALL have its expected columns and constraints
 
 #### Scenario: Table Count Verification
 
 GIVEN a migration runs against an existing database
 WHEN the migration completes
-THEN the total table count SHALL remain exactly 38
+THEN the 39 base tables SHALL all remain present alongside their required feature-owned tables
 AND no table SHALL be silently dropped
 
 #### Scenario: Missing Table Detection
@@ -149,7 +150,7 @@ AND the backup SHALL NOT be created
 
 GIVEN all version migrations complete successfully
 WHEN the post-migration phase begins
-THEN `_migrate_kategorien()` SHALL run to ensure seed categories exist
+THEN the category seed gate SHALL run and create no preconfigured mappings without an approved manifest
 AND `_migrate_signaturen()` SHALL run to ensure signature defaults exist
 AND `_setup_gobd_triggers()` SHALL install or reinstall GoBD triggers
 
@@ -250,7 +251,7 @@ AND the backup SHALL proceed normally
 
 ### Requirement: Seed Data
 
-The following seed data SHALL be inserted on fresh database creation: `ust_saetze` (0%, 7%, 19%), `nummernkreise` (all document types), `eu_laender` (EU member states with USt-IdNr formats), `bank_templates` (PayPal, N26, Vivid, CAMT XML), and `kategorien` (standard SKR03/SKR04 categories with EÜR line assignments).
+The following seed data SHALL be inserted on fresh database creation: `ust_saetze` (0%, 7%, 19%), `nummernkreise` (all document types), `eu_laender` (EU member states with USt-IdNr formats), and `bank_templates` (PayPal, N26, Vivid, CAMT XML). Category mappings SHALL be seeded only from an approved, versioned catalog manifest; without one, a fresh profile SHALL have no preconfigured SKR03, SKR04, EÜR, or EKS category mappings and SHALL expose an explicit unconfigured state. Seed logic MUST NOT generate accounting mappings from identifiers, arithmetic, or placeholder labels.
 
 #### Scenario: USt-Sätze Seeded
 
@@ -268,11 +269,17 @@ AND each SHALL have a format string and active flag
 
 #### Scenario: Kategorien Seeded With SKR Accounts
 
-GIVEN a fresh database is created
+GIVEN a fresh database is created with an approved accounting-catalog manifest
 WHEN seed data is inserted
-THEN `kategorien` SHALL contain at minimum 80 standard categories
-AND each SHALL have `konto_skr03`, `konto_skr04`, and `euer_zeile` values where applicable
-AND categories SHALL use "Du"-form descriptions
+THEN each seeded category and applicable mapping SHALL match a manifest entry exactly
+AND each mapped category SHALL record its source release and `catalog_verified` status
+
+#### Scenario: Fresh Profile Without Approved Catalog Has No Preconfigured Mappings
+
+GIVEN a fresh database is created and no approved accounting-catalog manifest is bundled
+WHEN seed data is inserted
+THEN no category SHALL be created with a generated SKR03, SKR04, EÜR, or EKS mapping
+AND the profile SHALL report category accounting setup as unconfigured
 
 #### Scenario: Seed Data Not Duplicated on Restart
 

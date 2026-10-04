@@ -124,6 +124,36 @@ class Kategorie {
       eksKategorie == null;
 }
 
+/// Posting-gate decision for a category mapping status. Blocked decisions
+/// apply only when the posting/output contract requires category mapping
+/// values; an inactive-category warning never replaces mapping review and
+/// deactivation never changes provenance status.
+enum CategoryPostingDecision {
+  /// Mapping values may be consumed (verified or user-confirmed).
+  allowed,
+
+  /// Untrusted mapping blocks operations requiring mapping values.
+  blockedUntrusted,
+
+  /// No mapping values required: the category is a descriptive label only.
+  allowedUnmappedLabel,
+}
+
+/// Decides whether a posting may proceed for [status]. When [requiresMapping]
+/// is true only verified/user-confirmed mappings are allowed; otherwise every
+/// status may label the posting without consuming mapping values.
+CategoryPostingDecision decidePostingUse(CategoryMappingStatus status, {required bool requiresMapping}) {
+  if (!requiresMapping) {
+    return status == CategoryMappingStatus.unmapped
+        ? CategoryPostingDecision.allowedUnmappedLabel
+        : CategoryPostingDecision.allowed;
+  }
+  return switch (status) {
+    CategoryMappingStatus.catalogVerified || CategoryMappingStatus.userConfirmed => CategoryPostingDecision.allowed,
+    _ => CategoryPostingDecision.blockedUntrusted,
+  };
+}
+
 class KategorienRepository {
   KategorienRepository(this.executor, {this.categoryWorkspaceAvailable = false});
   final QueryExecutor executor;

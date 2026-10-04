@@ -286,7 +286,10 @@ void main() {
       // excluded from revenue per subtask 04 predicate: force opening kategorie to euer-relevant and prove ignored
       await db.executor.runUpdate('UPDATE journal SET kategorie_id = 1 WHERE id = ?', <Object?>[openingId]);
       // ensure kategorie 1 has euer line (seeded); if not, set it
-      await db.executor.runUpdate('UPDATE kategorien SET euer_zeile = 12 WHERE id = 1', const []);
+      await db.executor.runUpdate(
+        "UPDATE kategorien SET euer_zeile = 12, mapping_status = 'catalog_verified', catalog_source_reference = 'TEST', catalog_source_version = '1' WHERE id = 1",
+        const [],
+      );
       final EuerService euer = EuerService(db.executor);
       final int jahr = DateTime.now().year;
       final result = await euer.generate(jahr: jahr);

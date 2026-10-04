@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/journal_entity.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart'
+    show CategoryMappingStatus, CategoryPostingDecision, decidePostingUse;
 
 /// Journal repository — raw SQL via drift executor, GoBD via DB triggers.
 /// ponytail: global executor lock ceiling — per-journal if throughput matters.
@@ -156,20 +158,34 @@ class JournalRepository {
     final int? istEuInt = istEuLieferung == null ? null : (istEuLieferung ? 1 : 0);
 
     // Resolve snapshots from category if not explicitly provided (spec §Audit snapshots).
+    // When the entry depends on category mapping values, only verified or
+    // user-confirmed mappings may drive it; legacy, review-required, and
+    // unmapped values are rejected with the category ID and a mapping-review
+    // action. Explicitly supplied snapshots never consume category mappings,
+    // so an unmapped category may label such an entry descriptively.
     String? resolvedKontoSkr03 = kontoSkr03;
     String? resolvedKontoSkr04 = kontoSkr04;
     if (resolvedKontoSkr03 == null || resolvedKontoSkr04 == null) {
       try {
         final List<Map<String, Object?>> catRows = await executor.runSelect(
-          'SELECT konto_skr03, konto_skr04 FROM kategorien WHERE id = ?',
+          'SELECT konto_skr03, konto_skr04, mapping_status FROM kategorien WHERE id = ?',
           <Object?>[kategorieId],
         );
         if (catRows.isNotEmpty) {
           final Map<String, Object?> cat = catRows.single;
+          final CategoryMappingStatus status = CategoryMappingStatus.fromDb(cat['mapping_status']);
+          final CategoryPostingDecision decision = decidePostingUse(status, requiresMapping: true);
+          if (decision == CategoryPostingDecision.blockedUntrusted) {
+            throw JournalException(
+              'Kategorie $kategorieId erfordert eine Mapping-Prüfung, bevor sie Buchungen steuern kann',
+            );
+          }
           resolvedKontoSkr03 ??= cat['konto_skr03'] as String?;
           resolvedKontoSkr04 ??= cat['konto_skr04'] as String?;
         }
-      } catch (_) {}
+      } catch (error) {
+        if (error is JournalException) rethrow;
+      }
     }
 
     final String datumStr = _formatDate(datum);

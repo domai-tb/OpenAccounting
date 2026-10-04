@@ -42,19 +42,20 @@ The system SHALL maintain a journal of all booking entries with GoBD-immutable p
 
 ### Requirement: Kategorien
 
-The system SHALL provide 65+ predefined categories with SKR03/SKR04 account mapping, euer_zeile (Anlage EÜR line number), eks_kategorie (Anlage EKS field), and activation status.
+The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance (`catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, `unmapped`). It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Without such a manifest, a fresh profile has no preconfigured mappings (explicit unconfigured state).
 
 #### Scenario: Category with SKR mapping
 
-- GIVEN a category is created or seeded
+- GIVEN a category is created from an approved manifest entry or explicitly reviewed by the user
 - WHEN the category is persisted
-- THEN it SHALL have konto_skr03, konto_skr04, euer_zeile, eks_kategorie, and aktiv fields populated
+- THEN it SHALL record its applicable mapping values together with their provenance status and source
 
 #### Scenario: User-modified SKR account
 
 - GIVEN a user overrides the SKR03 account for a category
 - WHEN the override is saved
-- THEN the system SHALL store the override in user_modified_skr03 and use it for all future entries while preserving the original default
+- THEN the entered value SHALL be preserved and the category SHALL become `review_required`
+- AND it SHALL NOT be used as a catalog-verified mapping until all populated mapping fields are explicitly reviewed
 
 #### Scenario: Inactive category
 
@@ -71,8 +72,8 @@ The system SHALL provide 65+ predefined categories with SKR03/SKR04 account mapp
 #### Scenario: Category with missing SKR mapping
 
 - GIVEN a category with konto_skr03 = NULL or konto_skr04 = NULL
-- WHEN a journal entry uses that category
-- THEN the system SHALL use a default account or flag the entry for review
+- WHEN a journal entry or export requires that account mapping
+- THEN export resolution SHALL report the category as unresolved and SHALL NOT substitute a default account
 
 ### Requirement: EÜR (Einnahmen-Überschuss-Rechnung)
 

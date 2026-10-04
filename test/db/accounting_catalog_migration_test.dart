@@ -248,5 +248,89 @@ CREATE TABLE kategorien (
       final unchanged = await fresh.kategorienRepository.findById(created.id);
       expect(unchanged?.kontoSkr03, '8002');
     });
+
+    test('test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration', () async {
+      final db = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      await db.ensureOpen();
+      addTearDown(db.close);
+      await db.executor.runCustom('DROP TABLE forderung_zahlungen');
+      final runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      await runner.setUserVersion(7);
+      await runner.run(createSchema: () async {});
+      final tables = await db.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='forderung_zahlungen'",
+        const [],
+      );
+      expect(tables, hasLength(1));
+      expect(await runner.getUserVersion(), 9);
+    });
+
+    test('test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows', () async {
+      final db = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      await db.ensureOpen();
+      addTearDown(db.close);
+      await db.executor.runCustom('DROP TABLE forderung_zahlungen');
+      await db.executor.runCustom('''
+CREATE TABLE forderung_zahlungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  forderung_id INTEGER NOT NULL REFERENCES forderungen(id),
+  journal_id INTEGER NOT NULL UNIQUE REFERENCES journal(id),
+  betrag NUMERIC(12,2) NOT NULL,
+  typ TEXT NOT NULL,
+  datum TEXT NOT NULL,
+  idempotency_key TEXT UNIQUE
+)''');
+      final katId = await db.executor.runInsert(
+        "INSERT INTO kategorien (bezeichnung, aktiv) VALUES ('Fixture', 1)",
+        const <Object?>[],
+      );
+      final journalId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ) VALUES (?, ?, ?, ?, ?)',
+        <Object?>['2026-01-05', 'Fixture', katId, '10.00', 'Einnahme'],
+      );
+      final forderungId = await db.executor.runInsert(
+        "INSERT INTO forderungen (betrag) VALUES ('10.00')",
+        const <Object?>[],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum) VALUES (?, ?, ?, ?, ?)',
+        <Object?>[forderungId, journalId, '10.00', 'zahlung', '2026-01-05'],
+      );
+      final runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      await runner.run(createSchema: () async {});
+      final rows = await db.executor.runSelect('SELECT betrag, typ FROM forderung_zahlungen', const []);
+      expect(rows.single['betrag'].toString(), contains('10'));
+      expect(rows.single['typ'], 'zahlung');
+    });
+
+    test('test_accounting_catalog_043_table_count_verification', () async {
+      final fresh = await openFresh();
+      final rows = await fresh.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        const [],
+      );
+      final names = rows.map((r) => r['name'].toString()).toSet();
+      expect(names.length, 41);
+      for (final t in AppDatabase.allTableNames) {
+        expect(names, contains(t));
+      }
+      expect(names, containsAll(<String>['forderung_zahlungen', 'category_mapping_history']));
+    });
+
+    test('test_accounting_catalog_045_missing_table_detection', () async {
+      final db = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      await db.ensureOpen();
+      addTearDown(db.close);
+      final runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      await runner.setUserVersion(8);
+      await expectLater(
+        runner.run(
+          createSchema: () async {},
+          afterFeatureSchemaDdl: (executor) async => throw StateError('CREATE TABLE failed'),
+        ),
+        throwsA(isA<StateError>()),
+      );
+      expect(await runner.getUserVersion(), 8);
+    });
   });
 }
