@@ -17,6 +17,7 @@ import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
+import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
 /// ponytail: German literals here are display strings for bank workflow; migrate to l10n via AppLocalizations when ARB coverage expands.
@@ -615,7 +616,7 @@ LIMIT 100
             _selectedTemplate?.typ,
             0,
             0,
-            reason,
+            BankImportFailurePayload.encodeFileRejection(const <String>['unknown_file_rejection']),
             'fehlgeschlagen',
           ],
         );
@@ -1651,7 +1652,20 @@ String _historyStatus(String raw, AppLocalizations l10n) {
   return raw.isEmpty ? l10n.statusUnknown : raw;
 }
 
-String? _diagnosticText(String raw) => raw.isEmpty ? null : raw;
+String? _diagnosticText(String raw) {
+  if (raw.isEmpty) return null;
+  try {
+    final Map<String, Object?> envelope = BankImportFailurePayload.decodeValidated(raw);
+    if (envelope['kind'] == 'file_rejection') {
+      final List<dynamic> codes = envelope['diagnostic_codes']! as List<dynamic>;
+      return 'Dateiabweisung (${codes.join(', ')})';
+    }
+    final List<dynamic> rows = envelope['rows']! as List<dynamic>;
+    return '${rows.length} fehlerhafte Zeilen (Details in der Historie)';
+  } on BankImportPayloadException {
+    return raw.length > 200 ? '${raw.substring(0, 200)}…' : raw;
+  }
+}
 
 String _safeError(Object error) {
   if (error is BankImportException) return error.message;

@@ -124,54 +124,54 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 - [ ] 8.4 Write failing test: `test_empty_history_offers_import` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Empty history offers import” (assert it fails for the right reason).
 - [ ] 8.5 Implement the behavior specified by “Empty history offers import” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
 - [ ] 8.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.7 Write failing test: `test_status_policy_controls_actions` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Status policy controls actions” (assert it fails for the right reason).
-- [ ] 8.8 Implement the behavior specified by “Status policy controls actions” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.10 Write failing test: `test_retry_resumes_persisted_failed_rows_under_the_original_identity` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retry resumes persisted failed rows under the original identity” (assert it fails for the right reason).
-- [ ] 8.11 Implement the behavior specified by “Retry resumes persisted failed rows under the original identity” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.12 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.13 Write failing test: `test_repeated_retry_processes_only_remaining_failures` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Repeated retry processes only remaining failures” (assert it fails for the right reason).
-- [ ] 8.14 Implement the behavior specified by “Repeated retry processes only remaining failures” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.15 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.16 Write failing test: `test_retried_row_becomes_duplicate` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retried row becomes duplicate” (assert it fails for the right reason).
-- [ ] 8.17 Implement the behavior specified by “Retried row becomes duplicate” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.18 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.19 Write failing test: `test_duplicate_only_import_completes` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Duplicate-only import completes” (assert it fails for the right reason).
-- [ ] 8.20 Implement the behavior specified by “Duplicate-only import completes” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.21 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.22 Write failing test: `test_legacy_malformed_and_unsupported_payloads_are_not_guessed` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Legacy, malformed, and unsupported payloads are not guessed” (assert it fails for the right reason).
-- [ ] 8.23 Implement the behavior specified by “Legacy, malformed, and unsupported payloads are not guessed” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.24 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.25 Write failing test: `test_rejected_whole_file_attempt_cannot_be_retried_from_history` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Rejected whole-file attempt cannot be retried from history” (assert it fails for the right reason).
-- [ ] 8.26 Implement the behavior specified by “Rejected whole-file attempt cannot be retried from history” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.27 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.28 Write failing test: `test_rule_categorized_manually_categorized_linked_and_reviewed_rows_have_distinct_states` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Rule-categorized, manually categorized, linked, and reviewed rows have distinct states” (assert it fails for the right reason).
-- [ ] 8.29 Implement the behavior specified by “Rule-categorized, manually categorized, linked, and reviewed rows have distinct states” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.30 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.31 Write failing test: `test_untouched_rule_suggestion_remains_distinguishable_from_a_user_choice` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Untouched rule suggestion remains distinguishable from a user choice” (assert it fails for the right reason).
-- [ ] 8.32 Implement the behavior specified by “Untouched rule suggestion remains distinguishable from a user choice” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.33 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.34 Write failing test: `test_review_state_is_scoped_across_completed_and_partial_attempts` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Review state is scoped across completed and partial attempts” (assert it fails for the right reason).
-- [ ] 8.35 Implement the behavior specified by “Review state is scoped across completed and partial attempts” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.36 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.37 Write failing test: `test_manual_review_is_scoped_to_the_selected_import` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Manual review is scoped to the selected import” (assert it fails for the right reason).
-- [ ] 8.38 Implement the behavior specified by “Manual review is scoped to the selected import” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.39 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.40 Write failing test: `test_reviewing_a_row_removes_it_from_the_unresolved_set` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Reviewing a row removes it from the unresolved set” (assert it fails for the right reason).
-- [ ] 8.41 Implement the behavior specified by “Reviewing a row removes it from the unresolved set” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.42 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.43 Write failing test: `test_completed_attempt_metadata_stays_immutable_while_child_review_remains_available` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Completed attempt metadata stays immutable while child review remains available” (assert it fails for the right reason).
-- [ ] 8.44 Implement the behavior specified by “Completed attempt metadata stays immutable while child review remains available” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.45 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.46 Write failing test: `test_manual_review_does_not_create_a_posting` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Manual review does not create a posting” (assert it fails for the right reason).
-- [ ] 8.47 Implement the behavior specified by “Manual review does not create a posting” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.48 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.49 Write failing test: `test_retry_failure_leaves_the_prior_attempt_usable` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retry failure leaves the prior attempt usable” (assert it fails for the right reason).
-- [ ] 8.50 Implement the behavior specified by “Retry failure leaves the prior attempt usable” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.51 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.52 Write failing test: `test_history_search_filters_before_stable_pagination` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History search filters before stable pagination” (assert it fails for the right reason).
-- [ ] 8.53 Implement the behavior specified by “History search filters before stable pagination” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.54 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.7 Write failing test: `test_status_policy_controls_actions` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Status policy controls actions” (assert it fails for the right reason).
+- [x] 8.8 Implement the behavior specified by “Status policy controls actions” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.10 Write failing test: `test_retry_resumes_persisted_failed_rows_under_the_original_identity` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retry resumes persisted failed rows under the original identity” (assert it fails for the right reason).
+- [x] 8.11 Implement the behavior specified by “Retry resumes persisted failed rows under the original identity” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.13 Write failing test: `test_repeated_retry_processes_only_remaining_failures` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Repeated retry processes only remaining failures” (assert it fails for the right reason).
+- [x] 8.14 Implement the behavior specified by “Repeated retry processes only remaining failures” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.15 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.16 Write failing test: `test_retried_row_becomes_duplicate` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retried row becomes duplicate” (assert it fails for the right reason).
+- [x] 8.17 Implement the behavior specified by “Retried row becomes duplicate” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.18 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.19 Write failing test: `test_duplicate_only_import_completes` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Duplicate-only import completes” (assert it fails for the right reason).
+- [x] 8.20 Implement the behavior specified by “Duplicate-only import completes” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.21 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.22 Write failing test: `test_legacy_malformed_and_unsupported_payloads_are_not_guessed` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Legacy, malformed, and unsupported payloads are not guessed” (assert it fails for the right reason).
+- [x] 8.23 Implement the behavior specified by “Legacy, malformed, and unsupported payloads are not guessed” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.24 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.25 Write failing test: `test_rejected_whole_file_attempt_cannot_be_retried_from_history` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Rejected whole-file attempt cannot be retried from history” (assert it fails for the right reason).
+- [x] 8.26 Implement the behavior specified by “Rejected whole-file attempt cannot be retried from history” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.27 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.28 Write failing test: `test_rule_categorized_manually_categorized_linked_and_reviewed_rows_have_distinct_states` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Rule-categorized, manually categorized, linked, and reviewed rows have distinct states” (assert it fails for the right reason).
+- [x] 8.29 Implement the behavior specified by “Rule-categorized, manually categorized, linked, and reviewed rows have distinct states” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.30 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.31 Write failing test: `test_untouched_rule_suggestion_remains_distinguishable_from_a_user_choice` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Untouched rule suggestion remains distinguishable from a user choice” (assert it fails for the right reason).
+- [x] 8.32 Implement the behavior specified by “Untouched rule suggestion remains distinguishable from a user choice” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.33 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.34 Write failing test: `test_review_state_is_scoped_across_completed_and_partial_attempts` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Review state is scoped across completed and partial attempts” (assert it fails for the right reason).
+- [x] 8.35 Implement the behavior specified by “Review state is scoped across completed and partial attempts” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.36 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.37 Write failing test: `test_manual_review_is_scoped_to_the_selected_import` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Manual review is scoped to the selected import” (assert it fails for the right reason).
+- [x] 8.38 Implement the behavior specified by “Manual review is scoped to the selected import” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.39 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.40 Write failing test: `test_reviewing_a_row_removes_it_from_the_unresolved_set` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Reviewing a row removes it from the unresolved set” (assert it fails for the right reason).
+- [x] 8.41 Implement the behavior specified by “Reviewing a row removes it from the unresolved set” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.42 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.43 Write failing test: `test_completed_attempt_metadata_stays_immutable_while_child_review_remains_available` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Completed attempt metadata stays immutable while child review remains available” (assert it fails for the right reason).
+- [x] 8.44 Implement the behavior specified by “Completed attempt metadata stays immutable while child review remains available” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.45 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.46 Write failing test: `test_manual_review_does_not_create_a_posting` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Manual review does not create a posting” (assert it fails for the right reason).
+- [x] 8.47 Implement the behavior specified by “Manual review does not create a posting” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.48 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.49 Write failing test: `test_retry_failure_leaves_the_prior_attempt_usable` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Retry failure leaves the prior attempt usable” (assert it fails for the right reason).
+- [x] 8.50 Implement the behavior specified by “Retry failure leaves the prior attempt usable” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.51 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.52 Write failing test: `test_history_search_filters_before_stable_pagination` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History search filters before stable pagination” (assert it fails for the right reason).
+- [x] 8.53 Implement the behavior specified by “History search filters before stable pagination” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.54 Refactor the related code; focused tests and the full suite stay green.
 - [ ] 8.55 Write failing test: `test_detail_return_restores_the_same_history_query` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Detail return restores the same history query” (assert it fails for the right reason).
 - [ ] 8.56 Implement the behavior specified by “Detail return restores the same history query” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
 - [ ] 8.57 Refactor the related code; focused tests and the full suite stay green.

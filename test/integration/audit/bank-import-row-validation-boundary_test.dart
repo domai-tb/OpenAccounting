@@ -1,11 +1,10 @@
 // ignore_for_file: file_names
 
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
+import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
 const int _kontoId = 1;
@@ -185,14 +184,17 @@ void main() {
     expect(partialRow['anzahl_fehlgeschlagen'], 2);
     expect(partialRow['duplikate'], 0);
     expect(partialRow['status'], 'teilweise');
-    final List<dynamic> partialDetails = jsonDecode(partialRow['fehler_details']! as String) as List<dynamic>;
+    final Map<String, Object?> envelope = BankImportFailurePayload.decodeValidated(
+      partialRow['fehler_details']! as String,
+    );
+    expect(envelope['kind'], 'rows');
+    final List<dynamic> partialDetails = envelope['rows']! as List<dynamic>;
     expect(partialDetails, hasLength(2));
     expect(partialDetails.every((dynamic item) => item is Map<String, dynamic>), isTrue);
     expect(partialDetails.map((dynamic item) => (item as Map<String, dynamic>)['source_row']), <Object?>[3, 4]);
     final Map<String, dynamic> dual = partialDetails.last as Map<String, dynamic>;
-    expect(dual['diagnostics'], <String>['Datum ungültig', 'Betrag ungültig']);
-    expect(dual['error'], 'Datum ungültig; Betrag ungültig');
-    expect(dual['parsed_datum'], isNull);
+    expect(dual['diagnostic_codes'], <String>['invalid_date', 'invalid_amount']);
+    expect(dual['datum'], isNull);
     expect(dual['raw_datum'], '');
     expect(dual['raw_betrag'], '');
 

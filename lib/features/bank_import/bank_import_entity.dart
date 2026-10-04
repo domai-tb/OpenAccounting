@@ -89,6 +89,8 @@ class ImportRowFailure {
     required this.transaction,
     required this.error,
     this.diagnostics = const <String>[],
+    this.diagnosticCodes = const <String>['unknown_row_failure'],
+    this.kategorieQuelle = 'keine',
   });
 
   /// One-based row number within the confirmed import batch.
@@ -102,6 +104,12 @@ class ImportRowFailure {
 
   /// Stable machine-readable categories for row validation failures.
   final List<String> diagnostics;
+
+  /// Stable versioned payload codes (never localized text).
+  final List<String> diagnosticCodes;
+
+  /// Category provenance: `keine`, `regel_vorschlag`, `benutzerentscheidung`.
+  final String kategorieQuelle;
 
   /// One-based source row delegated from the failed transaction.
   int get sourceRowNumber => transaction.sourceRowNumber ?? rowNumber;
@@ -129,6 +137,23 @@ class ImportRowFailure {
     'partner': transaction.partner,
     'diagnostics': diagnostics,
     'error': error,
+  };
+
+  /// Version-1 retry-payload row (stable codes only, no localized text).
+  Map<String, Object?> toPayloadJson() => <String, Object?>{
+    'row': rowNumber,
+    'source_row': sourceRowNumber,
+    'datum': transaction.datum?.toIso8601String().substring(0, 10),
+    'raw_datum': transaction.rawDatum ?? '',
+    'betrag': transaction.betrag,
+    'raw_betrag': transaction.rawBetrag ?? transaction.betrag,
+    'partner': transaction.partner,
+    'verwendungszweck': transaction.verwendungszweck,
+    'gegenkonto': transaction.gegenkonto,
+    'kategorie_id': transaction.kategorieId,
+    'journal_id': transaction.journalId,
+    'kategorie_quelle': kategorieQuelle,
+    'diagnostic_codes': diagnosticCodes,
   };
 
   @override
@@ -198,6 +223,82 @@ class MatchCandidate {
   final String? datum;
   final String? betrag;
   final String? beschreibung;
+}
+
+/// Per-row persistence outcome shared by initial imports and history retries.
+typedef RowOutcome = ({bool inserted, bool duplicate, bool autoCategorized, ImportRowFailure? failure});
+
+/// One typed history attempt for the actionable import history.
+class BankImportHistoryAttempt {
+  const BankImportHistoryAttempt({
+    required this.id,
+    required this.dateiname,
+    required this.datum,
+    required this.status,
+    required this.imported,
+    required this.duplicates,
+    required this.failed,
+    required this.unresolvedNeu,
+    required this.retryable,
+    this.templateTyp,
+  });
+  final int id;
+  final String dateiname;
+  final String datum;
+  final String status;
+  final int imported;
+  final int duplicates;
+  final int failed;
+  final int unresolvedNeu;
+  final bool retryable;
+  final String? templateTyp;
+}
+
+/// Paginated history result: filter-before-paginate, newest first.
+class BankImportHistoryPage {
+  const BankImportHistoryPage({required this.attempts, required this.total, required this.page, required this.hasMore});
+  final List<BankImportHistoryAttempt> attempts;
+  final int total;
+  final int page;
+  final bool hasMore;
+}
+
+/// Typed detail for one history attempt with safe diagnostics.
+class BankImportHistoryDetail {
+  const BankImportHistoryDetail({
+    required this.id,
+    required this.dateiname,
+    required this.datum,
+    required this.status,
+    required this.imported,
+    required this.duplicates,
+    required this.failed,
+    required this.unresolvedNeu,
+    required this.retryable,
+    required this.reviewOffered,
+    required this.diagnostics,
+    this.templateTyp,
+  });
+  final int id;
+  final String dateiname;
+  final String datum;
+  final String status;
+  final int imported;
+  final int duplicates;
+  final int failed;
+  final int unresolvedNeu;
+  final bool retryable;
+  final bool reviewOffered;
+  final List<String> diagnostics;
+  final String? templateTyp;
+}
+
+/// Allowed actions for a history row per the status policy.
+class BankImportHistoryActions {
+  const BankImportHistoryActions({required this.retry, required this.review, required this.newFile});
+  final bool retry;
+  final bool review;
+  final bool newFile;
 }
 
 /// Thrown when CSV cannot be parsed or no template matches.

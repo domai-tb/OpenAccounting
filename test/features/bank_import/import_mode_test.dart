@@ -51,7 +51,7 @@ void main() {
 
     Future<int> journalCount() async {
       final rows = await db.executor.runSelect('SELECT COUNT(*) AS c FROM journal', const []);
-      return ((rows.single['c']! as num)).toInt();
+      return (rows.single['c']! as num).toInt();
     }
 
     test('test_automatic_mode', () async {
@@ -74,12 +74,7 @@ void main() {
     test('test_manual_mode', () async {
       await modes.setMode(BankImportMode.manual);
       await addJournal();
-      final result = await service.importTransactions(
-        kontoId: kontoId,
-        rawTxs: <RawTx>[matchingTx()],
-        mode: 'manuell',
-        locale: 'de_DE',
-      );
+      final result = await service.importTransactions(kontoId: kontoId, rawTxs: <RawTx>[matchingTx()], locale: 'de_DE');
       final rows = await db.executor.runSelect('SELECT journal_id, status FROM bank_transaktionen', const []);
       expect(rows.single['journal_id'], isNull);
       expect(rows.single['status'], 'neu');
@@ -112,12 +107,7 @@ void main() {
       expect(await modes.getMode(), BankImportMode.manual);
 
       await modes.setMode(BankImportMode.automatic);
-      await service.importTransactions(
-        kontoId: kontoId,
-        rawTxs: <RawTx>[matchingTx()],
-        mode: 'manuell',
-        locale: 'de_DE',
-      );
+      await service.importTransactions(kontoId: kontoId, rawTxs: <RawTx>[matchingTx()], locale: 'de_DE');
       expect(await modes.getMode(), BankImportMode.automatic);
     });
   });

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
+import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 
@@ -295,120 +296,28 @@ class BankImportService {
       final RawTx tx = rawTxs[index];
       final int rowNumber = index + 1;
 
-      try {
-        // String money: normalize betrag via money helper to 2 decimals for hash + storage.
-        final ({List<String> diagnostics, String? normalizedAmount}) validation = _validateRow(tx, l10n);
-        if (validation.diagnostics.isNotEmpty) {
-          final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
-          final ImportRowFailure failure = ImportRowFailure(
-            rowNumber: rowNumber,
-            transaction: failureTransaction,
-            diagnostics: validation.diagnostics,
-            error: validation.diagnostics.join('; '),
-          );
-          failures.add(failure);
-          continue;
-        }
-        final String normBetrag = validation.normalizedAmount!;
-        String hash = _hashFor(tx, normBetrag);
-
-        final bool isDuplicate = await _hasDuplicate(kontoId: kontoId, hash: hash);
-        if (isDuplicate && !allowDuplicateOverride) {
-          duplicates++;
-          continue;
-        }
-
-        if (isDuplicate && allowDuplicateOverride) {
-          hash = await _uniqueOverrideHash(kontoId: kontoId, hash: hash, l10n: l10n);
-        }
-
-        // A reviewed category is authoritative. Only a rule result contributes
-        // to auto-categorized counts; both counts are updated after insertion.
-        final bool hasReviewedCategory = tx.kategorieId != null;
-        final int? kategorieId = tx.kategorieId ?? await applyRules(tx.verwendungszweck);
-        final bool wasAutoCategorized = !hasReviewedCategory && kategorieId != null;
-
-        // Score match against journals — link only a unique top candidate
-        // scoring at least 90 in automatic mode. Tied tops stay unlinked;
-        // manual mode never links suggestions (explicit selection only).
-        int? matchedJournalId = tx.journalId;
-        if (matchedJournalId == null && !candidatesUnavailable && journals.isNotEmpty) {
-          int bestScore = -1;
-          int? bestId;
-          int topCount = 0;
-          for (final j in journals) {
-            final int score = computeScore(tx, j);
-            if (score > bestScore) {
-              bestScore = score;
-              final Object? journalId = j['id'];
-              bestId = journalId == null ? null : (journalId as num).toInt();
-              topCount = 1;
-            } else if (score == bestScore) {
-              topCount++;
-            }
-          }
-          final bool uniqueTop = topCount == 1;
-          if (!uniqueTop || bestScore < 90 || mode.toLowerCase() != 'automatisch') {
-            bestId = null;
-          }
-          matchedJournalId = bestId;
-        }
-
-        // Review status from decisions: linked → gebucht; user-selected
-        // category → geprueft; rule-assigned or none → neu. A rule suggestion
-        // without explicit user decision never closes the row.
-        final String datumStr = _formatDate(tx.datum!);
-        final String status = matchedJournalId != null ? 'gebucht' : (hasReviewedCategory ? 'geprueft' : 'neu');
-
-        await executor.runInsert(
-          'INSERT INTO bank_transaktionen (konto_id, import_id, datum, betrag, verwendungszweck, '
-          'gegenkonto, gegenkonto_name, kategorie_id, journal_id, dedupe_hash, status) '
-          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          <Object?>[
-            kontoId,
-            importId,
-            datumStr,
-            normBetrag,
-            tx.verwendungszweck,
-            tx.gegenkonto,
-            tx.partner,
-            kategorieId,
-            matchedJournalId,
-            hash,
-            status,
-          ],
-        );
+      final RowOutcome outcome = await _persistRow(
+        kontoId: kontoId,
+        importId: importId,
+        tx: tx,
+        rowNumber: rowNumber,
+        mode: mode,
+        journals: journals,
+        candidatesUnavailable: candidatesUnavailable,
+        allowDuplicateOverride: allowDuplicateOverride,
+        l10n: l10n,
+      );
+      if (outcome.failure != null) {
+        failures.add(outcome.failure!);
+      } else if (outcome.duplicate) {
+        duplicates++;
+      } else {
         imported++;
-        if (wasAutoCategorized) {
+        if (outcome.autoCategorized) {
           autoCat++;
         } else {
           manualReview++;
         }
-      } catch (error, stackTrace) {
-        // A unique-index race is a duplicate outcome, not a failed row.
-        bool becameDuplicate = false;
-        try {
-          final String normalized = _normalizeBetragForStorage(tx.betrag, l10n);
-          becameDuplicate = await _hasDuplicate(kontoId: kontoId, hash: _hashFor(tx, normalized));
-        } catch (_) {
-          // Keep the original insert failure as the actionable diagnostic.
-        }
-        if (becameDuplicate && !allowDuplicateOverride) {
-          duplicates++;
-          continue;
-        }
-
-        final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
-        final ImportRowFailure failure = ImportRowFailure(
-          rowNumber: rowNumber,
-          transaction: failureTransaction,
-          error: _errorMessage(error, l10n),
-        );
-        failures.add(failure);
-        debugPrint('bank_import row ${failure.rowNumber} insert failed: ${failure.error}');
-        // Preserve the original stack in logs while allowing other rows to be
-        // persisted and the caller to retry this row.
-        debugPrint('$stackTrace');
       }
     }
 
@@ -454,6 +363,7 @@ class BankImportService {
     String dateiname = 'import.csv',
     BankTemplate? template,
     required String locale,
+    List<String> diagnosticCodes = const <String>['unknown_file_rejection'],
   }) async {
     final AppLocalizations l10n = _l10nFor(locale);
     final String message = diagnostic.trim();
@@ -477,6 +387,7 @@ class BankImportService {
       template: template,
       status: _historyFailedStatus,
       diagnosticsOverride: diagnostics,
+      fileRejectionCodes: diagnosticCodes,
     );
     if (!historyUpdated) {
       diagnostics.add(l10n.bankHistoryNotFinalSaved);
@@ -533,6 +444,413 @@ class BankImportService {
       );
     }
     return executor.runSelect("SELECT * FROM bank_transaktionen WHERE status = 'neu' ORDER BY id", const <Object?>[]);
+  }
+
+  /// Retries an attempt's persisted failed rows under the original
+  /// `bank_imports.id`. Only `teilweise`/`fehlgeschlagen` attempts with a
+  /// valid version-1 row payload are retryable; rejected-file and legacy
+  /// payloads throw. Successful child rows keep their IDs; duplicate-resolved
+  /// rows leave the payload and bump the duplicate aggregate exactly once.
+  /// Everything commits atomically; any failure rolls back to the prior
+  /// attempt state.
+  ///
+  /// [corrected] optionally replaces payload rows (keyed by payload `row`
+  /// number) with user-corrected transactions; row identity is preserved.
+  Future<ImportResult> retryImport({
+    required int importId,
+    required String locale,
+    String mode = 'manuell',
+    Map<int, RawTx> corrected = const <int, RawTx>{},
+  }) async {
+    final AppLocalizations l10n = _l10nFor(locale);
+    final attempts = await executor.runSelect('SELECT * FROM bank_imports WHERE id = ?', <Object?>[importId]);
+    if (attempts.isEmpty) throw BankImportException(l10n.bankHistoryNotFinalSaved);
+    final Map<String, Object?> attempt = attempts.single;
+    final String status = (attempt['status']?.toString() ?? '').toLowerCase();
+    if (status != 'teilweise' && status != 'fehlgeschlagen') {
+      throw const BankImportException('Import ist nicht wiederholbar');
+    }
+    final Object? rawPayload = attempt['fehler_details'];
+    if (rawPayload == null || rawPayload.toString().trim().isEmpty) {
+      throw const BankImportException('Keine wiederholbaren Zeilen vorhanden');
+    }
+    final Map<String, Object?> envelope;
+    try {
+      envelope = BankImportFailurePayload.decodeValidated(rawPayload.toString());
+    } on BankImportPayloadException catch (e) {
+      throw BankImportException(e.message);
+    }
+    if (envelope['kind'] != 'rows') {
+      throw const BankImportException('Dateiabweisung braucht einen neuen Import');
+    }
+    final List<Map<String, Object?>> payloadRows = (envelope['rows']! as List)
+        .map((r) => Map<String, Object?>.from(r as Map))
+        .toList(growable: false);
+    final int kontoId = ((attempt['konto_id'] as num?) ?? 0).toInt();
+    if (kontoId <= 0) throw BankImportException(l10n.bankInvalidImportNoAccount);
+
+    List<Map<String, Object?>> journals = <Map<String, Object?>>[];
+    bool candidatesUnavailable = false;
+    try {
+      journals = await loadMatchCandidates();
+    } catch (_) {
+      candidatesUnavailable = true;
+    }
+
+    int newDuplicates = 0;
+    final List<Map<String, Object?>> remaining = <Map<String, Object?>>[];
+    await executor.runCustom('BEGIN');
+    try {
+      for (final row in payloadRows) {
+        final int payloadRow = (row['row']! as num).toInt();
+        RawTx tx = _txFromPayloadRow(row);
+        final RawTx? fix = corrected[payloadRow];
+        if (fix != null) {
+          tx = fix;
+        }
+        final RowOutcome outcome = await _persistRow(
+          kontoId: kontoId,
+          importId: importId,
+          tx: tx,
+          rowNumber: payloadRow,
+          mode: mode,
+          journals: journals,
+          candidatesUnavailable: candidatesUnavailable,
+          allowDuplicateOverride: false,
+          l10n: l10n,
+        );
+        if (outcome.duplicate) {
+          newDuplicates++;
+        } else if (outcome.failure != null) {
+          remaining.add(outcome.failure!.toPayloadJson());
+        }
+      }
+
+      final int priorDuplicates = ((attempt['duplikate'] as num?) ?? 0).toInt();
+      final int childRows = await _childRowCount(importId);
+      final String nextStatus = remaining.isEmpty ? 'importiert' : (childRows > 0 ? 'teilweise' : 'fehlgeschlagen');
+      final String? nextPayload = remaining.isEmpty ? null : BankImportFailurePayload.encodeRows(remaining);
+      await executor.runUpdate(
+        'UPDATE bank_imports SET duplikate = ?, anzahl_importiert = ?, anzahl_fehlgeschlagen = ?, '
+        'fehler_details = ?, status = ? WHERE id = ?',
+        <Object?>[priorDuplicates + newDuplicates, childRows, remaining.length, nextPayload, nextStatus, importId],
+      );
+      await executor.runCustom('COMMIT');
+      return ImportResult(
+        imported: childRows,
+        duplicatesSkipped: priorDuplicates + newDuplicates,
+        autoCategorized: 0,
+        manualReview: 0,
+        failed: remaining.length,
+        status: nextStatus,
+        importId: importId,
+        candidatesUnavailable: candidatesUnavailable,
+      );
+    } catch (error, stackTrace) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (_) {}
+      Error.throwWithStackTrace(
+        error is BankImportException ? error : BankImportException(_errorMessage(error, _l10nFor(locale))),
+        stackTrace,
+      );
+    }
+  }
+
+  /// Typed history query: case-insensitive filename/template/status search
+  /// applied before stable pagination (newest first, ID descending on ties).
+  Future<BankImportHistoryPage> queryHistory({String q = '', int page = 1, int pageSize = 50}) async {
+    final String needle = '%${q.trim().toLowerCase()}%';
+    final countRows = await executor.runSelect(
+      "SELECT COUNT(*) AS c FROM bank_imports WHERE LOWER(COALESCE(dateiname, '')) LIKE ? "
+      "OR LOWER(COALESCE(template_typ, '')) LIKE ? OR LOWER(COALESCE(status, '')) LIKE ?",
+      <Object?>[needle, needle, needle],
+    );
+    final int total = (countRows.single['c']! as num).toInt();
+    final int lastPage = total == 0 ? 1 : ((total - 1) ~/ pageSize) + 1;
+    final int safePage = page < 1 ? 1 : (page > lastPage ? lastPage : page);
+    final int offset = (safePage - 1) * pageSize;
+    final rows = await executor.runSelect(
+      "SELECT * FROM bank_imports WHERE LOWER(COALESCE(dateiname, '')) LIKE ? "
+      "OR LOWER(COALESCE(template_typ, '')) LIKE ? OR LOWER(COALESCE(status, '')) LIKE ? "
+      'ORDER BY datum DESC, id DESC LIMIT ? OFFSET ?',
+      <Object?>[needle, needle, needle, pageSize, offset],
+    );
+    final List<BankImportHistoryAttempt> attempts = <BankImportHistoryAttempt>[];
+    for (final row in rows) {
+      final int id = (row['id']! as num).toInt();
+      attempts.add(
+        BankImportHistoryAttempt(
+          id: id,
+          dateiname: row['dateiname']?.toString() ?? '',
+          datum: row['datum']?.toString() ?? '',
+          status: row['status']?.toString() ?? '',
+          imported: ((row['anzahl_importiert'] as num?) ?? 0).toInt(),
+          duplicates: ((row['duplikate'] as num?) ?? 0).toInt(),
+          failed: ((row['anzahl_fehlgeschlagen'] as num?) ?? 0).toInt(),
+          templateTyp: row['template_typ']?.toString(),
+          unresolvedNeu: await _unresolvedCount(id),
+          retryable: _payloadRetryable(row['fehler_details'], row['status']?.toString()),
+        ),
+      );
+    }
+    return BankImportHistoryPage(attempts: attempts, total: total, page: safePage, hasMore: safePage < lastPage);
+  }
+
+  /// Typed detail for one attempt: metadata, safe diagnostics, unresolved
+  /// count, and allowed actions. Raw bank values never appear in error text.
+  Future<BankImportHistoryDetail> historyDetail(int importId) async {
+    final rows = await executor.runSelect('SELECT * FROM bank_imports WHERE id = ?', <Object?>[importId]);
+    if (rows.isEmpty) throw const BankImportException('Importverlauf nicht gefunden');
+    final Map<String, Object?> row = rows.single;
+    final String status = row['status']?.toString() ?? '';
+    final List<String> diagnostics = _safeDiagnostics(row['fehler_details']);
+    final int unresolved = await _unresolvedCount(importId);
+    final bool retryable = _payloadRetryable(row['fehler_details'], status);
+    return BankImportHistoryDetail(
+      id: importId,
+      dateiname: row['dateiname']?.toString() ?? '',
+      datum: row['datum']?.toString() ?? '',
+      status: status,
+      imported: ((row['anzahl_importiert'] as num?) ?? 0).toInt(),
+      duplicates: ((row['duplikate'] as num?) ?? 0).toInt(),
+      failed: ((row['anzahl_fehlgeschlagen'] as num?) ?? 0).toInt(),
+      templateTyp: row['template_typ']?.toString(),
+      diagnostics: diagnostics,
+      unresolvedNeu: unresolved,
+      retryable: retryable,
+      reviewOffered: unresolved > 0,
+    );
+  }
+
+  RawTx _txFromPayloadRow(Map<String, Object?> row) {
+    DateTime? datum;
+    final Object? rawDatum = row['datum'];
+    if (rawDatum is String && rawDatum.isNotEmpty) {
+      datum = DateTime.tryParse(rawDatum.length >= 10 ? rawDatum.substring(0, 10) : rawDatum);
+    }
+    int? asPositiveInt(Object? v) {
+      if (v is int && v > 0) return v;
+      if (v is num && v.toInt() == v && v.toInt() > 0) return v.toInt();
+      return null;
+    }
+
+    return RawTx(
+      datum: datum,
+      betrag: row['betrag']?.toString() ?? '',
+      verwendungszweck: row['verwendungszweck']?.toString() ?? '',
+      partner: row['partner']?.toString() ?? '',
+      gegenkonto: row['gegenkonto']?.toString(),
+      kategorieId: asPositiveInt(row['kategorie_id']),
+      journalId: asPositiveInt(row['journal_id']),
+      rawDatum: row['raw_datum']?.toString(),
+      rawBetrag: row['raw_betrag']?.toString(),
+      sourceRowNumber: asPositiveInt(row['source_row']),
+    );
+  }
+
+  Future<int> _childRowCount(int importId) async {
+    final rows = await executor.runSelect('SELECT COUNT(*) AS c FROM bank_transaktionen WHERE import_id = ?', <Object?>[
+      importId,
+    ]);
+    return (rows.single['c']! as num).toInt();
+  }
+
+  Future<int> _unresolvedCount(int importId) async {
+    try {
+      final rows = await executor.runSelect(
+        "SELECT COUNT(*) AS c FROM bank_transaktionen WHERE import_id = ? AND status = 'neu'",
+        <Object?>[importId],
+      );
+      return (rows.single['c']! as num).toInt();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  bool _payloadRetryable(Object? raw, Object? status) {
+    final String s = (status?.toString() ?? '').toLowerCase();
+    if (s != 'teilweise' && s != 'fehlgeschlagen') return false;
+    if (raw == null || raw.toString().trim().isEmpty) return false;
+    try {
+      final envelope = BankImportFailurePayload.decodeValidated(raw.toString());
+      return envelope['kind'] == 'rows';
+    } on BankImportPayloadException {
+      return false;
+    }
+  }
+
+  /// Safe display diagnostics: stable codes only, never raw bank values.
+  List<String> _safeDiagnostics(Object? raw) {
+    if (raw == null || raw.toString().trim().isEmpty) return const <String>[];
+    try {
+      final envelope = BankImportFailurePayload.decodeValidated(raw.toString());
+      if (envelope['kind'] == 'file_rejection') {
+        return (envelope['diagnostic_codes']! as List).map((c) => 'Datei: $c').toList(growable: false);
+      }
+      final rows = (envelope['rows']! as List).cast<Map<String, Object?>>();
+      return rows
+          .map((r) => 'Zeile ${r['row']}: ${(r['diagnostic_codes']! as List).join(', ')}')
+          .toList(growable: false);
+    } on BankImportPayloadException {
+      return const <String>['Details nicht verfügbar'];
+    }
+  }
+
+  /// Action policy for a history row. Retry needs a validated retryable
+  /// payload; review needs unresolved rows; otherwise a new file selection
+  /// is offered instead of retry.
+  BankImportHistoryActions historyActions({
+    required String status,
+    required bool retryable,
+    required int unresolvedNeu,
+  }) {
+    final bool retry = (status == 'teilweise' || status == 'fehlgeschlagen') && retryable;
+    return BankImportHistoryActions(retry: retry, review: unresolvedNeu > 0, newFile: !retry);
+  }
+
+  /// Persists one confirmed row: validate, dedup, categorize, score-link,
+  /// insert. Shared by initial imports and history retries so both produce
+  /// identical rows, statuses, and failure payloads.
+  Future<RowOutcome> _persistRow({
+    required int kontoId,
+    required int importId,
+    required RawTx tx,
+    required int rowNumber,
+    required String mode,
+    required List<Map<String, Object?>> journals,
+    required bool candidatesUnavailable,
+    required bool allowDuplicateOverride,
+    required AppLocalizations l10n,
+  }) async {
+    String rowQuelle = tx.kategorieId != null ? 'benutzerentscheidung' : 'keine';
+    try {
+      // String money: normalize betrag via money helper to 2 decimals for hash + storage.
+      final ({List<String> diagnostics, List<String> codes, String? normalizedAmount}) validation = _validateRow(
+        tx,
+        l10n,
+      );
+      if (validation.diagnostics.isNotEmpty) {
+        final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
+        String quelle = tx.kategorieId != null ? 'benutzerentscheidung' : 'keine';
+        if (quelle == 'keine' && await applyRules(tx.verwendungszweck) != null) {
+          quelle = 'regel_vorschlag';
+        }
+        return (
+          inserted: false,
+          duplicate: false,
+          autoCategorized: false,
+          failure: ImportRowFailure(
+            rowNumber: rowNumber,
+            transaction: failureTransaction,
+            diagnostics: validation.diagnostics,
+            error: validation.diagnostics.join('; '),
+            diagnosticCodes: validation.codes,
+            kategorieQuelle: quelle,
+          ),
+        );
+      }
+      final String normBetrag = validation.normalizedAmount!;
+      String hash = _hashFor(tx, normBetrag);
+
+      final bool isDuplicate = await _hasDuplicate(kontoId: kontoId, hash: hash);
+      if (isDuplicate && !allowDuplicateOverride) {
+        return (inserted: false, duplicate: true, autoCategorized: false, failure: null);
+      }
+
+      if (isDuplicate && allowDuplicateOverride) {
+        hash = await _uniqueOverrideHash(kontoId: kontoId, hash: hash, l10n: l10n);
+      }
+
+      // A reviewed category is authoritative. Only a rule result contributes
+      // to auto-categorized counts; both counts are updated after insertion.
+      final bool hasReviewedCategory = tx.kategorieId != null;
+      final int? kategorieId = tx.kategorieId ?? await applyRules(tx.verwendungszweck);
+      final bool wasAutoCategorized = !hasReviewedCategory && kategorieId != null;
+      if (wasAutoCategorized) rowQuelle = 'regel_vorschlag';
+
+      // Score match against journals — link only a unique top candidate
+      // scoring at least 90 in automatic mode. Tied tops stay unlinked;
+      // manual mode never links suggestions (explicit selection only).
+      int? matchedJournalId = tx.journalId;
+      if (matchedJournalId == null && !candidatesUnavailable && journals.isNotEmpty) {
+        int bestScore = -1;
+        int? bestId;
+        int topCount = 0;
+        for (final j in journals) {
+          final int score = computeScore(tx, j);
+          if (score > bestScore) {
+            bestScore = score;
+            final Object? journalId = j['id'];
+            bestId = journalId == null ? null : (journalId as num).toInt();
+            topCount = 1;
+          } else if (score == bestScore) {
+            topCount++;
+          }
+        }
+        final bool uniqueTop = topCount == 1;
+        if (!uniqueTop || bestScore < 90 || mode.toLowerCase() != 'automatisch') {
+          bestId = null;
+        }
+        matchedJournalId = bestId;
+      }
+
+      // Review status from decisions: linked → gebucht; user-selected
+      // category → geprueft; rule-assigned or none → neu. A rule suggestion
+      // without explicit user decision never closes the row.
+      final String datumStr = _formatDate(tx.datum!);
+      final String status = matchedJournalId != null ? 'gebucht' : (hasReviewedCategory ? 'geprueft' : 'neu');
+
+      await executor.runInsert(
+        'INSERT INTO bank_transaktionen (konto_id, import_id, datum, betrag, verwendungszweck, '
+        'gegenkonto, gegenkonto_name, kategorie_id, journal_id, dedupe_hash, status) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          kontoId,
+          importId,
+          datumStr,
+          normBetrag,
+          tx.verwendungszweck,
+          tx.gegenkonto,
+          tx.partner,
+          kategorieId,
+          matchedJournalId,
+          hash,
+          status,
+        ],
+      );
+      return (inserted: true, duplicate: false, autoCategorized: wasAutoCategorized, failure: null);
+    } catch (error, stackTrace) {
+      // A unique-index race is a duplicate outcome, not a failed row.
+      bool becameDuplicate = false;
+      try {
+        final String normalized = _normalizeBetragForStorage(tx.betrag, l10n);
+        becameDuplicate = await _hasDuplicate(kontoId: kontoId, hash: _hashFor(tx, normalized));
+      } catch (_) {
+        // Keep the original insert failure as the actionable diagnostic.
+      }
+      if (becameDuplicate && !allowDuplicateOverride) {
+        return (inserted: false, duplicate: true, autoCategorized: false, failure: null);
+      }
+
+      final RawTx failureTransaction = tx.sourceRowNumber == null ? tx.copyWith(sourceRowNumber: rowNumber) : tx;
+      debugPrint('bank_import row $rowNumber insert failed: ${_errorMessage(error, l10n)}');
+      // Preserve the original stack in logs while allowing other rows to be
+      // persisted and the caller to retry this row.
+      debugPrint('$stackTrace');
+      return (
+        inserted: false,
+        duplicate: false,
+        autoCategorized: false,
+        failure: ImportRowFailure(
+          rowNumber: rowNumber,
+          transaction: failureTransaction,
+          error: _errorMessage(error, l10n),
+          diagnosticCodes: const <String>['database_write_failed'],
+          kategorieQuelle: rowQuelle,
+        ),
+      );
+    }
   }
 
   void _validateImport({required int kontoId, required List<RawTx> rawTxs, required AppLocalizations l10n}) {
@@ -597,12 +915,17 @@ class BankImportService {
     required BankTemplate? template,
     required String status,
     List<String>? diagnosticsOverride,
+    List<String>? fileRejectionCodes,
   }) async {
     final List<String> diagnostics =
         diagnosticsOverride ?? failures.map((failure) => failure.toDiagnostic()).toList(growable: false);
     final String? details;
     if (failures.isNotEmpty) {
-      details = jsonEncode(failures.map((failure) => failure.toJson()).toList(growable: false));
+      details = BankImportFailurePayload.encodeRows(
+        failures.map((failure) => failure.toPayloadJson()).toList(growable: false),
+      );
+    } else if (fileRejectionCodes != null) {
+      details = BankImportFailurePayload.encodeFileRejection(fileRejectionCodes);
     } else if (diagnostics.isNotEmpty) {
       details = jsonEncode(
         diagnostics.map((diagnostic) => <String, Object?>{'message': diagnostic}).toList(growable: false),
@@ -712,10 +1035,15 @@ class BankImportService {
     return _parseBetrag(raw, l10n);
   }
 
-  ({List<String> diagnostics, String? normalizedAmount}) _validateRow(RawTx tx, AppLocalizations l10n) {
+  ({List<String> diagnostics, List<String> codes, String? normalizedAmount}) _validateRow(
+    RawTx tx,
+    AppLocalizations l10n,
+  ) {
     final List<String> diagnostics = <String>[];
+    final List<String> codes = <String>[];
     if (tx.datum == null || !_isValidDate(tx.datum!)) {
       diagnostics.add(l10n.bankInvalidDate);
+      codes.add('invalid_date');
     }
 
     String? normalizedAmount;
@@ -723,8 +1051,12 @@ class BankImportService {
       normalizedAmount = _normalizeBetragForStorage(tx.betrag, l10n);
     } catch (_) {
       diagnostics.add(l10n.bankInvalidAmount);
+      codes.add('invalid_amount');
     }
-    return (diagnostics: diagnostics, normalizedAmount: normalizedAmount);
+    if (diagnostics.isNotEmpty && codes.isEmpty) {
+      codes.add('missing_required_data');
+    }
+    return (diagnostics: diagnostics, codes: codes, normalizedAmount: normalizedAmount);
   }
 
   /// Parse CSV into RawTx — delimiter from template or auto-detect.

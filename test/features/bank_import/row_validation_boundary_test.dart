@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
+import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
 Future<AppDatabase> _openConfiguredDatabase() async {
@@ -72,6 +73,11 @@ void main() {
     expect(history.single['status'], 'teilweise');
     expect(history.single['anzahl_importiert'], 1);
     expect(history.single['anzahl_fehlgeschlagen'], 1);
-    expect(history.single['fehler_details'], contains('Datum ungültig'));
+    final Map<String, Object?> envelope = BankImportFailurePayload.decodeValidated(
+      history.single['fehler_details']! as String,
+    );
+    expect(envelope['kind'], 'rows');
+    final List<Map<String, Object?>> payloadRows = (envelope['rows']! as List).cast<Map<String, Object?>>();
+    expect(payloadRows.single['diagnostic_codes'], contains('invalid_date'));
   });
 }
