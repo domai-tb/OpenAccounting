@@ -43,6 +43,35 @@ The central ledger table (`journal`) records every financial transaction:
 
 ---
 
+## Schnellbuchungen (Quick-Booking Presets)
+
+Presets retain their IDs and stored values during migration. New fields are not
+inferred: legacy rows without direction, tax rate, or amount basis remain marked
+for review until the user supplies valid values. A complete preset explicitly
+stores its direction, payment account, category, configured tax-rate reference,
+amount basis, name, and description; its default amount is optional.
+
+```json
+{
+  "name": "Büromaterial",
+  "art": "ausgabe",
+  "konto_id": 1,
+  "kategorie_id": 5,
+  "ust_satz_id": 2,
+  "eingabemodus": "brutto",
+  "betrag": null,
+  "beschreibung": "Papier und Bürobedarf"
+}
+```
+
+`art` is `einnahme` or `ausgabe`; `eingabemodus` is `netto` or `brutto`.
+The selected tax rate must be supported for the business date by the posting
+owner. Execution remains unavailable until an accepted typed posting contract
+supports direct cash/bank transactions and all required preset inputs. Presets
+do not create journal entries or post directly to `journal`.
+
+---
+
 ## Kategorien (Chart of Accounts Mapping)
 
 Categories carry optional SKR03/SKR04/EÜR/EKS mappings plus mapping provenance
