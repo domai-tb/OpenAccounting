@@ -1,30 +1,30 @@
 ## 1. Table Definitions
 
-- [ ] 1.1 Write failing test `test_all_tables_created_on_fresh_install` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "All Tables Created on Fresh Install"; confirm it fails at the expected boundary.
+- [ ] 1.1 Write failing test `test_all_tables_created_on_fresh_install` in `test/db/inventory_stocktake_migration_test.dart` for scenario "All Tables Created on Fresh Install"; confirm it fails at the expected boundary.
 - [ ] 1.2 Implement the specified behavior for "All Tables Created on Fresh Install" to pass 1.1.
 - [ ] 1.3 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 1.4 Write failing test `test_table_count_verification` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Table Count Verification"; confirm it fails at the expected boundary.
+- [ ] 1.4 Write failing test `test_table_count_verification` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Table Count Verification"; confirm it fails at the expected boundary.
 - [ ] 1.5 Implement the specified behavior for "Table Count Verification" to pass 1.4.
 - [ ] 1.6 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 1.7 Write failing test `test_missing_table_detection` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Missing Table Detection"; confirm it fails at the expected boundary.
+- [ ] 1.7 Write failing test `test_missing_table_detection` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Missing Table Detection"; confirm it fails at the expected boundary.
 - [ ] 1.8 Implement the specified behavior for "Missing Table Detection" to pass 1.7.
 - [ ] 1.9 Refactor the affected persistence or workspace code; keep focused and full suites green.
 
 ## 2. Explicit feature-table migrations
 
-- [ ] 2.1 Write failing test `test_named_inventory_table_migration` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Named inventory table migration"; confirm it fails at the expected boundary.
+- [ ] 2.1 Write failing test `test_named_inventory_table_migration` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Named inventory table migration"; confirm it fails at the expected boundary.
 - [ ] 2.2 Implement the specified behavior for "Named inventory table migration" to pass 2.1.
 - [ ] 2.3 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 2.4 Write failing test `test_named_stocktake_table_migration` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Named stocktake table migration"; confirm it fails at the expected boundary.
+- [ ] 2.4 Write failing test `test_named_stocktake_table_migration` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Named stocktake table migration"; confirm it fails at the expected boundary.
 - [ ] 2.5 Implement the specified behavior for "Named stocktake table migration" to pass 2.4.
 - [ ] 2.6 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 2.7 Write failing test `test_empty_recorded_header_insert_is_rejected_by_the_database` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Empty recorded header insert is rejected by the database"; confirm it fails at the expected boundary.
+- [ ] 2.7 Write failing test `test_empty_recorded_header_insert_is_rejected_by_the_database` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Empty recorded header insert is rejected by the database"; confirm it fails at the expected boundary.
 - [ ] 2.8 Implement the specified behavior for "Empty recorded header insert is rejected by the database" to pass 2.7.
 - [ ] 2.9 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 2.10 Write failing test `test_recorded_count_immutability_is_enforced_by_the_database` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Recorded count immutability is enforced by the database"; confirm it fails at the expected boundary.
+- [ ] 2.10 Write failing test `test_recorded_count_immutability_is_enforced_by_the_database` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Recorded count immutability is enforced by the database"; confirm it fails at the expected boundary.
 - [ ] 2.11 Implement the specified behavior for "Recorded count immutability is enforced by the database" to pass 2.10.
 - [ ] 2.12 Refactor the affected persistence or workspace code; keep focused and full suites green.
-- [ ] 2.13 Write failing test `test_failed_stocktake_migration_leaves_prior_schema_intact` in `test/core/db/inventory_stocktake_migration_test.dart` for scenario "Failed stocktake migration leaves prior schema intact"; confirm it fails at the expected boundary.
+- [ ] 2.13 Write failing test `test_failed_stocktake_migration_leaves_prior_schema_intact` in `test/db/inventory_stocktake_migration_test.dart` for scenario "Failed stocktake migration leaves prior schema intact"; confirm it fails at the expected boundary.
 - [ ] 2.14 Implement the specified behavior for "Failed stocktake migration leaves prior schema intact" to pass 2.13.
 - [ ] 2.15 Refactor the affected persistence or workspace code; keep focused and full suites green.
 
