@@ -67,4 +67,4 @@ Deactivation hides a category from new-entry selectors but does not change its p
 ## Open Questions
 
 - Which exact SKR edition/source may be bundled, under what redistribution terms, and who signs off the EÜR/EKS relationships? No catalog values can be shipped until this is answered.
-- Category review is owned by the `/categories` workspace in `master-data-workspaces-and-crud`. This change is gated on that workspace's route and review action being accepted and available. Until then, category provenance is read-only, legacy/unreviewed mappings remain blocked from new postings and mapping-dependent outputs, and no hidden setter may mark them trusted.
+- Category review is owned by the `/settings/categories` workspace in `master-data-workspaces-and-crud`. This change is gated on that workspace's route and review action being accepted and available. Until then, category provenance is read-only, legacy/unreviewed mappings remain blocked from new postings and mapping-dependent outputs, and no hidden setter may mark them trusted.

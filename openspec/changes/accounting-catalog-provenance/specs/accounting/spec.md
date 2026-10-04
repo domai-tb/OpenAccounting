@@ -2,7 +2,7 @@
 
 ### Requirement: Kategorien
 
-The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance. It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Each category SHALL distinguish `catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, and `unmapped` status as applicable. A manual edit to any mapping field SHALL set the category to `review_required`; `user_confirmed` requires an explicit review of every populated mapping field. User-confirmed mappings MUST remain distinguishable from catalog-verified mappings. A posting or output that requires category mapping values SHALL consume only `catalog_verified` or `user_confirmed` values; no mappings SHALL be inferred for `legacy_unverified`, `review_required`, or `unmapped`. A balanced posting with independently supplied account and tax data MAY retain an unmapped category as a descriptive label without consuming its mapping fields. The review action SHALL be reachable from the accepted `/categories` workspace specified by `master-data-workspaces-and-crud`; until that workspace is accepted and available, provenance remains read-only and untrusted mappings stay blocked from mapping-dependent operations.
+The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance. It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Each category SHALL distinguish `catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, and `unmapped` status as applicable. A manual edit to any mapping field SHALL set the category to `review_required`; `user_confirmed` requires an explicit review of every populated mapping field. User-confirmed mappings MUST remain distinguishable from catalog-verified mappings. A posting or output that requires category mapping values SHALL consume only `catalog_verified` or `user_confirmed` values; no mappings SHALL be inferred for `legacy_unverified`, `review_required`, or `unmapped`. A balanced posting with independently supplied account and tax data MAY retain an unmapped category as a descriptive label without consuming its mapping fields. The review action SHALL be reachable from the accepted `/settings/categories` workspace specified by `master-data-workspaces-and-crud`; until that workspace is accepted and available, provenance remains read-only and untrusted mappings stay blocked from mapping-dependent operations.
 
 #### Scenario: Approved catalog category has traceable mappings
 
@@ -89,7 +89,7 @@ The system SHALL provide categories with stable IDs, name, description, activati
 
 #### Scenario: Category review is unavailable until its workspace is accepted
 
-- **GIVEN** a category has `legacy_unverified` or `review_required` status and the accepted `/categories` workspace is not available
+- **GIVEN** a category has `legacy_unverified` or `review_required` status and the accepted `/settings/categories` workspace is not available
 - **WHEN** a user attempts to review its mapping
 - **THEN** the system SHALL keep the category status unchanged and identify the unavailable review workflow
 - **AND** new postings and mapping-dependent output SHALL remain blocked for that category
