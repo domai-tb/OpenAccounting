@@ -1,0 +1,42 @@
+## Test Plan
+
+<!-- Every scenario in specs/ maps to a named test. -->
+<!-- During implementation, flip 🔴 red to 🟢 green when its test passes. -->
+
+| Requirement | Scenario | Test File | Test Name | Initial State |
+|-------------|----------|-----------|-----------|---------------|
+| specs/specs/accounting/spec.md → Tagesabschluss | Tagesabschluss creation | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_tagesabschluss_creation | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | Counting discrepancy | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_counting_discrepancy | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | GoBD signature | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_gobd_signature | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | Double close prevention | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_double_close_prevention | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | Concurrent finalization is serialized | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_concurrent_finalization_is_serialized | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | Ambiguous legacy close identity | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_ambiguous_legacy_close_identity | 🔴 red |
+| specs/specs/accounting/spec.md → Tagesabschluss | Expected cash source is unavailable | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_expected_cash_source_is_unavailable | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Approved cash event appears in the cashbook | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_approved_cash_event_appears_in_the_cashbook | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Missing posting contract blocks cash entry | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_missing_posting_contract_blocks_cash_entry | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Imported or legacy row is not treated as cash | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_imported_or_legacy_row_is_not_treated_as_cash | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Committed cash event cannot be silently rewritten | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_committed_cash_event_cannot_be_silently_rewritten | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses an authoritative complete report | Complete balance is shown from the report result | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_complete_balance_is_shown_from_the_report_result | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses an authoritative complete report | Incomplete historical source fails closed | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_incomplete_historical_source_fails_closed | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Complete daily close is finalized | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_complete_daily_close_is_finalized | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Expected balance or persistence mapping is unavailable | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_expected_balance_or_persistence_mapping_is_unavailable | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Discrepancy requires an explanation | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_discrepancy_requires_an_explanation | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Existing close remains read-only | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_existing_close_remains_read_only | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Concurrent close finalization cannot duplicate a signed record | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_concurrent_close_finalization_cannot_duplicate_a_signed_record | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Ambiguous legacy closes block finalization | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_ambiguous_legacy_closes_block_finalization | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Single unsigned legacy close blocks finalization | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_single_unsigned_legacy_close_blocks_finalization | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook views follow desktop localization and accessibility rules | Localized keyboard use remains complete | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_localized_keyboard_use_remains_complete | 🔴 red |
+| specs/specs/cashbook-and-daily-close-workspace/spec.md → Cashbook views follow desktop localization and accessibility rules | Narrow layout keeps close actions reachable | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_narrow_layout_keeps_close_actions_reachable | 🔴 red |
+| specs/specs/db/spec.md → Tagesabschluss evidence storage and immutability | Close evidence migration preserves existing history | test/core/db/cashbook_and_daily_close_workspace_migration_test.dart | test_close_evidence_migration_preserves_existing_history | 🔴 red |
+| specs/specs/db/spec.md → Tagesabschluss evidence storage and immutability | Signed close cannot be rewritten | test/core/db/cashbook_and_daily_close_workspace_migration_test.dart | test_signed_close_cannot_be_rewritten | 🔴 red |
+| specs/specs/db/spec.md → Tagesabschluss evidence storage and immutability | Failed evidence migration rolls back | test/core/db/cashbook_and_daily_close_workspace_migration_test.dart | test_failed_evidence_migration_rolls_back | 🔴 red |
+| specs/specs/db/spec.md → Tagesabschluss finalization prevents duplicate identities | Duplicate guard runs in a serialized transaction | test/core/db/cashbook_and_daily_close_workspace_migration_test.dart | test_duplicate_guard_runs_in_a_serialized_transaction | 🔴 red |
+| specs/specs/db/spec.md → Tagesabschluss finalization prevents duplicate identities | Legacy rows without one verified signed identity block a new close | test/core/db/cashbook_and_daily_close_workspace_migration_test.dart | test_legacy_rows_without_one_verified_signed_identity_block_a_new_close | 🔴 red |
+| specs/specs/pdf/spec.md → Tagesabschluss PDF renders the finalized snapshot | Complete signed close produces its PDF | test/features/pdf/cashbook_and_daily_close_workspace_test.dart | test_complete_signed_close_produces_its_pdf | 🔴 red |
+| specs/specs/pdf/spec.md → Tagesabschluss PDF renders the finalized snapshot | Incomplete or unsigned close has no PDF | test/features/pdf/cashbook_and_daily_close_workspace_test.dart | test_incomplete_or_unsigned_close_has_no_pdf | 🔴 red |
+
+## Coverage Notes
+
+- Every scenario is mapped once to a named executable test; all rows start red.
+- Tests use the repository’s Flutter test infrastructure and focused fixtures for the affected feature and persistence boundaries.
+- These are planned tests; this artifact does not claim that the tests already exist or have passed.
