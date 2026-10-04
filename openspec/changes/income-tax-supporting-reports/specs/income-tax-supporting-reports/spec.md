@@ -1,44 +1,42 @@
 ## ADDED Requirements
 
-### Requirement: Generate versioned S/G supporting workpapers from accounting records
+### Requirement: S/G availability is explicit and contains no guessed report values
 
-The Taxes workspace SHALL provide separate read-only supporting reports for Anlage S and Anlage G. Each report result SHALL identify its selected schedule, supported period, official form edition, calculation/mapping version, source coverage, contributing record scope, and unresolved-record count. Each displayed field SHALL derive from an accepted accounting source and a versioned, reviewed line mapping. The workspace SHALL NOT infer schedule eligibility, copy EÜR/EKS totals without an accepted mapping, or claim legal completeness or tax-authority submission. A missing form edition, source, period, classification, mapping, or completeness contract SHALL make the affected report/field unavailable rather than show a guessed or zero-filled amount.
+The Taxes workspace SHALL offer explicit Anlage S and Anlage G selections through the typed availability use case. In this change both schedules SHALL return an unavailable result because no accepted S/G form-year, period, classification, and accounting-source contract exists. The result SHALL identify those blocker reasons and SHALL NOT expose numeric S/G field values, source coverage counts, copied EÜR/EKS/GuV totals, source-record claims, exports, or filing status. A period selector SHALL remain unavailable until an accepted schedule-period contract exists. This state SHALL NOT change accounting records.
 
-#### Scenario: Supported schedule fields have traceable values
+#### Scenario: User selects a schedule before its contracts are accepted
 
-- **GIVEN** the user selects a schedule and period with accepted form mapping and complete accounting inputs
-- **WHEN** the supporting report loads
-- **THEN** every available field SHALL show its amount, form edition, mapping version, source coverage, and contributing-record path
-- **AND** the report SHALL leave source records unchanged.
+- **GIVEN** no accepted S/G form-year, period, classification, and accounting-source contract is registered
+- **WHEN** the user selects Anlage S or Anlage G
+- **THEN** the typed result SHALL be unavailable and list the missing contract reasons
+- **AND** no period picker, numeric field, source count, or report export SHALL be shown.
 
-#### Scenario: Unsupported tax-year form edition
+#### Scenario: EÜR data is not substituted for an S/G field
 
-- **GIVEN** no reviewed S/G field mapping exists for the selected tax year
-- **WHEN** the user opens that schedule period
-- **THEN** the report SHALL show a localized unsupported-period state
-- **AND** SHALL NOT reuse a prior-year field mapping or return an unlabeled total.
+- **GIVEN** an EÜR result exists but no accepted S/G line mapping exists
+- **WHEN** the user opens either S/G selection
+- **THEN** the S/G result SHALL remain unavailable
+- **AND** the EÜR result SHALL not be copied, relabeled, or summarized as S/G data.
 
-#### Scenario: Accounting source or classification is incomplete
+#### Scenario: Schedule eligibility is not inferred
 
-- **GIVEN** the selected period contains unresolved records or the schedule classification/source mapping is absent or ambiguous
-- **WHEN** the report is generated
-- **THEN** affected fields SHALL be unavailable with a localized reason and coverage count
-- **AND** the report SHALL NOT present the result as complete.
+- **GIVEN** the company profile contains a name, occupation, tax number, or transaction descriptions
+- **WHEN** the user opens the S/G availability view
+- **THEN** the application SHALL require an explicit schedule selection and SHALL NOT infer legal eligibility from those fields.
 
-#### Scenario: Workpaper is not filed
+#### Scenario: Missing schedule selection has a typed boundary
 
-- **GIVEN** a complete supporting report is displayed
-- **WHEN** the user views or exports it
-- **THEN** the output SHALL identify itself as a supporting workpaper
-- **AND** no submission or filing-success state SHALL be shown.
+- **GIVEN** `/taxes?view=income-tax-schedules` has no valid `schedule=s|g` value
+- **WHEN** the route resolves
+- **THEN** the page SHALL show a localized schedule-selection state without requesting accounting data or displaying numeric amounts.
 
-### Requirement: S/G workpapers follow the desktop design system
+### Requirement: S/G availability follows the desktop design system
 
-The Taxes view SHALL provide keyboard-accessible schedule and period selectors, visible focus, semantic table/status information, source-record drill-down, active-locale dates and amounts, German and English messages, and responsive behavior for narrow windows and text scaling as specified in `DESIGN.md`. Status and availability SHALL NOT rely on color alone.
+The availability view SHALL provide keyboard-accessible schedule selection, visible focus, semantic status information, German and English messages, and responsive behavior at supported narrow widths and text scaling as required by `DESIGN.md`. Status SHALL NOT rely on color alone.
 
-#### Scenario: Workpaper can be reviewed by keyboard
+#### Scenario: Availability can be reviewed by keyboard
 
-- **GIVEN** a user navigates the S/G report with keyboard focus
-- **WHEN** they select a period and open a contributing-record path
-- **THEN** selectors, report fields, source details, and return actions SHALL remain keyboard reachable with visible focus
-- **AND** unavailable states and field explanations SHALL be announced in the active locale.
+- **GIVEN** a user navigates the S/G availability view with keyboard focus
+- **WHEN** they select a schedule and open its blocker explanation
+- **THEN** the selection, blocker details, and return action SHALL remain keyboard reachable with visible focus
+- **AND** the unavailable state SHALL be announced in the active locale.

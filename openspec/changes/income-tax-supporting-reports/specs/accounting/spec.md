@@ -1,19 +1,26 @@
 ## ADDED Requirements
 
-### Requirement: S/G report values require versioned accounting mappings
+### Requirement: Anlage S/G values require an accepted source contract
 
-An Anlage S/G supporting report SHALL use an accepted form-year field mapping and an accepted accounting source/period contract. It SHALL identify its schedule and not infer whether the selected company belongs to Anlage S or Anlage G. Each available field SHALL expose its contributing records/categories and mapping version. Calendar-only values SHALL NOT be relabeled as configured business-year values, and tax filing periods SHALL remain owned by the accepted tax-report period contract.
+Anlage S/G numeric fields SHALL be returned only when an accepted tax-year form and line mapping, schedule-period contract, explicit classification evidence, and complete approved accounting source exist for the selected schedule. This change defines none of those value contracts, so its S/G availability result SHALL remain unavailable and SHALL NOT query an approximate source or relabel another report. An accepted future delta may replace this boundary only by specifying each source, field, formula, version, and completeness rule.
 
 #### Scenario: S/G source mapping is not accepted
 
-- **GIVEN** the selected schedule field has no accepted mapping from accounting records
-- **WHEN** the report is requested
-- **THEN** the field SHALL be unavailable
-- **AND** the service SHALL NOT copy an EÜR/EKS aggregate or compute an undocumented substitute.
+- **GIVEN** the selected schedule has no accepted mapping from accounting records to its tax-year form fields
+- **WHEN** a user requests S/G availability
+- **THEN** the service SHALL return an unavailable result naming the missing form/source contract
+- **AND** SHALL NOT copy EÜR/EKS/GuV totals or compute an undocumented substitute.
+
+#### Scenario: S/G completeness cannot be established
+
+- **GIVEN** no accepted S/G period and source-coverage contract exists
+- **WHEN** a user requests S/G availability
+- **THEN** the service SHALL report `periodContractUnavailable` and `accountingSourceContractUnavailable`
+- **AND** SHALL NOT emit a zero, estimate, completeness count, or numeric tax field.
 
 #### Scenario: Schedule choice is explicit
 
-- **GIVEN** company profile data does not contain an accepted S/G classification
+- **GIVEN** the profile has no accepted schedule-classification contract
 - **WHEN** the user opens the supporting-report view
-- **THEN** the user SHALL select which schedule to inspect
-- **AND** the application SHALL NOT infer eligibility from company name, profession text, or transaction descriptions.
+- **THEN** the user SHALL choose Anlage S or Anlage G explicitly
+- **AND** the application SHALL NOT infer eligibility from profile text or transaction descriptions.

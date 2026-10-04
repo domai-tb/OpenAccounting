@@ -1,18 +1,18 @@
 ## ADDED Requirements
 
-### Requirement: Income-tax supporting report view
+### Requirement: Income-tax schedule selection is a typed Taxes route state
 
-The existing `/taxes` route SHALL expose `view=income-tax-schedules` as a typed report view with explicit Anlage S or Anlage G selection and a supported period. It SHALL preserve unrelated tax route query state and SHALL use the registered report service through the application scope. Missing or unaccepted service/form mapping SHALL render a localized unavailable state, not a generic table or raw SQL projection.
+The existing `/taxes` route SHALL expose `view=income-tax-schedules` with `schedule=s|g` as a typed route state and SHALL preserve unrelated tax query parameters. It SHALL use `IncomeTaxScheduleAvailabilityUseCase` through the application scope. In this change it SHALL render only an availability/selection state; it SHALL NOT expose a form period or numeric report until an accepted S/G form/source contract exists. Missing or invalid query state or an unavailable service SHALL render a localized typed state, not a generic table or raw SQL projection.
 
-#### Scenario: Open an S/G supporting report
+#### Scenario: Open an S/G availability state
 
 - **GIVEN** the Taxes workspace is open
 - **WHEN** the user selects `view=income-tax-schedules` and Anlage S or G
-- **THEN** the route SHALL render the typed report state and its accepted period/source boundary.
+- **THEN** the route SHALL render the matching typed availability state and preserve unrelated query parameters.
 
-#### Scenario: Report service is unavailable
+#### Scenario: S/G availability service is unavailable
 
-- **GIVEN** no accepted S/G report service is registered
+- **GIVEN** no `IncomeTaxScheduleAvailabilityUseCase` is registered
 - **WHEN** the S/G route state is requested
 - **THEN** the Taxes page SHALL show a localized unavailable state
-- **AND** SHALL NOT fall back to an untyped database table.
+- **AND** SHALL NOT fall back to an untyped database table or guessed report result.

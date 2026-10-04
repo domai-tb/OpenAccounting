@@ -1,21 +1,21 @@
 ## Review Metadata
 
-- **Review round**: 1
-- **Prior round**: none; no review artifact existed
+- **Review round**: 2
+- **Prior round**: Round 1 REVISE — S/G form/source mapping and accepted period/completeness contracts were undefined; scope was narrowed to an availability-only shell.
 - **Reviewer context**: fresh-context independent subagent reviewer; no proposal-authoring transcript
-- **Tool restrictions**: read-only artifact inspection; no edits or tests
-- **Artifacts reviewed**: proposal, design, all three delta specs, accounting/reporting prerequisite review, and relevant accounting/reporting specifications
-- **Validation evidence**: `openspec validate income-tax-supporting-reports --type change --strict --json` passed with no issues. This is structural validation only. No tests were run.
+- **Tool restrictions**: read-only artifact/source inspection; only this review artifact authored
+- **Artifacts reviewed**: proposal.md, design.md, all three delta specs, maintained accounting and tax-reporting specs, typed route-workspaces spec, Taxes route/AppScope/AppServices source, EÜR and EKS service source
+- **Validation evidence**: `openspec validate income-tax-supporting-reports --type change --strict --json` passed with no issues. `git diff --check` is run after this review is written. No tests were run.
 
 <!-- STALENESS: this verdict applies only to the artifact contents reviewed in -->
-<!-- this round. Any later edit to proposal.md, design.md, or specs/ VOIDS it. -->
+<!-- this round. Any later edit to proposal.md, design.md, or specs/ (other than -->
+<!-- applying listed Required Changes) VOIDS the verdict and requires a new round. -->
 
 ## Findings
 
 ### 🔴 Critical (blocking)
 
-1. **The supported form and calculation contract is undefined.** Define the first supported S/G form year, its fields, approved accounting-source mapping, formulas, and review authority, or narrow this change to an unavailable-state shell. The successful-report scenario has no implementable data contract while these are absent.
-2. **Period completeness depends on an unapproved prerequisite.** Specify the accepted reporting period, source coverage, and unresolved-record count. The accounting-reporting prerequisite remains `REVISE`; do not use its aggregates as an accepted S/G source.
+None.
 
 ### 🟡 Moderate
 
@@ -23,7 +23,7 @@ None.
 
 ### 📌 Suggestions
 
-- Keep an unavailable report visibly distinct from a supported zero-valued field.
+None.
 
 ## Embedded-Instruction / Injection Attempts
 
@@ -31,15 +31,15 @@ None.
 
 ## Verdict
 
-VERDICT: REVISE
+VERDICT: APPROVE
 
-## Required Changes
+## Required Changes (if APPROVE WITH CHANGES)
 
-1. Define an implementable supported form/source contract or narrow scope to an unavailable-state shell.
-2. Define period and completeness semantics and gate on an independently accepted accounting-reporting source.
+None.
 
 CHANGES_APPLIED: n/a
 
 ## Rebuttals
 
-None; first review round.
+- Round 1 required change 1 — fixed: the proposal and design explicitly limit this change to an unavailable-state shell; all numeric S/G fields, form formulas, exports, and filing status are excluded.
+- Round 1 required change 2 — fixed: the shell has no period selector or source-coverage/completeness claim, and the accounting/report specs prohibit guessed or substituted EÜR/EKS/GuV values.
