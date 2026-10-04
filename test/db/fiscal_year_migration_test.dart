@@ -59,7 +59,7 @@ void main() {
       await runner.setUserVersion(10);
       await runner.run(createSchema: () async {});
 
-      expect(await runner.getUserVersion(), 11);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
       final rows = await db.executor.runSelect('SELECT name, geschaeftsjahr_startmonat FROM unternehmen', const []);
       expect(rows.single['name'], 'Bestand');
       expect(rows.single['geschaeftsjahr_startmonat'], 1);

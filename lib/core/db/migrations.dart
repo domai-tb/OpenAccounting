@@ -13,7 +13,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 11;
+  static const int currentVersion = 12;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -138,6 +138,7 @@ class MigrationRunner {
       await _migrateCategoryProvenance();
       await _migrateBankImportMode();
       await _migrateFiscalYearStart();
+      await _migrateQuickBookingPresets();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -228,6 +229,18 @@ class MigrationRunner {
       await _migrateCategoryProvenance();
       await _migrateBankImportMode();
       await _migrateFiscalYearStart();
+    }
+    if (version == 12) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
+      await _migrateReceivableFeature();
+      await _migrateCategoryProvenance();
+      await _migrateBankImportMode();
+      await _migrateFiscalYearStart();
+      await _migrateQuickBookingPresets();
     }
   }
 
@@ -674,6 +687,85 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     }
   }
 
+  /// Quick-booking explicit execution semantics (v12). Adds nullable `art`,
+  /// `ust_satz_id`, and `eingabemodus`, and rebuilds the table to make the
+  /// default `betrag` nullable while preserving stable IDs and every stored
+  /// value. No direction, tax, or basis is inferred; legacy presets stay
+  /// reviewable but non-executable. Any failure rolls everything back.
+  Future<void> _migrateQuickBookingPresets() async {
+    final tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schnellbuchungen'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Schnellbuchungen-Tabelle fehlt');
+    }
+    final columns = await executor.runSelect('PRAGMA table_info(schnellbuchungen)', const <Object?>[]);
+    final names = <String>{for (final row in columns) row['name'].toString()};
+    final bool needsRebuild =
+        !names.contains('art') || !names.contains('ust_satz_id') || !names.contains('eingabemodus');
+    final Object? betragNotNull = columns.where((c) => c['name'] == 'betrag').map((c) => c['notnull']).firstOrNull;
+    final bool betragRequired = betragNotNull is num && betragNotNull != 0;
+    if (!needsRebuild && !betragRequired) {
+      await _verifyQuickBookingColumns();
+      return;
+    }
+    await executor.runCustom('ALTER TABLE schnellbuchungen RENAME TO schnellbuchungen_legacy');
+    try {
+      await executor.runCustom(_quickBookingTableSql);
+      final copyCols = <String>[
+        'id',
+        'name',
+        'kategorie_id',
+        'konto_id',
+        'betrag',
+        'beschreibung',
+        'art',
+        'ust_satz_id',
+        'eingabemodus',
+      ];
+      final selectCols = <String>[
+        for (final c in copyCols)
+          if (names.contains(c)) '"$c"' else 'NULL',
+      ];
+      await executor.runCustom(
+        'INSERT INTO schnellbuchungen (${copyCols.join(', ')}) SELECT ${selectCols.join(', ')} FROM schnellbuchungen_legacy',
+      );
+      await executor.runCustom('DROP TABLE schnellbuchungen_legacy');
+    } catch (error) {
+      // Best-effort restore is handled by the caller's transaction rollback;
+      // rethrow to trigger it.
+      rethrow;
+    }
+    await _verifyQuickBookingColumns();
+    final counts = await executor.runSelect(
+      'SELECT COUNT(*) AS c, COUNT(id) AS ids, COUNT(DISTINCT id) AS distinct_ids FROM schnellbuchungen',
+      const <Object?>[],
+    );
+    if (counts.single['c'] != counts.single['distinct_ids']) {
+      throw StateError('Schnellbuchungen-IDs wurden nicht erhalten');
+    }
+  }
+
+  Future<void> _verifyQuickBookingColumns() async {
+    final columns = await executor.runSelect('PRAGMA table_info(schnellbuchungen)', const <Object?>[]);
+    final names = <String>{for (final row in columns) row['name'].toString()};
+    const required = <String>[
+      'id',
+      'name',
+      'kategorie_id',
+      'konto_id',
+      'betrag',
+      'beschreibung',
+      'art',
+      'ust_satz_id',
+      'eingabemodus',
+    ];
+    if (!required.every(names.contains)) {
+      throw StateError('Schnellbuchungen-Schema konnte nicht verifiziert werden');
+    }
+  }
+
   static int _asInt(Object? v) => v is int
       ? v
       : v is num
@@ -735,6 +827,19 @@ CREATE TABLE rechnungen (
   absender_snapshot TEXT,
   ausgegeben_am TEXT,
   mahnstufe_aktuell INTEGER DEFAULT 0
+)''';
+
+const String _quickBookingTableSql = '''
+CREATE TABLE schnellbuchungen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  kategorie_id INTEGER REFERENCES kategorien(id),
+  konto_id INTEGER REFERENCES konten(id),
+  betrag NUMERIC(12,2),
+  beschreibung TEXT,
+  art TEXT CHECK (art IN ('einnahme','ausgabe')),
+  ust_satz_id INTEGER REFERENCES ust_saetze(id),
+  eingabemodus TEXT CHECK (eingabemodus IN ('netto','brutto'))
 )''';
 
 const String _receivablePaymentTableSql = '''

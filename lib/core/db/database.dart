@@ -915,15 +915,18 @@ CREATE TABLE IF NOT EXISTS vorsteuer_ansprueche (
   unternehmen_id INTEGER REFERENCES unternehmen(id),
   ust_sonderfall TEXT
 )''',
-  // 36 schnellbuchungen
+  // 36 schnellbuchungen — explicit execution semantics (v12).
   '''
 CREATE TABLE IF NOT EXISTS schnellbuchungen (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   kategorie_id INTEGER REFERENCES kategorien(id),
   konto_id INTEGER REFERENCES konten(id),
-  betrag NUMERIC(12,2) NOT NULL,
-  beschreibung TEXT
+  betrag NUMERIC(12,2),
+  beschreibung TEXT,
+  art TEXT CHECK (art IN ('einnahme','ausgabe')),
+  ust_satz_id INTEGER REFERENCES ust_saetze(id),
+  eingabemodus TEXT CHECK (eingabemodus IN ('netto','brutto'))
 )''',
   // 37 auto_filter_regeln
   '''
