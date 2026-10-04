@@ -1,75 +1,82 @@
 ## Context
 
-The feature map's §35 asks for a dated business-mileage record with purpose, distance, and business context, followed by a deductible amount that reaches accounting and relevant reports. No maintained or active OpenSpec change defines that entry workflow. The closest maintained requirement is EKS-specific: `accounting/spec.md` says EKS B6_5 uses `journal.km_anzahl × 0.10` as a Jobcenter travel allowance (`:211-215`); the database has `journal.km_anzahl NUMERIC(12,2)` (`lib/core/db/database.dart:622`), and `EksService` applies that rate (`lib/features/accounting/eks_service.dart:160-169`). It does not establish a general business tax deduction rate or eligibility policy.
+Feature map §35 asks for dated business-mileage records containing purpose, distance, business context, and eventually a deductible amount used by accounting and reports. The closest maintained requirement is EKS-specific: `accounting/spec.md` says EKS B6_5 uses `journal.km_anzahl × 0.10` as a Jobcenter travel allowance (`:211-215`); `journal.km_anzahl` is `NUMERIC(12,2)` (`lib/core/db/database.dart:622`), and `EksService` applies that rate (`lib/features/accounting/eks_service.dart:160-169`). That does not establish a general business mileage policy.
 
-The app currently has no mileage route, form, repository, or use case. The accounting posting boundary is also unresolved: `balanced-journal-postings-and-settlement-events` remains active and its review is `REVISE`. This design therefore separates captured trip facts from calculated and posted amounts. It blocks monetary calculation/posting until a reviewed policy and an accepted posting contract define those outcomes.
+The app currently has no mileage route, form, repository, or use case. The active `balanced-journal-postings-and-settlement-events` change is still `REVISE`, and no accepted mileage policy or mileage account mapping exists. This change therefore defines durable capture and the future integration boundary, but it does not enable calculation, posting, or report totals until those contracts are accepted.
 
-No active change currently covers mileage capture. `accounting-reporting-workspaces` covers report workspaces and EKS but not trip entry; the active balanced-posting change covers ledger semantics, not mileage records.
+The current database baseline is schema version 8. The shared portability/export inventory comprises 39 pre-existing base tables, the `feature_table_state` health table, and six feature-owned tables: `forderung_zahlungen`, both recurring occurrence tables, both mileage tables, and `category_mapping_history` (46 known application-table names). The two mileage tables are migration-required at version 9; category history is migration-required at version 10; the two occurrence tables use the shared lazy markers. The mileage migration SHALL remain disabled and neither export may claim completeness for a profile containing mileage tables until both inventory owners accept this same 46-name contract. The mileage tables are not lazy and do not use `feature_table_state`. Existing `journal.km_anzahl` values are not complete trip records and are never backfilled.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Capture and review dated business trips with purpose, distance, and business context.
-- Preserve a durable source record that can later link to a policy result and one accounting posting.
-- Calculate only from an approved policy effective for the trip; keep unresolved records out of ledger and report totals.
-- Keep the existing EKS allowance separate from a general deductible amount.
-- Follow the page → use case → repository → data source structure and the accounting workspace conventions in `DESIGN.md`.
+- Capture and review dated business trips with purpose, positive distance, and business context.
+- Persist exact trip facts, lifecycle state, policy/calculation snapshot fields, and the accounting event reference needed for later accepted integrations.
+- Keep captured or unresolved records out of accounting and report totals.
+- Preserve posted source facts and define traceable replacement and undo requests.
+- Follow page → use case → repository → data source and `DESIGN.md` accounting workspace conventions.
 
 **Non-Goals:**
 
-- Choose or encode a statutory rate, deductible share, eligibility rule, cap, or rounding rule without an approved source.
-- Treat the EKS B6_5 Jobcenter allowance as a general income-tax deduction.
-- Resolve debit/credit, VAT, settlement-date, account-mapping, or reporting-period rules owned by the accounting/posting contracts.
-- Infer trip purpose, business share, or vehicle ownership from distance or free text.
-- Backfill complete mileage trips from existing `journal.km_anzahl` values; those values lack the trip facts this workflow requires.
+- Choose or encode a statutory rate, deductible share, eligibility rule, cap, or rounding rule without an accepted policy.
+- Treat the EKS B6_5 allowance as a general income-tax deduction.
+- Implement a journal writer, account mapping, VAT treatment, settlement-date rule, or report-period rule in this change.
+- Infer purpose, business share, or vehicle ownership from distance or free text.
+- Backfill trip records from legacy `journal.km_anzahl` values.
 
 ## Decisions
 
-### Keep trip facts separate from journal postings
+### Persist trip facts independently
 
-Persist mileage as a first-class source record containing its stable ID, date, purpose, distance, business context, and workflow state. Store a calculated amount and its approved policy reference only after a matching policy is available. A later posting references the trip ID and carries the distance needed by any report contract that explicitly consumes it.
+Create `mileage_trips` with a stable UUID, ISO trip date, non-empty purpose and business context, distance stored as integer hundredths of a kilometer, explicit lifecycle state, and nullable calculation/posting snapshots. The distance range is 1 through 999,999,999,999 hundredths (0.01 through 9,999,999,999.99 km), matching the existing `NUMERIC(12,2)` precision without storing binary floating-point distance. Store calculated amount as `NUMERIC(12,2)` only together with the policy ID, source, version, effective dates, and calculation timestamp. Store the opaque posting event ID returned by the accepted accounting boundary; keep it nullable and unique.
 
-Alternative considered: write directly to `journal.km_anzahl` on save. Rejected because mileage capture is not itself proof of an approved deductible amount, the journal lacks the trip purpose/context, and writing there before policy validation would leak unresolved data into reports. Keep the existing EKS rule as a separate report-specific calculation.
+Captured records begin as `unresolved`. The current change does not calculate or post them. Never write a captured distance to `journal.km_anzahl`; that column remains the distinct EKS input. Do not synthesize trip purpose or business context from legacy journal rows.
 
-### Fail closed on policy and mapping gaps
+Alternative considered: write directly to `journal.km_anzahl` on save. Rejected because capture alone does not prove a deductible amount and the journal cannot preserve the required trip facts.
 
-The calculation boundary requires a reviewed policy with source/version, effective dates, eligibility conditions, calculation basis, and rounding. No default rate is inferred. When the policy or required business facts are missing, save the trip as unresolved, show the missing decision, and do not create a monetary amount or accounting side effect. The EKS B6_5 value of €0.10/km remains limited to the existing EKS requirement.
+### Add a versioned, additive database migration
 
-Alternative considered: use EKS's €0.10/km for all mileage. Rejected because the maintained requirement labels it a Jobcenter travel allowance and does not establish its use as the general deductible rate.
+After both portability/export owner deltas accept the 46-name inventory, coordinate creation of both mileage tables with the shared inventory/marker migration in the next sequential schema migration (version 9 on the current baseline); do not create competing migrations that increment the version twice. Include both tables in fresh schema creation. If another accepted migration lands first, merge the DDL into the next sequential version before implementation. Before any repair that could recreate `forderung_zahlungen`, check its presence against `PRAGMA user_version` and stop if it is missing at or beyond its required version. In the same migration, seed `feature_table_state` for the two lazy occurrence tables: existing valid tables become `initialized`, and absent tables become `unknown`. Back up the profile before upgrading; create tables and indexes in the migration transaction; verify the complete inventory for the profile's migration version before incrementing `PRAGMA user_version`. Any DDL or verification failure rolls back the transaction and leaves the prior version and data intact. Preserve every existing table and row. Do not add a destructive downgrade; an older binary must reject the newer profile rather than drop mileage records.
 
-### Post only through the approved accounting boundary
+`mileage_trip_corrections` records `replace` or `void`, the original trip, optional replacement trip, non-empty reason, lifecycle, and the accepted accounting correction event ID. A partial unique index permits at most one draft or applied correction per trip. A later correction targets the replacement trip, producing an auditable chain. Foreign keys use `ON DELETE RESTRICT`.
 
-The UI calls a mileage use case; the use case validates state and policy eligibility; the repository coordinates the mileage record and accounting command; the data source persists source facts. A confirmed posting goes through the accepted accounting posting boundary, stores the unique source-mileage link, and is visible in reports only through that canonical posting. The operation must be idempotent. Until the balanced-posting contract and the policy/mapping decisions are accepted, posting stays unavailable; this change does not invent journal legs or write a journal row directly.
+### Keep monetary and accounting effects fail-closed
 
-Alternative considered: add a mileage-specific journal writer. Rejected because it would create another financial writer while the shared posting model is under review and would duplicate accounting rules.
+Until a separately accepted policy defines source/version, effective dates, eligibility, calculation basis, and rounding, captured trips remain unresolved with all calculation fields null. A policy snapshot may be stored only after such a policy is approved and implemented.
 
-### Build a focused mileage workspace
+Posting is unavailable until an accepted accounting contract supplies a posting command, a valid mileage category/account and tax mapping, canonical report inclusion, and a stable idempotency boundary keyed by source type `mileage_trip` and the trip UUID. A retry for the same trip must return the existing accounting event and cannot create another. This proposal does not choose journal legs, VAT, booking date, or report timing.
 
-Provide a `Neue Fahrt` primary action and a searchable, filterable trip table with date, purpose, distance, calculated amount/state, and posting status. Keep unresolved policy state visible in text, not color alone. Use right-aligned distance and money columns, keyboard access, and visible focus. Link the workspace from `Auswertungen`; keep the dashboard free of trip-editing controls. This follows `DESIGN.md` page-header and table guidance (`:232-264`, `:572-625`) and accessibility guidance (`:2013-2021`).
+Alternative considered: add a mileage-specific journal writer. Rejected because it would bypass the shared posting contract, which is under review.
 
-Alternative considered: embed mileage fields in the generic report table. Rejected because trip capture and review need a validated form and explicit unresolved/posting actions, not a raw database surface.
+### Preserve posted facts; correct through linked accounting operations
+
+Facts on a posted trip are immutable. A `replace` correction records a new trip with corrected facts and links it to the posted source; a `void` correction has no replacement. Creating or editing a correction draft does not change the source trip, posting, or totals. Applying a correction is unavailable until the accepted accounting correction operation can reverse the original posting and, for `replace`, post the replacement under one idempotent correction identity. The accepted operation controls correction date and report-period treatment. On success, the original trip becomes `corrected` or `voided`, the correction row becomes `applied`, and the replacement becomes `posted`; the source facts and original posting remain intact. On failure, no trip or accounting state changes and the draft remains retryable. Never directly update or delete a finalized journal row.
+
+### Build a focused, accessible workspace
+
+Provide a `Neue Fahrt` primary action and a searchable, filterable trip table with date, purpose, distance, amount/state, and posting state. Use localized labels and validation, keyboard-operable controls, visible focus, and text labels for unresolved states. Align distance and money values to the right. Link the workspace from `Auswertungen` and keep trip editing out of the dashboard. This follows `DESIGN.md` page-header and table guidance (`:232-264`, `:572-625`) and accessibility guidance (`:2013-2021`).
+
+Alternative considered: embed trip fields in the generic report table. Rejected because capture needs a validated form and explicit unresolved state.
 
 ## Risks / Trade-offs
 
-- **[Risk]** A trip can be recorded before policy questions are resolved, but no deduction is shown. → **Mitigation:** show an explicit unresolved state and exclude it from every accounting total until approval.
-- **[Risk]** Existing EKS and general tax mileage could be confused. → **Mitigation:** keep separate calculation labels, sources, and report paths; never reuse the EKS rate for the general amount.
-- **[Risk]** The posting and reporting contracts may change. → **Mitigation:** store trip facts independently and add integrations only through accepted interfaces; retain source IDs for traceability.
-- **[Risk]** Historical `km_anzahl` rows may be mistaken for complete trip records. → **Mitigation:** do not backfill missing purpose/context or claim those rows were entered through this workflow.
+- **[Risk]** Trips can be captured before policy questions are resolved. → **Mitigation:** show `Unresolved`, keep calculation values null, and exclude trips from every monetary total.
+- **[Risk]** EKS and general tax mileage can be confused. → **Mitigation:** retain separate labels and sources; never reuse the EKS rate.
+- **[Risk]** Posting and correction contracts may change. → **Mitigation:** keep their UI actions unavailable until accepted interfaces exist; preserve opaque source references and immutable trip facts.
+- **[Risk]** Historical `km_anzahl` values may be mistaken for complete trip records. → **Mitigation:** do not backfill them.
 
 ## Migration Plan
 
-1. Resolve the policy, accounting-mapping, accounting-date, and EKS-link questions below; independently approve the shared posting contract before enabling monetary postings.
-2. Add an additive mileage-record table and repository methods. Preserve existing journal rows and IDs. Do not infer trip records from legacy distance fields.
-3. Add the localized route and form through the application service boundary. Allow trip capture while policy is unresolved; keep calculation and posting actions disabled until all gates pass.
-4. Add policy calculation and source-linked posting through approved contracts, then expose the resulting canonical report data.
-5. On downgrade/rollback, preserve captured mileage records or restore the pre-migration profile backup; never delete posted accounting history or silently detach source links.
+1. Keep the mileage migration disabled until both portability/export owner deltas accept all 46 known names and their version-aware presence rules. Then coordinate `mileage_trips` and `mileage_trip_corrections` with the shared version-9 inventory/marker migration on the current version-8 baseline. Preserve existing data, apply the `forderung_zahlungen` pre-repair health check, seed lazy-table markers as `initialized` or `unknown`, and create no synthetic trips.
+2. Add capture and review through the application service boundary. New rows remain unresolved with null policy, amount, and posting fields.
+3. Keep calculation and posting controls unavailable until a separate accepted policy and the required mapping/posting/report contracts are implemented.
+4. Keep correction execution unavailable until an accepted accounting correction operation provides idempotent reversal/replacement and report-date behavior. Correction drafts have no financial effect.
+5. On migration failure, roll back DDL and retain the pre-migration backup. Do not drop either mileage table on downgrade; older binaries reject the newer schema version.
 
 ## Open Questions
 
-- Which reviewed source, effective version, and date range define the general mileage policy? Which trip types, vehicle ownership/use, business share, rate/cap, and rounding rules apply?
-- Which business facts must be collected to determine eligibility and the deductible portion? Is free-text context sufficient, or are structured trip/vehicle fields required?
-- What category and account mapping should a resolved mileage expense use, and what VAT treatment applies? Until answered, posting must fail closed.
-- Which accounting date and period rule governs the expense and any correction? The trip date is captured, but the accounting contract must decide report recognition.
-- Should mileage records feed the separate EKS B6_5 calculation? If so, what explicit eligibility/link field connects a trip to the maintained `journal.km_anzahl` requirement without treating €0.10/km as a general tax deduction?
-- What approved posting source identity and uniqueness boundary will the balanced-journal change expose for idempotent mileage posting?
+- Which reviewed source, effective version, trip types, eligibility rules, rate/cap, and rounding rule define the general mileage policy?
+- Which structured business facts are required to determine eligibility and deductible share?
+- Which mileage category/account mapping and VAT treatment apply? Posting stays unavailable until accepted.
+- Which accounting date and report-period rule governs posting and correction? The accepted accounting contract must decide this.
+- Should eligible mileage records feed EKS B6_5? If so, what explicit eligibility link applies without treating €0.10/km as a general deduction?
