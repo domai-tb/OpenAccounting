@@ -102,19 +102,19 @@
 
 ## 9. typed-route-workspaces: Canonical route inventory
 
-- [ ] 9.1 Write failing test `test_every_canonical_route_has_a_useful_surface` in `test/core/router/recurring_booking_workspace_routes_test.dart` for scenario "Every canonical route has a useful surface"; assert it fails for the right reason.
+- [ ] 9.1 Write failing test `test_every_canonical_route_has_a_useful_surface` in `test/core/recurring_booking_workspace_routes_test.dart` for scenario "Every canonical route has a useful surface"; assert it fails for the right reason.
 - [ ] 9.2 Implement the specified behavior for "Every canonical route has a useful surface" to pass 9.1.
 - [ ] 9.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 9.4 Write failing test `test_recurring_workspace_resolves_through_its_use_case` in `test/core/router/recurring_booking_workspace_routes_test.dart` for scenario "Recurring workspace resolves through its use case"; assert it fails for the right reason.
+- [ ] 9.4 Write failing test `test_recurring_workspace_resolves_through_its_use_case` in `test/core/recurring_booking_workspace_routes_test.dart` for scenario "Recurring workspace resolves through its use case"; assert it fails for the right reason.
 - [ ] 9.5 Implement the specified behavior for "Recurring workspace resolves through its use case" to pass 9.4.
 - [ ] 9.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 9.7 Write failing test `test_database_outage_is_not_an_empty_route` in `test/core/router/recurring_booking_workspace_routes_test.dart` for scenario "Database outage is not an empty route"; assert it fails for the right reason.
+- [ ] 9.7 Write failing test `test_database_outage_is_not_an_empty_route` in `test/core/recurring_booking_workspace_routes_test.dart` for scenario "Database outage is not an empty route"; assert it fails for the right reason.
 - [ ] 9.8 Implement the specified behavior for "Database outage is not an empty route" to pass 9.7.
 - [ ] 9.9 Refactor the affected code; keep the focused and full suites green.
-- [ ] 9.10 Write failing test `test_alias_matrix_preserves_deep_links` in `test/core/router/recurring_booking_workspace_routes_test.dart` for scenario "Alias matrix preserves deep links"; assert it fails for the right reason.
+- [ ] 9.10 Write failing test `test_alias_matrix_preserves_deep_links` in `test/core/recurring_booking_workspace_routes_test.dart` for scenario "Alias matrix preserves deep links"; assert it fails for the right reason.
 - [ ] 9.11 Implement the specified behavior for "Alias matrix preserves deep links" to pass 9.10.
 - [ ] 9.12 Refactor the affected code; keep the focused and full suites green.
-- [ ] 9.13 Write failing test `test_route_matrix_exposes_a_truthful_boundary` in `test/core/router/recurring_booking_workspace_routes_test.dart` for scenario "Route matrix exposes a truthful boundary"; assert it fails for the right reason.
+- [ ] 9.13 Write failing test `test_route_matrix_exposes_a_truthful_boundary` in `test/core/recurring_booking_workspace_routes_test.dart` for scenario "Route matrix exposes a truthful boundary"; assert it fails for the right reason.
 - [ ] 9.14 Implement the specified behavior for "Route matrix exposes a truthful boundary" to pass 9.13.
 - [ ] 9.15 Refactor the affected code; keep the focused and full suites green.
 

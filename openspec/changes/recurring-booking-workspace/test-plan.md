@@ -31,11 +31,11 @@
 | specs/specs/recurring/spec.md → Buchungsvorlage Auto-Generation | Repeated scan is idempotent | test/features/recurring/recurring_booking_workspace_test.dart | test_repeated_scan_is_idempotent | 🔴 red |
 | specs/specs/recurring/spec.md → Buchungsvorlage Auto-Generation | Inactive template skipped | test/features/recurring/recurring_booking_workspace_test.dart | test_inactive_template_skipped | 🔴 red |
 | specs/specs/recurring/spec.md → Buchungsvorlage Auto-Generation | Missing posting contract blocks execution | test/features/recurring/recurring_booking_workspace_test.dart | test_missing_posting_contract_blocks_execution | 🔴 red |
-| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Every canonical route has a useful surface | test/core/router/recurring_booking_workspace_routes_test.dart | test_every_canonical_route_has_a_useful_surface | 🔴 red |
-| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Recurring workspace resolves through its use case | test/core/router/recurring_booking_workspace_routes_test.dart | test_recurring_workspace_resolves_through_its_use_case | 🔴 red |
-| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Database outage is not an empty route | test/core/router/recurring_booking_workspace_routes_test.dart | test_database_outage_is_not_an_empty_route | 🔴 red |
-| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Alias matrix preserves deep links | test/core/router/recurring_booking_workspace_routes_test.dart | test_alias_matrix_preserves_deep_links | 🔴 red |
-| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Route matrix exposes a truthful boundary | test/core/router/recurring_booking_workspace_routes_test.dart | test_route_matrix_exposes_a_truthful_boundary | 🔴 red |
+| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Every canonical route has a useful surface | test/core/recurring_booking_workspace_routes_test.dart | test_every_canonical_route_has_a_useful_surface | 🔴 red |
+| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Recurring workspace resolves through its use case | test/core/recurring_booking_workspace_routes_test.dart | test_recurring_workspace_resolves_through_its_use_case | 🔴 red |
+| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Database outage is not an empty route | test/core/recurring_booking_workspace_routes_test.dart | test_database_outage_is_not_an_empty_route | 🔴 red |
+| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Alias matrix preserves deep links | test/core/recurring_booking_workspace_routes_test.dart | test_alias_matrix_preserves_deep_links | 🔴 red |
+| specs/specs/typed-route-workspaces/spec.md → Canonical route inventory | Route matrix exposes a truthful boundary | test/core/recurring_booking_workspace_routes_test.dart | test_route_matrix_exposes_a_truthful_boundary | 🔴 red |
 
 ## Coverage Notes
 
