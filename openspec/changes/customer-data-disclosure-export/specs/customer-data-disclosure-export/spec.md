@@ -4,6 +4,8 @@
 
 The application SHALL provide a user-initiated disclosure export for exactly one persisted customer from the customer detail workspace. The export SHALL use one consistent active-profile snapshot and a versioned manifest. Its current relationship inventory SHALL include the selected `kunden` row; that customer's `kunden_lieferadressen`; `rechnungen` linked by `kunde_id` or by `lieferadresse_id` to one of those customer addresses; and connected correction/conversion invoices reached in either direction through `storno_von`, `gutschrift_von`, `ersatz_fuer`, `ersatzrechnung_id`, `konvertiert_von`, or `konvertiert_zu`. The exporter SHALL follow those invoice lineage links until no additional invoice is reached and SHALL verify that inverse `konvertiert_von`/`konvertiert_zu` pointers agree whenever both are populated. It SHALL require populated `kunde_id` and delivery-address references to resolve to the selected customer. A missing or conflicting lineage, customer, supplier, or address identity SHALL cause the affected record to be excluded, identified in the manifest, and make the archive incomplete. The inventory SHALL then include `rechnungspositionen` belonging to those invoices; `mahnungen` and `forderungen` linked by customer or those invoices; `forderung_zahlungen` for those receivables; journal rows reached through invoice `rechnung_id`, receivable `journal_id`/`ausgleich_journal_id`, or linked receivable-payment rows; `vorsteuer_ansprueche` whose `rechnung_id` references those invoices; `rechnungsvorlagen` whose `kunde_id` is the selected customer or which are verified through `rechnungen.vorlage_id`; invoices reached from those templates through `auftrag_id`; generated invoices and `rechnungsvorlagen_occurrences` for those templates; `kunden_belege` links for the customer; and `belege` rows reached by those links. `buchungsvorlagen_occurrences` MAY be included only as a projected occurrence when its `rechnung_id` or `journal_id` already resolves to an included invoice or journal row; its unrelated booking-template identifier SHALL be omitted. The exporter SHALL preserve verified relationship paths and SHALL NOT infer relationships by name, free-text note, or bank counterparty text. It SHALL NOT include unrelated parties' master records or present the result as a full-profile export.
 
+The published archive SHALL be a ZIP containing `manifest.json`, one UTF-8 JSON Lines file at `records/<table>.jsonl` for each included record type, and copied evidence beneath `evidence/`. The manifest SHALL identify archive schema version `1`, record-projection version `1`, the selected customer reference, included record counts, verified relationship paths, exclusions, outcome, and SHA-256 digests for each record and evidence file. Evidence archive names SHALL use content digests and a safe extension, and SHALL NOT expose source filenames or host paths. The archive SHALL be written to a unique partial file in the destination directory, flushed, closed, and verified before it is renamed to the requested destination only when that destination does not exist. Cancellation or failure SHALL remove only this operation's partial file and leave any existing destination unchanged. A later retry after process interruption MAY remove only the exact matching application-owned partial file. The export SHALL store no persistent export history; only the current run's status and manifest are user-visible.
+
 Each record type SHALL use a versioned field allowlist. Unknown columns SHALL NOT be serialized. Cross-party references, including `rechnungen.lieferant_id`, `belege.lieferant_id`, `journal.vorlage_id`, and `vorsteuer_ansprueche.beleg_id`, SHALL be omitted. `journal.beleg_id` MAY be retained only when it resolves to evidence already linked to the selected customer. `forderungen.partner_typ`/`partner_id` SHALL be retained only when they resolve to the selected customer. Any omitted field containing a non-empty value whose scope cannot be proven outside this disclosure SHALL be listed in the manifest and make the result incomplete. A contradictory required relationship, unknown table, or non-empty unclassified field SHALL also make the result incomplete. The manifest SHALL identify the record projection version. This defines the supported export projection and SHALL NOT be described as legally sufficient disclosure.
 
 #### Scenario: Export an unambiguous customer's linked records
@@ -53,6 +55,14 @@ For linked records that reference files, the exporter SHALL resolve only paths b
 - **THEN** the manifest SHALL identify the excluded or unavailable reference
 - **AND** the result SHALL be incomplete or failed, never complete
 
+#### Scenario: Profile-local symlink targets evidence outside the profile
+
+- **GIVEN** a linked evidence path is lexically beneath the profile data root but resolves through a symbolic link to a canonical target outside that root
+- **WHEN** the package is created
+- **THEN** the target file SHALL NOT be copied into the archive
+- **AND** the manifest SHALL identify the excluded reference without exposing an absolute host path
+- **AND** the result SHALL be incomplete
+
 ### Requirement: Customer disclosure export is separate from erasure and profile portability
 
 The customer detail workspace SHALL describe this operation as a read-only, customer-scoped export and distinguish it from whole-profile portability, backup, and other export capabilities. The export SHALL NOT delete, anonymize, change retention, or mark a request as legally completed. If no approved policy defines third-party disclosure, retention, or erasure behavior, the UI SHALL state the unresolved boundary and SHALL expose no destructive action.
@@ -69,7 +79,16 @@ The customer detail workspace SHALL describe this operation as a read-only, cust
 - **GIVEN** snapshot, destination, serialization, linked-file, or validation work fails or is cancelled
 - **WHEN** the export stops
 - **THEN** no incomplete final archive SHALL be reported as successful
+- **AND** the operation's partial file SHALL be removed
+- **AND** any existing destination file SHALL remain unchanged
 - **AND** customer and related source records SHALL remain unchanged
+
+#### Scenario: Retry after interrupted archive creation
+
+- **GIVEN** a prior process interruption left an application-owned partial file for the same export destination
+- **WHEN** the user retries the export
+- **THEN** the exporter MAY remove only that exact matching partial file before creating a new one
+- **AND** it SHALL preserve unrelated files and any existing destination
 
 ### Requirement: Customer export follows the desktop design system
 
@@ -81,3 +100,11 @@ The export flow SHALL be keyboard accessible, provide visible focus and semantic
 - **WHEN** the user activates it with the keyboard and confirms a destination
 - **THEN** the same scoped export flow SHALL run as for pointer input
 - **AND** completion, incompleteness, failure, or cancellation SHALL be announced as a localized semantic status
+
+#### Scenario: Cancel destination selection in a narrow window with enlarged text
+
+- **GIVEN** the customer detail workspace is at a narrow window width with enlarged text and the destination dialog is open
+- **WHEN** the user cancels the dialog with the keyboard
+- **THEN** the dialog SHALL remain readable without horizontal overflow
+- **AND** focus SHALL return to the disclosure-export action
+- **AND** no archive SHALL be published and a localized cancelled status SHALL be shown

@@ -5,7 +5,7 @@ Feature-map item 72 asks customer information to support data disclosure/export 
 ## What Changes
 
 - Add a user-initiated data disclosure export from one customer detail view, limited to that customer and records reached through explicit typed relationships.
-- Package a versioned manifest, typed record projections, and profile-local files explicitly linked to the selected customer, including reviewed dynamic occurrence and receivable-payment tables.
+- Package a versioned ZIP containing `manifest.json`, typed UTF-8 JSON Lines record projections, and profile-local files explicitly linked to the selected customer, including reviewed dynamic occurrence and receivable-payment tables.
 - Use versioned per-table field allowlists; omit third-party references and mark any non-empty unclassified field as unsupported and the archive incomplete.
 - Follow invoice correction/conversion lineage, recurring-template source-invoice links, and saved delivery-address links while rejecting conflicting customer identities.
 - Identify included record types, relationship paths, excluded or ambiguous data, and missing files; never call an incomplete package complete.
