@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-10-03
+goal: Provide standards-validated outbound electronic invoice exports from
+  finalized invoices without changing accounting values

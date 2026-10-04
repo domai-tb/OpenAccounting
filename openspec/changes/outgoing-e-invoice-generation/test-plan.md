@@ -1,0 +1,47 @@
+## Test Plan
+
+<!-- Every scenario from specs/ maps to a concrete test. Initial state is red. -->
+
+| Requirement | Scenario | Test File | Test Name | Initial State |
+|-------------|----------|-----------|-----------|---------------|
+| specs/documents/spec.md → Document Lifecycle — Finalization | Finalization locks document | test/pages/rechnungen/e_invoice_finalization_test.dart | finalization_assigns_number_locks_fields_persists_format_and_stores_pdf | 🔴 red |
+| specs/documents/spec.md → Document Lifecycle — Finalization | Finalization captures company snapshot | test/pages/rechnungen/e_invoice_finalization_test.dart | finalized_pdf_uses_captured_company_snapshot | 🔴 red |
+| specs/documents/spec.md → Document Lifecycle — Finalization | Re-finalization blocked | test/pages/rechnungen/e_invoice_finalization_test.dart | rejects_finalization_of_already_finalized_invoice | 🔴 red |
+| specs/documents/spec.md → Document Lifecycle — Finalization | Legacy finalized invoice defaults to PDF | test/pages/rechnungen/e_invoice_finalization_test.dart | legacy_finalized_invoice_resolves_missing_format_to_pdf | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | Customer preference preselects ZUGFeRD | test/pages/rechnungen/invoice_output_format_widget_test.dart | zugferd_customer_preference_preselects_zugferd | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | Customer preference preselects PDF | test/pages/rechnungen/invoice_output_format_widget_test.dart | disabled_zugferd_preference_preselects_pdf | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | Per-invoice selection overrides the default | test/pages/rechnungen/invoice_output_format_widget_test.dart | per_invoice_choice_overrides_default_without_changing_customer | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | ZUGFeRD invoice generation | test/pages/rechnungen/e_invoice_finalization_test.dart | zugferd_finalization_stores_validated_hybrid_and_readiness | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | ZUGFeRD not generated when disabled | test/pages/rechnungen/e_invoice_finalization_test.dart | pdf_selection_does_not_embed_zugferd_xml | 🔴 red |
+| specs/stammdaten/spec.md → Kunden — Zugferd aktiv | Invalid selected ZUGFeRD data blocks finalization | test/pages/rechnungen/e_invoice_finalization_test.dart | invalid_zugferd_data_blocks_finalization_without_side_effects | 🔴 red |
+| specs/pdf/spec.md → ZUGFeRD and XRechnung E-Invoicing | ZUGFeRD PDF generation | test/pages/rechnungen/e_invoice_generation_test.dart | generates_hybrid_pdf_with_validated_zugferd_metadata | 🔴 red |
+| specs/pdf/spec.md → ZUGFeRD and XRechnung E-Invoicing | XRechnung generation | test/pages/rechnungen/e_invoice_generation_test.dart | generates_standalone_xrechnung_ubl_without_mutating_invoice | 🔴 red |
+| specs/pdf/spec.md → ZUGFeRD and XRechnung E-Invoicing | Invalid invoice data for e-invoicing | test/pages/rechnungen/e_invoice_generation_test.dart | rejects_invalid_invoice_with_localized_rule_diagnostic_and_no_output | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Version-pinned e-invoice formats | Generate supported pinned format | test/pages/rechnungen/e_invoice_validator_test.dart | validates_supported_xml_against_exact_local_pinned_artifacts | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Version-pinned e-invoice formats | Unsupported or unavailable validation bundle | test/pages/rechnungen/e_invoice_validator_test.dart | unavailable_or_corrupt_bundle_rejects_output_without_compliance_claim | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Generate from one canonical invoice snapshot | Finalization outputs share one canonical snapshot | test/pages/rechnungen/e_invoice_finalization_test.dart | pdf_and_cii_match_the_snapshot_and_committed_invoice | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Generate from one canonical invoice snapshot | Standalone export reads the committed snapshot | test/pages/rechnungen/e_invoice_export_test.dart | standalone_export_uses_committed_snapshot_without_mutation | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Generate from one canonical invoice snapshot | Snapshot output failure rolls back finalization | test/pages/rechnungen/e_invoice_finalization_test.dart | output_failure_rolls_back_number_status_stock_and_artifacts | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Generate from one canonical invoice snapshot | Draft invoice cannot be exported | test/pages/rechnungen/e_invoice_export_test.dart | draft_invoice_rejects_export_without_changes | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Tax categories are explicitly classified | Explicit tax classification is serialized | test/pages/rechnungen/e_invoice_generation_test.dart | serializes_approved_typed_tax_category_and_exemption_reason | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Tax categories are explicitly classified | Tax category mapping is unavailable | test/pages/rechnungen/e_invoice_generation_test.dart | unresolved_tax_mapping_fails_without_inference_or_output | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Required-field and business-rule validation | Valid data passes pinned validation | test/pages/rechnungen/e_invoice_validator_test.dart | valid_snapshot_is_accepted_and_reported_ready | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Required-field and business-rule validation | Missing required source field | test/pages/rechnungen/e_invoice_validator_test.dart | missing_source_field_reports_localized_diagnostic_without_output | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Required-field and business-rule validation | Pinned business rule rejects invoice | test/pages/rechnungen/e_invoice_validator_test.dart | pinned_business_rule_rejects_output_without_mutating_invoice | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Selected ZUGFeRD hybrid finalization | Selected ZUGFeRD finalization | test/pages/rechnungen/e_invoice_finalization_test.dart | stores_validated_hybrid_pdf_and_references_artifact | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Selected ZUGFeRD hybrid finalization | Customer default is overridden per invoice | test/pages/rechnungen/e_invoice_finalization_test.dart | explicit_non_zugferd_choice_generates_non_hybrid_pdf | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Selected ZUGFeRD hybrid finalization | ZUGFeRD validation failure rolls back finalization | test/pages/rechnungen/e_invoice_finalization_test.dart | zugferd_validation_failure_rolls_back_finalization_and_temp_files | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Standalone XRechnung export | Export standalone XRechnung | test/pages/rechnungen/e_invoice_export_test.dart | saves_validated_xrechnung_atomically_without_invoice_mutation | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Standalone XRechnung export | Cancel standalone XRechnung export | test/pages/rechnungen/e_invoice_export_test.dart | canceling_save_dialog_writes_no_file_and_changes_nothing | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → Standalone XRechnung export | Export cannot validate | test/pages/rechnungen/e_invoice_export_test.dart | validation_failure_prevents_save_dialog_and_file_write | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Output choices and state are visible | test/pages/rechnungen/invoice_output_format_widget_test.dart | shows_all_formats_selection_and_readiness_with_text | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Selected format survives reopening a finalized invoice | test/pages/rechnungen/invoice_output_format_widget_test.dart | restores_persisted_xrechnung_selection_after_reopen | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Invoice detail exposes a reachable export | test/pages/rechnungen/invoice_output_format_widget_test.dart | exposes_keyboard_reachable_localized_export_and_error_details | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Draft has no standalone export action | test/pages/rechnungen/invoice_output_format_widget_test.dart | hides_or_disables_export_for_draft_invoice | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Legacy finalized invoice defaults to PDF | test/pages/rechnungen/invoice_output_format_widget_test.dart | reopened_legacy_invoice_shows_pdf_without_customer_inference | 🔴 red |
+
+## Coverage Notes
+
+- All 35 specification scenarios have one named test. Tests are planned for the repository's Flutter test infrastructure and must start red before implementation.
+- Validator and PDF/A tests require the exact pinned offline artifacts and representative valid/invalid fixtures on supported desktop targets. Their platform packaging and runtime availability are pre-implementation gates; this plan does not claim those gates are already satisfied.
+- Export dialog tests should inject the native save-dialog adapter so cancellation and atomic output behavior can be verified without an interactive desktop session.

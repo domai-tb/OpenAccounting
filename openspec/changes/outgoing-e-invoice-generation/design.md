@@ -1,0 +1,52 @@
+# Design: Outgoing E-Invoice Generation
+
+## Context
+
+`PdfGenerator.generate` renders a visual PDF from `PdfDocumentSnapshot`. Invoice finalization calls it and stores `original_pdf_pfad`; it does not serialize structured XML or produce PDF/A-3. `kunden.zugferd_aktiv` is persisted, but no production generator consumes it. The incoming structured-invoice proposal reads XRechnung/ZUGFeRD sources and explicitly excludes outbound generation.
+
+The maintained `pdf` spec currently conflates XRechnung XML with XML embedded in PDF/A-3. The customer spec separately requires conditional ZUGFeRD generation during finalization. This change keeps that lifecycle while treating `zugferd_aktiv` as the default for a visible per-invoice output choice.
+
+## Standards reviewed
+
+As of 2026-10-04, the FeRD release information identifies ZUGFeRD 2.5.2 as effective from 2026-09-01. Its package is based on UN/CEFACT CII D22B and contains profile-specific XSD and Schematron validation artifacts. The initial target is the `EN16931` profile; do not emit the broader `EXTENDED` profile or imply capabilities the invoice model cannot represent. See [FeRD ZUGFeRD 2.5.2](https://www.ferd-net.de/en/downloads/publications/details?cHash=18b9628abae246f23bb98107bfc295de&tx_brochureshop_detail%5Baction%5D=show&tx_brochureshop_detail%5Barticle%5D=246&tx_brochureshop_detail%5Bcontroller%5D=Article).
+
+The current XRechnung format is version 3.0; the official XRechnung Bundle 3.0.2 Summer 2026, dated 2026-08-31, provides compatible technical components. “3.0.2” identifies the validator bundle, not a normative XRechnung format version. XRechnung 3.0 is stated to remain in force at least through 2027-07-31. The initial output syntax is UBL 2.1. See [XRechnung versions and bundles](https://xeinkauf.de/xrechnung/versionen-und-bundles/) and [the Summer 2026 bundle update](https://xeinkauf.de/aktuelles/xrechnung/xrechnung-bugfix-summer-2026/).
+
+Because these standards and their validation bundles change, the pinned versions are the proposal's initial targets, not a claim that the application will always support the latest release. Before implementation begins, re-check the official releases and revise this contract through OpenSpec if either target has changed. Do not download or silently update validators at application runtime.
+
+## Decisions
+
+1. **Keep the formats distinct, selected, and visible.** The invoice finalization surface presents ZUGFeRD, XRechnung, and PDF as explicit per-invoice output choices, as required by `DESIGN.md`. `kunden.zugferd_aktiv` preselects ZUGFeRD when true and PDF when false; it is a default, not a hidden forced choice. Persist the selected enum (`zugferd`, `xrechnung`, or `pdf`) as `rechnungen.ausgabeformat` in the same transaction as finalization and expose it in finalized-detail reads. Legacy finalized invoices with a null value display as PDF, never using today's customer default. Selecting ZUGFeRD generates a hybrid PDF/A-3b plus embedded ZUGFeRD 2.5.2 CII invoice during finalization. Selecting PDF keeps the existing visual PDF output. Selecting XRechnung uses the existing visual PDF as the human-readable original and marks standalone XRechnung 3.0 UBL 2.1 as the selected output; XML is generated only from the committed snapshot after an explicit user export action. After reopening, the detail surface restores the selected format and shows XRechnung as not yet exported/unvalidated until the export path validates it. The user can still explicitly export XRechnung as an alternate action for a finalized PDF or ZUGFeRD invoice. Finalized format selection is read-only. XRechnung is never wrapped in PDF/A-3.
+
+2. **Build from one canonical snapshot at each lifecycle point.** During finalization, after sequence allocation and canonical invoice calculation but before artifact generation, materialize one typed immutable finalization snapshot inside the transaction. It contains the number, selected output enum, dates, sender/customer state, lines, typed tax classifications, and canonical totals that will be written to the finalized row; the committed row MUST persist those same values. Both the visual PDF and embedded ZUGFeRD XML consume this same snapshot, so their displayed and structured values match. The XRechnung export path reads a typed immutable snapshot from the committed finalized invoice. Map only information present in validated invoice, company, customer, and position records. Serialization does not recalculate or normalize money, infer legal classifications, invent terms, or silently add required identifiers. The accepted invoice-money source, not preview math, owns canonical values.
+
+3. **Gate implementation on accepted money and tax-classification sources.** The snapshot and any amount mapping depend on the accepted `invoice-money-invariants` contract. Electronic invoice tax-category codes and required exemption reasons must come from an explicitly approved typed tax-classification map; a percentage or zero rate alone is insufficient. If persisted totals, line data, or tax classifications do not meet those contracts, generation fails with a typed source-data diagnostic. Do not use PDF preview calculations, rate-only inference, or a second calculator as a substitute.
+
+4. **Validate with pinned local standard artifacts.** Package the selected official XSD/Schematron/configuration artifacts with the application, identify their versions in code and release metadata, and run validation without network access. Use the XRechnung validator configuration and the ZUGFeRD EN16931 profile artifacts. The PDF/A-3b container and its embedded-file relationship must also pass the project's pinned PDF/A validator in release verification. The implementation must establish a supported offline validation engine for Linux, Windows, and macOS before it starts; inability to validate on any supported platform blocks generation rather than weakening the check.
+
+5. **Fail before exposing invalid output.** Missing mandatory fields and standard-rule failures return typed diagnostics with the field/business-term or rule identifier, localized explanation, and corrective route where available. ZUGFeRD validation and file creation occur inside the existing finalization transaction: any failure rolls back numbering, invoice status, inventory side effects, and database writes, and temporary files are removed. The snapshot passed to PDF and CII generation is the same immutable instance and its canonical totals equal those persisted if the transaction commits. Do not mark a document e-invoice ready unless generation and validation both succeed.
+
+6. **Keep XRechnung export read-only and user-selected.** The detail page makes the output format explicit and offers XRechnung export only for a finalized outgoing invoice. Show validation/readiness beside the selected format and offer any supported alternate output as an explicit action. Validate the committed snapshot before opening the save dialog. If the user cancels, write nothing. Otherwise write the validated XML to a same-directory temporary file and atomically rename it; a failed write leaves the invoice unchanged and no partial destination file.
+
+7. **Preserve existing application boundaries and design.** Expose the XRechnung action through the registered invoice application service/repository; the page does not construct data sources or issue SQL. Use the existing invoice detail surface, `AppPage`/`AppPageHeader`/`AppStatusChip` where applicable, generated English and German strings, visible focus, keyboard actions, a field-level validation summary, and responsive layout from `DESIGN.md`. The existing master-data capability owns editing `zugferd_aktiv`.
+
+8. **Limit this increment to ordinary outgoing invoices.** Do not generate XML for Storno, Gutschrift, replacement invoices, purchase invoices, reminders, or other document types until those document and money contracts explicitly define the output type and reference rules. Do not send the output by e-mail, transmit it to an authority, create a posting, or claim legal/GoBD compliance merely because schema validation succeeds.
+
+9. **Correct the feature guide with the implementation.** Replace ZUGFeRD 2.1.1 with the supported release; document the explicit output choice, conditional hybrid generation, separate XRechnung export, and the distinction between XRechnung 3.0 and validator Bundle 3.0.2. Replace blanket claims that USt-IdNr, service date, or payment terms are universally required with conditions from applicable law and the selected pinned format's business rules. Keep the guide explicit that technical validation does not decide tax treatment.
+
+10. **Migrate legacy invoices deterministically.** Add `rechnungen.ausgabeformat` to the invoice persistence/read model and finalization snapshot. New finalizations always write the selected value. Legacy finalized rows with `NULL` mean PDF because the pre-change application did not produce a structured XRechnung or ZUGFeRD output; never infer historical format from mutable customer settings.
+
+## Risks / Trade-offs
+
+- [The invoice model may not contain all required fields] → Fail closed with field-level diagnostics and make missing source fields visible in the owning master-data or invoice proposal; never invent values.
+- [Bundling an offline XRechnung/PDF-A validator may add platform and package cost] → Prove the packaging route for all supported desktop platforms before implementation; do not make network calls or turn validation into an optional warning.
+- [Selected ZUGFeRD generation can prevent finalization when source data is incomplete] → Validate before committing sequence, invoice, and stock changes and surface the exact corrections required.
+- [Standards releases can change] → Pin artifacts, record their release identity, and require an OpenSpec-reviewed upgrade rather than runtime refresh.
+
+## Implementation Preconditions
+
+- A replacement `invoice-money-invariants` contract has passed independent review and is accepted.
+- Every initially supported invoice tax situation has an accepted typed mapping to the selected electronic-invoice profile, including required exemption reasons.
+- `master-data-workspaces-and-crud` exposes the persisted ZUGFeRD customer setting with clear semantics.
+- The supported offline validator and PDF/A validation package are proven on every supported desktop target.
+- The proposed standards are rechecked against FeRD and XStandards Einkauf immediately before implementation.
