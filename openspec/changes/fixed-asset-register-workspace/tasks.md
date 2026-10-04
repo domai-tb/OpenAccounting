@@ -21,10 +21,10 @@
 
 ## 2. db: Asset schedule schema preserves legacy records and history
 
-- [ ] 2.1 Write failing test `test_existing_asset_data_survives_migration` in `test/core/db/fixed_asset_register_workspace_migration_test.dart` for scenario "Existing asset data survives migration"; assert it fails for the right reason.
+- [ ] 2.1 Write failing test `test_existing_asset_data_survives_migration` in `test/db/fixed_asset_register_workspace_migration_test.dart` for scenario "Existing asset data survives migration"; assert it fails for the right reason.
 - [ ] 2.2 Implement the specified behavior for "Existing asset data survives migration" to pass 2.1.
 - [ ] 2.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 2.4 Write failing test `test_schedule_history_remains_immutable` in `test/core/db/fixed_asset_register_workspace_migration_test.dart` for scenario "Schedule history remains immutable"; assert it fails for the right reason.
+- [ ] 2.4 Write failing test `test_schedule_history_remains_immutable` in `test/db/fixed_asset_register_workspace_migration_test.dart` for scenario "Schedule history remains immutable"; assert it fails for the right reason.
 - [ ] 2.5 Implement the specified behavior for "Schedule history remains immutable" to pass 2.4.
 - [ ] 2.6 Refactor the affected code; keep the focused and full suites green.
 
@@ -69,16 +69,16 @@
 
 ## 6. typed-route-workspaces: Canonical route inventory
 
-- [ ] 6.1 Write failing test `test_every_canonical_route_has_a_useful_surface` in `test/core/router/fixed_asset_register_workspace_routes_test.dart` for scenario "Every canonical route has a useful surface"; assert it fails for the right reason.
+- [ ] 6.1 Write failing test `test_every_canonical_route_has_a_useful_surface` in `test/core/fixed_asset_register_workspace_routes_test.dart` for scenario "Every canonical route has a useful surface"; assert it fails for the right reason.
 - [ ] 6.2 Implement the specified behavior for "Every canonical route has a useful surface" to pass 6.1.
 - [ ] 6.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 6.4 Write failing test `test_database_outage_is_not_an_empty_route` in `test/core/router/fixed_asset_register_workspace_routes_test.dart` for scenario "Database outage is not an empty route"; assert it fails for the right reason.
+- [ ] 6.4 Write failing test `test_database_outage_is_not_an_empty_route` in `test/core/fixed_asset_register_workspace_routes_test.dart` for scenario "Database outage is not an empty route"; assert it fails for the right reason.
 - [ ] 6.5 Implement the specified behavior for "Database outage is not an empty route" to pass 6.4.
 - [ ] 6.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 6.7 Write failing test `test_alias_matrix_preserves_deep_links` in `test/core/router/fixed_asset_register_workspace_routes_test.dart` for scenario "Alias matrix preserves deep links"; assert it fails for the right reason.
+- [ ] 6.7 Write failing test `test_alias_matrix_preserves_deep_links` in `test/core/fixed_asset_register_workspace_routes_test.dart` for scenario "Alias matrix preserves deep links"; assert it fails for the right reason.
 - [ ] 6.8 Implement the specified behavior for "Alias matrix preserves deep links" to pass 6.7.
 - [ ] 6.9 Refactor the affected code; keep the focused and full suites green.
-- [ ] 6.10 Write failing test `test_route_matrix_exposes_a_truthful_boundary` in `test/core/router/fixed_asset_register_workspace_routes_test.dart` for scenario "Route matrix exposes a truthful boundary"; assert it fails for the right reason.
+- [ ] 6.10 Write failing test `test_route_matrix_exposes_a_truthful_boundary` in `test/core/fixed_asset_register_workspace_routes_test.dart` for scenario "Route matrix exposes a truthful boundary"; assert it fails for the right reason.
 - [ ] 6.11 Implement the specified behavior for "Route matrix exposes a truthful boundary" to pass 6.10.
 - [ ] 6.12 Refactor the affected code; keep the focused and full suites green.
 
