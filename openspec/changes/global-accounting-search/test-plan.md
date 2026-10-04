@@ -18,12 +18,12 @@
 | specs/global-business-search/spec.md → Search palette interaction and accessibility | Keyboard search preserves the current page | test/features/global_search/global_business_search_test.dart | test_keyboard_search_preserves_the_current_page | 🔴 red |
 | specs/global-business-search/spec.md → Search palette interaction and accessibility | Keyboard and assistive-technology navigation | test/features/global_search/global_business_search_test.dart | test_keyboard_and_assistive_technology_navigation | 🔴 red |
 | specs/global-business-search/spec.md → Search palette interaction and accessibility | Narrow-window palette | test/features/global_search/global_business_search_test.dart | test_narrow_window_palette | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Combine invoice criteria | test/core/router/typed_route_workspace_search_test.dart | test_combine_invoice_criteria | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Combine receipt and banking criteria | test/core/router/typed_route_workspace_search_test.dart | test_combine_receipt_and_banking_criteria | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Invalid filter or query failure | test/core/router/typed_route_workspace_search_test.dart | test_invalid_filter_or_query_failure | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Clear one or all filters | test/core/router/typed_route_workspace_search_test.dart | test_clear_one_or_all_filters | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Banking selection is addressable through the canonical route | Open a selected bank transaction | test/core/router/typed_route_workspace_search_test.dart | test_open_a_selected_bank_transaction | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Banking selection is addressable through the canonical route | Invalid or missing transaction selection | test/core/router/typed_route_workspace_search_test.dart | test_invalid_or_missing_transaction_selection | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Combine invoice criteria | test/core/typed_route_workspace_search_test.dart | test_combine_invoice_criteria | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Combine receipt and banking criteria | test/core/typed_route_workspace_search_test.dart | test_combine_receipt_and_banking_criteria | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Invalid filter or query failure | test/core/typed_route_workspace_search_test.dart | test_invalid_filter_or_query_failure | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Business-document search and combined filters | Clear one or all filters | test/core/typed_route_workspace_search_test.dart | test_clear_one_or_all_filters | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Banking selection is addressable through the canonical route | Open a selected bank transaction | test/core/typed_route_workspace_search_test.dart | test_open_a_selected_bank_transaction | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Banking selection is addressable through the canonical route | Invalid or missing transaction selection | test/core/typed_route_workspace_search_test.dart | test_invalid_or_missing_transaction_selection | 🔴 red |
 <!-- Non-executable change (docs/config/schema): map to a mechanical check instead. -->
 <!-- | specs/<cap>/spec.md → <Requirement Name> | <Scenario Name> | openspec schema validate anvil | schema-validates | N/A — non-executable | -->
 

@@ -46,24 +46,24 @@ Keep search read-only and restricted to the typed fields, registered destination
 
 ## 4. Business-document search and combined filters
 
-- [ ] 4.1 Write failing test: `test_combine_invoice_criteria` in `test/core/router/typed_route_workspace_search_test.dart` for “Combine invoice criteria” (assert it fails for the right reason).
+- [ ] 4.1 Write failing test: `test_combine_invoice_criteria` in `test/core/typed_route_workspace_search_test.dart` for “Combine invoice criteria” (assert it fails for the right reason).
 - [ ] 4.2 Implement the typed, profile-scoped behavior for “Combine invoice criteria” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 4.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.4 Write failing test: `test_combine_receipt_and_banking_criteria` in `test/core/router/typed_route_workspace_search_test.dart` for “Combine receipt and banking criteria” (assert it fails for the right reason).
+- [ ] 4.4 Write failing test: `test_combine_receipt_and_banking_criteria` in `test/core/typed_route_workspace_search_test.dart` for “Combine receipt and banking criteria” (assert it fails for the right reason).
 - [ ] 4.5 Implement the typed, profile-scoped behavior for “Combine receipt and banking criteria” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 4.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.7 Write failing test: `test_invalid_filter_or_query_failure` in `test/core/router/typed_route_workspace_search_test.dart` for “Invalid filter or query failure” (assert it fails for the right reason).
+- [ ] 4.7 Write failing test: `test_invalid_filter_or_query_failure` in `test/core/typed_route_workspace_search_test.dart` for “Invalid filter or query failure” (assert it fails for the right reason).
 - [ ] 4.8 Implement the typed, profile-scoped behavior for “Invalid filter or query failure” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 4.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.10 Write failing test: `test_clear_one_or_all_filters` in `test/core/router/typed_route_workspace_search_test.dart` for “Clear one or all filters” (assert it fails for the right reason).
+- [ ] 4.10 Write failing test: `test_clear_one_or_all_filters` in `test/core/typed_route_workspace_search_test.dart` for “Clear one or all filters” (assert it fails for the right reason).
 - [ ] 4.11 Implement the typed, profile-scoped behavior for “Clear one or all filters” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 4.12 Refactor the related code; focused tests and the full suite stay green.
 
 ## 5. Banking selection is addressable through the canonical route
 
-- [ ] 5.1 Write failing test: `test_open_a_selected_bank_transaction` in `test/core/router/typed_route_workspace_search_test.dart` for “Open a selected bank transaction” (assert it fails for the right reason).
+- [ ] 5.1 Write failing test: `test_open_a_selected_bank_transaction` in `test/core/typed_route_workspace_search_test.dart` for “Open a selected bank transaction” (assert it fails for the right reason).
 - [ ] 5.2 Implement the typed, profile-scoped behavior for “Open a selected bank transaction” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 5.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 5.4 Write failing test: `test_invalid_or_missing_transaction_selection` in `test/core/router/typed_route_workspace_search_test.dart` for “Invalid or missing transaction selection” (assert it fails for the right reason).
+- [ ] 5.4 Write failing test: `test_invalid_or_missing_transaction_selection` in `test/core/typed_route_workspace_search_test.dart` for “Invalid or missing transaction selection” (assert it fails for the right reason).
 - [ ] 5.5 Implement the typed, profile-scoped behavior for “Invalid or missing transaction selection” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 5.6 Refactor the related code; focused tests and the full suite stay green.
