@@ -21,7 +21,7 @@ Feature-map item 72 asks customer information to support data disclosure/export 
 ### Modified Capabilities
 
 - `stammdaten`: Add an export action to the typed customer detail contract.
-- `db`: Require a stable relationship inventory and a consistent profile snapshot for the scoped package.
+- `db`: Require a stable relationship inventory and consistent profile snapshot, and replace the stale table-count requirement with the shared 40-base/3-feature inventory, durable lazy-table markers, and pre-repair payment-table health contract.
 
 ## Impact
 

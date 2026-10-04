@@ -8,7 +8,7 @@ The published archive SHALL be a ZIP containing `manifest.json`, one UTF-8 JSON 
 
 Each record type SHALL use a versioned field allowlist. Unknown columns SHALL NOT be serialized. Cross-party references, including `rechnungen.lieferant_id`, `belege.lieferant_id`, `journal.vorlage_id`, and `vorsteuer_ansprueche.beleg_id`, SHALL be omitted. `journal.beleg_id` MAY be retained only when it resolves to evidence already linked to the selected customer. A receivable's typed pair SHALL establish inclusion only when `partner_typ = 'kunde'` and `partner_id` resolves to the selected customer. When `kunde_id`, `rechnung_id`, and the typed pair are populated, they SHALL agree with the selected customer and included invoice as applicable. A supplier or other-customer identity, unknown partner type, or missing referenced row SHALL exclude the receivable, identify the conflict, and make the archive incomplete. The validated customer partner pair SHALL be retained in the projection. Any omitted field containing a non-empty value whose scope cannot be proven outside this disclosure SHALL be listed in the manifest and make the result incomplete. A contradictory required relationship, unknown table, or non-empty unclassified field SHALL also make the result incomplete. The manifest SHALL identify the record projection version. This defines the supported export projection and SHALL NOT be described as legally sufficient disclosure.
 
-The exporter SHALL compare the profile schema version and table inventory with the accepted maintained `db` specification before reporting completeness. A proposal or runtime table count alone SHALL NOT establish the accepted inventory. Until the maintained database inventory reconciles the current 38-table requirement with the separately proposed 39 base tables and three feature-owned tables, the archive SHALL remain incomplete. The exporter SHALL NOT create or repair tables. A required table missing for the accepted schema version, an absent lazy table without an accepted durable marker proving the feature was never initialized, or an unknown customer-relevant table SHALL be reported and make the archive incomplete.
+The exporter SHALL compare the active profile with the `Table Definitions` inventory and presence rules in this change's modified `db` requirement before reporting completeness. That contract names 40 required base tables, including durable `feature_table_state`, and three feature-owned tables, for 43 known application-table names. The exporter SHALL require the supported export schema version and a healthy table/state pairing: `forderung_zahlungen` is required at and after its declared migration version; each lazy occurrence table is valid only when present with marker state `initialized` or absent with marker state `never_initialized`. An absent lazy table marked `unknown`, a missing marker row, any state/table mismatch, a missing required table, a malformed table schema, or an undeclared application table SHALL make the archive incomplete. The exporter SHALL NOT create or repair tables. Startup SHALL check for missing `forderung_zahlungen` before any repair that could recreate it; if it is absent at or beyond its migration version, the original profile SHALL be preserved and remain unavailable for complete export until verified recovery. The manifest SHALL identify the table name and condition without exposing database paths. A change proposal or runtime table count alone SHALL NOT establish that the profile satisfies the accepted maintained contract.
 
 The ZIP SHALL contain a UTF-8 `manifest.json` and UTF-8 JSON Lines record files. Final publication SHALL use an atomic no-replace operation; if the destination exists when finalization occurs, the export SHALL fail without overwriting it.
 
@@ -112,3 +112,18 @@ The export flow SHALL be keyboard accessible, provide visible focus and semantic
 - **THEN** the dialog SHALL remain readable without horizontal overflow
 - **AND** focus SHALL return to the disclosure-export action
 - **AND** no archive SHALL be published and a localized cancelled status SHALL be shown
+
+#### Scenario: Unknown table state prevents complete disclosure
+
+- **GIVEN** a lazy occurrence table is absent with marker state `unknown`, a required table is missing, or an undeclared application table is present
+- **WHEN** the customer exporter validates the profile before projection
+- **THEN** the export SHALL be incomplete or unavailable
+- **AND** the manifest SHALL identify the table and state without exposing a database path
+- **AND** the exporter SHALL NOT create, repair, or replace a table
+
+#### Scenario: Missing payment table is detected before startup repair
+
+- **GIVEN** `PRAGMA user_version` is at or beyond the accepted `forderung_zahlungen` migration version and that table is absent
+- **WHEN** startup health checks run before any repair
+- **THEN** the profile SHALL remain unavailable for complete export and the original database SHALL be preserved
+- **AND** no empty replacement table SHALL be created automatically
