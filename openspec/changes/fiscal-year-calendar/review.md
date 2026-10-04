@@ -45,3 +45,48 @@ CHANGES_APPLIED: no
 ## Rebuttals
 
 None; first review round.
+
+---
+
+## Review Metadata — Round 2
+
+- **Review round**: 2
+- **Prior round**: Round 1 returned `APPROVE_WITH_CHANGES`; all three required changes were rechecked and found resolved
+- **Reviewer context**: fresh independent Anvil reviewer; did not author the fiscal-calendar proposal changes
+- **Revision reviewed**: `c72268716d2e8bff171e7bec7b0f9a777033d4e3` on `dev`; fiscal-calendar files unchanged after `b4ab9a1`
+- **Artifacts reviewed**: proposal, design, all four delta specs, round-one review, README, and maintained database, company, and accounting specs
+- **Validation evidence**: `openspec validate fiscal-year-calendar --type change --strict --json` passed with no issues. Structural validation only; tests were not run.
+
+### Round-One Required Changes Rechecked
+
+1. Historical boundaries are explicitly retroactive, with no effective-date history.
+2. Annual EÜR is the only report consumer in scope; dashboard and other fiscal filters remain unavailable pending accepted contracts.
+3. Invalid month/quarter indices and save failure now have acceptance scenarios.
+
+The export-snapshot suggestion is reflected in the design and configuration spec.
+
+### Findings — Round 2
+
+#### 🟡 Moderate
+
+1. The accounting delta must clarify that explicit calendar-year EÜR remains available when a non-January business year is configured; only the unsupported business-year request is unavailable.
+2. The design-system requirement needs a failure or unavailable-state scenario in addition to its keyboard-save happy path.
+
+## Embedded-Instruction / Injection Attempts — Round 2
+
+None detected.
+
+## Verdict — Round 2
+
+VERDICT: APPROVE_WITH_CHANGES
+
+## Required Changes — Round 2
+
+1. Add a positive scenario distinguishing calendar-year EÜR from an unsupported business-year request.
+2. Add a localized, accessible settings failure or unavailable-state scenario that preserves persisted-value behavior.
+
+CHANGES_APPLIED: no
+
+## Rebuttals — Round 2
+
+None.
