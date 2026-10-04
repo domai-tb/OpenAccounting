@@ -81,22 +81,22 @@
 
 ## 6. db: Tagesabschluss evidence storage and immutability
 
-- [ ] 6.1 Write failing test `test_close_evidence_migration_preserves_existing_history` in `test/core/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Close evidence migration preserves existing history"; assert it fails for the right reason.
+- [ ] 6.1 Write failing test `test_close_evidence_migration_preserves_existing_history` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Close evidence migration preserves existing history"; assert it fails for the right reason.
 - [ ] 6.2 Implement the specified behavior for "Close evidence migration preserves existing history" to pass 6.1.
 - [ ] 6.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 6.4 Write failing test `test_signed_close_cannot_be_rewritten` in `test/core/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Signed close cannot be rewritten"; assert it fails for the right reason.
+- [ ] 6.4 Write failing test `test_signed_close_cannot_be_rewritten` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Signed close cannot be rewritten"; assert it fails for the right reason.
 - [ ] 6.5 Implement the specified behavior for "Signed close cannot be rewritten" to pass 6.4.
 - [ ] 6.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 6.7 Write failing test `test_failed_evidence_migration_rolls_back` in `test/core/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Failed evidence migration rolls back"; assert it fails for the right reason.
+- [ ] 6.7 Write failing test `test_failed_evidence_migration_rolls_back` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Failed evidence migration rolls back"; assert it fails for the right reason.
 - [ ] 6.8 Implement the specified behavior for "Failed evidence migration rolls back" to pass 6.7.
 - [ ] 6.9 Refactor the affected code; keep the focused and full suites green.
 
 ## 7. db: Tagesabschluss finalization prevents duplicate identities
 
-- [ ] 7.1 Write failing test `test_duplicate_guard_runs_in_a_serialized_transaction` in `test/core/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Duplicate guard runs in a serialized transaction"; assert it fails for the right reason.
+- [ ] 7.1 Write failing test `test_duplicate_guard_runs_in_a_serialized_transaction` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Duplicate guard runs in a serialized transaction"; assert it fails for the right reason.
 - [ ] 7.2 Implement the specified behavior for "Duplicate guard runs in a serialized transaction" to pass 7.1.
 - [ ] 7.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 7.4 Write failing test `test_legacy_rows_without_one_verified_signed_identity_block_a_new_close` in `test/core/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Legacy rows without one verified signed identity block a new close"; assert it fails for the right reason.
+- [ ] 7.4 Write failing test `test_legacy_rows_without_one_verified_signed_identity_block_a_new_close` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Legacy rows without one verified signed identity block a new close"; assert it fails for the right reason.
 - [ ] 7.5 Implement the specified behavior for "Legacy rows without one verified signed identity block a new close" to pass 7.4.
 - [ ] 7.6 Refactor the affected code; keep the focused and full suites green.
 
