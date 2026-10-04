@@ -1,0 +1,4 @@
+schema: anvil
+created: 2026-10-04
+goal: Provide user-confirmed, auditable email delivery of existing business
+  document artifacts using secure SMTP and editable templates
