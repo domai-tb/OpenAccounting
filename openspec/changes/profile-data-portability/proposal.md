@@ -5,7 +5,7 @@ Settings currently has no complete profile export, and its active workspace prop
 ## What Changes
 
 - Add a profile-scoped export action under Settings → Daten & Datenschutz that creates a versioned, portable archive from a consistent local snapshot.
-- Include the fixed inventory of 42 known production tables: the 39 base registry tables, migration-managed `forderung_zahlungen`, and the two lazy feature tables `buchungsvorlagen_occurrences` and `rechnungsvorlagen_occurrences`. Record expected versus optional table presence explicitly, and include every present table with its relationships and currently persisted profile-local files.
+- Define one shared inventory of 43 known application tables: 40 required base tables (the existing 39-table target plus the new durable `feature_table_state` marker table) and three feature-owned tables (`forderung_zahlungen`, `buchungsvorlagen_occurrences`, and `rechnungsvorlagen_occurrences`). Record migration-required, initialized, never-initialized, and unknown states; include every supported present table with its relationships and currently persisted profile-local files.
 - Define this as profile-owner-controlled portability; it does not provide a subject-scoped disclosure for an individual customer or supplier.
 - Exclude secrets and unrelated machine configuration; never describe a report, backup, or partial archive as a complete profile export.
 - Keep export read-only and non-destructive. Deletion, anonymization, and retention scheduling remain unavailable until their separate policy is approved.
@@ -19,7 +19,7 @@ Settings currently has no complete profile export, and its active workspace prop
 
 ### Modified Capabilities
 
-- `db`: Reconcile the maintained database inventory with 39 registered base tables and three known feature-owned tables created outside that base registry; require an audited runtime inventory for both sets and allow only explicitly specified future feature tables as additive schema.
+- `db`: Replace the stale maintained table-count contract with the shared 40-base/3-feature inventory, including a durable two-row marker for lazy-table initialization, pre-repair payment-table health checks, and fail-closed handling of unknown or mismatched tables.
 
 ## Impact
 
