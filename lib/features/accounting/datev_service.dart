@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -21,10 +22,46 @@ class DatevService {
   /// Export DATEV EXTF CSV as String and optionally commit it atomically to a
   /// caller-selected absolute path.
   /// [jahr] filters journal by year, [von]/[bis] by inclusive date range.
-  /// [kontoBankFallback] overrides global unternehmen.datev_konto_bank.
+  /// [kontoBankFallback] explicitly selects a company account for bank legs
+  /// that carry no explicit account mapping. The stored
+  /// unternehmen.datev_konto_bank is validated but never applied implicitly.
   /// Throws [DatevException] if datev_beraternummer or mandantennummer missing,
   /// or if required EXTF fields are malformed (fail-closed before success log).
   Future<String> exportCsv({
+    int? jahr,
+    DateTime? von,
+    DateTime? bis,
+    String? kontoBankFallback,
+    String? destinationPath,
+  }) async {
+    return (await exportDetailed(
+      jahr: jahr,
+      von: von,
+      bis: bis,
+      kontoBankFallback: kontoBankFallback,
+      destinationPath: destinationPath,
+    )).csv;
+  }
+
+  /// Alias per task description: export({jahr, von, bis}) → CSV String
+  Future<String> export({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback, String? destinationPath}) {
+    return exportCsv(
+      jahr: jahr,
+      von: von,
+      bis: bis,
+      kontoBankFallback: kontoBankFallback,
+      destinationPath: destinationPath,
+    );
+  }
+
+  /// Full export with preview metadata and persisted per-slot provenance.
+  /// Each emitted `Konto`/`Gegenkonto` value is resolved independently from
+  /// its posting leg: an explicit account mapping (row konto
+  /// datev_kontonummer), an explicitly passed company override, or an
+  /// eligible category mapping attached to the leg. Unresolved slots fail
+  /// with the journal ID and slot name; no implicit company default and no
+  /// synthetic account (1200/8400) is ever substituted.
+  Future<DatevExportResult> exportDetailed({
     int? jahr,
     DateTime? von,
     DateTime? bis,
@@ -56,19 +93,28 @@ class DatevService {
     }
     // Strict header validation before any success logging — fail-closed.
     _validateHeader(berater: berater, mandant: mandant, jahr: jahr, von: von, bis: bis);
-    final String globalBankRaw = kontoBankFallback?.trim().isNotEmpty == true
-        ? kontoBankFallback!.trim()
-        : _unternehmenField(u, <String>['datev_konto_bank', 'konto_bank', 'datev_konto', 'datev_kontonummer']);
-    final String globalBank = globalBankRaw.trim();
-    if (globalBank.isNotEmpty) {
-      _validateKonto(globalBank, field: 'datev_konto_bank');
+    // Explicit company-account override for bank legs without their own
+    // account mapping. The stored unternehmen.datev_konto_bank is validated
+    // for format but never applied implicitly (fail-closed provenance).
+    final String callerOverride = (kontoBankFallback ?? '').trim();
+    if (callerOverride.isNotEmpty) {
+      _validateKonto(callerOverride, field: 'kontoBankFallback');
+    }
+    final String storedBank = _unternehmenField(u, <String>[
+      'datev_konto_bank',
+      'konto_bank',
+      'datev_konto',
+      'datev_kontonummer',
+    ]);
+    if (storedBank.trim().isNotEmpty) {
+      _validateKonto(storedBank.trim(), field: 'datev_konto_bank');
     }
 
-    // --- Kategorieliste ---
+    // --- Kategorieliste with mapping provenance ---
     final Map<int, _KatInfo> katMap = <int, _KatInfo>{};
     try {
       final List<Map<String, Object?>> kRows = await executor.runSelect(
-        'SELECT id, konto_skr03, konto_skr04 FROM kategorien',
+        'SELECT id, konto_skr03, konto_skr04, mapping_status, catalog_source_reference, catalog_source_version FROM kategorien',
         const <Object?>[],
       );
       for (final Map<String, Object?> r in kRows) {
@@ -77,10 +123,13 @@ class DatevService {
         katMap[id] = _KatInfo(
           skr03: (r['konto_skr03'] as String?)?.trim() ?? '',
           skr04: (r['konto_skr04'] as String?)?.trim() ?? '',
+          mappingStatus: (r['mapping_status'] as String?)?.trim() ?? 'legacy_unverified',
+          quelle: (r['catalog_source_reference'] as String?)?.trim(),
+          version: (r['catalog_source_version'] as String?)?.trim(),
         );
       }
     } catch (_) {
-      // keep empty — fallback handled per row
+      // keep empty — unresolved slots fail per row below
     }
 
     // --- Konten datev_kontonummer ---
@@ -134,7 +183,7 @@ class DatevService {
 
     // Validate each filtered row strictly before producing CSV — fail-closed for malformed fixtures.
     for (final Map<String, Object?> row in filtered) {
-      _validateRow(row, katMap: katMap, kontenMap: kontenMap, globalBank: globalBank);
+      _validateRow(row);
     }
 
     // --- Header ---
@@ -197,8 +246,11 @@ class DatevService {
     ];
     final String colHeaderLine = colHeader.map(_escapeCsv).join(';');
 
-    // --- Data lines ---
+    // --- Data lines: independent per-slot resolution, fail-closed ---
     final List<String> lines = <String>[headerLine, colHeaderLine];
+    final List<Map<String, Object?>> slotRecords = <Map<String, Object?>>[];
+    final List<int> userConfirmedIds = <int>[];
+    final Map<String, String> datevSources = <String, String>{};
     for (final Map<String, Object?> row in filtered) {
       final String betragRaw = row['betrag']?.toString() ?? '0.00';
       final String betragDe = _toGermanAmount(betragRaw);
@@ -211,35 +263,49 @@ class DatevService {
       _validateBelegfeld1(belegNr);
       final String art = (row['beleg_typ'] as String?)?.trim() ?? (row['art'] as String?)?.trim() ?? '';
 
+      final int journalId = (row['id'] as num?)?.toInt() ?? 0;
       final int? kontoId = (row['konto_id'] as num?)?.toInt();
       final int? kategorieId = (row['kategorie_id'] as num?)?.toInt();
       final _KatInfo? kat = kategorieId != null ? katMap[kategorieId] : null;
+      final bool katEligible =
+          kat != null && (kat.mappingStatus == 'catalog_verified' || kat.mappingStatus == 'user_confirmed');
 
-      // Solver: konto = entry.konto_id?.datev_kontonummer ?? globalBankKonto ?? kategorien.konto_skr03
-      String resolvedBank = '';
-      if (kontoId != null && kontenMap[kontoId]?.isNotEmpty == true) {
-        resolvedBank = kontenMap[kontoId]!;
-      } else if (globalBank.isNotEmpty) {
-        resolvedBank = globalBank;
-      } else if (kat != null && kat.skr03.isNotEmpty) {
-        resolvedBank = kat.skr03;
-      } else {
-        resolvedBank = '1200';
+      // Bank leg: explicit account mapping, else explicit caller override, else fail.
+      String? bankKonto;
+      String bankQuelle = '';
+      if (kontoId != null && (kontenMap[kontoId]?.isNotEmpty == true)) {
+        bankKonto = kontenMap[kontoId];
+        bankQuelle = 'explicit_account';
+      } else if (callerOverride.isNotEmpty) {
+        bankKonto = callerOverride;
+        bankQuelle = 'caller_override';
       }
-
-      final String gegenkonto = (kat != null && kat.skr03.isNotEmpty) ? kat.skr03 : '8400';
-      // guard: avoid Konto == Gegenkonto when global empty (both fell back to kat.skr03)
-      if (globalBank.isEmpty && resolvedBank == gegenkonto) {
-        resolvedBank = '1200';
-        if (resolvedBank == gegenkonto) {
-          // kat was 1200 — pick alternate bank to keep distinct
-          resolvedBank = '1800';
-        }
+      if (bankKonto == null || bankKonto.isEmpty) {
+        throw DatevException(
+          'DATEV Konto-Slot ohne zulässige Quelle (Journal-ID: $journalId)',
+          <int>[journalId],
+          kategorieId == null ? const <int>[] : <int>[kategorieId],
+          'Konto',
+        );
+      }
+      // Sachkonto leg: eligible category mapping attached to the leg, else fail.
+      // No synthetic account is ever substituted.
+      String? sachKonto;
+      if (katEligible && kat.skr03.isNotEmpty) {
+        sachKonto = kat.skr03;
+      }
+      if (sachKonto == null || sachKonto.isEmpty) {
+        throw DatevException(
+          'DATEV Gegenkonto-Slot ohne zulässige Kategorie-Mappingquelle (Journal-ID: $journalId)',
+          <int>[journalId],
+          kategorieId == null ? const <int>[] : <int>[kategorieId],
+          'Gegenkonto',
+        );
       }
 
       // Validate konto numbers strictly — fail-closed for malformed fixtures
-      _validateKonto(resolvedBank, field: 'Konto');
-      _validateKonto(gegenkonto, field: 'Gegenkonto');
+      _validateKonto(bankKonto, field: 'Konto');
+      _validateKonto(sachKonto, field: 'Gegenkonto');
 
       // Soll/Haben: Ausgabe=S, Einnahme=H (ponytail: deterministic per art)
       final String artLower = art.toLowerCase();
@@ -260,16 +326,48 @@ class DatevService {
       // Konto/Gegenkonto ordering: DATEV Konto vs Gegenkonto — bank vs sachkonto
       String kontoField;
       String gegenkontoField;
+      String kontoQuelle;
+      String gegenkontoQuelle;
       if (artLower == 'ausgabe') {
-        kontoField = gegenkonto;
-        gegenkontoField = resolvedBank;
+        kontoField = sachKonto;
+        gegenkontoField = bankKonto;
+        kontoQuelle = 'category_mapping';
+        gegenkontoQuelle = bankQuelle;
       } else {
-        kontoField = resolvedBank;
-        gegenkontoField = gegenkonto;
+        kontoField = bankKonto;
+        gegenkontoField = sachKonto;
+        kontoQuelle = bankQuelle;
+        gegenkontoQuelle = 'category_mapping';
+      }
+
+      final int? historyId = kategorieId == null ? null : await _latestHistoryId(kategorieId);
+      slotRecords.add(<String, Object?>{
+        'journal_id': journalId,
+        'slot': 'Konto',
+        'account_number': kontoField,
+        'source': kontoQuelle,
+        if (kontoQuelle == 'category_mapping' && kategorieId != null) 'category_id': kategorieId,
+        if (kontoQuelle == 'category_mapping' && historyId != null) 'category_history_id': historyId,
+        if (kontoQuelle == 'category_mapping' && kat != null) 'mapping_status': kat.mappingStatus,
+      });
+      slotRecords.add(<String, Object?>{
+        'journal_id': journalId,
+        'slot': 'Gegenkonto',
+        'account_number': gegenkontoField,
+        'source': gegenkontoQuelle,
+        if (gegenkontoQuelle == 'category_mapping' && kategorieId != null) 'category_id': kategorieId,
+        if (gegenkontoQuelle == 'category_mapping' && historyId != null) 'category_history_id': historyId,
+        if (gegenkontoQuelle == 'category_mapping' && kat != null) 'mapping_status': kat.mappingStatus,
+      });
+      if (katEligible && kat.mappingStatus == 'user_confirmed' && kategorieId != null) {
+        if (!userConfirmedIds.contains(kategorieId)) userConfirmedIds.add(kategorieId);
+      }
+      if (katEligible && kat.mappingStatus == 'catalog_verified' && kat.quelle != null && kat.version != null) {
+        datevSources[kat.quelle!] = kat.version!;
       }
 
       // Ensure umlauts preserved — no ASCII folding; CSV is UTF-8, validate round-trip
-      // ponytail: UTF-8 CSV, DATEV spec allows CP1252/UTF-8; umlauts must survive write/read
+      // ponytail: UTF-8 CSV, DATEV spec allows UTF-8; umlauts must survive write/read
       final List<String> fields = <String>[
         betragDe,
         sh,
@@ -295,7 +393,14 @@ class DatevService {
       await _writeArtifact(destinationPath, csv);
     }
 
-    // --- Export log — only after strict validation succeeded ---
+    // --- Export log with per-slot provenance snapshot — only after strict validation succeeded ---
+    final Map<String, Object?> snapshot = <String, Object?>{
+      'version': 1,
+      'datev_accounts': slotRecords,
+      'user_confirmed_category_ids': userConfirmedIds,
+      'catalog_sources': datevSources,
+    };
+    int exportLogId;
     try {
       final String vonStr;
       if (von != null) {
@@ -316,12 +421,13 @@ class DatevService {
       final int? unternehmenId = (u['id'] as num?)?.toInt();
       final Object? vonVal = vonStr.isEmpty ? null : vonStr;
       final Object? bisVal = bisStr.isEmpty ? null : bisStr;
+      await _ensureProvenanceColumn();
       const String insertLog =
           'INSERT INTO datev_export_log '
           '(datum, zeitraum_von, zeitraum_bis, anzahl_buchungen, '
-          'datei_pfad, unternehmen_id, status) '
-          'VALUES (?, ?, ?, ?, ?, ?, ?)';
-      await executor.runInsert(insertLog, <Object?>[
+          'datei_pfad, unternehmen_id, status, mapping_provenance_json) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+      exportLogId = await executor.runInsert(insertLog, <Object?>[
         _formatDateIso(now),
         vonVal,
         bisVal,
@@ -329,6 +435,7 @@ class DatevService {
         destinationPath ?? 'memory://datev.csv',
         unternehmenId,
         'erfolg',
+        _snapshotJson(snapshot),
       ]);
     } catch (error, stackTrace) {
       debugPrint('DATEV error: export_log insert failed: $error');
@@ -342,17 +449,12 @@ class DatevService {
       );
     }
 
-    return csv;
-  }
-
-  /// Alias per task description: export({jahr, von, bis}) → CSV String
-  Future<String> export({int? jahr, DateTime? von, DateTime? bis, String? kontoBankFallback, String? destinationPath}) {
-    return exportCsv(
-      jahr: jahr,
-      von: von,
-      bis: bis,
-      kontoBankFallback: kontoBankFallback,
-      destinationPath: destinationPath,
+    return DatevExportResult(
+      csv: csv,
+      userConfirmedCategoryIds: userConfirmedIds,
+      catalogSources: datevSources,
+      slotSnapshots: snapshot,
+      exportLogId: exportLogId,
     );
   }
 
@@ -394,6 +496,32 @@ class DatevService {
       );
     }
   }
+
+  Future<int?> _latestHistoryId(int kategorieId) async {
+    try {
+      final rows = await executor.runSelect(
+        'SELECT MAX(id) AS hid FROM category_mapping_history WHERE kategorie_id = ?',
+        <Object?>[kategorieId],
+      );
+      if (rows.isEmpty) return null;
+      return (rows.single['hid'] as num?)?.toInt();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _ensureProvenanceColumn() async {
+    try {
+      final cols = await executor.runSelect('PRAGMA table_info(datev_export_log)', const <Object?>[]);
+      if (!cols.any((c) => c['name'] == 'mapping_provenance_json')) {
+        await executor.runCustom('ALTER TABLE datev_export_log ADD COLUMN mapping_provenance_json TEXT');
+      }
+    } catch (e) {
+      throw DatevException('DATEV: mapping_provenance_json konnte nicht erstellt werden: $e');
+    }
+  }
+
+  static String _snapshotJson(Map<String, Object?> snapshot) => jsonEncode(snapshot);
 
   Future<void> _ensureDatevColumns() async {
     // unternehmen columns — fail-closed via explicit column check, not silent swallow
@@ -498,12 +626,7 @@ class DatevService {
     }
   }
 
-  void _validateRow(
-    Map<String, Object?> row, {
-    required Map<int, _KatInfo> katMap,
-    required Map<int, String> kontenMap,
-    required String globalBank,
-  }) {
+  void _validateRow(Map<String, Object?> row) {
     final String? datumRaw = row['datum'] as String?;
     if (datumRaw == null || datumRaw.trim().isEmpty) {
       throw const DatevException('DATEV row: datum required');
@@ -528,7 +651,8 @@ class DatevService {
     } catch (e) {
       throw DatevException('DATEV row: invalid betrag $betragRaw: $e');
     }
-    // Konto validation via resolved bank or kategorie fallback will be checked in main loop; here just check raw konto_id if present is int
+    // Konto validation happens per resolved slot in the main loop (fail-closed
+    // with journal ID and slot name); here only raw field sanity is checked.
     final String beschreibung = (row['beschreibung'] as String?) ?? (row['bezeichnung'] as String?) ?? '';
     if (beschreibung.isNotEmpty) {
       _validateBuchungstext(beschreibung);
@@ -607,9 +731,14 @@ class DatevService {
 }
 
 class _KatInfo {
-  const _KatInfo({required this.skr03, required this.skr04});
+  const _KatInfo({required this.skr03, required this.skr04, required this.mappingStatus, this.quelle, this.version});
   final String skr03;
   final String skr04;
+  final String mappingStatus;
+  final String? quelle;
+  final String? version;
+
+  bool get eligible => mappingStatus == 'catalog_verified' || mappingStatus == 'user_confirmed';
 }
 
 String _unternehmenField(Map<String, Object?> row, List<String> keys) {

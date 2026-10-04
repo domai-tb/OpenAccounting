@@ -33,12 +33,12 @@
 - [x] 1.31 Write failing test `test_accounting_catalog_011_category_description` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Category description" (assert the expected failure).
 - [x] 1.32 Implement the specified behavior for "Category description" to pass the test.
 - [x] 1.33 Refactor this behavior; rerun `test_accounting_catalog_011_category_description` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.34 Write failing test `test_accounting_catalog_012_unmapped_category_does_not_receive_an_invented_account` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped category does not receive an invented account" (assert the expected failure).
-- [ ] 1.35 Implement the specified behavior for "Unmapped category does not receive an invented account" to pass the test.
-- [ ] 1.36 Refactor this behavior; rerun `test_accounting_catalog_012_unmapped_category_does_not_receive_an_invented_account` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 1.37 Write failing test `test_accounting_catalog_013_category_with_missing_skr_mapping` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Category with missing SKR mapping" (assert the expected failure).
-- [ ] 1.38 Implement the specified behavior for "Category with missing SKR mapping" to pass the test.
-- [ ] 1.39 Refactor this behavior; rerun `test_accounting_catalog_013_category_with_missing_skr_mapping` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.34 Write failing test `test_accounting_catalog_012_unmapped_category_does_not_receive_an_invented_account` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unmapped category does not receive an invented account" (assert the expected failure).
+- [x] 1.35 Implement the specified behavior for "Unmapped category does not receive an invented account" to pass the test.
+- [x] 1.36 Refactor this behavior; rerun `test_accounting_catalog_012_unmapped_category_does_not_receive_an_invented_account` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 1.37 Write failing test `test_accounting_catalog_013_category_with_missing_skr_mapping` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Category with missing SKR mapping" (assert the expected failure).
+- [x] 1.38 Implement the specified behavior for "Category with missing SKR mapping" to pass the test.
+- [x] 1.39 Refactor this behavior; rerun `test_accounting_catalog_013_category_with_missing_skr_mapping` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 - [x] 1.40 Write failing test `test_accounting_catalog_014_category_review_is_unavailable_until_its_workspace_is_accepted` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Category review is unavailable until its workspace is accepted" (assert the expected failure).
 - [x] 1.41 Implement the specified behavior for "Category review is unavailable until its workspace is accepted" to pass the test.
 - [x] 1.42 Refactor this behavior; rerun `test_accounting_catalog_014_category_review_is_unavailable_until_its_workspace_is_accepted` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
@@ -66,15 +66,15 @@
 - [x] 2.10 Write failing test `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "EÜR detects a missing category reference" (assert the expected failure).
 - [x] 2.11 Implement the specified behavior for "EÜR detects a missing category reference" to pass the test.
 - [x] 2.12 Refactor this behavior; rerun `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.13 Write failing test `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV detects missing category account mappings" (assert the expected failure).
-- [ ] 2.14 Implement the specified behavior for "DATEV detects missing category account mappings" to pass the test.
-- [ ] 2.15 Refactor this behavior; rerun `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.16 Write failing test `test_accounting_catalog_023_datev_records_both_account_slot_sources` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV records both account slot sources" (assert the expected failure).
-- [ ] 2.17 Implement the specified behavior for "DATEV records both account slot sources" to pass the test.
-- [ ] 2.18 Refactor this behavior; rerun `test_accounting_catalog_023_datev_records_both_account_slot_sources` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.19 Write failing test `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV rejects an unresolved account slot" (assert the expected failure).
-- [ ] 2.20 Implement the specified behavior for "DATEV rejects an unresolved account slot" to pass the test.
-- [ ] 2.21 Refactor this behavior; rerun `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.13 Write failing test `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV detects missing category account mappings" (assert the expected failure).
+- [x] 2.14 Implement the specified behavior for "DATEV detects missing category account mappings" to pass the test.
+- [x] 2.15 Refactor this behavior; rerun `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.16 Write failing test `test_accounting_catalog_023_datev_records_both_account_slot_sources` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV records both account slot sources" (assert the expected failure).
+- [x] 2.17 Implement the specified behavior for "DATEV records both account slot sources" to pass the test.
+- [x] 2.18 Refactor this behavior; rerun `test_accounting_catalog_023_datev_records_both_account_slot_sources` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.19 Write failing test `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV rejects an unresolved account slot" (assert the expected failure).
+- [x] 2.20 Implement the specified behavior for "DATEV rejects an unresolved account slot" to pass the test.
+- [x] 2.21 Refactor this behavior; rerun `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 - [x] 2.22 Write failing test `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "User-confirmed mapping is visible and recorded" (assert the expected failure).
 - [x] 2.23 Implement the specified behavior for "User-confirmed mapping is visible and recorded" to pass the test.
 - [x] 2.24 Refactor this behavior; rerun `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
@@ -158,9 +158,9 @@
 - [x] 5.4 Write failing test `test_accounting_catalog_047_mapping_status_and_values_update_atomically` in `test/db/accounting_catalog_migration_test.dart` for scenario "Mapping status and values update atomically" (assert the expected failure).
 - [x] 5.5 Implement the specified behavior for "Mapping status and values update atomically" to pass the test.
 - [x] 5.6 Refactor this behavior; rerun `test_accounting_catalog_047_mapping_status_and_values_update_atomically` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 5.7 Write failing test `test_accounting_catalog_048_export_records_persist_the_mapping_provenance_snapshot` in `test/db/accounting_catalog_migration_test.dart` for scenario "Export records persist the mapping provenance snapshot" (assert the expected failure).
-- [ ] 5.8 Implement the specified behavior for "Export records persist the mapping provenance snapshot" to pass the test.
-- [ ] 5.9 Refactor this behavior; rerun `test_accounting_catalog_048_export_records_persist_the_mapping_provenance_snapshot` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 5.7 Write failing test `test_accounting_catalog_048_export_records_persist_the_mapping_provenance_snapshot` in `test/db/accounting_catalog_migration_test.dart` for scenario "Export records persist the mapping provenance snapshot" (assert the expected failure).
+- [x] 5.8 Implement the specified behavior for "Export records persist the mapping provenance snapshot" to pass the test.
+- [x] 5.9 Refactor this behavior; rerun `test_accounting_catalog_048_export_records_persist_the_mapping_provenance_snapshot` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 
 ## 6. Docs and maintained specs sync (missing coverage)
 

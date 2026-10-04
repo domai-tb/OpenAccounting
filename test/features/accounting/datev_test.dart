@@ -54,8 +54,8 @@ void main() {
       String bezeichnung = 'Test Kategorie',
     }) async {
       await db.executor.runInsert(
-        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv) VALUES (?, ?, ?, ?, ?, 1)',
-        <Object?>[id, bezeichnung, skr03, skr04, 15],
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[id, bezeichnung, skr03, skr04, 15, 'catalog_verified', 'TEST-DATEV', '2026-test.1'],
       );
     }
 
@@ -79,7 +79,7 @@ void main() {
       await insertKategorie(id: 901, skr03: '8400');
       await insertJournal(kategorieId: 901, betrag: '119.00', datum: '2025-03-15', bezeichnung: 'Erlös Test');
 
-      final String csv = await service.exportCsv(jahr: 2025);
+      final String csv = await service.exportCsv(jahr: 2025, kontoBankFallback: '1200');
 
       final List<String> lines = csv.split('\n').map((String s) => s.trim()).where((String s) => s.isNotEmpty).toList();
       expect(lines.isNotEmpty, isTrue);
@@ -108,7 +108,7 @@ void main() {
       );
       await insertJournal(kategorieId: 903, betrag: '100.00', datum: '2025-06-20', bezeichnung: 'Rechnung 2');
 
-      final String csv = await service.exportCsv(jahr: 2025);
+      final String csv = await service.exportCsv(jahr: 2025, kontoBankFallback: '1200');
       final List<String> lines = csv.split('\r\n').expand((String l) => l.split('\n')).toList();
 
       // header + colHeader + 2 data lines >=4
@@ -137,7 +137,7 @@ void main() {
       }
     });
 
-    test('konto.datev_kontonummer fallback vs global konto_bank', () async {
+    test('konto.datev_kontonummer wins over explicit override; no implicit global', () async {
       await upsertUnternehmen(berater: '999', mandant: '111', kontoBank: '1200');
       await insertKategorie(id: 910, skr03: '8400', bezeichnung: 'Erlös');
       final int kontoMit = await insertKonto(name: 'Bank A', datevKontonummer: '1800');
@@ -151,52 +151,38 @@ void main() {
         bezeichnung: 'Mit Override',
         kontoId: kontoMit,
       );
-      // Entry with null override → fallback global 1200
+      // Entry with konto lacking a datev number and no override → fail-closed.
       await insertJournal(
         kategorieId: 910,
         betrag: '300.00',
         datum: '2025-04-11',
-        bezeichnung: 'Fallback global',
+        bezeichnung: 'Ohne Quelle',
         kontoId: kontoLeer,
       );
-      // Entry without konto_id → fallback global 1200
-      await insertJournal(kategorieId: 910, betrag: '200.00', datum: '2025-04-12', bezeichnung: 'Ohne Konto');
-      // Entry with global fallback override via param
-      await insertJournal(kategorieId: 910, betrag: '100.00', datum: '2025-04-13', bezeichnung: 'Param fallback');
 
-      final String csvDefault = await service.exportCsv(jahr: 2025);
-      expect(csvDefault.contains('1800'), isTrue, reason: 'per-konto datev_kontonummer must be used');
-      expect(csvDefault.contains('1200'), isTrue, reason: 'global konto_bank fallback must appear');
-      // Ensure both appear, and 1800 is in row for Mit Override (both bank and sachkonto present)
-      final List<String> dataLines = csvDefault
-          .split('\r\n')
-          .expand((String l) => l.split('\n'))
-          .skip(2)
-          .where((String l) => l.trim().isNotEmpty)
-          .toList();
-      final bool line1800 = dataLines.any((String l) => l.contains('1800') && l.contains('Mit Override'));
-      expect(line1800, isTrue);
-      final bool line1200Fallback = dataLines.any((String l) => l.contains('1200') && l.contains('Fallback global'));
-      expect(line1200Fallback, isTrue);
+      await expectLater(service.exportCsv(jahr: 2025), throwsA(isA<DatevException>()));
 
-      // Param fallback overrides global
+      // Stored global 1200 is never applied implicitly; explicit override works.
       final String csvParam = await service.exportCsv(jahr: 2025, kontoBankFallback: '1220');
-      // At least one line should contain 1220 for entries without per-konto override
       expect(csvParam.contains('1220'), isTrue);
-      // Row with 1800 should still be 1800 (per-konto wins over param)
       final List<String> paramLines = csvParam.split('\r\n').expand((String l) => l.split('\n')).skip(2).toList();
       final bool still1800 = paramLines.any((String l) => l.contains('1800'));
       expect(still1800, isTrue);
     });
 
-    test('kategorie SKR fallback when global bank missing', () async {
+    test('unresolved slots fail without synthetic accounts', () async {
       await upsertUnternehmen(berater: '555', mandant: '777');
       await insertKategorie(id: 911, skr03: '8910', bezeichnung: 'Fallback Kategorie');
       await insertJournal(kategorieId: 911, betrag: '50.00', datum: '2025-05-01', bezeichnung: 'Kategorie Fallback');
 
-      final String csv = await service.exportCsv(jahr: 2025);
-      // When global missing and konto_id null, bank fallback should be kategorie SKR03 per solver
-      expect(csv.contains('8910'), isTrue);
+      await expectLater(
+        service.exportCsv(jahr: 2025),
+        throwsA(
+          isA<DatevException>()
+              .having((e) => e.unresolvedSlot, 'slot', 'Konto')
+              .having((e) => e.toString(), 'message', isNot(contains('1200'))),
+        ),
+      );
     });
 
     test('period filter jahr and von/bis', () async {
@@ -207,14 +193,18 @@ void main() {
       await insertJournal(kategorieId: 920, betrag: '999.00', datum: '2024-12-31', bezeichnung: 'Vorjahr');
       await insertJournal(kategorieId: 920, betrag: '888.00', datum: '2025-12-31', bezeichnung: 'Dez');
 
-      final String csvJahr = await service.exportCsv(jahr: 2025);
+      final String csvJahr = await service.exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csvJahr.contains('Jan'), isTrue);
       expect(csvJahr.contains('Jun'), isTrue);
       expect(csvJahr.contains('Dez'), isTrue);
       expect(csvJahr.contains('Vorjahr'), isFalse);
       expect(csvJahr.contains('999,00'), isFalse);
 
-      final String csvRange = await service.exportCsv(von: DateTime(2025, 6), bis: DateTime(2025, 6, 30));
+      final String csvRange = await service.exportCsv(
+        von: DateTime(2025, 6),
+        bis: DateTime(2025, 6, 30),
+        kontoBankFallback: '1200',
+      );
       expect(csvRange.contains('Jun'), isTrue);
       expect(csvRange.contains('Jan'), isFalse);
       expect(csvRange.contains('Dez'), isFalse);
@@ -249,7 +239,7 @@ void main() {
       await insertJournal(kategorieId: 940, betrag: '0.50', datum: '2025-08-02', bezeichnung: 'Klein');
       await insertJournal(kategorieId: 940, betrag: '1234.50', datum: '2025-08-03', bezeichnung: 'Mit Komma');
 
-      final String csv = await service.exportCsv(jahr: 2025);
+      final String csv = await service.exportCsv(jahr: 2025, kontoBankFallback: '1200');
       expect(csv.contains('1000,00'), isTrue);
       expect(csv.contains('0,50'), isTrue);
       expect(csv.contains('1234,50'), isTrue);
@@ -274,8 +264,8 @@ void main() {
       await insertKategorie(id: 950, skr03: '8400');
       await insertJournal(kategorieId: 950, betrag: '42.00', datum: '2025-09-01', bezeichnung: 'Log Test');
 
-      final String csv1 = await service.export(jahr: 2025);
-      final String csv2 = await service.exportCsv(jahr: 2025);
+      final String csv1 = await service.export(jahr: 2025, kontoBankFallback: '1210');
+      final String csv2 = await service.exportCsv(jahr: 2025, kontoBankFallback: '1210');
       expect(csv1, csv2);
       expect(csv1.contains('EXTF'), isTrue);
       // log exists
@@ -313,7 +303,7 @@ void main() {
       addTearDown(() => directory.delete(recursive: true));
       final String path = '${directory.path}/buchungsstapel.csv';
 
-      final String csv = await service.exportCsv(jahr: 2025, destinationPath: path);
+      final String csv = await service.exportCsv(jahr: 2025, destinationPath: path, kontoBankFallback: '1200');
 
       final File artifact = File(path);
       expect(artifact.existsSync(), isTrue);
