@@ -1401,4 +1401,31 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bankDetailsUnavailable => 'Details nicht verfügbar';
+
+  @override
+  String get incomeTaxTitle => 'Einkommensteuer-Anlagen';
+
+  @override
+  String get incomeTaxScheduleS => 'Anlage S';
+
+  @override
+  String get incomeTaxScheduleG => 'Anlage G';
+
+  @override
+  String get incomeTaxSelectPrompt => 'Anlage für die Verfügbarkeitsprüfung wählen';
+
+  @override
+  String get incomeTaxUnavailable => 'Noch nicht verfügbar';
+
+  @override
+  String get incomeTaxBlockerForm => 'Kein akzeptierter Formular- und Quellvertrag';
+
+  @override
+  String get incomeTaxBlockerPeriod => 'Kein akzeptierter Zeitraumvertrag';
+
+  @override
+  String get incomeTaxBlockerClassification => 'Keine akzeptierte Klassifizierung';
+
+  @override
+  String get incomeTaxBlockerSource => 'Keine vollständige Buchhaltungsquelle';
 }

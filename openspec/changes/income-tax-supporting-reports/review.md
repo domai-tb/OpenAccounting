@@ -43,3 +43,13 @@ CHANGES_APPLIED: n/a
 
 - Round 1 required change 1 — fixed: the proposal and design explicitly limit this change to an unavailable-state shell; all numeric S/G fields, form formulas, exports, and filing status are excluded.
 - Round 1 required change 2 — fixed: the shell has no period selector or source-coverage/completeness claim, and the accounting/report specs prohibit guessed or substituted EÜR/EKS/GuV values.
+
+---
+
+## Implementation Note (not a review round)
+
+- Implemented as specified: typed availability use case (always unavailable,
+  blocker reasons, no numeric values), `/taxes?view=income-tax-schedules`
+  route state with query preservation, localized de/en copy, keyboard
+  reviewable view. No migration, no accounting writes.
+- No spec edits were required; round verdict stands.

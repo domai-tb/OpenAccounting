@@ -1394,4 +1394,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bankDetailsUnavailable => 'Details unavailable';
+
+  @override
+  String get incomeTaxTitle => 'Income tax schedules';
+
+  @override
+  String get incomeTaxScheduleS => 'Schedule S';
+
+  @override
+  String get incomeTaxScheduleG => 'Schedule G';
+
+  @override
+  String get incomeTaxSelectPrompt => 'Choose a schedule to check availability';
+
+  @override
+  String get incomeTaxUnavailable => 'Not yet available';
+
+  @override
+  String get incomeTaxBlockerForm => 'No accepted form and source contract';
+
+  @override
+  String get incomeTaxBlockerPeriod => 'No accepted period contract';
+
+  @override
+  String get incomeTaxBlockerClassification => 'No accepted classification';
+
+  @override
+  String get incomeTaxBlockerSource => 'No complete accounting source';
 }

@@ -730,5 +730,14 @@
   "bankDetailSeeHistory": "Details in der Historie",
   "bankDiagnosticFile": "Datei",
   "bankDiagnosticRow": "Zeile",
-  "bankDetailsUnavailable": "Details nicht verfügbar"
+  "bankDetailsUnavailable": "Details nicht verfügbar",
+  "incomeTaxTitle": "Einkommensteuer-Anlagen",
+  "incomeTaxScheduleS": "Anlage S",
+  "incomeTaxScheduleG": "Anlage G",
+  "incomeTaxSelectPrompt": "Anlage für die Verfügbarkeitsprüfung wählen",
+  "incomeTaxUnavailable": "Noch nicht verfügbar",
+  "incomeTaxBlockerForm": "Kein akzeptierter Formular- und Quellvertrag",
+  "incomeTaxBlockerPeriod": "Kein akzeptierter Zeitraumvertrag",
+  "incomeTaxBlockerClassification": "Keine akzeptierte Klassifizierung",
+  "incomeTaxBlockerSource": "Keine vollständige Buchhaltungsquelle"
 }

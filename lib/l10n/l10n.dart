@@ -2695,6 +2695,60 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Details nicht verfügbar'**
   String get bankDetailsUnavailable;
+
+  /// No description provided for @incomeTaxTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Einkommensteuer-Anlagen'**
+  String get incomeTaxTitle;
+
+  /// No description provided for @incomeTaxScheduleS.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage S'**
+  String get incomeTaxScheduleS;
+
+  /// No description provided for @incomeTaxScheduleG.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage G'**
+  String get incomeTaxScheduleG;
+
+  /// No description provided for @incomeTaxSelectPrompt.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage für die Verfügbarkeitsprüfung wählen'**
+  String get incomeTaxSelectPrompt;
+
+  /// No description provided for @incomeTaxUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch nicht verfügbar'**
+  String get incomeTaxUnavailable;
+
+  /// No description provided for @incomeTaxBlockerForm.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein akzeptierter Formular- und Quellvertrag'**
+  String get incomeTaxBlockerForm;
+
+  /// No description provided for @incomeTaxBlockerPeriod.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein akzeptierter Zeitraumvertrag'**
+  String get incomeTaxBlockerPeriod;
+
+  /// No description provided for @incomeTaxBlockerClassification.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine akzeptierte Klassifizierung'**
+  String get incomeTaxBlockerClassification;
+
+  /// No description provided for @incomeTaxBlockerSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine vollständige Buchhaltungsquelle'**
+  String get incomeTaxBlockerSource;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

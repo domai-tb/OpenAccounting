@@ -730,5 +730,14 @@
   "bankDetailSeeHistory": "see history for details",
   "bankDiagnosticFile": "File",
   "bankDiagnosticRow": "Row",
-  "bankDetailsUnavailable": "Details unavailable"
+  "bankDetailsUnavailable": "Details unavailable",
+  "incomeTaxTitle": "Income tax schedules",
+  "incomeTaxScheduleS": "Schedule S",
+  "incomeTaxScheduleG": "Schedule G",
+  "incomeTaxSelectPrompt": "Choose a schedule to check availability",
+  "incomeTaxUnavailable": "Not yet available",
+  "incomeTaxBlockerForm": "No accepted form and source contract",
+  "incomeTaxBlockerPeriod": "No accepted period contract",
+  "incomeTaxBlockerClassification": "No accepted classification",
+  "incomeTaxBlockerSource": "No complete accounting source"
 }

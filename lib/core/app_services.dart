@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/desktop/desktop_capability.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
+import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/einkommen/forderungen_usecases.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/mahnungen_repository.dart';
@@ -43,6 +44,7 @@ class AppServices {
   late final MahnwesenEinstellungenRepository mahnwesenEinstellungen = MahnwesenEinstellungenRepository(_db.executor);
   late final SperrungService sperrung = SperrungService(_db.executor);
   late final BankingUseCase banking = BankingUseCase(_db.executor);
+  late final IncomeTaxScheduleAvailabilityUseCase incomeTax = const IncomeTaxScheduleAvailabilityUseCase();
   late final WizardService setup = WizardService(repository: SetupRepository(_db.executor), profileId: _db.profileDir);
 }
 

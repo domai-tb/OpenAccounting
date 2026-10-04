@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:openaccounting/app/app_shell.dart';
 import 'package:openaccounting/core/app_locale.dart';
 import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
+import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_schedules_view.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
@@ -625,6 +627,31 @@ class TaxesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l10n = appLocalizationsOf(context);
+    final Map<String, String> query = GoRouterState.of(context).uri.queryParameters;
+    if (query['view'] == 'income-tax-schedules') {
+      final AppScope? scope = AppScope.maybeOf(context);
+      if (scope == null) {
+        return ProductionRoutePage(
+          title: l10n.routeTaxes,
+          table: 'ustva_exporte',
+          icon: Icons.percent,
+          subtitle: l10n.incomeTaxUnavailable,
+          emptyTitle: l10n.emptyEntries,
+          emptyMessage: l10n.incomeTaxUnavailable,
+        );
+      }
+      final IncomeTaxSchedule? schedule = IncomeTaxScheduleAvailabilityUseCase.parseSchedule(query['schedule']);
+      return IncomeTaxSchedulesView(
+        useCase: scope.services.incomeTax,
+        initialSchedule: schedule,
+        onScheduleChanged: (IncomeTaxSchedule value) {
+          final Map<String, String> next = Map<String, String>.from(query);
+          next['schedule'] = value.name;
+          final String qs = next.entries.map((e) => '${e.key}=${e.value}').join('&');
+          context.go('/taxes?$qs');
+        },
+      );
+    }
     return ProductionRoutePage(
       title: l10n.routeTaxes,
       table: 'ustva_exporte',
