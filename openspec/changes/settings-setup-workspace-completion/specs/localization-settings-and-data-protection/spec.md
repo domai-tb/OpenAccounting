@@ -2,7 +2,7 @@
 
 ### Requirement: Settings controls change live persisted application state
 
-The Settings workspace MUST expose and persist supported theme, locale, region/formatting, sidebar, company/tax, storage/privacy, and backup preferences through their owning providers or use-case/repository boundaries. A preference change MUST update the running shell without restart where its owning contract requires live behavior. Settings SHALL link to company/tax workspaces instead of duplicating their forms. Every rendered control MUST correspond to a supported persisted preference and MUST expose a localized success or failure state where persistence can fail.
+The Settings workspace MUST expose and persist supported theme, locale, region/formatting, sidebar, company/tax, storage/privacy, and backup preferences through their owning providers or use-case/repository boundaries. A preference change MUST update the running shell without restart where its owning contract requires live behavior. Settings SHALL link to company/tax workspaces instead of duplicating their forms. Every rendered control MUST correspond to a supported persisted preference and MUST expose a localized success or failure state where persistence can fail. Settings SHALL meet the shared `localized-accessible-surface` contract, including visible focus, deterministic focus order, and usable reflow at supported narrow widths and text scaling.
 
 #### Scenario: Language switch retains context
 
@@ -30,7 +30,7 @@ The Settings workspace MUST expose and persist supported theme, locale, region/f
 
 ### Requirement: Local-first backup and integrations report real outcomes
 
-Settings MUST expose the supported local-first backup/restore operations and configured integration controls defined by their owning capabilities. Backup destinations MUST obey the profile-local and external-target boundaries in `backup`; integration tests MUST label the operation actually performed and MUST report failure when that operation fails. SMTP connection feedback MUST NOT imply credentials were authenticated or a message was delivered unless those steps occurred. Settings MAY expose only export actions with a defined OpenSpec scope. Permanent data erasure MUST remain unavailable until an explicit retention/erasure policy is approved; profile removal MUST honor the non-destructive `profiles` contract.
+Settings MUST expose the supported local-first backup/restore operations and configured integration controls defined by their owning capabilities. Backup destinations MUST obey the profile-local and external-target boundaries in `backup`; the displayed backup state MUST distinguish never completed, current, stale, and failed based on actual operation history. Integration tests MUST label the operation actually performed and MUST report failure when that operation fails. SMTP connection feedback MUST NOT imply credentials were authenticated or a message was delivered unless those steps occurred. Settings MAY expose only export actions with a defined OpenSpec scope. Permanent data erasure MUST remain unavailable until an explicit retention/erasure policy is approved; profile removal MUST honor the non-destructive `profiles` contract.
 
 #### Scenario: A backup can be created and restored
 

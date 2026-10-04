@@ -54,7 +54,7 @@ The system SHALL persist backup scheduling per active profile in `backup_state.j
 
 ### Requirement: Restore is staged and applied before database open
 
-The active database SHALL never be replaced while any executor or database connection to it remains open. A restore requested in Settings SHALL validate its source and stage a restorable database under the active profile, record the pending operation, block further writes to that profile, and require the application to exit and restart. The next process SHALL verify exclusive application ownership and apply the staged restore before constructing or opening any database executor. It SHALL remove stale SQLite WAL/SHM sidecars only after no handle can be open, and SHALL use an atomic replacement with rollback to the prior database if replacement fails. Successful replacement SHALL be reported only after the restored database opens and passes validation. Failed validation or replacement SHALL retain the prior database, clean up or mark the staged artifact for safe retry/removal, and report failure.
+The active database SHALL never be replaced while any executor or database connection to it remains open. Before opening any writable database handle, each application process SHALL acquire and retain an exclusive OS-level lock on a lock file inside the active profile; inability to acquire that lock SHALL stop startup with a localized profile-in-use state. All database mutations SHALL pass through one profile-scoped `ProfileWriteGate` at the shared database write boundary. A restore requested in Settings SHALL validate its source and stage a restorable database under the active profile, close the gate to new writes, wait for in-flight mutations to finish, record the pending operation, keep the gate closed, and require the application to exit and restart. If staging or pending-state persistence fails, the gate SHALL reopen and the live database SHALL remain unchanged. The next process SHALL acquire the profile lock and apply the staged restore before constructing or opening any database executor. It SHALL remove stale SQLite WAL/SHM sidecars only after no handle can be open, and SHALL use an atomic replacement with rollback to the prior database if replacement fails. Successful replacement SHALL be reported only after the restored database opens and passes validation. Failed validation or replacement SHALL retain the prior database, clean up or mark the staged artifact for safe retry/removal, and report failure.
 
 #### Scenario: Live Settings restore waits for restart
 
@@ -79,6 +79,24 @@ The active database SHALL never be replaced while any executor or database conne
 - **GIVEN** a validated restore is staged and atomic replacement fails during startup
 - **WHEN** the restore coordinator handles the failure
 - **THEN** the prior active database SHALL be restored before the application opens it, the failure SHALL be retained for Settings to display, and the failed staged artifact SHALL NOT be reported as applied
+
+#### Scenario: A second process cannot open the same profile
+
+- **GIVEN** one application process owns the active profile's exclusive OS-level lock
+- **WHEN** another process starts with that same profile selected
+- **THEN** it SHALL fail before opening a writable database handle and SHALL show a localized profile-in-use state
+
+#### Scenario: Restore blocks every profile mutation
+
+- **GIVEN** restore has been confirmed and the profile write gate is closed
+- **WHEN** any repository or service attempts a database mutation
+- **THEN** the shared write boundary SHALL reject it without issuing SQL, and the restore coordinator SHALL wait for already-running mutations before persisting pending restore state
+
+#### Scenario: Restore staging failure reopens writes
+
+- **GIVEN** restore confirmation begins while the active database is open
+- **WHEN** staging or pending-state persistence fails
+- **THEN** the live database SHALL remain unchanged and the profile write gate SHALL return to its open state
 
 ## MODIFIED Requirements
 

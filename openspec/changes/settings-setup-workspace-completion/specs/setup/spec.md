@@ -2,7 +2,7 @@
 
 ### Requirement: Four-step wizard flow
 
-The setup wizard SHALL consist of exactly four steps in order: Stammdaten, Konten, Kategorien, and Abschluss. Each step SHALL have Next/Back navigation and a progress indicator. It SHALL collect the company name, address, tax ID, legal form, and bank-account IBAN, BIC, and account holder, then show the values that will be persisted. The account holder SHALL be stored in the account record. Step 3 SHALL use only category records whose catalog version is explicitly verified against the maintained accounting seed contract. If no verified catalog is available, Step 3 SHALL clearly mark category selection as deferred, allow the user to continue without category IDs, and show that setup remains incomplete for categories; it MUST NOT present the current synthetic seed rows as a real chart of accounts. Skip SHALL close setup with minimal company/account values, no category selection, and an explicit deferred state. A later verified catalog MAY populate the same step without changing the four-step order.
+The setup wizard SHALL consist of exactly four steps in order: Stammdaten, Konten, Kategorien, and Abschluss. Each step SHALL have Next/Back navigation and a progress indicator. It SHALL collect the company name, address, tax ID, legal form, and bank-account IBAN, BIC, and account holder, then show the values that will be persisted. The account holder SHALL be stored in the account record. Step 3 SHALL use only category records whose catalog source and edition are covered by an accepted accounting-catalog provenance contract and whose mapping manifest has passed its required review. A version string or populated category table alone SHALL NOT establish trust. The application SHALL verify the stored source, edition, manifest identity, and accepted review status before marking categories selectable. If no verified catalog is available, Step 3 SHALL clearly mark category selection as deferred, allow the user to continue without category IDs, and show that setup remains incomplete for categories; it MUST NOT present the current synthetic seed rows as a real chart of accounts. Skip SHALL close setup with minimal company/account values, no category selection, and an explicit deferred state. A later verified catalog MAY populate the same step without changing the four-step order.
 
 #### Scenario: Setup displays and saves real values
 
@@ -21,6 +21,12 @@ The setup wizard SHALL consist of exactly four steps in order: Stammdaten, Konte
 - **GIVEN** the database contains the current generated `Kategorie N` rows or rows with an unverified catalog version
 - **WHEN** the user opens setup or a category selector
 - **THEN** those rows SHALL NOT be presented as an approved chart, and no selection or report mapping SHALL be marked configured from those rows
+
+#### Scenario: Catalog version without accepted provenance is not trusted
+
+- **GIVEN** category rows contain a version marker but lack an accepted source/edition provenance record or reviewed mapping manifest
+- **WHEN** setup loads the Kategorien step
+- **THEN** it SHALL treat the catalog as unverified, defer category selection, and SHALL NOT mark any category mapping as configured
 
 #### Scenario: Invalid required setup value blocks progression
 

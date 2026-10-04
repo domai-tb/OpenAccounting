@@ -2,7 +2,7 @@
 
 ### Requirement: Settings provides a designed, reachable capability index
 
-The `/settings` route SHALL render a localized full-page workspace with constrained content width and section navigation aligned with `DESIGN.md` §19. It SHALL include the supported Allgemein, Unternehmen, Steuern, Rechnungen, Bank & Integrationen, Daten & Datenschutz, Sicherung, Darstellung, Sprache & Region, Erweitert, and Über destinations. Company, account, tax-rate, number-range, and report/export actions SHALL navigate to their owning production workspaces; Settings SHALL NOT duplicate their forms or calculations. Unsupported features SHALL NOT be presented as working controls. Every visible action SHALL be keyboard-operable, have a localized accessible name, preserve the current route when a preference changes, and report the result of the action it invokes.
+The `/settings` route SHALL render a localized full-page workspace with constrained content width and section navigation aligned with `DESIGN.md` §19 and the shared `localized-accessible-surface` contract. It SHALL include the supported Allgemein, Unternehmen, Steuern, Rechnungen, Bank & Integrationen, Daten & Datenschutz, Sicherung, Darstellung, Sprache & Region, Erweitert, and Über destinations. Company, account, tax-rate, number-range, and report/export actions SHALL navigate to their owning production workspaces; Settings SHALL NOT duplicate their forms or calculations. Unsupported features SHALL NOT be presented as working controls. Every visible action SHALL be keyboard-operable, have a localized accessible name, visible focus, deterministic focus order, preserve the current route when a preference changes, and report the result of the action it invokes. At narrow supported widths and increased text scaling, all sections and actions SHALL remain reachable by keyboard and scrolling without horizontal clipping or overlap. Backup status SHALL distinguish never completed, current, stale, and failed states using the operation time and outcome returned by the backup service.
 
 #### Scenario: User opens an available Settings section
 
@@ -15,6 +15,12 @@ The `/settings` route SHALL render a localized full-page workspace with constrai
 - **GIVEN** a linked section owner is not registered or returns an unavailable result
 - **WHEN** the user selects that section
 - **THEN** Settings SHALL show a localized unavailable/error state with no raw database table fallback and SHALL NOT report the action as successful
+
+#### Scenario: Settings stays accessible at narrow width and larger text scale
+
+- **GIVEN** Settings is open at the narrowest supported desktop width with text scaling enabled
+- **WHEN** the user traverses the section navigation and all visible controls by keyboard
+- **THEN** focus SHALL remain visible and deterministic, every action SHALL be reachable without horizontal clipping or overlap, and the current section SHALL remain identifiable
 
 ### Requirement: Settings profile actions follow the canonical profile contract
 
@@ -47,6 +53,12 @@ The Sicherung section SHALL expose supported manual and scheduled backup prefere
 - **GIVEN** a selected target is unsafe, unavailable, invalid, or a restore artifact fails validation
 - **WHEN** the operation is attempted
 - **THEN** Settings SHALL show a localized failure tied to the attempted operation and the active database SHALL remain unchanged after a failed restore
+
+#### Scenario: Backup history status distinguishes never, current, stale, and failed
+
+- **GIVEN** the backup service reports no prior success, a recent success, an overdue success, or a failed latest attempt
+- **WHEN** the Sicherung section renders its status
+- **THEN** it SHALL distinguish never completed, current, stale, and failed, and SHALL show the actual timestamp and outcome when available
 
 ### Requirement: Settings never overstates data portability or erasure
 
