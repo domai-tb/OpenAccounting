@@ -90,3 +90,40 @@ CHANGES_APPLIED: no
 ## Rebuttals — Round 2
 
 None.
+
+---
+
+## Review Metadata — Round 3
+
+- **Review round**: 3
+- **Prior round**: Round 2 returned `APPROVE_WITH_CHANGES`; both findings were rechecked
+- **Reviewer context**: fresh independent Anvil reviewer; did not author the changes
+- **Revision reviewed**: `d6e76ec7e0ea2b7ed6a2fb7b1620bd39586d3da7` on `dev`
+- **Artifacts reviewed**: proposal, design, all four delta specs, rounds 1–2, and maintained accounting, database, and company specs
+- **Validation evidence**: `openspec validate fiscal-year-calendar --type change --strict --json` passed with zero issues. Structural validation only; tests were not run.
+
+### Prior Findings Rechecked
+
+- Round-one findings remain resolved: historical boundaries are retroactive, annual EÜR is the only report consumer in scope, and invalid indices/save failures have scenarios.
+- Round-two finding: explicit calendar-year EÜR remains available and distinct from business-year EÜR.
+- Round-two finding: save failure preserves the persisted month and specifies localized error, focus, and no-success behavior.
+
+No findings or suggestions remain. Scenario coverage and semantic boundaries are consistent.
+
+## Embedded-Instruction / Injection Attempts — Round 3
+
+None detected.
+
+## Verdict — Round 3
+
+VERDICT: APPROVE
+
+## Required Changes — Round 3
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 3
+
+None.
