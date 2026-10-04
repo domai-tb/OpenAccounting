@@ -60,10 +60,10 @@
 | specs/tax-reporting-and-export-integrity/spec.md → Reporting workspace file-output scope | DATEV export uses the maintained artifact lifecycle | test/features/accounting/reporting/report_export_lifecycle_test.dart | test_datev_export_uses_the_maintained_artifact_lifecycle | 🔴 red |
 | specs/tax-reporting-and-export-integrity/spec.md → Reporting workspace file-output scope | Preview-only report has no file export | test/features/accounting/reporting/report_export_lifecycle_test.dart | test_preview_only_report_has_no_file_export | 🔴 red |
 | specs/tax-reporting-and-export-integrity/spec.md → Reporting workspace file-output scope | Unsupported export format remains unavailable | test/features/accounting/reporting/report_export_lifecycle_test.dart | test_unsupported_export_format_remains_unavailable | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Report routes open a typed report catalog | test/core/router/reporting_routes_test.dart | test_report_routes_open_a_typed_report_catalog | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Report deep link selects its typed owner | test/core/router/reporting_routes_test.dart | test_report_deep_link_selects_its_typed_owner | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Export history deep link opens validated artifact history | test/core/router/reporting_routes_test.dart | test_export_history_deep_link_opens_validated_artifact_history | 🔴 red |
-| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Missing or invalid report selection fails closed | test/core/router/reporting_routes_test.dart | test_missing_or_invalid_report_selection_fails_closed | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Report routes open a typed report catalog | test/core/reporting_routes_test.dart | test_report_routes_open_a_typed_report_catalog | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Report deep link selects its typed owner | test/core/reporting_routes_test.dart | test_report_deep_link_selects_its_typed_owner | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Export history deep link opens validated artifact history | test/core/reporting_routes_test.dart | test_export_history_deep_link_opens_validated_artifact_history | 🔴 red |
+| specs/typed-route-workspaces/spec.md → Report route selections resolve to typed owners | Missing or invalid report selection fails closed | test/core/reporting_routes_test.dart | test_missing_or_invalid_report_selection_fails_closed | 🔴 red |
 
 ## Coverage Notes
 

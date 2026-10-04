@@ -198,16 +198,16 @@
 
 ## 12. typed-route-workspaces: Report route selections resolve to typed owners
 
-- [ ] 12.1 Write failing test `test_report_routes_open_a_typed_report_catalog` in `test/core/router/reporting_routes_test.dart` for scenario "Report routes open a typed report catalog"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [ ] 12.1 Write failing test `test_report_routes_open_a_typed_report_catalog` in `test/core/reporting_routes_test.dart` for scenario "Report routes open a typed report catalog"; assert it fails for the expected report, period, source, route, or artifact boundary.
 - [ ] 12.2 Implement the specified behavior for "Report routes open a typed report catalog" to pass 12.1, using the typed owner in `design.md`.
 - [ ] 12.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 12.4 Write failing test `test_report_deep_link_selects_its_typed_owner` in `test/core/router/reporting_routes_test.dart` for scenario "Report deep link selects its typed owner"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [ ] 12.4 Write failing test `test_report_deep_link_selects_its_typed_owner` in `test/core/reporting_routes_test.dart` for scenario "Report deep link selects its typed owner"; assert it fails for the expected report, period, source, route, or artifact boundary.
 - [ ] 12.5 Implement the specified behavior for "Report deep link selects its typed owner" to pass 12.4, using the typed owner in `design.md`.
 - [ ] 12.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 12.7 Write failing test `test_export_history_deep_link_opens_validated_artifact_history` in `test/core/router/reporting_routes_test.dart` for scenario "Export history deep link opens validated artifact history"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [ ] 12.7 Write failing test `test_export_history_deep_link_opens_validated_artifact_history` in `test/core/reporting_routes_test.dart` for scenario "Export history deep link opens validated artifact history"; assert it fails for the expected report, period, source, route, or artifact boundary.
 - [ ] 12.8 Implement the specified behavior for "Export history deep link opens validated artifact history" to pass 12.7, using the typed owner in `design.md`.
 - [ ] 12.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 12.10 Write failing test `test_missing_or_invalid_report_selection_fails_closed` in `test/core/router/reporting_routes_test.dart` for scenario "Missing or invalid report selection fails closed"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [ ] 12.10 Write failing test `test_missing_or_invalid_report_selection_fails_closed` in `test/core/reporting_routes_test.dart` for scenario "Missing or invalid report selection fails closed"; assert it fails for the expected report, period, source, route, or artifact boundary.
 - [ ] 12.11 Implement the specified behavior for "Missing or invalid report selection fails closed" to pass 12.10, using the typed owner in `design.md`.
 - [ ] 12.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
