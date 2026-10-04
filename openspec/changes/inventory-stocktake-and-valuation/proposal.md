@@ -4,10 +4,10 @@ The `/inventory` route currently stops at an unavailable page, and the inventory
 
 ## What Changes
 
-- Replace the unavailable inventory boundary with a typed, profile-local stocktake workspace when global inventory is enabled; keep a truthful unavailable state when it is disabled or its data service cannot be opened.
+- Replace the unavailable inventory boundary with a typed, profile-local stocktake workspace when global inventory is enabled; keep a truthful unavailable state when new stocktakes are disabled or its data service cannot be opened; retain previously recorded history as read-only.
 - Persist stocktake reporting date, capture time, article identity/description/unit snapshots, and explicit counted quantities. A recorded count is evidence only: it does not change live stock, append movement rows, or create accounting entries.
 - Show recorded quantities in the result list. Do not represent current stock as historical book stock, and show inventory values as unavailable until a reviewed valuation policy and its required data are specified.
-- Add named, versioned stocktake tables without rewriting existing article quantities or movement history.
+- Add named, versioned stocktake tables and database guards that make recorded count evidence immutable without rewriting existing article quantities or movement history. Update the maintained table inventory to 41 tables after both inventory migrations.
 
 ## Capabilities
 

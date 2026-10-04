@@ -35,7 +35,7 @@ AND the count SHALL be stored in its stocktake position.
 
 ### Requirement: Physical stocktake capture and recording
 
-When global inventory is enabled, the `/inventory` workspace SHALL let the user start a stocktake for a selected reporting date. Starting a draft SHALL snapshot each currently inventory-enabled article once, with its ID, description, and unit. Users SHALL enter an explicit counted quantity for every snapshotted article; zero is a valid quantity and an unentered quantity SHALL remain missing rather than being treated as zero. Counted quantities SHALL support the article stock precision of three decimal places and SHALL NOT be negative. Recording SHALL require all quantities, atomically persist the recorded state, and make the recorded snapshot immutable. A stocktake SHALL retain both its selected reporting date and creation timestamp. Its result SHALL label stored quantities as physical counts and SHALL NOT show `bestand_aktuell` as the selected date's book quantity or calculate a count variance. Creating, editing, or recording a stocktake SHALL NOT change article stock, append stock movements, create or modify business documents, or post accounting entries.
+When global inventory is enabled, the `/inventory` workspace SHALL let the user start a stocktake for a selected reporting date. Starting a draft SHALL require at least one currently inventory-enabled article and snapshot each such article once, with its ID, description, and unit. Users SHALL enter an explicit counted quantity for every snapshotted article; zero is a valid quantity and an unentered quantity SHALL remain missing rather than being treated as zero. Counted quantities SHALL support the article stock precision of three decimal places and SHALL NOT be negative. Recording SHALL require all quantities, atomically persist the recorded state, and make the recorded snapshot immutable. A stocktake SHALL retain both its selected reporting date and creation timestamp. Its result SHALL label stored quantities as physical counts and SHALL NOT show `bestand_aktuell` as the selected date's book quantity or calculate a count variance. When global inventory is disabled, previously recorded stocktakes SHALL remain available as read-only history, but new drafts and edits SHALL be unavailable. Creating, editing, or recording a stocktake SHALL NOT change article stock, append stock movements, create or modify business documents, or post accounting entries.
 
 #### Scenario: Complete a physical count
 
@@ -56,8 +56,16 @@ AND null SHALL NOT be displayed or persisted as a count of zero.
 
 GIVEN `unternehmen.lagerführung_aktiv = false`
 WHEN the user opens `/inventory` or requests stocktake creation
-THEN the route SHALL show a localized unavailable state
-AND no stocktake row SHALL be created.
+THEN the stocktake action SHALL show a localized unavailable state
+AND previously recorded counts SHALL remain available as read-only history
+AND no new stocktake row SHALL be created.
+
+#### Scenario: No inventory-enabled articles are available
+
+GIVEN global inventory is enabled but no article is inventory-enabled
+WHEN the user starts a stocktake
+THEN the workspace SHALL show a localized no-countable-articles state
+AND SHALL NOT create an empty stocktake.
 
 #### Scenario: Recorded count cannot be overwritten
 
@@ -68,7 +76,7 @@ AND the user SHALL be directed to create a separate stocktake for a correction.
 
 ### Requirement: Physical stocktake persistence
 
-The stocktake migration SHALL create exactly two named tables. `inventuren` SHALL contain `id` (primary key), `stichtag` (non-null ISO date text), `status` (non-null text constrained to `entwurf` or `erfasst`), and `erstellt_am` (non-null ISO timestamp text). `inventur_positionen` SHALL contain `id` (primary key), `inventur_id` (non-null foreign key to `inventuren.id`), `artikel_id` (non-null historical article identifier), `bezeichnung_snapshot` (non-null text), `einheit_snapshot` (non-null text), and `menge_gezaehlt` (nullable NUMERIC(10,3), constrained to be non-negative when present), with a unique constraint on `(inventur_id, artikel_id)`. Drafts MAY contain null counts; a transition to `erfasst` SHALL be rejected unless every position has a count. Creating and recording a stocktake SHALL persist header and positions atomically. These tables SHALL store count evidence only and SHALL NOT store derived valuation amounts or accounting postings.
+The stocktake migration SHALL create exactly two named tables. `inventuren` SHALL contain `id` (primary key), `stichtag` (non-null ISO date text), `status` (non-null text constrained to `entwurf` or `erfasst`), and `erstellt_am` (non-null ISO timestamp text). `inventur_positionen` SHALL contain `id` (primary key), `inventur_id` (non-null foreign key to `inventuren.id`), `artikel_id` (non-null historical article identifier), `bezeichnung_snapshot` (non-null text), `einheit_snapshot` (non-null text), and `menge_gezaehlt` (nullable NUMERIC(10,3), constrained to be non-negative when present), with a unique constraint on `(inventur_id, artikel_id)`. Drafts MAY contain null counts; a transition to `erfasst` SHALL be rejected unless at least one position exists and every position has a count. Creating and recording a stocktake SHALL persist header and positions atomically. Database triggers or equivalent persistence-boundary guards SHALL reject UPDATE or DELETE of a recorded `inventuren` row and INSERT, UPDATE, or DELETE of any `inventur_positionen` row whose parent is recorded; a draft-to-recorded transition SHALL be rejected if any count is null. These tables SHALL store count evidence only and SHALL NOT store derived valuation amounts or accounting postings.
 
 #### Scenario: Migration creates the declared stocktake tables
 
@@ -76,6 +84,20 @@ GIVEN the stocktake migration runs against a supported profile database
 WHEN the migration completes
 THEN `inventuren` and `inventur_positionen` SHALL exist with the declared columns, constraints, and foreign key
 AND existing article and movement rows SHALL retain their values.
+
+#### Scenario: Direct SQL cannot create an empty recorded header
+
+GIVEN the stocktake migration is installed
+WHEN direct SQL attempts to insert an `inventuren` header with status `erfasst` before any positions exist
+THEN the persistence guard SHALL reject the insert
+AND no recorded header without count positions SHALL remain.
+
+#### Scenario: Direct update or delete of recorded stocktake is rejected
+
+GIVEN a stocktake has status `erfasst`
+WHEN direct SQL attempts to update or delete its header or to insert, update, or delete one of its positions
+THEN the persistence guard SHALL reject each mutation
+AND the recorded header and positions SHALL remain unchanged.
 
 #### Scenario: Duplicate article position is rejected
 
