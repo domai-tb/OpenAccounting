@@ -17,3 +17,21 @@ The scoped exporter SHALL read one consistent profile-local snapshot and travers
 - **WHEN** a scoped export is requested
 - **THEN** the export SHALL fail without publishing a final archive
 - **AND** source records SHALL remain unchanged
+
+### Requirement: Customer export completeness uses an accepted table inventory
+
+The customer exporter SHALL validate the active profile's schema version and present table set against the accepted maintained `db` specification before it reports a complete archive. A change proposal or runtime count alone SHALL NOT establish the accepted inventory. Until the maintained contract reconciles its current 38-table requirement with the separately proposed inventory of 39 base and three feature-owned tables, the customer export SHALL remain incomplete. The exporter SHALL NOT create or repair tables. A required table missing at the accepted schema version, an absent lazily created table without an accepted durable marker proving the feature was never initialized, or an unknown customer-relevant table SHALL be reported and SHALL prevent a complete outcome.
+
+#### Scenario: Profile table inventory has not been accepted
+
+- **GIVEN** the maintained `db` specification does not yet reconcile the profile's known table inventory
+- **WHEN** a customer disclosure export is requested
+- **THEN** the export MAY include safely projected records but SHALL be marked incomplete
+- **AND** it SHALL NOT create or repair missing tables
+
+#### Scenario: Required or unknown customer table is missing or present
+
+- **GIVEN** an accepted required table is absent, an unmarked lazy table is absent, or an unknown customer-relevant table is present
+- **WHEN** the customer disclosure export checks the profile schema
+- **THEN** it SHALL identify the table condition in the manifest
+- **AND** it SHALL not report the archive as complete
