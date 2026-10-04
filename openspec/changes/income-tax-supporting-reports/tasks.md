@@ -30,10 +30,10 @@
 
 ## 4. typed-route-workspaces: Income-tax supporting report view
 
-- [ ] 4.1 Write failing test `test_open_an_s_g_supporting_report` in `test/core/router/income_tax_supporting_reports_routes_test.dart` for scenario "Open an S/G supporting report"; assert it fails for the right reason.
+- [ ] 4.1 Write failing test `test_open_an_s_g_supporting_report` in `test/core/income_tax_supporting_reports_routes_test.dart` for scenario "Open an S/G supporting report"; assert it fails for the right reason.
 - [ ] 4.2 Implement the specified behavior for "Open an S/G supporting report" to pass 4.1.
 - [ ] 4.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.4 Write failing test `test_report_service_is_unavailable` in `test/core/router/income_tax_supporting_reports_routes_test.dart` for scenario "Report service is unavailable"; assert it fails for the right reason.
+- [ ] 4.4 Write failing test `test_report_service_is_unavailable` in `test/core/income_tax_supporting_reports_routes_test.dart` for scenario "Report service is unavailable"; assert it fails for the right reason.
 - [ ] 4.5 Implement the specified behavior for "Report service is unavailable" to pass 4.4.
 - [ ] 4.6 Refactor the affected code; keep the focused and full suites green.
 
