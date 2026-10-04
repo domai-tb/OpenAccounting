@@ -102,3 +102,56 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 2
 
 None.
+
+---
+
+## Review Metadata — Round 3
+
+- **Review round**: 3
+- **Prior round**: Round 2 returned `REVISE`; this reviewer rechecked the changes against all round-two required findings
+- **Reviewer context**: fresh-context independent read-only reviewer
+- **Revision reviewed**: `dev` at `29a29cd`
+- **Tool restrictions**: no edits or tests
+- **Artifacts reviewed**: proposal, design, all three delta specs, round-two review, maintained `db` and `profiles` specs, and active `profile-data-portability` proposal
+- **Validation evidence**: `openspec validate customer-data-disclosure-export --type change --strict --json` passed 1/1 and `openspec validate --specs --strict` passed 55/55. These are structural checks; they do not resolve the inventory conflict. No tests were run.
+
+### Round-Two Required Changes Rechecked
+
+- Receivable typed identity now establishes inclusion and conflicting identities fail closed.
+- Whole-profile portability is described as proposed and unavailable; the customer export UI cannot imply it is currently available.
+- The table-inventory finding remains unresolved: this change adds a fail-closed gate but does not modify the maintained `Table Definitions` requirement, which still lists exactly 38 tables.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+1. **The maintained table inventory and expected/optional/missing-table contract are still unreconciled.** The maintained `db` spec requires exactly 38 tables; the active portability proposal specifies 39 base tables plus three feature-owned tables; runtime also creates those known feature tables. The customer export delta currently states that export remains incomplete until reconciliation, but it does not itself modify the maintained table-definition contract. Add a `MODIFIED Requirement: Table Definitions` delta with the accepted inventory and presence rules, or keep this proposal blocked from test-plan and task generation until another accepted change supplies that contract.
+
+#### 🟡 Moderate
+
+None.
+
+#### 📌 Suggestions
+
+- The UTF-8 manifest and no-clobber publication suggestions are now addressed.
+- Decide whether `journal.storno_von` reversal rows for included invoice-linked journal entries are in scope.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded-instruction finding was reported in this round.
+
+### Verdict — Round 3
+
+VERDICT: REVISE
+
+## Required Changes — Round 3
+
+1. Modify the maintained `db` Table Definitions delta to specify the 39 base and three feature-owned tables and their expected/optional/missing behavior, including the lazy-table marker. Otherwise keep downstream planning blocked.
+
+Round-one and round-two findings are confirmed addressed. The table inventory remains unresolved, so `test-plan.md` and `tasks.md` remain blocked.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 3
+
+None.
