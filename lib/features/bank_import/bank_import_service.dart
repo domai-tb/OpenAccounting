@@ -599,7 +599,7 @@ class BankImportService {
 
   /// Typed detail for one attempt: metadata, safe diagnostics, unresolved
   /// count, and allowed actions. Raw bank values never appear in error text.
-  Future<BankImportHistoryDetail> historyDetail(int importId, {String locale = 'de_DE'}) async {
+  Future<BankImportHistoryDetail> historyDetail(int importId, {required String locale}) async {
     final AppLocalizations l10n = _l10nFor(locale);
     final rows = await executor.runSelect('SELECT * FROM bank_imports WHERE id = ?', <Object?>[importId]);
     if (rows.isEmpty) throw const BankImportException('Importverlauf nicht gefunden');

@@ -170,7 +170,7 @@ void main() {
         'INSERT INTO bank_imports (konto_id, dateiname, datum, status, fehler_details) VALUES (?, ?, ?, ?, ?)',
         <Object?>[kontoId, 'alt.csv', '2026-05-01', 'teilweise', '[{"row": 1}]'],
       );
-      final detail = await service.historyDetail(importId);
+      final detail = await service.historyDetail(importId, locale: 'de_DE');
       expect(detail.retryable, isFalse);
       expect(detail.diagnostics, isNotEmpty);
       await expectLater(service.retryImport(importId: importId, locale: 'de_DE'), throwsA(isA<BankImportException>()));
@@ -190,7 +190,7 @@ void main() {
         locale: 'de_DE',
       );
       final int importId = rejected.importId!;
-      final detail = await service.historyDetail(importId);
+      final detail = await service.historyDetail(importId, locale: 'de_DE');
       expect(detail.retryable, isFalse);
       await expectLater(service.retryImport(importId: importId, locale: 'de_DE'), throwsA(isA<BankImportException>()));
     });
@@ -228,7 +228,7 @@ void main() {
       final int importId = result.importId!;
       final reviewed = await service.unresolvedReviewRows(importId: importId);
       expect(reviewed, hasLength(1), reason: 'only the rule-suggested row stays neu');
-      final detail = await service.historyDetail(importId);
+      final detail = await service.historyDetail(importId, locale: 'de_DE');
       expect(detail.unresolvedNeu, 1);
       final all = await db.executor.runSelect(
         'SELECT status FROM bank_transaktionen WHERE import_id = ? ORDER BY id',
@@ -287,8 +287,8 @@ void main() {
       );
       expect(await service.unresolvedReviewRows(importId: complete.importId), hasLength(1));
       expect(await service.unresolvedReviewRows(importId: partial.importId), hasLength(1));
-      expect((await service.historyDetail(complete.importId!)).unresolvedNeu, 1);
-      expect((await service.historyDetail(partial.importId!)).unresolvedNeu, 1);
+      expect((await service.historyDetail(complete.importId!, locale: 'de_DE')).unresolvedNeu, 1);
+      expect((await service.historyDetail(partial.importId!, locale: 'de_DE')).unresolvedNeu, 1);
     });
 
     test('test_manual_review_is_scoped_to_the_selected_import', () async {
@@ -319,7 +319,7 @@ void main() {
       final row = (await service.unresolvedReviewRows(importId: importId)).single;
       await service.reviewTransaction(id: (row['id']! as num).toInt(), kategorieId: kategorieId);
       expect(await service.unresolvedReviewRows(importId: importId), isEmpty);
-      expect((await service.historyDetail(importId)).unresolvedNeu, 0);
+      expect((await service.historyDetail(importId, locale: 'de_DE')).unresolvedNeu, 0);
     });
 
     test('test_completed_attempt_metadata_stays_immutable_while_child_review_remains_available', () async {
@@ -333,7 +333,7 @@ void main() {
       expect(after['status'], before['status']);
       expect(after['anzahl_importiert'], before['anzahl_importiert']);
       expect(after['fehler_details'], before['fehler_details']);
-      expect((await service.historyDetail(importId)).unresolvedNeu, 0);
+      expect((await service.historyDetail(importId, locale: 'de_DE')).unresolvedNeu, 0);
     });
 
     test('test_manual_review_does_not_create_a_posting', () async {

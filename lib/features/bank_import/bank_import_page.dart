@@ -1397,7 +1397,7 @@ LIMIT 100
     if (importId == null) return;
     BankImportHistoryDetail detail;
     try {
-      detail = await _banking.service.historyDetail(importId);
+      detail = await _banking.service.historyDetail(importId, locale: _activeLocale);
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = e.toString());
