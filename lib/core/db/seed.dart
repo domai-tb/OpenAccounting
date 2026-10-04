@@ -106,19 +106,11 @@ class SeedData {
     }
   }
 
-  static Future<void> _seedKategorien(QueryExecutor executor) async {
-    // 80+ SKR03/04 categories with EÜR line assignments, Du-form descriptions.
-    // ponytail: generate synthetic categories 1..85 with distinct SKR mappings.
-    for (var i = 1; i <= 85; i++) {
-      final skr03 = (8000 + i).toString();
-      final skr04 = (4000 + i).toString();
-      final euer = (i % 60) + 10;
-      final bezeichnung = 'Kategorie $i — Du kannst hier deine Einnahmen zuordnen';
-      final beschreibung = 'Beschreibung für Kategorie $i — Passe deinen Kontenrahmen an';
-      await executor.runCustom(
-        'INSERT OR IGNORE INTO kategorien (id, bezeichnung, beschreibung, konto_skr03, konto_skr04, euer_zeile, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[i, bezeichnung, beschreibung, skr03, skr04, euer, 1],
-      );
-    }
-  }
+  /// Category mappings are seeded only from an approved, versioned catalog
+  /// manifest. No manifest is bundled, so fresh profiles receive no
+  /// preconfigured SKR03/SKR04/EÜR/EKS mappings and report an explicit
+  /// unconfigured state (KategorienRepository.isAccountingConfigured).
+  /// Synthetic account numbers or tax lines must never be derived from IDs,
+  /// ranges, labels, or arithmetic. Idempotent: never overwrites existing rows.
+  static Future<void> _seedKategorien(QueryExecutor executor) async {}
 }

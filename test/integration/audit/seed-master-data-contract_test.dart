@@ -16,32 +16,32 @@ void main() {
     tearDown(() async => db.close());
 
     test('test_seed_master_data_contract_1_1_fresh_profile_supports_reporting_without_custom_fixtures', () async {
-      // Fresh profile should have categories with valid SKR03/SKR04 mappings
+      // Fresh profile ships no preconfigured mappings without an approved
+      // manifest: explicit unconfigured state, no synthetic SKR/EÜR values.
       final cats = await db.executor.runSelect(
         'SELECT id, bezeichnung, konto_skr03, konto_skr04, euer_zeile FROM kategorien LIMIT 10',
         const <Object?>[],
       );
-      expect(cats.isNotEmpty, isTrue, reason: 'Seed should create categories');
-
-      for (final cat in cats) {
-        // SKR03 should be non-empty
-        expect(cat['konto_skr03'], isNotNull, reason: 'SKR03 should be set');
-        // SKR04 should be non-empty
-        expect(cat['konto_skr04'], isNotNull, reason: 'SKR04 should be set');
-      }
+      expect(cats, isEmpty, reason: 'No synthetic categories without an approved manifest');
+      expect(await db.kategorienRepository.isAccountingConfigured(), isFalse);
     });
 
     test('test_seed_master_data_contract_1_2_seed_upgrade_preserves_user_edits', () async {
-      // Modify a seeded category
-      await db.executor.runCustom("UPDATE kategorien SET bezeichnung = 'Meine Kategorie' WHERE id = 1");
-      final before = await db.executor.runSelect('SELECT bezeichnung FROM kategorien WHERE id = 1', const <Object?>[]);
+      // User-defined category with explicit values.
+      final created = await db.kategorienRepository.create(bezeichnung: 'Anfang', kontoSkr03: '8001');
+      await db.kategorienRepository.update(created.id, <String, dynamic>{'bezeichnung': 'Meine Kategorie'});
+      final before = await db.executor.runSelect('SELECT bezeichnung FROM kategorien WHERE id = ?', <Object?>[
+        created.id,
+      ]);
       expect(before.first['bezeichnung'], 'Meine Kategorie');
 
       // Re-run seed (idempotent)
       await SeedData.run(db.executor);
 
       // User edit should be preserved
-      final after = await db.executor.runSelect('SELECT bezeichnung FROM kategorien WHERE id = 1', const <Object?>[]);
+      final after = await db.executor.runSelect('SELECT bezeichnung FROM kategorien WHERE id = ?', <Object?>[
+        created.id,
+      ]);
       expect(after.first['bezeichnung'], 'Meine Kategorie');
     });
 

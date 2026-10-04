@@ -15,6 +15,8 @@ void main() {
     setUp(() async {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       repo = BuchungsVorlagenRepository(db.executor);
       await db.executor.runInsert('INSERT INTO konten (id, name, iban) VALUES (?, ?, ?)', <Object?>[
         1,

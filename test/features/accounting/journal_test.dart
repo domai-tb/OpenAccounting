@@ -12,6 +12,10 @@ void main() {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
       repo = JournalRepository(db.executor);
+      // No categories are preseeded; create explicit fixtures (ids 1..5).
+      for (var i = 1; i <= 5; i++) {
+        await db.kategorienRepository.create(bezeichnung: 'Testkategorie $i');
+      }
     });
 
     tearDown(() async {
@@ -19,7 +23,7 @@ void main() {
     });
 
     test('booking creates immutable entry with auto id and GoBD trigger', () async {
-      // Arrange: valid kategorien seeded (ids 1..85) + booking data.
+      // Arrange: explicit category fixtures + booking data.
       final entry = await repo.create(
         datum: DateTime(2026, 3, 15),
         bezeichnung: 'Testbuchung Einnahme',

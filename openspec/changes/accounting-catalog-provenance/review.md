@@ -124,3 +124,17 @@ None. All blocking round-2 findings are resolved:
 VERDICT: APPROVE
 
 CHANGES_APPLIED: n/a
+
+---
+
+## Implementation Note (not a review round)
+
+- Executed version reassignment per the delta's own reassignment clause: no accepted
+  v9 migration had landed and no approved DDL exists for the mileage/marker tables,
+  so the provenance migration ships as **v9** (spec text updated: v10 → v9 for the
+  provenance requirement, category history scenario, and feature-owned rule).
+- Per the staleness clause above, these spec edits void the round-3 APPROVE verdict;
+  a fresh review round is required before archive.
+- Deferred to the v9-owner change: shared markers + mileage + lazy-unknown scenarios
+  (036/040/042). Test paths corrected to `test/db/`; truncated test names expanded;
+  docs/maintained-spec sync tracked as tasks 6.1–6.3.

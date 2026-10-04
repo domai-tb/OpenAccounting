@@ -13,6 +13,8 @@ void main() {
     setUp(() async {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       ds = RechnungenDataSource(db.executor);
     });
 

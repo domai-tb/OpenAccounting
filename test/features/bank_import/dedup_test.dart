@@ -12,6 +12,13 @@ void main() {
     setUp(() async {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 1');
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 2');
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 3');
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 4');
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 5');
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie 6');
+
       await db.executor.runInsert('INSERT INTO konten (id, name, iban, waehrung) VALUES (?, ?, ?, ?)', <Object?>[
         1,
         'Giro Sparkasse',

@@ -50,7 +50,7 @@ void main() {
       addTearDown(db.close);
       await db.ensureOpen();
 
-      expect(await _userVersion(native), 8);
+      expect(await _userVersion(native), 9);
       final List<String> columns = await _columnNames(native, 'forderung_zahlungen');
       expect(
         columns,
@@ -92,7 +92,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 39);
+      expect(await _allTableCount(native), 40);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
@@ -106,8 +106,8 @@ void main() {
       );
       // No fabricated historical payment rows.
       expect(await _rowCount(native, 'forderung_zahlungen'), 0);
-      expect(await _userVersion(native), 8);
-      expect(await _allTableCount(native), 40);
+      expect(await _userVersion(native), 9);
+      expect(await _allTableCount(native), 41);
     });
 
     test('test_present_v7_relation_table_repairs_missing_constraints', () async {
@@ -148,10 +148,10 @@ void main() {
       expect(row['datum'], '2026-02-02');
       expect(row['idempotency_key'], 'legacy-repair');
       expect(row['requested_betrag_cents'], isNull);
-      expect(await _userVersion(native), 8);
+      expect(await _userVersion(native), 9);
       // Base schema stays exactly 39 tables plus the feature table.
-      expect(await _baseTableCount(native), 39);
-      expect(await _allTableCount(native), 40);
+      expect(await _baseTableCount(native), 40);
+      expect(await _allTableCount(native), 41);
     });
 
     test('test_duplicate_legacy_key_rolls_migration_back', () async {
@@ -193,7 +193,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 39);
+      expect(await _allTableCount(native), 40);
 
       final AppDatabase db = AppDatabase.forTesting(
         native,
@@ -202,7 +202,7 @@ void main() {
       addTearDown(db.close);
       await _expectSchemaMigrationFailed(db);
 
-      expect(await _allTableCount(native), 39);
+      expect(await _allTableCount(native), 40);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _userVersion(native), 7);
       expect(db.isOpen, isFalse);
@@ -246,38 +246,43 @@ void main() {
       // Failure surfaces typed, without requiring raw SQL text in the public message.
       expect(error.code, ForderungenErrorCode.schemaMigrationFailed);
       expect(error.toString(), isNot(contains('CREATE TABLE')));
-      // Startup side effects never ran: no trigger installs and no seed inserts during this open.
-      expect(statements.any((String s) => s.contains('CREATE TRIGGER')), isFalse);
+      // Startup side effects never ran: no post-migration trigger installs and no
+      // seed inserts during this open. Migration-transaction DDL for the
+      // append-only category history triggers is rolled back with the rest.
+      expect(
+        statements.any((String s) => s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY')),
+        isFalse,
+      );
       expect(statements.any((String s) => s.startsWith('INSERT OR IGNORE')), isFalse);
       expect(failing.isOpen, isFalse);
       expect(() => failing.kundenRepository, throwsStateError);
       expect(() => failing.kategorienRepository, throwsStateError);
       // Rolled back to the v7 fixture: version, base tables, and seed/trigger state unchanged.
       expect(await _userVersion(native), 7);
-      expect(await _allTableCount(native), 39);
+      expect(await _allTableCount(native), 40);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _triggerCount(native), triggerCountBefore);
       expect(await _seedRowCount(native), seedRowsBefore);
     });
 
-    test('test_current_v8_repairs_missing_feature_table_transactionally', () async {
+    test('test_current_v9_repairs_missing_feature_table_transactionally', () async {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
-      await seed.executor.runCustom('PRAGMA user_version = 8');
-      expect(await _allTableCount(native), 39);
+      await seed.executor.runCustom('PRAGMA user_version = 9');
+      expect(await _allTableCount(native), 40);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
       await db.ensureOpen();
 
       expect(await _tableExists(native, 'forderung_zahlungen'), isTrue);
-      expect(await _userVersion(native), 8);
-      expect(await _baseTableCount(native), 39);
-      expect(await _allTableCount(native), 40);
+      expect(await _userVersion(native), 9);
+      expect(await _baseTableCount(native), 40);
+      expect(await _allTableCount(native), 41);
       expect(db.isOpen, isTrue);
     });
 
-    test('test_current_v8_repairs_all_columns_when_constraints_are_missing', () async {
+    test('test_current_v9_repairs_all_columns_when_constraints_are_missing', () async {
       final AppDatabase seed = await _seedV8(native);
       await seed.executor.runCustom('DROP TABLE forderung_zahlungen');
       await seed.executor.runCustom('''
@@ -293,7 +298,7 @@ CREATE TABLE forderung_zahlungen (
   fingerprint_direction TEXT,
   fingerprint_date_policy TEXT
 )''');
-      await seed.executor.runCustom('PRAGMA user_version = 8');
+      await seed.executor.runCustom('PRAGMA user_version = 9');
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
@@ -304,10 +309,10 @@ CREATE TABLE forderung_zahlungen (
         await _indexNames(native, 'forderung_zahlungen'),
         containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
       );
-      expect(await _userVersion(native), 8);
+      expect(await _userVersion(native), 9);
     });
 
-    test('test_fresh_upgrade_current_v8_repair_and_rollback_share_raw_begin_migration_path', () async {
+    test('test_fresh_upgrade_current_v9_repair_and_rollback_share_raw_begin_migration_path', () async {
       // Fixture A: fresh empty profile.
       final drift_native.NativeDatabase freshNative = drift_native.NativeDatabase.memory();
       final List<String> freshStatements = <String>[];
@@ -323,12 +328,17 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(freshDdl, greaterThan(freshBegin));
       expect(freshDdl, lessThan(freshCommit));
-      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = 8');
+      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = 9');
       expect(freshVersion, greaterThan(freshBegin));
       expect(freshVersion, lessThan(freshCommit));
-      expect(freshStatements.indexWhere((String s) => s.contains('CREATE TRIGGER')), greaterThan(freshCommit));
+      expect(
+        freshStatements.indexWhere(
+          (String s) => s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY'),
+        ),
+        greaterThan(freshCommit),
+      );
       expect(freshStatements.indexWhere((String s) => s.startsWith('INSERT OR IGNORE')), greaterThan(freshCommit));
-      expect(await _userVersion(freshNative), 8);
+      expect(await _userVersion(freshNative), 9);
       await fresh.close();
 
       // Fixture B: v7 upgrade.
@@ -349,15 +359,20 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(upgradeDdl, greaterThan(upgradeBegin));
       expect(upgradeDdl, lessThan(upgradeCommit));
-      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = 8');
+      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = 9');
       expect(upgradeVersion, greaterThan(upgradeBegin));
       expect(upgradeVersion, lessThan(upgradeCommit));
-      expect(upgradeStatements.indexWhere((String s) => s.contains('CREATE TRIGGER')), greaterThan(upgradeCommit));
-      expect(await _userVersion(upgradeNative), 8);
+      expect(
+        upgradeStatements.indexWhere(
+          (String s) => s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY'),
+        ),
+        greaterThan(upgradeCommit),
+      );
+      expect(await _userVersion(upgradeNative), 9);
       expect(await _tableExists(upgradeNative, 'forderung_zahlungen'), isTrue);
       await upgraded.close();
 
-      // Fixture C: current-v8 repair of a missing feature table.
+      // Fixture C: current-version repair of a missing feature table.
       final drift_native.NativeDatabase repairNative = drift_native.NativeDatabase.memory();
       final AppDatabase repairSeed = AppDatabase.forTesting(repairNative);
       await repairSeed.ensureOpen();
@@ -374,16 +389,16 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(repairDdl, greaterThan(repairBegin));
       expect(repairDdl, lessThan(repairCommit));
-      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = 8');
+      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = 9');
       expect(repairVersion, greaterThan(repairBegin));
       expect(repairVersion, lessThan(repairCommit));
       expect(repairStatements.indexWhere((String s) => s.contains('CREATE TRIGGER')), greaterThan(repairCommit));
       expect(repairStatements.indexWhere((String s) => s.startsWith('INSERT OR IGNORE')), greaterThan(repairCommit));
-      expect(await _userVersion(repairNative), 8);
+      expect(await _userVersion(repairNative), 9);
       expect(await _tableExists(repairNative, 'forderung_zahlungen'), isTrue);
       await repaired.close();
 
-      // Fixture D: injected current-v8 failure records raw BEGIN then ROLLBACK and leaves no residue.
+      // Fixture D: injected current-version failure records raw BEGIN then ROLLBACK and leaves no residue.
       final drift_native.NativeDatabase failNative = drift_native.NativeDatabase.memory();
       final AppDatabase failSeed = AppDatabase.forTesting(failNative);
       await failSeed.ensureOpen();
@@ -404,11 +419,15 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(failDdl, greaterThan(failBegin));
       expect(failDdl, lessThan(failStatements.indexOf('ROLLBACK')));
-      // No startup side effects after the failed transaction.
-      expect(failStatements.any((String s) => s.contains('CREATE TRIGGER')), isFalse);
+      // No startup side effects after the failed transaction (migration-internal
+      // category-history trigger DDL rolls back with the transaction).
+      expect(
+        failStatements.any((String s) => s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY')),
+        isFalse,
+      );
       expect(failStatements.any((String s) => s.startsWith('INSERT OR IGNORE')), isFalse);
-      expect(await _userVersion(failNative), 8);
-      expect(await _allTableCount(failNative), 39);
+      expect(await _userVersion(failNative), 9);
+      expect(await _allTableCount(failNative), 40);
       expect(await _tableExists(failNative, 'forderung_zahlungen'), isFalse);
       expect(failing.isOpen, isFalse);
       await failing.close();

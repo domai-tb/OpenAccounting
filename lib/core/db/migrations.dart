@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/core/db/backup_service.dart';
@@ -11,7 +13,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 8;
+  static const int currentVersion = 9;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -133,6 +135,7 @@ class MigrationRunner {
     try {
       await createSchema();
       await _migrateReceivableFeature();
+      await _migrateCategoryProvenance();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -193,6 +196,15 @@ class MigrationRunner {
       await _migrateInventarbewegungen();
       await _migrateJournalGruppeId();
       await _migrateReceivableFeature();
+    }
+    if (version == 9) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
+      await _migrateReceivableFeature();
+      await _migrateCategoryProvenance();
     }
   }
 
@@ -483,6 +495,110 @@ FROM rechnungen_v1
     }
     await executor.runCustom('UPDATE journal SET gruppe_id = id WHERE gruppe_id IS NULL');
   }
+
+  /// Accounting-catalog-provenance migration (v9, reassigned from v10: no accepted
+  /// v9 migration had landed and no approved DDL exists for mileage/marker tables).
+  /// Adds mapping-provenance columns to `kategorien` with a safe literal default
+  /// so every preexisting row is classified `legacy_unverified` without rewriting
+  /// values, creates the append-only `category_mapping_history`, records one
+  /// migration history row per preexisting category, and adds nullable
+  /// `mapping_provenance_json` snapshot columns to the export logs.
+  /// Idempotent: safe to run on fresh schemas (columns/table already present)
+  /// and to rerun (history rows are inserted only when missing).
+  Future<void> _migrateCategoryProvenance() async {
+    final katColumns = await executor.runSelect('PRAGMA table_info(kategorien)', const <Object?>[]);
+    final katNames = <String>{for (final row in katColumns) row['name'].toString()};
+    const additions = <String, String>{
+      'mapping_status':
+          "TEXT NOT NULL DEFAULT 'legacy_unverified' CHECK (mapping_status IN "
+          "('catalog_verified','user_confirmed','legacy_unverified','review_required','unmapped'))",
+      'catalog_entry_key': 'TEXT',
+      'catalog_source_reference': 'TEXT',
+      'catalog_source_version': 'TEXT',
+      'mapping_reviewed_at': 'TEXT',
+    };
+    for (final entry in additions.entries) {
+      if (!katNames.contains(entry.key)) {
+        await executor.runCustom('ALTER TABLE kategorien ADD COLUMN ${entry.key} ${entry.value}');
+      }
+    }
+    final unverified = await executor.runSelect(
+      'SELECT COUNT(*) AS c FROM kategorien WHERE mapping_status NOT IN '
+      "('catalog_verified','user_confirmed','legacy_unverified','review_required','unmapped')",
+      const <Object?>[],
+    );
+    if (_asInt(unverified.single['c']) != 0) {
+      throw StateError('Kategorie-Provenienz konnte nicht verifiziert werden');
+    }
+
+    await executor.runCustom('''
+CREATE TABLE IF NOT EXISTS category_mapping_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  geaendert_am TEXT NOT NULL,
+  aktion TEXT NOT NULL CHECK (aktion IN ('migration','catalog_import','mapping_edit','user_review')),
+  vorher_mapping_json TEXT,
+  nachher_mapping_json TEXT NOT NULL,
+  katalog_quelle TEXT,
+  katalog_version TEXT
+)''');
+    await executor.runCustom('''
+CREATE TRIGGER IF NOT EXISTS trg_category_mapping_history_no_update
+BEFORE UPDATE ON category_mapping_history
+BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
+    await executor.runCustom('''
+CREATE TRIGGER IF NOT EXISTS trg_category_mapping_history_no_delete
+BEFORE DELETE ON category_mapping_history
+BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
+
+    // One migration history row per preexisting category that lacks one.
+    // Column-agnostic (SELECT k.*): optional mapping columns such as
+    // konto_ust_skr03 are added lazily by the repository and may be absent.
+    final pending = await executor.runSelect(
+      'SELECT k.* '
+      'FROM kategorien k LEFT JOIN category_mapping_history h '
+      "ON h.kategorie_id = k.id AND h.aktion = 'migration' "
+      'WHERE h.id IS NULL',
+      const <Object?>[],
+    );
+    final now = DateTime.now().toUtc().toIso8601String();
+    for (final row in pending) {
+      final mapping = <String, Object?>{
+        'konto_skr03': row['konto_skr03'],
+        'konto_skr04': row['konto_skr04'],
+        'konto_ust_skr03': row['konto_ust_skr03'],
+        'konto_ust_skr04': row['konto_ust_skr04'],
+        'euer_zeile': row['euer_zeile'],
+        'eks_kategorie': row['eks_kategorie'],
+      };
+      final nachher = <String, Object?>{...mapping, 'mapping_status': row['mapping_status']};
+      await executor.runInsert(
+        'INSERT INTO category_mapping_history '
+        '(kategorie_id, geaendert_am, aktion, vorher_mapping_json, nachher_mapping_json, katalog_quelle, katalog_version) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[row['id'], now, 'migration', jsonEncode(mapping), jsonEncode(nachher), null, null],
+      );
+    }
+
+    await _addColumnIfMissing('euer_exporte', 'mapping_provenance_json', 'TEXT');
+    await _addColumnIfMissing('datev_export_log', 'mapping_provenance_json', 'TEXT');
+
+    final history = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='category_mapping_history'",
+      const <Object?>[],
+    );
+    if (history.isEmpty) {
+      throw StateError('Kategorie-Historie konnte nicht verifiziert werden');
+    }
+  }
+
+  static int _asInt(Object? v) => v is int
+      ? v
+      : v is num
+      ? v.toInt()
+      : v is String
+      ? int.tryParse(v) ?? -1
+      : -1;
 
   Future<void> _addColumnIfMissing(String table, String name, String definition) async {
     final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);

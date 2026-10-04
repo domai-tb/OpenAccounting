@@ -16,6 +16,8 @@ void main() {
     setUp(() async {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       repo = DashboardRepository(db.executor);
     });
 
@@ -250,6 +252,8 @@ void main() {
     test('widget provider exposes data-source failures to error rendering', () async {
       final db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       await db.close();
       final container = ProviderContainer(overrides: [appDatabaseProvider.overrideWithValue(db)]);
       addTearDown(container.dispose);
@@ -286,6 +290,8 @@ void main() {
     testWidgets('dashboard renders every visible widget card from providers', (tester) async {
       final db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       addTearDown(db.close);
       tester.view.physicalSize = const Size(1600, 1200);
       tester.view.devicePixelRatio = 1.0;
@@ -369,6 +375,8 @@ void main() {
     testWidgets('hidden does not fetch — provider returns null, no card', (tester) async {
       final db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       final repo = DashboardRepository(db.executor);
       final cfg = repo.defaultConfig().copyWith(
         visibility: <String, bool>{for (final id in dashboardWidgetIds) id: false},
@@ -391,6 +399,8 @@ void main() {
     setUp(() async {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       repo = DashboardRepository(db.executor);
     });
 

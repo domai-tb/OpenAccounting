@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/db/seed.dart';
+import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 
 void main() {
   group('SeedData', () {
@@ -39,20 +40,16 @@ void main() {
       );
     });
 
-    test('seeds categories with both SKR mappings', () async {
-      final rows = await db.executor.runSelect(
-        'SELECT konto_skr03, konto_skr04, euer_zeile, bezeichnung, beschreibung FROM kategorien',
-        const [],
-      );
+    test('fresh profile without approved catalog has no preconfigured mappings', () async {
+      final rows = await db.executor.runSelect('SELECT konto_skr03, konto_skr04, euer_zeile FROM kategorien', const []);
 
-      expect(rows.length, greaterThanOrEqualTo(80));
-      expect(rows.every((row) => row['konto_skr03'] != null && row['konto_skr04'] != null), isTrue);
-      expect(rows.every((row) => (row['bezeichnung']?.toString() ?? '').contains('Du')), isTrue);
-      expect(rows.every((row) => (row['beschreibung']?.toString() ?? '').contains('deinen')), isTrue);
+      expect(rows, isEmpty, reason: 'No synthetic categories without an approved manifest');
+      expect(await db.kategorienRepository.isAccountingConfigured(), isFalse);
     });
 
     test('is idempotent and preserves existing seed values', () async {
       await db.executor.runCustom("UPDATE ust_saetze SET bezeichnung = 'Eigene Bezeichnung' WHERE id = 1");
+      final created = await db.kategorienRepository.create(bezeichnung: 'Eigene Kategorie');
       await SeedData.run(db.executor);
 
       final rates = await db.executor.runSelect('SELECT bezeichnung FROM ust_saetze WHERE id = 1', const []);
@@ -66,7 +63,11 @@ void main() {
       );
       expect(counts.single['rates'], 3);
       expect(counts.single['ranges'], 11);
-      expect(counts.single['categories'], 85);
+      expect(counts.single['categories'], 1);
+
+      final kept = await db.kategorienRepository.findById(created.id);
+      expect(kept?.bezeichnung, 'Eigene Kategorie');
+      expect(kept?.mappingStatus, CategoryMappingStatus.unmapped);
     });
   });
 }

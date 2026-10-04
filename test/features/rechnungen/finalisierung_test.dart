@@ -13,6 +13,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
@@ -42,6 +44,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
@@ -74,6 +78,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 101 WHERE typ = 'rechnung_ausgang'",
     );
@@ -112,6 +118,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
     );
@@ -149,6 +157,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
@@ -216,6 +226,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
@@ -253,6 +265,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "INSERT INTO unternehmen (name, strasse, plz, ort) VALUES ('Test GmbH', 'Alte Straße 1', '10115', 'Berlin')",
     );
@@ -336,6 +350,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "INSERT INTO unternehmen (name, strasse, plz, ort) VALUES ('Other GmbH', 'Andere Straße 1', '10117', 'Berlin')",
     );
@@ -377,6 +393,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 101 WHERE typ = 'rechnung_ausgang'",
     );
@@ -415,6 +433,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
     );
@@ -448,6 +468,8 @@ void main() {
       final database = AppDatabase.createTestDatabase();
       addTearDown(database.close);
       await database.ensureOpen();
+      await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
       await database.executor.runCustom(
         'UPDATE nummernkreise SET format = ?, naechste_nummer = 7 WHERE typ = ?',
         <Object?>[format, 'rechnung_ausgang'],
@@ -478,6 +500,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom("UPDATE nummernkreise SET aktiv = 0 WHERE typ = 'rechnung_ausgang'");
     final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
     final draft = await useCases.createDraftRechnung(
@@ -503,6 +527,8 @@ void main() {
     final database = AppDatabase.createTestDatabase();
     addTearDown(database.close);
     await database.ensureOpen();
+    await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
     );

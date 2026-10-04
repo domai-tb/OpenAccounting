@@ -16,6 +16,8 @@ void main() {
     tmpDir = await Directory.systemTemp.createTemp('pdf-artifact-test-');
     db = AppDatabase.createTestDatabase();
     await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+
     ds = RechnungenDataSource(db.executor);
     // Ensure extra columns exist (same as RechnungenDataSource._ensureExtraColumns).
     for (final sql in [

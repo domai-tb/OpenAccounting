@@ -12,6 +12,7 @@ void main() {
       db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
       await _ensureUstvaColumns(db);
+      await db.kategorienRepository.create(bezeichnung: 'UStVA-Testkategorie');
       service = UstvaService(db.executor);
     });
 

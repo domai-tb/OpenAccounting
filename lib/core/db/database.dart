@@ -404,7 +404,12 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   einleitungstext_storno TEXT,
   schlusstext_storno TEXT
 )''',
-  // 2 kategorien
+  // 2 kategorien — mapping provenance per accounting-catalog-provenance (v9).
+  // mapping_status defaults to legacy_unverified so legacy insert paths and
+  // migrated rows are never silently treated as verified. Only an approved
+  // manifest import or an explicit user-review transaction may set a trusted
+  // status. Fresh profiles ship with no approved manifest, hence no
+  // preconfigured mappings (explicit unconfigured state).
   '''
 CREATE TABLE IF NOT EXISTS kategorien (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -415,8 +420,33 @@ CREATE TABLE IF NOT EXISTS kategorien (
   euer_zeile INTEGER,
   aktiv INTEGER DEFAULT 1,
   typ TEXT,
-  eks_kategorie TEXT
+  eks_kategorie TEXT,
+  mapping_status TEXT NOT NULL DEFAULT 'legacy_unverified' CHECK (mapping_status IN ('catalog_verified','user_confirmed','legacy_unverified','review_required','unmapped')),
+  catalog_entry_key TEXT,
+  catalog_source_reference TEXT,
+  catalog_source_version TEXT,
+  mapping_reviewed_at TEXT
 )''',
+  // 2b category_mapping_history — append-only provenance log (v9, feature-owned).
+  '''
+CREATE TABLE IF NOT EXISTS category_mapping_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  geaendert_am TEXT NOT NULL,
+  aktion TEXT NOT NULL CHECK (aktion IN ('migration','catalog_import','mapping_edit','user_review')),
+  vorher_mapping_json TEXT,
+  nachher_mapping_json TEXT NOT NULL,
+  katalog_quelle TEXT,
+  katalog_version TEXT
+)''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_category_mapping_history_no_update
+BEFORE UPDATE ON category_mapping_history
+BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_category_mapping_history_no_delete
+BEFORE DELETE ON category_mapping_history
+BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''',
   // 3 konten
   '''
 CREATE TABLE IF NOT EXISTS konten (
@@ -837,7 +867,8 @@ CREATE TABLE IF NOT EXISTS euer_exporte (
   jahr INTEGER NOT NULL,
   summen TEXT,
   status TEXT DEFAULT 'entwurf',
-  unternehmen_id INTEGER REFERENCES unternehmen(id)
+  unternehmen_id INTEGER REFERENCES unternehmen(id),
+  mapping_provenance_json TEXT
 )''',
   // 32 eks_exporte
   '''
@@ -859,7 +890,8 @@ CREATE TABLE IF NOT EXISTS datev_export_log (
   anzahl_buchungen INTEGER DEFAULT 0,
   datei_pfad TEXT,
   unternehmen_id INTEGER REFERENCES unternehmen(id),
-  status TEXT
+  status TEXT,
+  mapping_provenance_json TEXT
 )''',
   // 34 eks_einstellungen
   '''

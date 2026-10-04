@@ -489,19 +489,21 @@ WHERE id = ? AND ist_entwurf = 1
         final kundeId = invoice['kunde_id'];
         final String belegTyp = RechnungTyp.belegTypFor(typ: typ, lieferantId: lieferantId);
         final String datumStr = invoiceDate.toIso8601String().substring(0, 10);
-        // Resolve kategorie for journal — first active, fallback 1
-        int? kategorieId;
-        try {
-          final katRows = await transaction.runSelect(
-            'SELECT id FROM kategorien WHERE aktiv = 1 ORDER BY id LIMIT 1',
-            const <Object?>[],
-          );
-          if (katRows.isNotEmpty) {
-            final v = katRows.single['id'];
-            kategorieId = v is int ? v : int.tryParse(v.toString());
-          }
-        } catch (_) {}
-        kategorieId ??= 1;
+        // Resolve kategorie for journal — first active category wins. No
+        // synthetic fallback: finalizing without any category fails closed
+        // instead of inventing a mapping reference.
+        final katRows = await transaction.runSelect(
+          'SELECT id FROM kategorien WHERE aktiv = 1 ORDER BY id LIMIT 1',
+          const <Object?>[],
+        );
+        if (katRows.isEmpty) {
+          throw StateError('Rechnung kann nicht finalisiert werden: keine Kategorie vorhanden');
+        }
+        final katValue = katRows.single['id'];
+        final int? kategorieId = katValue is int ? katValue : int.tryParse(katValue.toString());
+        if (kategorieId == null) {
+          throw StateError('Rechnung kann nicht finalisiert werden: keine Kategorie vorhanden');
+        }
         final int journalId = await transaction.runInsert(
           'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, rechnung_id, beleg_nr, immutable, erstellungsdatum, gruppe_id) VALUES (?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, NULL)',
           <Object?>[

@@ -151,14 +151,19 @@ class SetupRepository {
       }
     }
     if (journals.isEmpty) {
-      // need at least one kategorie for FK — use first available or create fallback 1
-      int kategorieId = 1;
-      try {
-        final List<Map<String, Object?>> kats = await executor.runSelect('SELECT id FROM kategorien LIMIT 1', const []);
-        if (kats.isNotEmpty) {
-          kategorieId = ((kats.single['id'] as num?) ?? 0).toInt();
-        }
-      } catch (_) {}
+      // No synthetic category may be assumed: use the first available one,
+      // else create an explicitly unmapped opening category (descriptive label
+      // only — no account or tax mapping is derived from it).
+      final List<Map<String, Object?>> kats = await executor.runSelect('SELECT id FROM kategorien LIMIT 1', const []);
+      final int kategorieId;
+      if (kats.isNotEmpty) {
+        kategorieId = (kats.single['id'] as num? ?? 0).toInt();
+      } else {
+        kategorieId = await executor.runInsert(
+          "INSERT INTO kategorien (bezeichnung, beschreibung, aktiv, mapping_status) VALUES (?, ?, 1, 'unmapped')",
+          const <Object?>['Eröffnung', 'Automatisch angelegte Eröffungskategorie ohne Kontenrahmen-Mapping'],
+        );
+      }
       await executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable, is_opening_balance) '
         'VALUES (?, ?, ?, ?, ?, ?, 0, 1)',
@@ -184,7 +189,8 @@ class SetupRepository {
     if (ids.isEmpty) {
       throw const SetupException('Mindestens eine Kategorie erforderlich');
     }
-    // seed guarantees 1..85 exist; validate each exists
+    // Categories are user data: every selected id must exist. Fresh profiles
+    // ship with no preconfigured categories (explicit unconfigured state).
     for (final int id in ids) {
       final List<Map<String, Object?>> rows = await executor.runSelect(
         'SELECT id FROM kategorien WHERE id = ?',
@@ -218,7 +224,8 @@ class SetupRepository {
       await executor.runUpdate('UPDATE unternehmen SET name = ? WHERE id = 1', const ['Meine Firma']);
     }
     await ensureKassenKonto(betrag: '0.00');
-    // kategorien already seeded — ensure at least one aktiv
+    // No categories are preseeded; the opening entry creates its own
+    // explicitly unmapped label category when none exists.
   }
 
   /// Run a complete setup write as one SQLite transaction.

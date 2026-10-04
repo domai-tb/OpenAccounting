@@ -170,6 +170,7 @@ void main() {
     final AppDatabase pdfDb = AppDatabase.createTestDatabase(profileDir: pdfProfile.path);
     addTearDown(pdfDb.close);
     await pdfDb.ensureOpen();
+    await pdfDb.kategorienRepository.create(bezeichnung: 'Finalisierung');
     await pdfDb.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );

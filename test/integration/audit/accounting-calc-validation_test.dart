@@ -579,6 +579,7 @@ void main() {
     test('PDF snapshot immutable after finalize and not minimal blank', () async {
       final AppDatabase db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Finalisierung');
       final Directory tmpDir = await Directory.systemTemp.createTemp('pdf-snapshot-');
       addTearDown(() async {
         try {
@@ -712,6 +713,7 @@ CREATE TABLE forderungen (
     test('Forderungen occurrence check/insert atomic for concurrent createForRechnung', () async {
       final AppDatabase db = AppDatabase.createTestDatabase();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Finalisierung');
       addTearDown(() async => db.close());
       final int kundeId = await db.executor.runInsert(
         'INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)',

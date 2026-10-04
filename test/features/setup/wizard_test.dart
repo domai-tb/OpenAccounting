@@ -81,6 +81,8 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final db = _db();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Kat 1');
+      await db.kategorienRepository.create(bezeichnung: 'Kat 2');
       final repo = SetupRepository(db.executor);
       final service = WizardService(repository: repo);
 
@@ -176,6 +178,7 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final db = _db();
       await db.ensureOpen();
+      await db.kategorienRepository.create(bezeichnung: 'Kat 1');
       final service = WizardService(repository: SetupRepository(db.executor));
       const account = BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX');
 
