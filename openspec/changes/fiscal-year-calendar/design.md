@@ -8,7 +8,7 @@ Feature-map item 58 requires a calendar-year default, optional non-calendar fisc
 
 - Store one company-level start month, defaulting to January.
 - Return typed, deterministic fiscal-month, fiscal-quarter, and fiscal-year labels and date intervals.
-- Provide one boundary service for reports that group data by company business year.
+- Provide one boundary service for later accepted reports that group data by company business year; this change adds no fiscal-period filters to those reports.
 - Make configuration and its effect on historical report boundaries clear to the user.
 - Prevent calendar-year EÜR output from being mislabeled as a configured alternate business year.
 
@@ -26,9 +26,9 @@ Feature-map item 58 requires a calendar-year default, optional non-calendar fisc
 3. **Define all business-period boundaries centrally.** For a configured year start month, fiscal month 1 is that start month and fiscal months 1–12 are consecutive calendar months within the fiscal year. Fiscal quarters each span three consecutive fiscal months. Fiscal year labels use the starting calendar year. Each service result is a half-open calendar-date range. Explicit calendar-month and calendar-quarter filters remain separate from business-fiscal-month and business-fiscal-quarter filters.
 4. **Use a single typed service.** Company configuration and all boundary calculations live behind one injected fiscal-calendar use case. Report widgets and repositories do not reproduce month arithmetic. A consumer that cannot resolve a valid configuration shows an unavailable state rather than assuming a fiscal period.
 5. **Keep statutory periods with tax-report owners.** A business-year range is not automatically a VAT declaration period or another filing period. Tax-report capabilities continue using their separately defined statutory period and cadence; this change does not recalculate or shift tax outputs.
-6. **Gate reports that still assume calendar years.** Annual EÜR is a business-year report. It may report an alternate configured fiscal year only after its accepted calculation consumes the service's exact half-open range. While its implementation or posting source remains calendar-only or unapproved, EÜR for a non-January start month is unavailable and SHALL NOT be relabeled as the configured fiscal year. Other report consumers follow the same explicit contract.
-7. **Make configuration changes explicit.** Changing the start month changes the boundaries for every fiscal month, quarter, and year selected afterward, including historical periods. The confirmation names that consequence. No journal or invoice data is rewritten, and report exports keep their own stored period snapshot. No effective-date history is added in this proposal; preserving prior boundary versions remains an open policy decision.
-8. **Do not imply that consumers are already integrated.** Accounting reports and dashboard period summaries must call this service when they offer a company business-year period. Until each consumer has an accepted source and uses the service, it must not label a calendar-based result as the configured fiscal period.
+6. **Gate report consumers explicitly.** Annual EÜR is the only report consumer in scope. Until its accepted calculation consumes the service's exact half-open range, EÜR for a non-January start month is unavailable and SHALL NOT be relabeled as the configured fiscal year. Dashboard period summaries and all other reports remain unavailable for business-fiscal filters until their own source and calculation contracts are accepted and integrated.
+7. **Make configuration changes explicit.** Changing the start month changes the boundaries for every fiscal month, quarter, and year selected afterward, including historical periods. The confirmation names that consequence. No journal or invoice data is rewritten, and report exports keep their own stored period snapshot. No effective-date history is added; the saved start month applies retroactively to historical selections as well as future selections.
+8. **Do not imply that other consumers are integrated.** A report may offer a company business-period filter only after its source and calculation contract is accepted and it uses this service. Until then, it must show the fiscal period as unavailable and must not label a calendar-based result as a configured fiscal period.
 9. **Follow the existing desktop design system.** Add the selector beside company-period settings in `/settings`, with a short explanation and explicit Save action. Use standard page/card/form tokens, visible focus, semantic labels, active-locale date formatting, German and English catalogs, and narrow-window layouts from `DESIGN.md`.
 
 ## Risks / Trade-offs
@@ -48,6 +48,4 @@ Feature-map item 58 requires a calendar-year default, optional non-calendar fisc
 
 ## Open Questions
 
-- Must a changed start month preserve historical calendar definitions through effective-date versions, or is the explicit all-years recalculation described above the accepted behavior?
-- Which report consumers beyond EÜR are approved to use the business-year calendar when their own posting, completeness, and calculation contracts are accepted?
 - Should the UI allow the fiscal-year name to be overridden when business terminology differs from the starting calendar year? The initial version uses the starting year to keep labels deterministic.

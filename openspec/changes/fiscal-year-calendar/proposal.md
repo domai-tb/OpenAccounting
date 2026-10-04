@@ -6,7 +6,7 @@ Feature-map item 58 requires calendar-year accounting by default, an optional co
 
 - Add a company-level fiscal-year start month, defaulting to January for existing and new profiles.
 - Add one typed fiscal-calendar service that returns labeled, inclusive-start/exclusive-end date ranges for a business month, quarter, year, or requested date.
-- Add accessible, localized controls in Settings → Unternehmen and require fiscal-year-aware reporting consumers, including annual EÜR, to use the shared boundary service or show an unsupported period as unavailable.
+- Add accessible, localized controls in Settings → Unternehmen and the shared fiscal-boundary service. Annual EÜR remains unavailable for a non-January fiscal year until its accepted calculation consumes the service; dashboard and other report consumers remain unavailable for business-fiscal filters until their own source and calculation contracts are accepted.
 - Keep tax-form period rules and all accounting calculations with their owning accepted capabilities; selecting a fiscal year does not change postings or statutory period rules.
 - Follow the Settings form, localization, keyboard, and responsive requirements in `DESIGN.md`.
 
@@ -24,4 +24,4 @@ Feature-map item 58 requires calendar-year accounting by default, an optional co
 
 ## Impact
 
-Company profile persistence and Settings UI, the shared period-boundary service, and fiscal-year consumers such as accounting reports and dashboard summaries. Existing records and journal postings remain unchanged. Tax filings continue to use their own explicitly configured statutory periods. Changes to the configured start month affect period boundaries for all selected years and must be clearly confirmed to the user.
+Company profile persistence and Settings UI, the shared period-boundary service, and the annual EÜR availability guard. Dashboard summaries and other reports do not gain business-fiscal filters in this change. Existing records and journal postings remain unchanged. Tax filings continue to use their own explicitly configured statutory periods. Changes to the configured start month affect period boundaries for all selected years and must be clearly confirmed to the user.

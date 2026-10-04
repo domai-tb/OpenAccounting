@@ -26,6 +26,13 @@ The application SHALL store one company-level fiscal-year start month in the act
 - **THEN** the fiscal-calendar service SHALL return a typed unavailable/error result
 - **AND** the report SHALL NOT substitute January or display a fabricated period
 
+#### Scenario: Save failure retains the persisted setting
+
+- **GIVEN** the company has a persisted fiscal-year start month
+- **WHEN** saving a different valid start month fails
+- **THEN** the persisted month SHALL remain active for all period calculations
+- **AND** Settings SHALL show a localized retryable error and SHALL NOT report the unsaved month as saved
+
 ### Requirement: Shared fiscal-year boundaries
 
 The injected fiscal-calendar service SHALL resolve a requested business date, fiscal-month index, fiscal-quarter index, or fiscal-year label to an immutable label and inclusive-start/exclusive-end calendar-date range using the configured company start month. Fiscal month 1 SHALL begin at that configured month, the next 11 fiscal months SHALL be consecutive calendar months, and each of the four fiscal quarters SHALL contain three consecutive fiscal months. Fiscal month and quarter labels SHALL identify their position and containing fiscal-year label. A fiscal-year label SHALL be the calendar year in which that fiscal year starts. Report consumers that offer a company business-period filter SHALL obtain its range from this service and expose that selected range. Explicit user-selected calendar date ranges SHALL remain unchanged. A service result SHALL represent calendar dates without a time zone and SHALL use a half-open interval `[startDate, endDateExclusive)`.
@@ -56,6 +63,13 @@ The injected fiscal-calendar service SHALL resolve a requested business date, fi
 - **THEN** fiscal month 1 SHALL cover `[2026-04-01, 2026-05-01)`
 - **AND** fiscal quarter 1 SHALL cover `[2026-04-01, 2026-07-01)`
 - **AND** the month and quarter SHALL identify fiscal year 2026
+
+#### Scenario: Invalid fiscal month or quarter index is rejected
+
+- **GIVEN** the company has a valid fiscal-year start month
+- **WHEN** the service receives a fiscal-month index outside 1 through 12 or a fiscal-quarter index outside 1 through 4
+- **THEN** it SHALL return a typed invalid-period result
+- **AND** it SHALL NOT substitute a calendar month or quarter
 
 #### Scenario: Tax filing period remains separately owned
 
