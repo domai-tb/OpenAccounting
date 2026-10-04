@@ -19,8 +19,8 @@ void main() {
 
     Future<void> insertKategorie({required int id, required int zeile, String bezeichnung = 'Test Kategorie'}) async {
       await db.executor.runInsert(
-        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv) VALUES (?, ?, ?, ?, ?, 1)',
-        <Object?>[id, bezeichnung, '800$zeile', '400$zeile', zeile],
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[id, bezeichnung, '800$zeile', '400$zeile', zeile, 'catalog_verified', 'TEST-EUER', '2026-test.1'],
       );
     }
 

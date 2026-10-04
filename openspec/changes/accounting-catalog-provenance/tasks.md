@@ -54,18 +54,18 @@
 
 ## 2. EÜR and DATEV disclose or reject category mapping provenance (specs/accounting/spec.md)
 
-- [ ] 2.1 Write failing test `test_accounting_catalog_018_user_configured_output_is_identified` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "User-configured output is identified" (assert the expected failure).
-- [ ] 2.2 Implement the specified behavior for "User-configured output is identified" to pass the test.
-- [ ] 2.3 Refactor this behavior; rerun `test_accounting_catalog_018_user_configured_output_is_identified` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.4 Write failing test `test_accounting_catalog_019_unresolved_mapping_stops_the_output` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unresolved mapping stops the output" (assert the expected failure).
-- [ ] 2.5 Implement the specified behavior for "Unresolved mapping stops the output" to pass the test.
-- [ ] 2.6 Refactor this behavior; rerun `test_accounting_catalog_019_unresolved_mapping_stops_the_output` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.7 Write failing test `test_accounting_catalog_020_euer_detects_categories_missing_a_report_line` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "EÜR detects categories missing a report line" (assert the expected failure).
-- [ ] 2.8 Implement the specified behavior for "EÜR detects categories missing a report line" to pass the test.
-- [ ] 2.9 Refactor this behavior; rerun `test_accounting_catalog_020_euer_detects_categories_missing_a_report_line` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.10 Write failing test `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "EÜR detects a missing category reference" (assert the expected failure).
-- [ ] 2.11 Implement the specified behavior for "EÜR detects a missing category reference" to pass the test.
-- [ ] 2.12 Refactor this behavior; rerun `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.1 Write failing test `test_accounting_catalog_018_user_configured_output_is_identified` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "User-configured output is identified" (assert the expected failure).
+- [x] 2.2 Implement the specified behavior for "User-configured output is identified" to pass the test.
+- [x] 2.3 Refactor this behavior; rerun `test_accounting_catalog_018_user_configured_output_is_identified` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.4 Write failing test `test_accounting_catalog_019_unresolved_mapping_stops_the_output` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "Unresolved mapping stops the output" (assert the expected failure).
+- [x] 2.5 Implement the specified behavior for "Unresolved mapping stops the output" to pass the test.
+- [x] 2.6 Refactor this behavior; rerun `test_accounting_catalog_019_unresolved_mapping_stops_the_output` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.7 Write failing test `test_accounting_catalog_020_euer_detects_categories_missing_a_report_line` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "EÜR detects categories missing a report line" (assert the expected failure).
+- [x] 2.8 Implement the specified behavior for "EÜR detects categories missing a report line" to pass the test.
+- [x] 2.9 Refactor this behavior; rerun `test_accounting_catalog_020_euer_detects_categories_missing_a_report_line` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.10 Write failing test `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "EÜR detects a missing category reference" (assert the expected failure).
+- [x] 2.11 Implement the specified behavior for "EÜR detects a missing category reference" to pass the test.
+- [x] 2.12 Refactor this behavior; rerun `test_accounting_catalog_021_euer_detects_a_missing_category_reference` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 - [ ] 2.13 Write failing test `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV detects missing category account mappings" (assert the expected failure).
 - [ ] 2.14 Implement the specified behavior for "DATEV detects missing category account mappings" to pass the test.
 - [ ] 2.15 Refactor this behavior; rerun `test_accounting_catalog_022_datev_detects_missing_category_account_mappings` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
@@ -75,9 +75,9 @@
 - [ ] 2.19 Write failing test `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "DATEV rejects an unresolved account slot" (assert the expected failure).
 - [ ] 2.20 Implement the specified behavior for "DATEV rejects an unresolved account slot" to pass the test.
 - [ ] 2.21 Refactor this behavior; rerun `test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
-- [ ] 2.22 Write failing test `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "User-confirmed mapping is visible and recorded" (assert the expected failure).
-- [ ] 2.23 Implement the specified behavior for "User-confirmed mapping is visible and recorded" to pass the test.
-- [ ] 2.24 Refactor this behavior; rerun `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
+- [x] 2.22 Write failing test `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` for scenario "User-confirmed mapping is visible and recorded" (assert the expected failure).
+- [x] 2.23 Implement the specified behavior for "User-confirmed mapping is visible and recorded" to pass the test.
+- [x] 2.24 Refactor this behavior; rerun `test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded` in `test/features/accounting/category_mapping_provenance_test.dart` and keep the full suite green.
 
 ## 3. Seed Data (specs/db/spec.md)
 

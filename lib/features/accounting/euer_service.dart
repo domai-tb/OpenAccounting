@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/beleg_typ.dart';
@@ -8,10 +10,21 @@ import 'package:openaccounting/features/accounting/money.dart' as money;
 /// Journal direction is read from beleg_typ and kept separate from the
 /// category's presentation line. All amounts are aggregated as integer cents.
 class EuerException implements Exception {
-  const EuerException(this.message, [this.cause]);
+  const EuerException(
+    this.message, [
+    this.cause,
+    this.affectedJournalIds = const <int>[],
+    this.affectedCategoryIds = const <int>[],
+  ]);
 
   final String message;
   final Object? cause;
+
+  /// Journal entries that blocked generation (unresolved mapping input).
+  final List<int> affectedJournalIds;
+
+  /// Categories that blocked generation (unresolved mapping input).
+  final List<int> affectedCategoryIds;
 
   @override
   String toString() => 'EuerException: $message';
@@ -23,6 +36,13 @@ class EuerService {
   final QueryExecutor executor;
   final DateTime? defaultCutoverDatum;
 
+  /// Generates the EÜR for [jahr]. Before grouping, every in-scope journal row
+  /// is left-joined to its category and its mapping provenance validated:
+  /// only `catalog_verified` and explicitly `user_confirmed` mappings may
+  /// contribute. A missing category, missing report line, or ineligible
+  /// provenance blocks output with the affected journal/category IDs instead
+  /// of silently excluding rows. AfA line 33 stays computed from
+  /// anlageverzeichnis (journal rows pointing at it are skipped, not failed).
   Future<EuerResult> generate({required int jahr, DateTime? cutoverDatum}) async {
     final String jahrStr = jahr.toString().padLeft(4, '0');
 
@@ -30,15 +50,17 @@ class EuerService {
     final Map<int, String> zeilen = <int, String>{for (int i = 12; i <= 107; i++) i: '0.00'};
     final Map<int, String> hinweise = <int, String>{106: '0.00', 107: '0.00'};
 
-    // Journal JOIN kategorien — GROUP BY euer_zeile via Dart cents add.
+    // LEFT JOIN: unresolved mappings must fail closed, never vanish.
     // beleg_typ is deliberately selected so Gewinn never infers direction
     // from arbitrary EÜR line-number ranges.
     final List<Map<String, Object?>> rows;
     try {
       rows = await executor.runSelect(
-        'SELECT k.euer_zeile as zeile, j.betrag as betrag, j.beleg_typ as art '
-        'FROM journal j JOIN kategorien k ON j.kategorie_id = k.id '
-        "WHERE k.euer_zeile IS NOT NULL AND strftime('%Y', j.datum) = ?",
+        'SELECT j.id AS journal_id, j.kategorie_id AS kategorie_id, k.euer_zeile as zeile, '
+        'j.betrag as betrag, j.beleg_typ as art, k.mapping_status AS mapping_status, '
+        'k.catalog_source_reference AS quelle, k.catalog_source_version AS version '
+        'FROM journal j LEFT JOIN kategorien k ON j.kategorie_id = k.id '
+        "WHERE strftime('%Y', j.datum) = ?",
         <Object?>[jahrStr],
       );
     } catch (error, stackTrace) {
@@ -46,26 +68,45 @@ class EuerService {
     }
     var einnahmen = 0;
     var ausgaben = 0;
+    final List<int> blockedJournals = <int>[];
+    final List<int> blockedCategories = <int>[];
+    final List<_ResolvedMapping> resolved = <_ResolvedMapping>[];
     for (final Map<String, Object?> r in rows) {
-      final int? zeile = (r['zeile'] as num?)?.toInt();
-      if (zeile == null) {
-        continue;
-      }
-      if (zeile == 33) {
-        continue; // AfA overridden via anlageverzeichnis.
-      }
-      if (zeile < 12 || zeile > 107) {
-        continue;
-      }
       // Explicit beleg_typ predicate — not string contains. Cash categories
       // Zahlung/Ueberzahlung/Ausbuchung/Eroeffnung never count as revenue.
       // ponytail: whitelist Einnahme/Ausgabe only, explicit exclusion list in BelegTyp.nonRevenue.
+      // Non-revenue rows are outside the accepted posting rules and stay skipped.
       final String art = r['art']?.toString().trim().toLowerCase() ?? '';
       final bool isRevenue = art == BelegTyp.einnahme.toLowerCase();
       final bool isExpense = art == BelegTyp.ausgabe.toLowerCase();
       if (!isRevenue && !isExpense) {
         continue;
       }
+      final int journalId = (r['journal_id'] as num?)?.toInt() ?? 0;
+      final int? kategorieId = (r['kategorie_id'] as num?)?.toInt();
+      final String? status = r['mapping_status']?.toString();
+      final int? zeile = (r['zeile'] as num?)?.toInt();
+      final bool eligible = status == 'catalog_verified' || status == 'user_confirmed';
+      if (kategorieId == null || status == null || !eligible || zeile == null || zeile < 12 || zeile > 107) {
+        blockedJournals.add(journalId);
+        if (kategorieId != null && !blockedCategories.contains(kategorieId)) {
+          blockedCategories.add(kategorieId);
+        }
+        continue;
+      }
+      if (zeile == 33) {
+        continue; // AfA overridden via anlageverzeichnis.
+      }
+      resolved.add(
+        _ResolvedMapping(
+          journalId: journalId,
+          kategorieId: kategorieId,
+          zeile: zeile,
+          status: status,
+          quelle: r['quelle']?.toString(),
+          version: r['version']?.toString(),
+        ),
+      );
       final String raw = r['betrag']?.toString() ?? '0.00';
       final String formatted = money.formatBetrag(raw);
       final String current = zeilen[zeile] ?? '0.00';
@@ -79,6 +120,15 @@ class EuerService {
           ausgaben += cents;
         }
       }
+    }
+    if (blockedJournals.isNotEmpty) {
+      throw EuerException(
+        'EÜR blockiert: ${blockedJournals.length} Buchungen mit ungeklärtem Kategorie-Mapping '
+        '(Journal-IDs: ${blockedJournals.join(', ')}; Kategorie-IDs: ${blockedCategories.join(', ')})',
+        null,
+        blockedJournals,
+        blockedCategories,
+      );
     }
 
     // Zeile 33 — AfA from anlageverzeichnis, not journal.
@@ -223,8 +273,104 @@ class EuerService {
     final int gewinnCents = einnahmen - ausgaben - afaCents;
     final String gewinn = money.fromCents(gewinnCents);
 
-    return EuerResult(jahr: jahr, zeilen: zeilen, hinweise: hinweise, vorsteuerBetrag: vorsteuer, gewinn: gewinn);
+    // Provenance metadata: user-confirmed ids, catalog sources, and the
+    // version-1 snapshot binding every emitted value to its mapping.
+    final List<int> userConfirmed = <int>[];
+    final Map<String, String> sources = <String, String>{};
+    for (final _ResolvedMapping m in resolved) {
+      if (m.status == 'user_confirmed' && !userConfirmed.contains(m.kategorieId)) {
+        userConfirmed.add(m.kategorieId);
+      }
+      if (m.status == 'catalog_verified' && m.quelle != null && m.version != null) {
+        sources[m.quelle!] = m.version!;
+      }
+    }
+    final Map<int, int> historyIds = await _latestHistoryIds(resolved.map((m) => m.kategorieId).toSet());
+    final Map<String, Object?> snapshot = <String, Object?>{
+      'version': 1,
+      'jahr': jahr,
+      'resolved': <Object?>[
+        for (final _ResolvedMapping m in resolved)
+          <String, Object?>{
+            'journal_id': m.journalId,
+            'category_id': m.kategorieId,
+            'euer_zeile': m.zeile,
+            'mapping_status': m.status,
+            if (m.quelle != null) 'source_reference': m.quelle,
+            if (m.version != null) 'source_version': m.version,
+            if (historyIds[m.kategorieId] != null) 'category_history_id': historyIds[m.kategorieId],
+          },
+      ],
+      'user_confirmed_category_ids': userConfirmed,
+      'catalog_sources': sources,
+    };
+
+    return EuerResult(
+      jahr: jahr,
+      zeilen: zeilen,
+      hinweise: hinweise,
+      vorsteuerBetrag: vorsteuer,
+      gewinn: gewinn,
+      userConfirmedCategoryIds: userConfirmed,
+      catalogSources: sources,
+      provenanceSnapshot: snapshot,
+    );
   }
+
+  /// Persists a generated result to `euer_exporte` with its version-1 mapping
+  /// provenance snapshot. Returns the export row id.
+  Future<int> persistExport({required int jahr, required EuerResult result, int? unternehmenId}) async {
+    await _ensureProvenanceColumn();
+    final int? companyId = unternehmenId ?? await _singleUnternehmenId();
+    return executor.runInsert(
+      'INSERT INTO euer_exporte (jahr, summen, status, unternehmen_id, mapping_provenance_json) VALUES (?, ?, ?, ?, ?)',
+      <Object?>[jahr, _summenJson(result), 'erstellt', companyId, _snapshotJson(result)],
+    );
+  }
+
+  Future<Map<int, int>> _latestHistoryIds(Set<int> categoryIds) async {
+    if (categoryIds.isEmpty) return <int, int>{};
+    try {
+      final placeholders = List.filled(categoryIds.length, '?').join(', ');
+      final rows = await executor.runSelect(
+        'SELECT kategorie_id, MAX(id) AS hid FROM category_mapping_history '
+        'WHERE kategorie_id IN ($placeholders) GROUP BY kategorie_id',
+        <Object?>[...categoryIds],
+      );
+      return <int, int>{for (final r in rows) (r['kategorie_id']! as num).toInt(): (r['hid']! as num).toInt()};
+    } catch (_) {
+      return <int, int>{};
+    }
+  }
+
+  Future<void> _ensureProvenanceColumn() async {
+    final cols = await executor.runSelect('PRAGMA table_info(euer_exporte)', const <Object?>[]);
+    if (!cols.any((c) => c['name'] == 'mapping_provenance_json')) {
+      await executor.runCustom('ALTER TABLE euer_exporte ADD COLUMN mapping_provenance_json TEXT');
+    }
+  }
+
+  Future<int?> _singleUnternehmenId() async {
+    try {
+      final rows = await executor.runSelect('SELECT id FROM unternehmen LIMIT 1', const <Object?>[]);
+      if (rows.isEmpty) return null;
+      return (rows.single['id'] as num?)?.toInt();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _summenJson(EuerResult result) {
+    final entries = <String, String>{};
+    for (final e in result.zeilen.entries) {
+      if (e.value != '0.00') entries[e.key.toString()] = e.value;
+    }
+    entries['gewinn'] = result.gewinn;
+    entries['vorsteuer'] = result.vorsteuerBetrag;
+    return jsonEncode(entries);
+  }
+
+  static String _snapshotJson(EuerResult result) => jsonEncode(result.provenanceSnapshot);
 
   Future<Set<String>> _tableColumns(String table) async {
     final List<Map<String, Object?>> rows = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
@@ -297,4 +443,22 @@ bool _useSoll(int jahr, DateTime? cutoverDatum) {
   final DateTime periodStart = DateTime(jahr);
   final DateTime cut = DateTime(cutoverDatum.year, cutoverDatum.month, cutoverDatum.day);
   return !periodStart.isBefore(cut);
+}
+
+/// One journal row resolved to an eligible category mapping for EÜR output.
+class _ResolvedMapping {
+  const _ResolvedMapping({
+    required this.journalId,
+    required this.kategorieId,
+    required this.zeile,
+    required this.status,
+    this.quelle,
+    this.version,
+  });
+  final int journalId;
+  final int kategorieId;
+  final int zeile;
+  final String status;
+  final String? quelle;
+  final String? version;
 }
