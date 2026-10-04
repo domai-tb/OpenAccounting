@@ -100,21 +100,21 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 
 ## 7. Bank Transactions Table
 
-- [ ] 7.1 Write failing test: `test_transaction_linked_to_journal_entry` in `test/features/bank_import/bank_import_service_test.dart` for “Transaction linked to journal entry” (assert it fails for the right reason).
-- [ ] 7.2 Implement the behavior specified by “Transaction linked to journal entry” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 7.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 7.4 Write failing test: `test_transaction_stored_without_journal_link` in `test/features/bank_import/bank_import_service_test.dart` for “Transaction stored without journal link” (assert it fails for the right reason).
-- [ ] 7.5 Implement the behavior specified by “Transaction stored without journal link” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 7.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 7.7 Write failing test: `test_import_assigns_row_review_status_from_its_decisions` in `test/features/bank_import/bank_import_service_test.dart` for “Import assigns row review status from its decisions” (assert it fails for the right reason).
-- [ ] 7.8 Implement the behavior specified by “Import assigns row review status from its decisions” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 7.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 7.10 Write failing test: `test_automatic_mode_does_not_link_a_low_confidence_candidate` in `test/features/bank_import/bank_import_service_test.dart` for “Automatic mode does not link a low-confidence candidate” (assert it fails for the right reason).
-- [ ] 7.11 Implement the behavior specified by “Automatic mode does not link a low-confidence candidate” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 7.12 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 7.13 Write failing test: `test_explicit_review_closes_a_new_row` in `test/features/bank_import/bank_import_service_test.dart` for “Explicit review closes a new row” (assert it fails for the right reason).
-- [ ] 7.14 Implement the behavior specified by “Explicit review closes a new row” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 7.15 Refactor the related code; focused tests and the full suite stay green.
+- [x] 7.1 Write failing test: `test_transaction_linked_to_journal_entry` in `test/features/bank_import/bank_import_service_test.dart` for “Transaction linked to journal entry” (assert it fails for the right reason).
+- [x] 7.2 Implement the behavior specified by “Transaction linked to journal entry” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 7.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 7.4 Write failing test: `test_transaction_stored_without_journal_link` in `test/features/bank_import/bank_import_service_test.dart` for “Transaction stored without journal link” (assert it fails for the right reason).
+- [x] 7.5 Implement the behavior specified by “Transaction stored without journal link” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 7.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 7.7 Write failing test: `test_import_assigns_row_review_status_from_its_decisions` in `test/features/bank_import/bank_import_service_test.dart` for “Import assigns row review status from its decisions” (assert it fails for the right reason).
+- [x] 7.8 Implement the behavior specified by “Import assigns row review status from its decisions” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 7.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 7.10 Write failing test: `test_automatic_mode_does_not_link_a_low_confidence_candidate` in `test/features/bank_import/bank_import_service_test.dart` for “Automatic mode does not link a low-confidence candidate” (assert it fails for the right reason).
+- [x] 7.11 Implement the behavior specified by “Automatic mode does not link a low-confidence candidate” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 7.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 7.13 Write failing test: `test_explicit_review_closes_a_new_row` in `test/features/bank_import/bank_import_service_test.dart` for “Explicit review closes a new row” (assert it fails for the right reason).
+- [x] 7.14 Implement the behavior specified by “Explicit review closes a new row” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 7.15 Refactor the related code; focused tests and the full suite stay green.
 
 ## 8. Import history is actionable
 

@@ -354,8 +354,11 @@ class BankImportService {
           matchedJournalId = bestId;
         }
 
+        // Review status from decisions: linked → gebucht; user-selected
+        // category → geprueft; rule-assigned or none → neu. A rule suggestion
+        // without explicit user decision never closes the row.
         final String datumStr = _formatDate(tx.datum!);
-        final String status = matchedJournalId != null ? 'gebucht' : 'neu';
+        final String status = matchedJournalId != null ? 'gebucht' : (hasReviewedCategory ? 'geprueft' : 'neu');
 
         await executor.runInsert(
           'INSERT INTO bank_transaktionen (konto_id, import_id, datum, betrag, verwendungszweck, '
@@ -488,6 +491,48 @@ class BankImportService {
       importId: importId,
       historyUpdated: historyUpdated,
     );
+  }
+
+  /// Post-import review of one row. Confirming a category closes the row as
+  /// `geprueft`; associating an existing journal entry closes it as `gebucht`
+  /// (taking precedence). A row cannot leave `neu` without a category or an
+  /// existing journal link. Creates no journal entry or payment.
+  Future<void> reviewTransaction({required int id, int? kategorieId, int? journalId}) async {
+    final rows = await executor.runSelect('SELECT status FROM bank_transaktionen WHERE id = ?', <Object?>[id]);
+    if (rows.isEmpty) throw const BankImportException('Transaktion nicht gefunden');
+    if (journalId != null) {
+      final journals = await executor.runSelect('SELECT id FROM journal WHERE id = ?', <Object?>[journalId]);
+      if (journals.isEmpty) throw const BankImportException('Journaleintrag nicht gefunden');
+      await executor.runUpdate('UPDATE bank_transaktionen SET journal_id = ?, status = ? WHERE id = ?', <Object?>[
+        journalId,
+        'gebucht',
+        id,
+      ]);
+      return;
+    }
+    if (kategorieId != null) {
+      final cats = await executor.runSelect('SELECT id FROM kategorien WHERE id = ?', <Object?>[kategorieId]);
+      if (cats.isEmpty) throw const BankImportException('Kategorie nicht gefunden');
+      await executor.runUpdate('UPDATE bank_transaktionen SET kategorie_id = ?, status = ? WHERE id = ?', <Object?>[
+        kategorieId,
+        'geprueft',
+        id,
+      ]);
+      return;
+    }
+    throw const BankImportException('Review braucht eine Kategorie oder einen Journaleintrag');
+  }
+
+  /// Rows awaiting explicit post-import review (`status = 'neu'`), optionally
+  /// scoped to one import.
+  Future<List<Map<String, Object?>>> unresolvedReviewRows({int? importId}) async {
+    if (importId != null) {
+      return executor.runSelect(
+        "SELECT * FROM bank_transaktionen WHERE import_id = ? AND status = 'neu' ORDER BY id",
+        <Object?>[importId],
+      );
+    }
+    return executor.runSelect("SELECT * FROM bank_transaktionen WHERE status = 'neu' ORDER BY id", const <Object?>[]);
   }
 
   void _validateImport({required int kontoId, required List<RawTx> rawTxs, required AppLocalizations l10n}) {
