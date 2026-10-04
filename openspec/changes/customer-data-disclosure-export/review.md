@@ -155,3 +155,109 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 3
 
 None.
+
+---
+
+## Review Metadata — Round 4
+
+- **Review round**: 4
+- **Prior round**: Round 3 returned `REVISE`; this reviewer rechecked the required Table Definitions contract
+- **Reviewer context**: fresh-context independent read-only reviewer; no proposal-authoring transcript
+- **Revision reviewed**: `dev` at `d40546fa5063be52702d1fc1b8d35bbde2ad58a2`
+- **Tool restrictions**: read-only inspection; no edits or tests
+- **Artifacts reviewed**: proposal, design, all delta specs, review rounds 1–3, maintained database and receivable-migration specs, database schema/migration source, and the active profile-portability proposal
+- **Validation evidence**: `openspec validate customer-data-disclosure-export --type change --strict --json` passed 1/1 with no issues. This is structural validation only; no tests were run.
+
+### Round-Three Required Change Rechecked
+
+The change now contains a `MODIFIED Requirement: Table Definitions` delta, satisfying the requested contract location. The new definition still misstates the runtime base-table count and does not explicitly preserve the existing v7-to-v8 missing-payment-table creation behavior.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+1. **The table inventory misclassifies the base tables.** The delta calls the 40 entries (including `feature_table_state`) base tables, but the maintained `AppDatabase.allTableNames` set contains 39 existing base tables; `feature_table_state` is a separate shared health table. Split those counts in the contract and inventory scenarios so migration-required feature tables do not become part of the legacy base-table count.
+2. **The payment-table version rules omit a required migration behavior.** The accepted receivable migration creates `forderung_zahlungen` when absent during v7-to-v8. State that creation and verification remain part of that migration, while absence at v8 or later is detected before repair, preserves the missing-table completeness signal, and does not trigger empty-table recreation.
+
+#### 🟡 Moderate
+
+None.
+
+#### 📌 Suggestions
+
+- Keep the shared database-health contract byte-identical with `profile-data-portability` as the known feature-table inventory evolves.
+- Decide whether `journal.storno_von` reversal rows for included invoice-linked journal entries are in scope.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 4
+
+VERDICT: REVISE
+
+## Required Changes — Round 4
+
+1. Define the inventory as 39 existing base tables plus a separate shared `feature_table_state` table and feature-owned tables; update counts and scenarios consistently.
+2. Preserve explicit v7-to-v8 creation/verification of an absent `forderung_zahlungen` table and specify the v8+ pre-repair fail-closed behavior that leaves the missing table as the completeness signal.
+
+Round-three scope is addressed, but the inventory and migration contract require correction before downstream planning.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 4
+
+None.
+
+---
+
+## Review Metadata — Round 5
+
+- **Review round**: 5
+- **Prior round**: Round 4 returned `REVISE`; this reviewer rechecked the inventory and payment migration findings against the repaired artifacts
+- **Reviewer context**: fresh-context independent reviewer; no proposal-authoring transcript
+- **Revision reviewed**: branch `dev`, HEAD `4c7caf36b146d86e7ed8698026d2d075ebc70426` plus the current working-tree proposal changes
+- **Tool restrictions**: read-only proposal review; no tests
+- **Artifacts reviewed**: proposal, design, all delta specs, review rounds 1–4, the paired profile-portability proposal/specs, maintained database spec, current database table list and migration code, and the receivable migration delta
+- **Validation evidence**: `openspec validate customer-data-disclosure-export --type change --strict --json` passed 1/1 with no issues. This is structural validation only. No tests were run.
+
+### Round-Four Required Changes Rechecked
+
+- The modified `Table Definitions` contract names 39 pre-existing base tables, a separate `feature_table_state` table, and six feature-owned tables. Its complete requirement is byte-identical to the profile-portability delta; the 39 names also match `AppDatabase.allTableNames` in `lib/core/db/database.dart`.
+- The contract and receivable delta preserve creation of an absent `forderung_zahlungen` table during v7-to-v8 migration, and specify that absence at v8 or later is checked before repair, leaves the table absent, and blocks profile initialization/export pending verified recovery.
+- The v9 marker contract is consistent: fresh profiles seed both lazy-table rows as `never_initialized`; migration classifies present tables as `initialized` and absent tables as `unknown`; initialization cannot create an `unknown` table; and marker/table mismatches fail health checks.
+- Mileage, category-history, and marker tables are included in schema-health checks but explicitly excluded from the customer payload. Their absence from that scoped payload does not make it incomplete. Recurring occurrence rows remain conditionally projectable only through the declared customer-linked paths.
+- The earlier typed-identity, unavailable whole-profile portability, ZIP publication, canonical-path, and accessible cancellation requirements remain explicit.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+None.
+
+#### 🟡 Moderate
+
+None.
+
+#### 📌 Suggestions
+
+- Implementation must add a regression case for each payment-table boundary. Current runtime schema version is 8, and current startup repair still treats an absent v8 payment table as repairable; the new pre-repair guard is a planned change, not current runtime behavior.
+- Decide whether `journal.storno_von` reversal rows for included invoice-linked journal entries are in scope.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 5
+
+VERDICT: APPROVE
+
+## Required Changes — Round 5
+
+None. This approval covers the proposal/design/spec artifacts only; no implementation or downstream test-plan/tasks were reviewed.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 5
+
+None.

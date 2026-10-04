@@ -8,7 +8,7 @@ The published archive SHALL be a ZIP containing `manifest.json`, one UTF-8 JSON 
 
 Each record type SHALL use a versioned field allowlist. Unknown columns SHALL NOT be serialized. Cross-party references, including `rechnungen.lieferant_id`, `belege.lieferant_id`, `journal.vorlage_id`, and `vorsteuer_ansprueche.beleg_id`, SHALL be omitted. `journal.beleg_id` MAY be retained only when it resolves to evidence already linked to the selected customer. A receivable's typed pair SHALL establish inclusion only when `partner_typ = 'kunde'` and `partner_id` resolves to the selected customer. When `kunde_id`, `rechnung_id`, and the typed pair are populated, they SHALL agree with the selected customer and included invoice as applicable. A supplier or other-customer identity, unknown partner type, or missing referenced row SHALL exclude the receivable, identify the conflict, and make the archive incomplete. The validated customer partner pair SHALL be retained in the projection. Any omitted field containing a non-empty value whose scope cannot be proven outside this disclosure SHALL be listed in the manifest and make the result incomplete. A contradictory required relationship, unknown table, or non-empty unclassified field SHALL also make the result incomplete. The manifest SHALL identify the record projection version. This defines the supported export projection and SHALL NOT be described as legally sufficient disclosure.
 
-The exporter SHALL compare the active profile with the `Table Definitions` inventory and presence rules in this change's modified `db` requirement before reporting completeness. That contract names 40 required base tables, including durable `feature_table_state`, and three feature-owned tables, for 43 known application-table names. The exporter SHALL require the supported export schema version and a healthy table/state pairing: `forderung_zahlungen` is required at and after its declared migration version; each lazy occurrence table is valid only when present with marker state `initialized` or absent with marker state `never_initialized`. An absent lazy table marked `unknown`, a missing marker row, any state/table mismatch, a missing required table, a malformed table schema, or an undeclared application table SHALL make the archive incomplete. The exporter SHALL NOT create or repair tables. Startup SHALL check for missing `forderung_zahlungen` before any repair that could recreate it; if it is absent at or beyond its migration version, the original profile SHALL be preserved and remain unavailable for complete export until verified recovery. The manifest SHALL identify the table name and condition without exposing database paths. A change proposal or runtime table count alone SHALL NOT establish that the profile satisfies the accepted maintained contract.
+The exporter SHALL compare the active profile with the Table Definitions inventory and version-aware presence rules in this change's modified db requirement before reporting completeness. That contract names 39 pre-existing base tables, the shared feature_table_state table at v9, and six feature-owned tables, for 46 known application-table names. The supported customer export schema is v10. The exporter SHALL require forderung_zahlungen at v8 and later, both mileage tables at v9 and later, category_mapping_history at v10 and later, and valid declared schemas for all migration-required tables. Each lazy occurrence table after v9 is valid only when present with marker state initialized or absent with marker state never_initialized. An absent lazy table marked unknown, a missing marker row, any state/table mismatch, a missing required table, a malformed schema, or an undeclared application table SHALL make the archive incomplete. Before v8, a missing payment table is valid input to the normal v7-to-v8 migration. At v8 or later, startup SHALL detect a missing payment table before repair, preserve the original database with the table still absent, and keep the profile unavailable for complete export until verified recovery; it SHALL NOT create an empty replacement. The exporter SHALL NOT create or repair tables. Mileage tables and category_mapping_history SHALL be checked for version-appropriate presence and schema but SHALL NOT be projected because no accepted typed relationship links them to the selected customer. Trip purpose, business context, and category history SHALL NOT be used to infer a customer relationship. feature_table_state SHALL be used for schema health only and SHALL NOT be projected into the customer payload. Omission of these unrelated tables SHALL not by itself make a customer-scoped archive incomplete. The manifest SHALL identify the table name and condition without exposing database paths.
 
 The ZIP SHALL contain a UTF-8 `manifest.json` and UTF-8 JSON Lines record files. Final publication SHALL use an atomic no-replace operation; if the destination exists when finalization occurs, the export SHALL fail without overwriting it.
 
@@ -121,9 +121,24 @@ The export flow SHALL be keyboard accessible, provide visible focus and semantic
 - **AND** the manifest SHALL identify the table and state without exposing a database path
 - **AND** the exporter SHALL NOT create, repair, or replace a table
 
+#### Scenario: Pre-v9 profile remains valid but is not a complete export source
+
+- **GIVEN** a version-8 profile has the 39 existing base tables and valid forderung_zahlungen but lacks feature_table_state and mileage tables
+- **WHEN** database schema health is checked before migration
+- **THEN** the v9 tables SHALL be treated as not yet required
+- **AND** the customer archive SHALL remain unavailable for complete supported-schema export until normal sequential migrations succeed
+
 #### Scenario: Missing payment table is detected before startup repair
 
-- **GIVEN** `PRAGMA user_version` is at or beyond the accepted `forderung_zahlungen` migration version and that table is absent
-- **WHEN** startup health checks run before any repair
-- **THEN** the profile SHALL remain unavailable for complete export and the original database SHALL be preserved
+- **GIVEN** PRAGMA user_version is 8 or later and forderung_zahlungen is absent
+- **WHEN** startup health checks run before any repair or later migration
+- **THEN** the profile SHALL remain unavailable for complete export and the original database and table absence SHALL be preserved
 - **AND** no empty replacement table SHALL be created automatically
+
+#### Scenario: Mileage and category tables remain outside customer payload
+
+- **GIVEN** the v10 mileage tables and category_mapping_history are present without an accepted typed relationship to the selected customer
+- **WHEN** a customer-scoped archive is generated
+- **THEN** the tables SHALL be checked for schema health but none of their rows SHALL be projected into the customer archive
+- **AND** free-text purpose, business context, or category history SHALL NOT be used to infer a customer relationship
+- **AND** their omission SHALL not by itself make the customer-scoped archive incomplete
