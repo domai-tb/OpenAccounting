@@ -94,27 +94,27 @@ The Banking workspace SHALL allow a user to create and edit profile-scoped custo
 
 ### Requirement: Manual vs Automatic Mode
 
-The active profile SHALL persist its mode in `unternehmen.bank_import_manuell` as integer `1` for manual and `0` for automatic. The column SHALL be `NOT NULL`, constrained to `0` or `1`, and default to `1`. Fresh schema creation SHALL include it at schema version 9. The ordered migration from version 8 to 9 SHALL add the column with manual default while preserving company data. No runtime workflow or post-migration `ensureOpen` fallback may create the column. A profile without a company row or without a resolved setting SHALL use manual mode. The Banking route SHALL obtain and change the mode through the application-scope use case and repository.
+The active profile SHALL persist its mode in `unternehmen.bank_import_manuell` as integer `1` for manual and `0` for automatic. The column SHALL be `NOT NULL`, constrained to `0` or `1`, and default to `1`. Fresh schema creation SHALL include it at schema version 10. The ordered migration from version 9 to 10 SHALL add the column with manual default while preserving company data. No runtime workflow or post-migration `ensureOpen` fallback may create the column. A profile without a company row or without a resolved setting SHALL use manual mode. The Banking route SHALL obtain and change the mode through the application-scope use case and repository.
 
 Both modes SHALL require the existing explicit Review confirmation. Automatic mode SHALL only associate a transaction with one unique existing journal candidate scoring at least 90%; it SHALL NOT create a journal entry or payment. Tied, lower-confidence, missing, or unavailable candidates remain unlinked automatically. Manual mode SHALL leave suggestions unlinked unless the user explicitly selects an existing journal entry. Posting or payment creation remains subject to `balanced-journal-postings-and-settlement-events`.
 
 #### Scenario: Missing profile mode defaults to manual
 
 - **GIVEN** a new profile database is created
-- **WHEN** schema creation completes at version 9 and Banking loads
+- **WHEN** schema creation completes at version 10 and Banking loads
 - **THEN** `bank_import_manuell` exists with value `1` when read and the UI shows manual mode
 
-#### Scenario: Version-8 profile migrates without changing company data
+#### Scenario: Version-9 profile migrates without changing company data
 
-- **GIVEN** an existing version-8 database has a company row and accounting data
-- **WHEN** the ordered version-9 migration runs
-- **THEN** the new column is `1`, prior company/accounting values are unchanged, and the database version is 9
+- **GIVEN** an existing version-9 database has a company row and accounting data
+- **WHEN** the ordered version-10 migration runs
+- **THEN** the new column is `1`, prior company/accounting values are unchanged, and the database version is 10
 
 #### Scenario: Failed mode migration rolls back
 
-- **GIVEN** the version-9 mode-column migration fails
+- **GIVEN** the version-10 mode-column migration fails
 - **WHEN** profile startup reports the migration failure
-- **THEN** the version remains 8, the existing company data remains intact, and Banking does not run against the missing column
+- **THEN** the version remains 9, the existing company data remains intact, and Banking does not run against the missing column
 
 #### Scenario: Automatic mode
 

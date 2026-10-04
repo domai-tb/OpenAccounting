@@ -207,7 +207,7 @@ CREATE TABLE kategorien (
         executor: fresh.executor,
         profileDir: profileDirectory.path,
       ).getUserVersion();
-      expect(version, 9);
+      expect(version, MigrationRunner.currentVersion);
     });
 
     test('test_accounting_catalog_046_provenance_migration_preserves_and_marks_existing_categories', () async {
@@ -262,7 +262,7 @@ CREATE TABLE kategorien (
         const [],
       );
       expect(tables, hasLength(1));
-      expect(await runner.getUserVersion(), 9);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
     });
 
     test('test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows', () async {

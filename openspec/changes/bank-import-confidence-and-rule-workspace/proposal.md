@@ -11,7 +11,7 @@ The banking page lets users edit categories before import, but it does not show 
 - Make import history actionable with detail, failed-row retry under the original import identity, and a filtered view of transactions awaiting review.
 - Persist a versioned, validated retry payload containing every field needed to restore a failed reviewed row; treat legacy diagnostics and rejected whole-file attempts as non-retryable.
 - Define row review state using the existing `bank_transaktionen.status` values `neu`, `geprueft`, and `gebucht`, and derive unresolved counts from `status = 'neu'`.
-- Add the profile mode through ordered migration 9 with a manual default for fresh and existing profiles.
+- Add the profile mode through ordered migration 10 (reassigned from 9: v9 shipped as the category-provenance migration) with a manual default for fresh and existing profiles.
 - Put score, rule, custom-template, mode, history, retry, and row-review operations behind the typed application-scope Banking use case and repository.
 - Preserve deduplication and partial-failure boundaries; new posting or payment allocation remains governed by the balanced-posting capability.
 - Align all of `docs/04-bank-import.md` with maintained OpenSpec and Dart behavior: template/parser claims, no-posting behavior, rule fields/order, 40/30/30 score, dedup hash inputs and schema, ordered mode migration, retry/review semantics, and history query behavior.

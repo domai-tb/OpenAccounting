@@ -11,21 +11,21 @@
 | specs/bank-import/spec.md → Score-Based Matching | No match | test/features/bank_import/bank_import_service_test.dart | test_no_match | 🔴 red |
 | specs/bank-import/spec.md → Score-Based Matching | Tied top candidates are not auto-linked | test/features/bank_import/bank_import_service_test.dart | test_tied_top_candidates_are_not_auto_linked | 🔴 red |
 | specs/bank-import/spec.md → Score-Based Matching | Candidate query failure is not a no-match | test/features/bank_import/bank_import_service_test.dart | test_candidate_query_failure_is_not_a_no_match | 🔴 red |
-| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Create filter rule | test/features/bank_import/category_rule_repository_test.dart | test_create_filter_rule | 🔴 red |
-| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Reject an invalid filter rule | test/features/bank_import/category_rule_repository_test.dart | test_reject_an_invalid_filter_rule | 🔴 red |
-| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Equal-priority rules use rule ID order | test/features/bank_import/category_rule_repository_test.dart | test_equal_priority_rules_use_rule_id_order | 🔴 red |
-| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Edit and prioritize a rule | test/features/bank_import/category_rule_repository_test.dart | test_edit_and_prioritize_a_rule | 🔴 red |
-| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Delete filter rule | test/features/bank_import/category_rule_repository_test.dart | test_delete_filter_rule | 🔴 red |
-| specs/bank-import/spec.md → Custom Template Creation | Create custom template | test/features/bank_import/custom_template_repository_test.dart | test_create_custom_template | 🔴 red |
-| specs/bank-import/spec.md → Custom Template Creation | Reject invalid or colliding custom template | test/features/bank_import/custom_template_repository_test.dart | test_reject_invalid_or_colliding_custom_template | 🔴 red |
-| specs/bank-import/spec.md → Custom Template Creation | Edit existing template | test/features/bank_import/custom_template_repository_test.dart | test_edit_existing_template | 🔴 red |
-| specs/bank-import/spec.md → Custom Template Creation | Predefined templates are protected | test/features/bank_import/custom_template_repository_test.dart | test_predefined_templates_are_protected | 🔴 red |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Missing profile mode defaults to manual | test/features/bank_import/import_mode_migration_test.dart | test_missing_profile_mode_defaults_to_manual | 🔴 red |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Version-8 profile migrates without changing company data | test/features/bank_import/import_mode_migration_test.dart | test_version_8_profile_migrates_without_changing_company_data | 🔴 red |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Failed mode migration rolls back | test/features/bank_import/import_mode_migration_test.dart | test_failed_mode_migration_rolls_back | 🔴 red |
+| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Create filter rule | test/features/bank_import/category_rule_repository_test.dart | test_create_filter_rule | 🟢 green |
+| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Reject an invalid filter rule | test/features/bank_import/category_rule_repository_test.dart | test_reject_an_invalid_filter_rule | 🟢 green |
+| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Equal-priority rules use rule ID order | test/features/bank_import/category_rule_repository_test.dart | test_equal_priority_rules_use_rule_id_order | 🟢 green |
+| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Edit and prioritize a rule | test/features/bank_import/category_rule_repository_test.dart | test_edit_and_prioritize_a_rule | 🟢 green |
+| specs/bank-import/spec.md → Auto-Filter Rule CRUD | Delete filter rule | test/features/bank_import/category_rule_repository_test.dart | test_delete_filter_rule | 🟢 green |
+| specs/bank-import/spec.md → Custom Template Creation | Create custom template | test/features/bank_import/custom_template_repository_test.dart | test_create_custom_template | 🟢 green |
+| specs/bank-import/spec.md → Custom Template Creation | Reject invalid or colliding custom template | test/features/bank_import/custom_template_repository_test.dart | test_reject_invalid_or_colliding_custom_template | 🟢 green |
+| specs/bank-import/spec.md → Custom Template Creation | Edit existing template | test/features/bank_import/custom_template_repository_test.dart | test_edit_existing_template | 🟢 green |
+| specs/bank-import/spec.md → Custom Template Creation | Predefined templates are protected | test/features/bank_import/custom_template_repository_test.dart | test_predefined_templates_are_protected | 🟢 green |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Missing profile mode defaults to manual | test/features/bank_import/import_mode_migration_test.dart | test_missing_profile_mode_defaults_to_manual | 🟢 green |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Version-9 profile migrates without changing company data | test/features/bank_import/import_mode_migration_test.dart | test_version_9_profile_migrates_without_changing_company_data | 🟢 green |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Failed mode migration rolls back | test/features/bank_import/import_mode_migration_test.dart | test_failed_mode_migration_rolls_back | 🟢 green |
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Automatic mode | test/features/bank_import/import_mode_test.dart | test_automatic_mode | 🔴 red |
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Manual mode | test/features/bank_import/import_mode_test.dart | test_manual_mode | 🔴 red |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Import mode remains profile-scoped | test/features/bank_import/import_mode_migration_test.dart | test_import_mode_remains_profile_scoped | 🔴 red |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Import mode remains profile-scoped | test/features/bank_import/import_mode_migration_test.dart | test_import_mode_remains_profile_scoped | 🟢 green |
 | specs/bank-import/spec.md → Per-Session Import Mode Override | Override for single import | test/features/bank_import/import_mode_test.dart | test_override_for_single_import | 🔴 red |
 | specs/bank-import/spec.md → Per-Session Import Mode Override | Override does not persist | test/features/bank_import/import_mode_test.dart | test_override_does_not_persist | 🔴 red |
 | specs/bank-import/spec.md → Banking workspace follows the design system | Banking resolves the typed use case | test/features/routed_surface/bank_import_test.dart | test_banking_resolves_the_typed_use_case | 🔴 red |

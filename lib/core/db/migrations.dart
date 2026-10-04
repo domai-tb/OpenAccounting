@@ -13,7 +13,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 9;
+  static const int currentVersion = 10;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -136,6 +136,7 @@ class MigrationRunner {
       await createSchema();
       await _migrateReceivableFeature();
       await _migrateCategoryProvenance();
+      await _migrateBankImportMode();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -205,6 +206,16 @@ class MigrationRunner {
       await _migrateJournalGruppeId();
       await _migrateReceivableFeature();
       await _migrateCategoryProvenance();
+    }
+    if (version == 10) {
+      await createSchema();
+      await _migrateRechnungen();
+      await _migrateMahnwesen();
+      await _migrateInventarbewegungen();
+      await _migrateJournalGruppeId();
+      await _migrateReceivableFeature();
+      await _migrateCategoryProvenance();
+      await _migrateBankImportMode();
     }
   }
 
@@ -589,6 +600,32 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     );
     if (history.isEmpty) {
       throw StateError('Kategorie-Historie konnte nicht verifiziert werden');
+    }
+  }
+
+  /// Bank-import profile mode (v10, reassigned from 9). Adds the strict
+  /// `unternehmen.bank_import_manuell` flag (1 = manual default, 0 =
+  /// automatic) without touching company data. No runtime fallback may
+  /// create this column; any DDL/version failure rolls everything back.
+  Future<void> _migrateBankImportMode() async {
+    final columns = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    if (columns.isEmpty) {
+      throw StateError('Bankimport-Modus braucht die Tabelle unternehmen');
+    }
+    if (!columns.any((c) => c['name'] == 'bank_import_manuell')) {
+      await executor.runCustom(
+        'ALTER TABLE unternehmen ADD COLUMN bank_import_manuell INTEGER NOT NULL DEFAULT 1 '
+        'CHECK (bank_import_manuell IN (0, 1))',
+      );
+    }
+    final verify = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    final col = verify.where((c) => c['name'] == 'bank_import_manuell').toList(growable: false);
+    if (col.isEmpty) {
+      throw StateError('Bankimport-Modus konnte nicht verifiziert werden');
+    }
+    final notNull = col.single['notnull'];
+    if (notNull is! num || notNull == 0) {
+      throw StateError('Bankimport-Modus muss NOT NULL sein');
     }
   }
 

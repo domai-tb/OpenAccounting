@@ -113,3 +113,13 @@ CHANGES_APPLIED: none; this round records an independent review only.
 ## Rebuttals
 
 None supplied for this round.
+
+---
+
+## Implementation Note (not a review round)
+
+- Ordered migration reassigned 9 → 10: v9 shipped as the
+  accounting-catalog-provenance migration. Design, requirement, and the three
+  mode-migration scenarios now target the 9-to-10 migration and fresh schema
+  version 10. Per the staleness clause, a fresh review round is required
+  before archive.

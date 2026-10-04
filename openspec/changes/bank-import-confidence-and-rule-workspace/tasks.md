@@ -19,57 +19,57 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 
 ## 2. Auto-Filter Rule CRUD
 
-- [ ] 2.1 Write failing test: `test_create_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Create filter rule” (assert it fails for the right reason).
-- [ ] 2.2 Implement the behavior specified by “Create filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 2.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 2.4 Write failing test: `test_reject_an_invalid_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Reject an invalid filter rule” (assert it fails for the right reason).
-- [ ] 2.5 Implement the behavior specified by “Reject an invalid filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 2.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 2.7 Write failing test: `test_equal_priority_rules_use_rule_id_order` in `test/features/bank_import/category_rule_repository_test.dart` for “Equal-priority rules use rule ID order” (assert it fails for the right reason).
-- [ ] 2.8 Implement the behavior specified by “Equal-priority rules use rule ID order” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 2.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 2.10 Write failing test: `test_edit_and_prioritize_a_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Edit and prioritize a rule” (assert it fails for the right reason).
-- [ ] 2.11 Implement the behavior specified by “Edit and prioritize a rule” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 2.12 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 2.13 Write failing test: `test_delete_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Delete filter rule” (assert it fails for the right reason).
-- [ ] 2.14 Implement the behavior specified by “Delete filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 2.15 Refactor the related code; focused tests and the full suite stay green.
+- [x] 2.1 Write failing test: `test_create_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Create filter rule” (assert it fails for the right reason).
+- [x] 2.2 Implement the behavior specified by “Create filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 2.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 2.4 Write failing test: `test_reject_an_invalid_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Reject an invalid filter rule” (assert it fails for the right reason).
+- [x] 2.5 Implement the behavior specified by “Reject an invalid filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 2.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 2.7 Write failing test: `test_equal_priority_rules_use_rule_id_order` in `test/features/bank_import/category_rule_repository_test.dart` for “Equal-priority rules use rule ID order” (assert it fails for the right reason).
+- [x] 2.8 Implement the behavior specified by “Equal-priority rules use rule ID order” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 2.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 2.10 Write failing test: `test_edit_and_prioritize_a_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Edit and prioritize a rule” (assert it fails for the right reason).
+- [x] 2.11 Implement the behavior specified by “Edit and prioritize a rule” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 2.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 2.13 Write failing test: `test_delete_filter_rule` in `test/features/bank_import/category_rule_repository_test.dart` for “Delete filter rule” (assert it fails for the right reason).
+- [x] 2.14 Implement the behavior specified by “Delete filter rule” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 2.15 Refactor the related code; focused tests and the full suite stay green.
 
 ## 3. Custom Template Creation
 
-- [ ] 3.1 Write failing test: `test_create_custom_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Create custom template” (assert it fails for the right reason).
-- [ ] 3.2 Implement the behavior specified by “Create custom template” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 3.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 3.4 Write failing test: `test_reject_invalid_or_colliding_custom_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Reject invalid or colliding custom template” (assert it fails for the right reason).
-- [ ] 3.5 Implement the behavior specified by “Reject invalid or colliding custom template” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 3.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 3.7 Write failing test: `test_edit_existing_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Edit existing template” (assert it fails for the right reason).
-- [ ] 3.8 Implement the behavior specified by “Edit existing template” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 3.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 3.10 Write failing test: `test_predefined_templates_are_protected` in `test/features/bank_import/custom_template_repository_test.dart` for “Predefined templates are protected” (assert it fails for the right reason).
-- [ ] 3.11 Implement the behavior specified by “Predefined templates are protected” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 3.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 3.1 Write failing test: `test_create_custom_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Create custom template” (assert it fails for the right reason).
+- [x] 3.2 Implement the behavior specified by “Create custom template” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 3.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 3.4 Write failing test: `test_reject_invalid_or_colliding_custom_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Reject invalid or colliding custom template” (assert it fails for the right reason).
+- [x] 3.5 Implement the behavior specified by “Reject invalid or colliding custom template” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 3.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 3.7 Write failing test: `test_edit_existing_template` in `test/features/bank_import/custom_template_repository_test.dart` for “Edit existing template” (assert it fails for the right reason).
+- [x] 3.8 Implement the behavior specified by “Edit existing template” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 3.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 3.10 Write failing test: `test_predefined_templates_are_protected` in `test/features/bank_import/custom_template_repository_test.dart` for “Predefined templates are protected” (assert it fails for the right reason).
+- [x] 3.11 Implement the behavior specified by “Predefined templates are protected” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 3.12 Refactor the related code; focused tests and the full suite stay green.
 
 ## 4. Manual vs Automatic Mode
 
-- [ ] 4.1 Write failing test: `test_missing_profile_mode_defaults_to_manual` in `test/features/bank_import/import_mode_migration_test.dart` for “Missing profile mode defaults to manual” (assert it fails for the right reason).
-- [ ] 4.2 Implement the behavior specified by “Missing profile mode defaults to manual” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.4 Write failing test: `test_version_8_profile_migrates_without_changing_company_data` in `test/features/bank_import/import_mode_migration_test.dart` for “Version-8 profile migrates without changing company data” (assert it fails for the right reason).
-- [ ] 4.5 Implement the behavior specified by “Version-8 profile migrates without changing company data” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.7 Write failing test: `test_failed_mode_migration_rolls_back` in `test/features/bank_import/import_mode_migration_test.dart` for “Failed mode migration rolls back” (assert it fails for the right reason).
-- [ ] 4.8 Implement the behavior specified by “Failed mode migration rolls back” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.1 Write failing test: `test_missing_profile_mode_defaults_to_manual` in `test/features/bank_import/import_mode_migration_test.dart` for “Missing profile mode defaults to manual” (assert it fails for the right reason).
+- [x] 4.2 Implement the behavior specified by “Missing profile mode defaults to manual” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.4 Write failing test: `test_version_9_profile_migrates_without_changing_company_data` in `test/features/bank_import/import_mode_migration_test.dart` for “Version-9 profile migrates without changing company data” (assert it fails for the right reason).
+- [x] 4.5 Implement the behavior specified by “Version-9 profile migrates without changing company data” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.7 Write failing test: `test_failed_mode_migration_rolls_back` in `test/features/bank_import/import_mode_migration_test.dart` for “Failed mode migration rolls back” (assert it fails for the right reason).
+- [x] 4.8 Implement the behavior specified by “Failed mode migration rolls back” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.9 Refactor the related code; focused tests and the full suite stay green.
 - [ ] 4.10 Write failing test: `test_automatic_mode` in `test/features/bank_import/import_mode_test.dart` for “Automatic mode” (assert it fails for the right reason).
 - [ ] 4.11 Implement the behavior specified by “Automatic mode” in `specs/bank-import/spec.md` to pass the preceding test.
 - [ ] 4.12 Refactor the related code; focused tests and the full suite stay green.
 - [ ] 4.13 Write failing test: `test_manual_mode` in `test/features/bank_import/import_mode_test.dart` for “Manual mode” (assert it fails for the right reason).
 - [ ] 4.14 Implement the behavior specified by “Manual mode” in `specs/bank-import/spec.md` to pass the preceding test.
 - [ ] 4.15 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.16 Write failing test: `test_import_mode_remains_profile_scoped` in `test/features/bank_import/import_mode_migration_test.dart` for “Import mode remains profile-scoped” (assert it fails for the right reason).
-- [ ] 4.17 Implement the behavior specified by “Import mode remains profile-scoped” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.18 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.16 Write failing test: `test_import_mode_remains_profile_scoped` in `test/features/bank_import/import_mode_migration_test.dart` for “Import mode remains profile-scoped” (assert it fails for the right reason).
+- [x] 4.17 Implement the behavior specified by “Import mode remains profile-scoped” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.18 Refactor the related code; focused tests and the full suite stay green.
 
 ## 5. Per-Session Import Mode Override
 

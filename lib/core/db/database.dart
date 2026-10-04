@@ -402,7 +402,8 @@ CREATE TABLE IF NOT EXISTS unternehmen (
   einleitungstext_gutschrift TEXT,
   schlusstext_gutschrift TEXT,
   einleitungstext_storno TEXT,
-  schlusstext_storno TEXT
+  schlusstext_storno TEXT,
+  bank_import_manuell INTEGER NOT NULL DEFAULT 1 CHECK (bank_import_manuell IN (0, 1))
 )''',
   // 2 kategorien — mapping provenance per accounting-catalog-provenance (v9).
   // mapping_status defaults to legacy_unverified so legacy insert paths and
