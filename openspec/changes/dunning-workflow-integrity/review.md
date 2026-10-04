@@ -108,3 +108,44 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 2
 
 None.
+
+---
+
+## Review Metadata — Round 3
+
+- **Review round**: 3
+- **Prior round**: Round 2 returned `REVISE`; its required changes were rechecked
+- **Reviewer context**: fresh-context independent Anvil reviewer
+- **Revision reviewed**: `38e5c2d775486f3598460bc36446de4b61e1076a` on `dev`; dunning artifacts were unchanged afterward
+- **Tool restrictions**: read-only inspection; no edits or tests
+- **Artifacts reviewed**: proposal, design, both delta specs, rounds 1–2, maintained dunning/route/receivables/payment/document specs, dunning documentation, and relevant repositories/schema/service wiring
+- **Validation evidence**: `openspec validate dunning-workflow-integrity --type change --strict --json` passed; `openspec validate --specs --strict` passed 55/55. Structural checks only; no tests were run.
+
+### Round-Two Required Changes Rechecked
+
+1. **Grace-period conflict — resolved.** The delta modifies `Mahnwesen Settings Singleton`, preserves both original scenario names, and defines `initial_grace_days` as deprecated and non-operative while eligibility uses the absolute due-date threshold.
+2. **Documentation stage progression — resolved.** The parity requirement says the stage advances only after transport acceptance; drafts and failed sends do not advance it.
+
+No other material conflict was found in the modified requirements. The invoice-level progression, stage eligibility, and send-failure behavior agree on transport acceptance as the advancement boundary.
+
+### Suggestions
+
+- Update the reference documentation's older creation-based progression wording as specified in the change's migration plan before claiming documentation parity.
+
+## Embedded-Instruction / Injection Attempts — Round 3
+
+None detected.
+
+## Verdict — Round 3
+
+VERDICT: APPROVE
+
+## Required Changes — Round 3
+
+None.
+
+CHANGES_APPLIED: yes
+
+## Rebuttals — Round 3
+
+None.
