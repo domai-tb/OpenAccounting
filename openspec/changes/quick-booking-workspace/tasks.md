@@ -20,13 +20,13 @@ Do not create journal rows or claim execution until an independently accepted ty
 
 ## 3. Quick-booking presets store explicit execution semantics
 
-- [ ] 3.1 Write failing test: `test_fresh_schema_stores_the_complete_preset_contract` in `test/core/db/quick_booking_migration_test.dart` for “Fresh schema stores the complete preset contract” (assert it fails for the right reason).
+- [ ] 3.1 Write failing test: `test_fresh_schema_stores_the_complete_preset_contract` in `test/db/quick_booking_migration_test.dart` for “Fresh schema stores the complete preset contract” (assert it fails for the right reason).
 - [ ] 3.2 Implement the behavior specified by “Fresh schema stores the complete preset contract” in `specs/db/spec.md` to pass the preceding test.
 - [ ] 3.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 3.4 Write failing test: `test_legacy_preset_migration_preserves_values` in `test/core/db/quick_booking_migration_test.dart` for “Legacy preset migration preserves values” (assert it fails for the right reason).
+- [ ] 3.4 Write failing test: `test_legacy_preset_migration_preserves_values` in `test/db/quick_booking_migration_test.dart` for “Legacy preset migration preserves values” (assert it fails for the right reason).
 - [ ] 3.5 Implement the behavior specified by “Legacy preset migration preserves values” in `specs/db/spec.md` to pass the preceding test.
 - [ ] 3.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 3.7 Write failing test: `test_failed_table_rebuild_rolls_back` in `test/core/db/quick_booking_migration_test.dart` for “Failed table rebuild rolls back” (assert it fails for the right reason).
+- [ ] 3.7 Write failing test: `test_failed_table_rebuild_rolls_back` in `test/db/quick_booking_migration_test.dart` for “Failed table rebuild rolls back” (assert it fails for the right reason).
 - [ ] 3.8 Implement the behavior specified by “Failed table rebuild rolls back” in `specs/db/spec.md` to pass the preceding test.
 - [ ] 3.9 Refactor the related code; focused tests and the full suite stay green.
 
@@ -71,9 +71,9 @@ Do not create journal rows or claim execution until an independently accepted ty
 
 ## 8. Quick-booking Banking view state
 
-- [ ] 8.1 Write failing test: `test_quick_booking_view_uses_typed_route_state` in `test/core/router/quick_booking_route_test.dart` for “Quick-booking view uses typed route state” (assert it fails for the right reason).
+- [ ] 8.1 Write failing test: `test_quick_booking_view_uses_typed_route_state` in `test/core/quick_booking_route_test.dart` for “Quick-booking view uses typed route state” (assert it fails for the right reason).
 - [ ] 8.2 Implement the behavior specified by “Quick-booking view uses typed route state” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 8.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.4 Write failing test: `test_database_outage_is_not_an_empty_quick_booking_view` in `test/core/router/quick_booking_route_test.dart` for “Database outage is not an empty quick-booking view” (assert it fails for the right reason).
+- [ ] 8.4 Write failing test: `test_database_outage_is_not_an_empty_quick_booking_view` in `test/core/quick_booking_route_test.dart` for “Database outage is not an empty quick-booking view” (assert it fails for the right reason).
 - [ ] 8.5 Implement the behavior specified by “Database outage is not an empty quick-booking view” in `specs/typed-route-workspaces/spec.md` to pass the preceding test.
 - [ ] 8.6 Refactor the related code; focused tests and the full suite stay green.
