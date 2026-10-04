@@ -2,19 +2,20 @@
 
 ## Overview
 
-OpenInvoices provides a 3-step bank transaction import workflow: **Upload** CSV/XML → **Review** with auto-categorization → **Import** into the journal. Supports 10+ bank templates, CAMT XML, deduplication, and both automatic and manual matching modes.
+OpenInvoices provides a 3-step bank transaction import workflow: **Upload** CSV/CAMT.053 → **Review** with rule categorization and match scores → **Import** storing confirmed rows in `bank_transaktionen`. Supports seven predefined CSV templates plus the seeded CAMT.053 template and profile-scoped custom templates, deduplication, and manual/automatic matching modes. Imports never create journal entries or payments; automatic mode may link one unambiguous existing journal entry.
 
 ---
 
 ## Workflow
 
 ```
-Step 1: Upload        Step 2: Review         Step 3: Import
-┌─────────────┐      ┌─────────────┐        ┌─────────────┐
-│ Select file │──────▶│ Match &     │────────▶│ Journal     │
-│ Choose      │      │ Categorize  │        │ entries     │
-│ template    │      │             │        │ created     │
-└─────────────┘      └─────────────┘        └─────────────┘
+Step 1: Upload        Step 2: Review              Step 3: Import
+┌─────────────┐      ┌──────────────────┐        ┌──────────────┐
+│ Select file │──────▶│ Match, patterns, │───────▶│ Confirmed    │
+│ Choose      │      │ scores, override │        │ rows stored  │
+│ template    │      │                  │        │ in bank_     │
+└─────────────┘      └──────────────────┘        │ transaktionen│
+                                                 └──────────────┘
 ```
 
 ### Step 1: Upload
@@ -26,7 +27,7 @@ Step 1: Upload        Step 2: Review         Step 3: Import
 
 ### Step 2: Review
 
-Each transaction displayed with:
+Each transaction displayed with score, confidence label, and best journal candidate (date, amount, description) without changing accounting data. Suggestions never set links automatically in manual mode:
 
 - **Date**, **Amount**, **Partner**, **Reference** (Verwendungszweck)
 - **Auto-category** (if rule matches)
@@ -139,7 +140,7 @@ Pre-configured parsers for common German bank formats:
 </Document>
 ```
 
-CAMT XML parsed via `xml.etree.ElementTree`; supports `camt.053` (Kontoauszug) and `camt.052` (Tagesauszug).
+CAMT XML parsing supports `camt.053` (Kontoauszug). `camt.052` is not supported.
 
 ---
 
@@ -150,30 +151,20 @@ Rules match transactions to Kategorien based on patterns:
 ```json
 {
   "id": 1,
+  "muster": "Amazon",
   "kategorie_id": 5,
-  "match_typ": "betreff",
-  "match_muster": "Rechnung|Invoice|Faktura",
-  "betrag_min": null,
-  "betrag_max": null,
-  "prioritaet": 1,
+  "prioritaet": 10,
   "aktiv": true
 }
 ```
 
-### Match Types
-
-| Typ | Beschreibung |
-|-----|-------------|
-| `betreff` | Regex on Verwendungszweck/reference |
-| `partner` | Exact or partial match on partner name |
-| `betrag` | Amount range (min/max) |
-| `kombiniert` | All conditions must match |
+Rules in `auto_filter_regeln` match case-insensitively as substrings of Verwendungszweck only.
 
 ### Evaluation Order
 
-1. Rules sorted by `prioritaet` (lower = higher priority)
-2. First match wins
-3. Score reflects match quality (exact = 100, partial = 50-80, no match = 0)
+1. Active rules sorted by `prioritaet` descending, then rule ID ascending
+2. First match wins; equal priority is deterministic by ID
+3. Rule changes affect future imports only
 
 ---
 
@@ -183,17 +174,16 @@ Each transaction receives a confidence score:
 
 | Score | Confidence | Action |
 |-------|-----------|--------|
-| 90-100 | Hoch | Auto-categorize, suggest import |
+| 90-100 | Hoch | Automatic mode may link one unique existing journal entry after confirmation |
 | 70-89 | Mittel | Show suggestion, require confirmation |
-| 50-69 | Niedrig | Show empty category, require manual selection |
-| 0-49 | Keine | Flag as unprocessed |
+| 50-69 | Niedrig | Show suggestion, require manual selection |
+| 0-49 | Keine | Explicit no-match state |
 
-### Score Factors
+### Score Factors (40/30/30)
 
-- Category rule match: +40 points
-- Partner match to existing Kunde/Lieferant: +30 points
-- Amount matches existing Rechnung: +20 points
-- Reference contains Rechnungsnummer: +10 points
+- Amount within 0.01 EUR: +40 points
+- Date within 7 days: +30 points
+- Partner similarity above 80%: +30 points
 
 ---
 
@@ -202,7 +192,7 @@ Each transaction receives a confidence score:
 SHA-256 hash computed from:
 
 ```
-hash = SHA256(datum + betrag + partner_iban + verwendungszweck)
+hash = SHA256(datum + normalized betrag + partner + verwendungszweck)
 ```
 
 ### Storage
@@ -213,8 +203,7 @@ hash = SHA256(datum + betrag + partner_iban + verwendungszweck)
   "konto_id": 1,
   "datum": "2025-03-15",
   "betrag": 119.00,
-  "partner_name": "ACME GmbH",
-  "partner_iban": "DE89370400440532013000",
+  "gegenkonto_name": "ACME GmbH",
   "verwendungszweck": "Rechnung RE-250042",
   "kategorie_id": 5,
   "journal_id": 42,
@@ -225,7 +214,7 @@ hash = SHA256(datum + betrag + partner_iban + verwendungszweck)
 
 ### Duplicate Detection
 
-- `UNIQUE INDEX uix_bank_tx_hash` on `(konto_id, dedupe_hash) WHERE NOT NULL`
+- `UNIQUE INDEX idx_bank_transaktionen_dedupe` on `(konto_id, dedupe_hash)` where the hash is not null
 - Duplicate detected → transaction marked with "Duplikat" badge
 - User can override and force-import (e.g., legitimate double payment)
 
@@ -233,56 +222,56 @@ hash = SHA256(datum + betrag + partner_iban + verwendungszweck)
 
 ## Manual vs Automatic Mode
 
-### Automatic Mode (`bank_import_manuell = false`)
+The profile mode persists in `unternehmen.bank_import_manuell` (`1` = manual default, `0` = automatic), added by the ordered v10 migration. Both modes require explicit Review confirmation.
 
-- Score 90+ transactions auto-imported
-- Score 50-89 shown for review
-- Score <50 skipped
+### Automatic Mode (`bank_import_manuell = 0`)
 
-### Manual Mode (`bank_import_manuell = true`)
+- After confirmation, links only one unique existing journal candidate scoring at least 90
+- Tied tops, lower scores, and unavailable candidate queries stay unlinked
+- Never creates a journal entry or payment
 
-- All transactions shown for review
-- No auto-import
+### Manual Mode (`bank_import_manuell = 1`)
+
+- Score suggestions never set links; the user may explicitly select an existing journal entry
 - User confirms each transaction individually
 
-### Per-Session Override
+### Per-Import Override
 
-Toggle in the import UI switches mode for current session only. Persistent setting in `unternehmen.bank_import_manuell`.
+The one-import override in Review applies only to the staged import and is discarded afterwards. The stored profile mode never changes through an override.
 
 ---
 
 ## Integration with Journal
 
-Imported transactions create journal entries:
+Imported transactions are stored in `bank_transaktionen`:
 
 ```json
 {
+  "konto_id": 1,
+  "import_id": 7,
   "datum": "2025-03-15",
   "betrag": 119.00,
-  "brutto_betrag": 119.00,
-  "vorsteuer_betrag": 19.00,
+  "verwendungszweck": "Rechnung RE-250042",
+  "gegenkonto": null,
+  "gegenkonto_name": "ACME GmbH",
   "kategorie_id": 5,
-  "partner_typ": "kunde",
-  "partner_id": 42,
-  "konto_id": 1,
-  "konto_skr03": "8400",
-  "konto_skr04": "8400",
-  "quelle": "bank_import",
-  "bank_transaktion_id": 1
+  "journal_id": 42,
+  "dedupe_hash": "a1b2c3d4e5f6...",
+  "status": "gebucht"
 }
 ```
 
-- `quelle` field distinguishes bank imports from manual entries
-- `bank_transaktion_id` back-link for audit trail
-- Vorsteuer calculated based on Kategorie's `ust_satz_standard`
+- `journal_id` references an existing journal entry or is null; no entry is ever created by import or review
+- `status` is `neu` (awaiting review), `geprueft` (user-reviewed), or `gebucht` (linked)
+- Duplicate detection: partial unique index on `(konto_id, dedupe_hash)` where the hash is not null
+- User can override and force-import (e.g., legitimate double payment)
 
 ---
 
 ## Technical Notes
 
-- **File parsing**: CSV via Python `csv` module; XML via `xml.etree.ElementTree`
-- **Encoding**: Auto-detection via `chardet` library; fallback to UTF-8
-- **CAMT XML**: ISO 20022 standard; namespace-aware parsing
-- **Hash**: SHA-256 via `hashlib`; collision probability negligible for transaction data
-- **WAL mode**: Concurrent reads during import; no lock contention
-- **Template extensibility**: New templates added as JSON config files in `bank_templates/` seed
+- **File parsing**: CSV and CAMT.053 parsing in Dart; no Python, `chardet`, ElementTree, or `hashlib` involved
+- **Encoding**: UTF-8 or ISO-8859-1 per template configuration
+- **CAMT XML**: `camt.053` only; `camt.052` is not supported
+- **Hash**: SHA-256 over date, normalized amount, partner, and Verwendungszweck
+- **Custom templates**: profile-scoped rows in `bank_templates` with stable `custom_` type identifiers; predefined types are protected

@@ -192,7 +192,9 @@ void main() {
     expect(history.single['template_typ'], template.typ);
 
     await _pumpBankingPage(tester, db);
-    await tester.tap(find.text('Verlauf'));
+    await tester.tap(find.byIcon(Icons.menu));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verlauf').last);
     await tester.pumpAndSettle();
     expect(
       find.text('maerz-2026.csv'),

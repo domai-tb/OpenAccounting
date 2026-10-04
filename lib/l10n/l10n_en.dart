@@ -1256,4 +1256,142 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bankCandidatesUnavailable => 'Candidates could not be loaded. Automatic linking is disabled.';
+
+  @override
+  String get bankRulesTitle => 'Rules';
+
+  @override
+  String get bankRulePattern => 'Pattern (purpose)';
+
+  @override
+  String get bankRuleCategory => 'Category';
+
+  @override
+  String get bankRulePriority => 'Priority';
+
+  @override
+  String get bankRuleActive => 'Active';
+
+  @override
+  String get bankRuleNew => 'New rule';
+
+  @override
+  String get bankRuleEdit => 'Edit rule';
+
+  @override
+  String get bankRuleDelete => 'Delete rule';
+
+  @override
+  String get bankRuleSave => 'Save';
+
+  @override
+  String get bankRuleCancel => 'Cancel';
+
+  @override
+  String get bankRuleEmpty => 'No rules yet. Create a rule to categorize imports automatically.';
+
+  @override
+  String get bankRuleDisabled => 'Disabled';
+
+  @override
+  String get bankTemplatesTitle => 'Templates';
+
+  @override
+  String get bankTemplateNew => 'Custom template';
+
+  @override
+  String get bankTemplateEdit => 'Edit template';
+
+  @override
+  String get bankTemplateName => 'Name';
+
+  @override
+  String get bankTemplateProtected => 'Predefined – protected';
+
+  @override
+  String get bankTemplateDelete => 'Delete template';
+
+  @override
+  String get bankModeLabel => 'Import mode';
+
+  @override
+  String get bankModeManual => 'Manual';
+
+  @override
+  String get bankModeAutomatic => 'Automatic';
+
+  @override
+  String get bankModeOverride => 'Override once for this import';
+
+  @override
+  String get bankScoreLabel => 'Match';
+
+  @override
+  String get bankViewImport => 'Import';
+
+  @override
+  String get bankViewHistory => 'History';
+
+  @override
+  String get bankViewRules => 'Rules';
+
+  @override
+  String get bankViewTemplates => 'Templates';
+
+  @override
+  String get bankHistoryDetail => 'Details';
+
+  @override
+  String get bankHistoryRetry => 'Retry';
+
+  @override
+  String get bankHistoryReview => 'Review';
+
+  @override
+  String get bankHistorySearch => 'Search';
+
+  @override
+  String get bankHistorySearchHint => 'Search filename, template, or status';
+
+  @override
+  String get bankHistoryEmpty => 'No imports yet.';
+
+  @override
+  String get bankHistoryImportAction => 'Choose file';
+
+  @override
+  String get bankHistoryNextPage => 'Next';
+
+  @override
+  String get bankHistoryPrevPage => 'Back';
+
+  @override
+  String get bankDetailImported => 'Imported';
+
+  @override
+  String get bankDetailDuplicates => 'Duplicates';
+
+  @override
+  String get bankDetailFailed => 'Failed';
+
+  @override
+  String get bankDetailUnresolved => 'Open';
+
+  @override
+  String get bankDetailFileRejection => 'File rejection';
+
+  @override
+  String get bankDetailErrorRows => 'failed rows';
+
+  @override
+  String get bankDetailSeeHistory => 'see history for details';
+
+  @override
+  String get bankDiagnosticFile => 'File';
+
+  @override
+  String get bankDiagnosticRow => 'Row';
+
+  @override
+  String get bankDetailsUnavailable => 'Details unavailable';
 }

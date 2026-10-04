@@ -7,6 +7,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/features/bank_import/banking_usecase.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
@@ -17,6 +19,10 @@ import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
+import 'package:openaccounting/features/bank_import/bank_history_review_dialog.dart';
+import 'package:openaccounting/features/bank_import/bank_import_mode_repository.dart';
+import 'package:openaccounting/features/bank_import/bank_rules_view.dart';
+import 'package:openaccounting/features/bank_import/bank_templates_view.dart';
 import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
 
@@ -33,7 +39,7 @@ typedef BankImportFileReader = Future<List<int>> Function(String path);
 
 const int _maxImportFileBytes = 20 * 1024 * 1024;
 
-enum _BankImportView { import, history }
+enum _BankImportView { import, history, rules, templates }
 
 enum _BankImportStage { upload, review, result }
 
@@ -42,6 +48,7 @@ enum _BankImportStage { upload, review, result }
 class BankImportPage extends ConsumerStatefulWidget {
   const BankImportPage({
     this.service,
+    this.useCase,
     this.fileReader,
     this.initialContent,
     this.initialFileName = 'import.csv',
@@ -51,6 +58,9 @@ class BankImportPage extends ConsumerStatefulWidget {
 
   /// Optional service injection keeps the page easy to exercise in isolation.
   final BankImportService? service;
+
+  /// Optional typed use-case injection (AppScope otherwise, provider fallback).
+  final BankingUseCase? useCase;
 
   /// Optional reader used by desktop integrations or widget tests.
   final BankImportFileReader? fileReader;
@@ -78,6 +88,9 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   final Map<int, _ImportOutcome> _outcomesByImportId = <int, _ImportOutcome>{};
 
   List<_HistoryEntry> _history = <_HistoryEntry>[];
+  String _historyQuery = '';
+  int _historyPage = 1;
+  static const int _historyPageSize = 50;
   BankTemplate? _selectedTemplate;
   int? _selectedAccountId;
   List<int>? _fileBytes;
@@ -93,6 +106,10 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   bool _historyLoading = false;
   bool _isBusy = false;
   bool _allowDuplicateOverride = false;
+  BankImportMode _profileMode = BankImportMode.manual;
+  bool _overrideOnceAutomatic = false;
+  Map<int, _RowSuggestion> _suggestions = <int, _RowSuggestion>{};
+  bool _candidatesUnavailable = false;
 
   AppDatabase get _db => ref.read(appDatabaseProvider);
 
@@ -108,6 +125,15 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   }
 
   BankImportService get _service => widget.service ?? ref.read(bankImportServiceProvider);
+
+  /// Typed Banking use case: AppScope first, widget override second,
+  /// provider-built fallback last.
+  BankingUseCase get _banking {
+    final AppScope? scope = AppScope.maybeOf(context);
+    if (scope != null) return scope.services.banking;
+    if (widget.useCase != null) return widget.useCase!;
+    return BankingUseCase(ref.read(appDatabaseProvider).executor);
+  }
 
   @override
   void initState() {
@@ -164,6 +190,13 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     }
 
     final List<_HistoryEntry> history = await _readHistory();
+    BankImportMode profileMode = BankImportMode.manual;
+    try {
+      profileMode = await _banking.modes.getMode();
+    } catch (error, stackTrace) {
+      debugPrint('bank_import mode failed: $error\n$stackTrace');
+      dataError ??= _l10n.dataLoadError;
+    }
     if (!mounted) return;
     final String? initialTemplateType = widget.initialTemplate?.typ;
     final BankTemplate? resolvedTemplate = initialTemplateType == null
@@ -185,12 +218,33 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
         ..addAll(categoryRows.map((Map<String, Object?> row) => _BankCategoryOption.fromRow(row, l10n: _l10n)));
       _selectedAccountId = _accounts.isEmpty ? null : _accounts.first.id;
       _selectedTemplate = resolvedTemplate;
+      _profileMode = profileMode;
+      _overrideOnceAutomatic = false;
       _history = history;
       _historyError = null;
       _pageDataError = dataError;
       _errorMessage = dataError;
       _isLoading = false;
     });
+  }
+
+  Future<void> _changeProfileMode(BankImportMode mode) async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      await _banking.modes.setMode(mode);
+      if (!mounted) return;
+      setState(() {
+        _profileMode = mode;
+        _isBusy = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isBusy = false;
+        _errorMessage = error.toString();
+      });
+    }
   }
 
   Future<void> _retryPageData() async {
@@ -411,6 +465,7 @@ LIMIT 100
         _errorMessage = null;
         _noticeMessage = _l10n.setupSaved;
       });
+      unawaited(_computeSuggestions());
     } on BankImportException catch (error) {
       await _rejectInput(fileName, error.message, recoveryAction: error.recoveryAction);
     } catch (error) {
@@ -469,14 +524,21 @@ LIMIT 100
     });
 
     try {
+      final String effectiveMode = _overrideOnceAutomatic || _profileMode == BankImportMode.automatic
+          ? 'automatisch'
+          : 'manuell';
       final ImportResult serviceResult = await _service.importTransactions(
         kontoId: kontoId,
         rawTxs: preparedRows.map((_PreparedBankRow item) => item.raw).toList(),
+        mode: effectiveMode,
         allowDuplicateOverride: _allowDuplicateOverride,
         dateiname: fileName,
         template: _selectedTemplate,
         locale: _activeLocale,
       );
+      if (mounted) {
+        setState(() => _overrideOnceAutomatic = false);
+      }
       final List<_FailedEditableRow> failedRows = _mapFailedRows(preparedRows, serviceResult.failedRows);
       final int categorized = await _loadCategorizedCount(serviceResult.importId);
       final String? detail = serviceResult.diagnostics.isEmpty ? null : serviceResult.diagnostics.join('\n');
@@ -552,6 +614,40 @@ LIMIT 100
     return mapped;
   }
 
+  /// Computes top-1 score suggestions for the current review rows without
+  /// touching accounting data. A candidate-query failure marks the review
+  /// unavailable (automatic linking disabled) instead of showing no-match.
+  Future<void> _computeSuggestions() async {
+    final Map<int, _RowSuggestion> next = <int, _RowSuggestion>{};
+    bool unavailable = false;
+    for (final _EditableBankRow row in _rows) {
+      try {
+        final RawTx tx = row.toRawTx();
+        final List<MatchCandidate> ranked = await _service.rankCandidates(tx);
+        if (ranked.isNotEmpty) {
+          final MatchCandidate top = ranked.first;
+          next[row.lineNumber] = _RowSuggestion(
+            score: top.score,
+            label: _service.confidenceLabel(top.score, _l10n),
+            description: <String>[
+              if ((top.betrag ?? '').isNotEmpty) top.betrag!,
+              if ((top.datum ?? '').isNotEmpty) top.datum!,
+              if ((top.beschreibung ?? '').isNotEmpty) top.beschreibung!,
+            ].join(' · '),
+          );
+        }
+      } catch (_) {
+        unavailable = true;
+        break;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _suggestions = next;
+      _candidatesUnavailable = unavailable;
+    });
+  }
+
   Future<void> _retryFailedRows() async {
     final _ImportOutcome? outcome = _outcome;
     if (outcome == null || outcome.failed == 0) return;
@@ -569,6 +665,7 @@ LIMIT 100
       _errorMessage = null;
       _noticeMessage = _l10n.bankRetryNotice;
     });
+    unawaited(_computeSuggestions());
   }
 
   Future<void> _rejectInput(String fileName, String reason, {String? recoveryAction}) async {
@@ -672,6 +769,9 @@ LIMIT 100
     _disposeRows();
     setState(() {
       _rows.clear();
+      _suggestions = <int, _RowSuggestion>{};
+      _candidatesUnavailable = false;
+      _overrideOnceAutomatic = false;
       _fileBytes = null;
       _fileName = null;
       _pathController.clear();
@@ -805,6 +905,27 @@ LIMIT 100
                 padding: const EdgeInsets.only(top: AppSpacing.md),
                 child: Text(_l10n.bankNoAccountYet),
               ),
+            const SizedBox(height: AppSpacing.md),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: <Widget>[
+                  Text(_l10n.bankModeLabel),
+                  const SizedBox(width: AppSpacing.md),
+                  SegmentedButton<BankImportMode>(
+                    segments: <ButtonSegment<BankImportMode>>[
+                      ButtonSegment<BankImportMode>(value: BankImportMode.manual, label: Text(_l10n.bankModeManual)),
+                      ButtonSegment<BankImportMode>(
+                        value: BankImportMode.automatic,
+                        label: Text(_l10n.bankModeAutomatic),
+                      ),
+                    ],
+                    selected: <BankImportMode>{_profileMode},
+                    onSelectionChanged: (Set<BankImportMode> value) => unawaited(_changeProfileMode(value.single)),
+                  ),
+                ],
+              ),
+            ),
             if (_isCamtFile(_fileName))
               Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.md),
@@ -864,6 +985,15 @@ LIMIT 100
                 Expanded(child: Text(_l10n.bankDuplicateOverride)),
               ],
             ),
+            Row(
+              children: <Widget>[
+                Checkbox(
+                  value: _overrideOnceAutomatic,
+                  onChanged: _isBusy ? null : (bool? value) => setState(() => _overrideOnceAutomatic = value ?? false),
+                ),
+                Expanded(child: Text(_l10n.bankModeOverride)),
+              ],
+            ),
             const SizedBox(height: AppSpacing.sm),
             _buildReviewTable(),
             const SizedBox(height: AppSpacing.lg),
@@ -903,6 +1033,7 @@ LIMIT 100
               DataColumn(label: Text(_l10n.bankColAmount)),
               DataColumn(label: Text(_l10n.bankColPartnerPurpose)),
               DataColumn(label: Text(_l10n.bankColCategory)),
+              DataColumn(label: Text(_l10n.bankScoreLabel)),
             ],
             rows: _rows.map(_buildReviewRow).toList(),
           ),
@@ -963,6 +1094,31 @@ LIMIT 100
           ),
         ),
         DataCell(_buildCategoryDropdown(row)),
+        DataCell(_buildSuggestionCell(row)),
+      ],
+    );
+  }
+
+  /// Top score suggestion for a review row. Suggestions never mutate
+  /// accounting data; an unavailable candidate query shows a warning state
+  /// instead of a fabricated no-match.
+  Widget _buildSuggestionCell(_EditableBankRow row) {
+    if (_candidatesUnavailable) {
+      return Tooltip(
+        message: _l10n.bankCandidatesUnavailable,
+        child: Text(_l10n.bankCandidatesUnavailable, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      );
+    }
+    final _RowSuggestion? suggestion = _suggestions[row.lineNumber];
+    if (suggestion == null) {
+      return Text(_l10n.bankConfidenceNone);
+    }
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('${suggestion.score}% · ${suggestion.label}'),
+        if (suggestion.description.isNotEmpty) Text(suggestion.description),
       ],
     );
   }
@@ -1112,6 +1268,19 @@ LIMIT 100
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              decoration: InputDecoration(
+                labelText: _l10n.bankHistorySearch,
+                hintText: _l10n.bankHistorySearchHint,
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (String value) => setState(() {
+                _historyQuery = value;
+                _historyPage = 1;
+              }),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (_historyError != null) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
               _buildMessage(_historyError!, isError: true),
@@ -1120,28 +1289,210 @@ LIMIT 100
             if (_historyLoading)
               const Center(child: CircularProgressIndicator())
             else if (_history.isEmpty)
-              Text(_l10n.emptyEntries)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(_l10n.bankHistoryEmpty),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    onPressed: () => setState(() => _view = _BankImportView.import),
+                    icon: const Icon(Icons.file_open),
+                    label: Text(_l10n.bankHistoryImportAction),
+                  ),
+                ],
+              )
             else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columnSpacing: AppSpacing.lg,
-                  columns: <DataColumn>[
-                    DataColumn(label: Text(_l10n.bankColTime)),
-                    DataColumn(label: Text(_l10n.bankColSource)),
-                    DataColumn(label: Text(_l10n.bankColTemplate)),
-                    DataColumn(label: Text(_l10n.bankColAccount)),
-                    DataColumn(label: Text(_l10n.bankColImported)),
-                    DataColumn(label: Text(_l10n.bankColDuplicates)),
-                    DataColumn(label: Text(_l10n.bankColError)),
-                    DataColumn(label: Text(_l10n.bankColStatus)),
-                  ],
-                  rows: _history.map(_buildHistoryRow).toList(),
-                ),
-              ),
+              _buildHistoryTable(),
           ],
         ),
       ],
+    );
+  }
+
+  /// Filtered + paginated history rows (filter before pagination, 50/page).
+  List<_HistoryEntry> get _visibleHistory {
+    final String needle = _historyQuery.trim().toLowerCase();
+    final List<_HistoryEntry> filtered = needle.isEmpty
+        ? _history
+        : _history
+              .where(
+                (_HistoryEntry e) =>
+                    e.fileName.toLowerCase().contains(needle) ||
+                    e.template.toLowerCase().contains(needle) ||
+                    e.status.toLowerCase().contains(needle),
+              )
+              .toList(growable: false);
+    final int lastPage = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _historyPageSize) + 1;
+    final int page = _historyPage < 1 ? 1 : (_historyPage > lastPage ? lastPage : _historyPage);
+    if (page != _historyPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _historyPage = page);
+      });
+    }
+    final int start = (page - 1) * _historyPageSize;
+    final int end = (start + _historyPageSize).clamp(0, filtered.length);
+    return start >= filtered.length ? <_HistoryEntry>[] : filtered.sublist(start, end);
+  }
+
+  int get _historyTotalPages {
+    final String needle = _historyQuery.trim().toLowerCase();
+    final int count = needle.isEmpty
+        ? _history.length
+        : _history
+              .where(
+                (_HistoryEntry e) =>
+                    e.fileName.toLowerCase().contains(needle) ||
+                    e.template.toLowerCase().contains(needle) ||
+                    e.status.toLowerCase().contains(needle),
+              )
+              .length;
+    return count == 0 ? 1 : ((count - 1) ~/ _historyPageSize) + 1;
+  }
+
+  Widget _buildHistoryTable() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: AppSpacing.lg,
+            columns: <DataColumn>[
+              DataColumn(label: Text(_l10n.bankColTime)),
+              DataColumn(label: Text(_l10n.bankColSource)),
+              DataColumn(label: Text(_l10n.bankColTemplate)),
+              DataColumn(label: Text(_l10n.bankColAccount)),
+              DataColumn(label: Text(_l10n.bankColImported)),
+              DataColumn(label: Text(_l10n.bankColDuplicates)),
+              DataColumn(label: Text(_l10n.bankColError)),
+              DataColumn(label: Text(_l10n.bankColStatus)),
+              DataColumn(label: Text(_l10n.bankHistoryDetail)),
+            ],
+            rows: _visibleHistory.map(_buildHistoryRow).toList(),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.chevron_left),
+              tooltip: _l10n.bankHistoryPrevPage,
+              onPressed: _historyPage > 1 ? () => setState(() => _historyPage--) : null,
+            ),
+            Text('$_historyPage / $_historyTotalPages'),
+            IconButton(
+              icon: const Icon(Icons.chevron_right),
+              tooltip: _l10n.bankHistoryNextPage,
+              onPressed: _historyPage < _historyTotalPages ? () => setState(() => _historyPage++) : null,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// History detail dialog: metadata, safe diagnostics, unresolved count,
+  /// and the retry/review actions allowed by the attempt and row states.
+  Future<void> _showHistoryDetail(int? importId) async {
+    if (importId == null) return;
+    BankImportHistoryDetail detail;
+    try {
+      detail = await _banking.service.historyDetail(importId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final BankImportHistoryActions actions = _banking.service.historyActions(
+      status: detail.status,
+      retryable: detail.retryable,
+      unresolvedNeu: detail.unresolvedNeu,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text(detail.dateiname),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('${detail.status} · ${detail.datum}'),
+              Text(
+                '${_l10n.bankDetailImported}: ${detail.imported} · ${_l10n.bankDetailDuplicates}: ${detail.duplicates} · ${_l10n.bankDetailFailed}: ${detail.failed}',
+              ),
+              Text('${_l10n.bankDetailUnresolved}: ${detail.unresolvedNeu}'),
+              if (detail.diagnostics.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 8),
+                ...detail.diagnostics.map(Text.new),
+              ],
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          if (actions.review)
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                unawaited(_showHistoryReview(importId));
+              },
+              child: Text(_l10n.bankHistoryReview),
+            ),
+          if (actions.retry)
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                unawaited(_retryHistoryImport(importId));
+              },
+              child: Text(_l10n.bankHistoryRetry),
+            ),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_l10n.actionClose)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _retryHistoryImport(int importId) async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    try {
+      await _banking.service.retryImport(importId: importId, locale: _activeLocale);
+      if (!mounted) return;
+      setState(() => _isBusy = false);
+      await _refreshHistory();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isBusy = false;
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
+  /// Manual review for one history attempt: unresolved rows with category
+  /// confirm + journal link actions. Review never creates postings/payments.
+  Future<void> _showHistoryReview(int importId) async {
+    List<Map<String, Object?>> rows;
+    try {
+      rows = await _banking.service.unresolvedReviewRows(importId: importId);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => HistoryReviewDialog(
+        banking: _banking,
+        importId: importId,
+        initialRows: rows,
+        categories: <({int id, String name})>[
+          for (final _BankCategoryOption c in _categories) (id: c.id, name: c.name),
+        ],
+        onChanged: () => unawaited(_refreshHistory()),
+      ),
     );
   }
 
@@ -1173,6 +1524,13 @@ LIMIT 100
               entry.status,
               style: TextStyle(color: statusColor, fontWeight: FontWeight.w600),
             ),
+          ),
+        ),
+        DataCell(
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: _l10n.bankHistoryDetail,
+            onPressed: () => unawaited(_showHistoryDetail(entry.id)),
           ),
         ),
       ],
@@ -1374,9 +1732,17 @@ LIMIT 100
   Widget build(BuildContext context) {
     final Widget content = _isLoading
         ? const Center(child: CircularProgressIndicator())
-        : _view == _BankImportView.history
-        ? _buildHistoryView()
-        : _buildImportView();
+        : switch (_view) {
+            _BankImportView.history => _buildHistoryView(),
+            _BankImportView.rules => BankRulesView(
+              useCase: _banking,
+              categories: <({int id, String name})>[
+                for (final _BankCategoryOption c in _categories) (id: c.id, name: c.name),
+              ],
+            ),
+            _BankImportView.templates => BankTemplatesView(useCase: _banking),
+            _BankImportView.import => _buildImportView(),
+          };
     return AppPage(
       maxWidth: 1400,
       header: AppPageHeader(
@@ -1384,14 +1750,16 @@ LIMIT 100
         subtitle: _view == _BankImportView.history ? _l10n.bankHeaderSubtitleHistory : _l10n.bankHeaderSubtitleImport,
         showFilterToolbar: false,
         actions: <Widget>[
-          TextButton.icon(
-            onPressed: _isBusy
-                ? null
-                : () => setState(() {
-                    _view = _view == _BankImportView.import ? _BankImportView.history : _BankImportView.import;
-                  }),
-            icon: Icon(_view == _BankImportView.import ? Icons.history : Icons.file_upload),
-            label: Text(_view == _BankImportView.import ? _l10n.actionHistory : _l10n.actionImport),
+          PopupMenuButton<_BankImportView>(
+            icon: const Icon(Icons.menu),
+            tooltip: _l10n.sidebarBanking,
+            onSelected: (_BankImportView value) => setState(() => _view = value),
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<_BankImportView>>[
+              PopupMenuItem<_BankImportView>(value: _BankImportView.import, child: Text(_l10n.bankViewImport)),
+              PopupMenuItem<_BankImportView>(value: _BankImportView.history, child: Text(_l10n.bankViewHistory)),
+              PopupMenuItem<_BankImportView>(value: _BankImportView.rules, child: Text(_l10n.bankViewRules)),
+              PopupMenuItem<_BankImportView>(value: _BankImportView.templates, child: Text(_l10n.bankViewTemplates)),
+            ],
           ),
         ],
       ),
@@ -1414,6 +1782,13 @@ class _PreparedBankRow {
 
   final _EditableBankRow row;
   final RawTx raw;
+}
+
+class _RowSuggestion {
+  const _RowSuggestion({required this.score, required this.label, required this.description});
+  final int score;
+  final String label;
+  final String description;
 }
 
 class _EditableBankRow {
@@ -1549,7 +1924,7 @@ class _HistoryEntry {
     final int duplicates = outcome?.duplicates ?? (_asInt(row['duplikate']) ?? 0);
     final int failed = outcome?.failed ?? (_asInt(row['anzahl_fehlgeschlagen']) ?? 0);
     final String rawStatus = _asString(row['status']);
-    final String? detail = outcome?.detail ?? _diagnosticText(_asString(row['fehler_details']));
+    final String? detail = outcome?.detail ?? _diagnosticText(_asString(row['fehler_details']), l10n);
     final String rawFileName = _asString(row['dateiname']);
     return _HistoryEntry(
       id: _asInt(row['id']),
@@ -1652,16 +2027,16 @@ String _historyStatus(String raw, AppLocalizations l10n) {
   return raw.isEmpty ? l10n.statusUnknown : raw;
 }
 
-String? _diagnosticText(String raw) {
+String? _diagnosticText(String raw, AppLocalizations l10n) {
   if (raw.isEmpty) return null;
   try {
     final Map<String, Object?> envelope = BankImportFailurePayload.decodeValidated(raw);
     if (envelope['kind'] == 'file_rejection') {
       final List<dynamic> codes = envelope['diagnostic_codes']! as List<dynamic>;
-      return 'Dateiabweisung (${codes.join(', ')})';
+      return '${l10n.bankDetailFileRejection} (${codes.join(', ')})';
     }
     final List<dynamic> rows = envelope['rows']! as List<dynamic>;
-    return '${rows.length} fehlerhafte Zeilen (Details in der Historie)';
+    return '${rows.length} ${l10n.bankDetailErrorRows} (${l10n.bankDetailSeeHistory})';
   } on BankImportPayloadException {
     return raw.length > 200 ? '${raw.substring(0, 200)}…' : raw;
   }

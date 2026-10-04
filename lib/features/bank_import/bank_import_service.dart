@@ -599,12 +599,13 @@ class BankImportService {
 
   /// Typed detail for one attempt: metadata, safe diagnostics, unresolved
   /// count, and allowed actions. Raw bank values never appear in error text.
-  Future<BankImportHistoryDetail> historyDetail(int importId) async {
+  Future<BankImportHistoryDetail> historyDetail(int importId, {String locale = 'de_DE'}) async {
+    final AppLocalizations l10n = _l10nFor(locale);
     final rows = await executor.runSelect('SELECT * FROM bank_imports WHERE id = ?', <Object?>[importId]);
     if (rows.isEmpty) throw const BankImportException('Importverlauf nicht gefunden');
     final Map<String, Object?> row = rows.single;
     final String status = row['status']?.toString() ?? '';
-    final List<String> diagnostics = _safeDiagnostics(row['fehler_details']);
+    final List<String> diagnostics = _safeDiagnostics(row['fehler_details'], l10n);
     final int unresolved = await _unresolvedCount(importId);
     final bool retryable = _payloadRetryable(row['fehler_details'], status);
     return BankImportHistoryDetail(
@@ -681,19 +682,27 @@ class BankImportService {
   }
 
   /// Safe display diagnostics: stable codes only, never raw bank values.
-  List<String> _safeDiagnostics(Object? raw) {
+  List<String> _safeDiagnostics(Object? raw, AppLocalizations l10n) {
     if (raw == null || raw.toString().trim().isEmpty) return const <String>[];
     try {
-      final envelope = BankImportFailurePayload.decodeValidated(raw.toString());
-      if (envelope['kind'] == 'file_rejection') {
-        return (envelope['diagnostic_codes']! as List).map((c) => 'Datei: $c').toList(growable: false);
+      final Map<String, Object?> envelope = BankImportFailurePayload.decodeValidated(raw.toString());
+      final Object? kind = envelope['kind'];
+      if (kind == 'file_rejection') {
+        final Object? codesRaw = envelope['diagnostic_codes'];
+        final List<String> codes = <String>[for (final c in codesRaw! as List) c.toString()];
+        return codes.map((String c) => '${l10n.bankDiagnosticFile}: $c').toList(growable: false);
       }
-      final rows = (envelope['rows']! as List).cast<Map<String, Object?>>();
-      return rows
-          .map((r) => 'Zeile ${r['row']}: ${(r['diagnostic_codes']! as List).join(', ')}')
-          .toList(growable: false);
+      final Object? rowsRaw = envelope['rows'];
+      final List<String> lines = <String>[];
+      for (final row in rowsRaw! as List) {
+        final Map<String, Object?> entry = Map<String, Object?>.from(row as Map);
+        final Object? entryCodes = entry['diagnostic_codes'];
+        final String joined = (entryCodes! as List).join(', ');
+        lines.add('${l10n.bankDiagnosticRow} ${entry['row']}: $joined');
+      }
+      return lines;
     } on BankImportPayloadException {
-      return const <String>['Details nicht verfügbar'];
+      return <String>[l10n.bankDetailsUnavailable];
     }
   }
 

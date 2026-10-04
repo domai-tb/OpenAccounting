@@ -82,21 +82,21 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 
 ## 6. Banking workspace follows the design system
 
-- [ ] 6.1 Write failing test: `test_banking_resolves_the_typed_use_case` in `test/features/routed_surface/bank_import_test.dart` for “Banking resolves the typed use case” (assert it fails for the right reason).
-- [ ] 6.2 Implement the behavior specified by “Banking resolves the typed use case” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 6.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 6.4 Write failing test: `test_rule_controls_work_from_the_keyboard` in `test/features/routed_surface/bank_import_test.dart` for “Rule controls work from the keyboard” (assert it fails for the right reason).
-- [ ] 6.5 Implement the behavior specified by “Rule controls work from the keyboard” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 6.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 6.7 Write failing test: `test_history_and_review_controls_work_from_the_keyboard` in `test/features/routed_surface/bank_import_test.dart` for “History and review controls work from the keyboard” (assert it fails for the right reason).
-- [ ] 6.8 Implement the behavior specified by “History and review controls work from the keyboard” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 6.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 6.10 Write failing test: `test_narrow_banking_window_keeps_actions_reachable` in `test/features/routed_surface/bank_import_test.dart` for “Narrow banking window keeps actions reachable” (assert it fails for the right reason).
-- [ ] 6.11 Implement the behavior specified by “Narrow banking window keeps actions reachable” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 6.12 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 6.13 Write failing test: `test_desktop_banking_views_expose_localized_accessible_controls` in `test/features/routed_surface/bank_import_test.dart` for “Desktop banking views expose localized accessible controls” (assert it fails for the right reason).
-- [ ] 6.14 Implement the behavior specified by “Desktop banking views expose localized accessible controls” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 6.15 Refactor the related code; focused tests and the full suite stay green.
+- [x] 6.1 Write failing test: `test_banking_resolves_the_typed_use_case` in `test/features/routed_surface/bank_import_test.dart` for “Banking resolves the typed use case” (assert it fails for the right reason).
+- [x] 6.2 Implement the behavior specified by “Banking resolves the typed use case” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 6.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 6.4 Write failing test: `test_rule_controls_work_from_the_keyboard` in `test/features/routed_surface/bank_import_test.dart` for “Rule controls work from the keyboard” (assert it fails for the right reason).
+- [x] 6.5 Implement the behavior specified by “Rule controls work from the keyboard” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 6.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 6.7 Write failing test: `test_history_and_review_controls_work_from_the_keyboard` in `test/features/routed_surface/bank_import_test.dart` for “History and review controls work from the keyboard” (assert it fails for the right reason).
+- [x] 6.8 Implement the behavior specified by “History and review controls work from the keyboard” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 6.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 6.10 Write failing test: `test_narrow_banking_window_keeps_actions_reachable` in `test/features/routed_surface/bank_import_test.dart` for “Narrow banking window keeps actions reachable” (assert it fails for the right reason).
+- [x] 6.11 Implement the behavior specified by “Narrow banking window keeps actions reachable” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 6.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 6.13 Write failing test: `test_desktop_banking_views_expose_localized_accessible_controls` in `test/features/routed_surface/bank_import_test.dart` for “Desktop banking views expose localized accessible controls” (assert it fails for the right reason).
+- [x] 6.14 Implement the behavior specified by “Desktop banking views expose localized accessible controls” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 6.15 Refactor the related code; focused tests and the full suite stay green.
 
 ## 7. Bank Transactions Table
 
@@ -118,12 +118,12 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 
 ## 8. Import history is actionable
 
-- [ ] 8.1 Write failing test: `test_history_row_opens_details` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History row opens details” (assert it fails for the right reason).
-- [ ] 8.2 Implement the behavior specified by “History row opens details” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.4 Write failing test: `test_empty_history_offers_import` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Empty history offers import” (assert it fails for the right reason).
-- [ ] 8.5 Implement the behavior specified by “Empty history offers import” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.1 Write failing test: `test_history_row_opens_details` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History row opens details” (assert it fails for the right reason).
+- [x] 8.2 Implement the behavior specified by “History row opens details” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.4 Write failing test: `test_empty_history_offers_import` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Empty history offers import” (assert it fails for the right reason).
+- [x] 8.5 Implement the behavior specified by “Empty history offers import” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.6 Refactor the related code; focused tests and the full suite stay green.
 - [x] 8.7 Write failing test: `test_status_policy_controls_actions` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Status policy controls actions” (assert it fails for the right reason).
 - [x] 8.8 Implement the behavior specified by “Status policy controls actions” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
 - [x] 8.9 Refactor the related code; focused tests and the full suite stay green.
@@ -172,13 +172,13 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 - [x] 8.52 Write failing test: `test_history_search_filters_before_stable_pagination` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History search filters before stable pagination” (assert it fails for the right reason).
 - [x] 8.53 Implement the behavior specified by “History search filters before stable pagination” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
 - [x] 8.54 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.55 Write failing test: `test_detail_return_restores_the_same_history_query` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Detail return restores the same history query” (assert it fails for the right reason).
-- [ ] 8.56 Implement the behavior specified by “Detail return restores the same history query” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.57 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 8.58 Write failing test: `test_history_keyboard_actions_preserve_focus` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History keyboard actions preserve focus” (assert it fails for the right reason).
-- [ ] 8.59 Implement the behavior specified by “History keyboard actions preserve focus” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
-- [ ] 8.60 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.55 Write failing test: `test_detail_return_restores_the_same_history_query` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “Detail return restores the same history query” (assert it fails for the right reason).
+- [x] 8.56 Implement the behavior specified by “Detail return restores the same history query” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.57 Refactor the related code; focused tests and the full suite stay green.
+- [x] 8.58 Write failing test: `test_history_keyboard_actions_preserve_focus` in `test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart` for “History keyboard actions preserve focus” (assert it fails for the right reason).
+- [x] 8.59 Implement the behavior specified by “History keyboard actions preserve focus” in `specs/bank-import-recovery-surface/spec.md` to pass the preceding test.
+- [x] 8.60 Refactor the related code; focused tests and the full suite stay green.
 
 ## 9. Align the bank-import guide
 
-- [ ] 9.1 Update `docs/04-bank-import.md` after behavior changes to match the accepted specs and implemented Dart paths; remove unsupported template, parser, schema, scoring, and posting claims.
+- [x] 9.1 Update `docs/04-bank-import.md` after behavior changes to match the accepted specs and implemented Dart paths; remove unsupported template, parser, schema, scoring, and posting claims.

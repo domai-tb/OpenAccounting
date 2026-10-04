@@ -1,9 +1,13 @@
 // ignore_for_file: file_names
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
+import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
 
 /// Actionable import history: retry, review states, search (recovery surface).
@@ -412,6 +416,91 @@ void main() {
       final rejectedPolicy = service.historyActions(status: 'fehlgeschlagen', retryable: false, unresolvedNeu: 0);
       expect(rejectedPolicy.retry, isFalse);
       expect(rejectedPolicy.newFile, isTrue);
+    });
+  });
+  bankHistoryUiSection();
+}
+
+/// History UI: detail, empty state, query preservation, keyboard (section 8 UI).
+void bankHistoryUiSection() {
+  group('Import history UI', () {
+    Future<AppDatabase> openDb() async {
+      final AppDatabase db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
+      await db.executor.runInsert('INSERT INTO konten (name, iban) VALUES (?, ?)', const <Object?>['Giro', 'DE001']);
+      return db;
+    }
+
+    Future<void> pumpHistory(WidgetTester tester, AppDatabase db) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(home: BankImportPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Verlauf').last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('test_history_row_opens_details', (tester) async {
+      final AppDatabase db = await openDb();
+      await db.executor.runInsert(
+        'INSERT INTO bank_imports (konto_id, dateiname, datum, status) VALUES (?, ?, ?, ?)',
+        const <Object?>[1, 'auszug.csv', '2026-05-01', 'importiert'],
+      );
+      await pumpHistory(tester, db);
+      final Finder detailButton = find.byIcon(Icons.info_outline).first;
+      await tester.ensureVisible(detailButton);
+      await tester.tap(detailButton, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.text('auszug.csv'), findsWidgets);
+      expect(find.textContaining('importiert'), findsWidgets);
+    });
+
+    testWidgets('test_empty_history_offers_import', (tester) async {
+      final AppDatabase db = await openDb();
+      await pumpHistory(tester, db);
+      expect(find.text('Datei wählen'), findsOneWidget);
+      await tester.tap(find.text('Datei wählen'));
+      await tester.pumpAndSettle();
+      expect(find.text('Datei wählen'), findsNothing);
+    });
+
+    testWidgets('test_detail_return_restores_the_same_history_query', (tester) async {
+      final AppDatabase db = await openDb();
+      await db.executor.runInsert(
+        'INSERT INTO bank_imports (konto_id, dateiname, datum, status) VALUES (?, ?, ?, ?)',
+        const <Object?>[1, 'suche-mich.csv', '2026-05-01', 'importiert'],
+      );
+      await pumpHistory(tester, db);
+      await tester.enterText(find.widgetWithText(TextField, 'Suchen'), 'suche-mich');
+      await tester.pumpAndSettle();
+      final Finder detailButton = find.byIcon(Icons.info_outline).first;
+      await tester.ensureVisible(detailButton);
+      await tester.tap(detailButton, warnIfMissed: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Schließen'));
+      await tester.pumpAndSettle();
+      expect(find.text('suche-mich'), findsOneWidget);
+      expect(find.text('suche-mich.csv'), findsOneWidget);
+    });
+
+    testWidgets('test_history_keyboard_actions_preserve_focus', (tester) async {
+      final AppDatabase db = await openDb();
+      await pumpHistory(tester, db);
+      final Finder search = find.widgetWithText(TextField, 'Suchen');
+      await tester.tap(search);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+      final FocusNode? before = FocusManager.instance.primaryFocus;
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+      expect(FocusManager.instance.primaryFocus, isNot(equals(before)));
     });
   });
 }

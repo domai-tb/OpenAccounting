@@ -1,4 +1,14 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/core/app_services.dart';
+import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/bank_import/bank_history_review_dialog.dart';
+import 'package:openaccounting/features/bank_import/bank_import_page.dart';
+import 'package:openaccounting/features/bank_import/bank_rules_view.dart';
+import 'package:openaccounting/features/bank_import/banking_usecase.dart';
 
 /// Import history entry.
 class ImportHistoryEntry {
@@ -143,6 +153,135 @@ void main() {
       expect(pendingPolicy.canRetry, isFalse);
       expect(pendingPolicy.canViewDetails, isFalse);
       expect(pendingPolicy.canExport, isFalse);
+    });
+  });
+  bankingWorkspaceSection();
+}
+
+/// Banking workspace design-system conformance (bank-import section 6).
+void bankingWorkspaceSection() {
+  group('Banking workspace design system', () {
+    Future<AppDatabase> openDb() async {
+      final AppDatabase db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
+      return db;
+    }
+
+    Widget wrapPage(AppDatabase db, Widget child) {
+      return ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: MaterialApp(
+          home: AppScope(services: AppServices(db), child: child),
+        ),
+      );
+    }
+
+    testWidgets('test_banking_resolves_the_typed_use_case', (tester) async {
+      final AppDatabase db = await openDb();
+      await tester.pumpWidget(wrapPage(db, const BankImportPage()));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.menu), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      expect(find.text('Regeln'), findsWidgets);
+      expect(find.text('Vorlagen'), findsWidgets);
+      final AppServices services = AppServices(db);
+      expect(services.banking.rules, isNotNull);
+      expect(services.banking.templates, isNotNull);
+      expect(services.banking.modes, isNotNull);
+    });
+
+    testWidgets('test_rule_controls_work_from_the_keyboard', (tester) async {
+      final AppDatabase db = await openDb();
+      final int katId = await db.executor.runInsert(
+        "INSERT INTO kategorien (bezeichnung, aktiv) VALUES ('Regelkat', 1)",
+        const <Object?>[],
+      );
+      final BankingUseCase useCase = BankingUseCase(db.executor);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(db)],
+          child: MaterialApp(
+            home: BankRulesView(useCase: useCase, categories: <({int id, String name})>[(id: katId, name: 'Regelkat')]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Neue Regel'), findsOneWidget);
+
+      await tester.tap(find.text('Neue Regel'));
+      await tester.pumpAndSettle();
+      final Finder patternField = find.widgetWithText(TextField, 'Muster (Verwendungszweck)');
+      expect(patternField, findsOneWidget);
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+
+      await tester.enterText(patternField, 'Amazon');
+      final FocusNode? before = FocusManager.instance.primaryFocus;
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+      expect(FocusManager.instance.primaryFocus, isNot(equals(before)));
+
+      await tester.tap(find.text('Speichern'));
+      await tester.pumpAndSettle();
+      expect(find.text('Amazon'), findsOneWidget);
+    });
+
+    testWidgets('test_history_and_review_controls_work_from_the_keyboard', (tester) async {
+      final AppDatabase db = await openDb();
+      final BankingUseCase useCase = BankingUseCase(db.executor);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(db)],
+          child: MaterialApp(
+            home: Scaffold(
+              body: HistoryReviewDialog(
+                banking: useCase,
+                importId: 1,
+                initialRows: const <Map<String, Object?>>[],
+                categories: const <({int id, String name})>[],
+                onChanged: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final Finder closeButton = find.text('Schließen');
+      expect(closeButton, findsOneWidget);
+      Focus.of(closeButton.evaluate().single).requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+    });
+
+    testWidgets('test_narrow_banking_window_keeps_actions_reachable', (tester) async {
+      final AppDatabase db = await openDb();
+      tester.view.physicalSize = const Size(360, 700);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(wrapPage(db, const BankImportPage()));
+      await tester.pumpAndSettle();
+      for (final String label in <String>['Import', 'Verlauf', 'Regeln', 'Vorlagen']) {
+        await tester.tap(find.byIcon(Icons.menu));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.text('Vorlagen'), findsWidgets);
+    });
+
+    testWidgets('test_desktop_banking_views_expose_localized_accessible_controls', (tester) async {
+      final AppDatabase db = await openDb();
+      await tester.pumpWidget(wrapPage(db, const BankImportPage()));
+      await tester.pumpAndSettle();
+      expect(find.text('Manuell'), findsOneWidget);
+      expect(find.text('Automatisch'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Regeln'), findsWidgets);
     });
   });
 }

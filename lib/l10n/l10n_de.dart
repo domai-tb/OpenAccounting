@@ -1263,4 +1263,142 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get bankCandidatesUnavailable =>
       'Treffer konnten nicht geladen werden. Automatische Verknüpfung ist deaktiviert.';
+
+  @override
+  String get bankRulesTitle => 'Regeln';
+
+  @override
+  String get bankRulePattern => 'Muster (Verwendungszweck)';
+
+  @override
+  String get bankRuleCategory => 'Kategorie';
+
+  @override
+  String get bankRulePriority => 'Priorität';
+
+  @override
+  String get bankRuleActive => 'Aktiv';
+
+  @override
+  String get bankRuleNew => 'Neue Regel';
+
+  @override
+  String get bankRuleEdit => 'Regel bearbeiten';
+
+  @override
+  String get bankRuleDelete => 'Regel löschen';
+
+  @override
+  String get bankRuleSave => 'Speichern';
+
+  @override
+  String get bankRuleCancel => 'Abbrechen';
+
+  @override
+  String get bankRuleEmpty => 'Keine Regeln vorhanden. Lege eine Regel an, um Importe automatisch zu kategorisieren.';
+
+  @override
+  String get bankRuleDisabled => 'Deaktiviert';
+
+  @override
+  String get bankTemplatesTitle => 'Vorlagen';
+
+  @override
+  String get bankTemplateNew => 'Eigene Vorlage';
+
+  @override
+  String get bankTemplateEdit => 'Vorlage bearbeiten';
+
+  @override
+  String get bankTemplateName => 'Name';
+
+  @override
+  String get bankTemplateProtected => 'Vordefiniert – geschützt';
+
+  @override
+  String get bankTemplateDelete => 'Vorlage löschen';
+
+  @override
+  String get bankModeLabel => 'Importmodus';
+
+  @override
+  String get bankModeManual => 'Manuell';
+
+  @override
+  String get bankModeAutomatic => 'Automatisch';
+
+  @override
+  String get bankModeOverride => 'Einmalig für diesen Import überschreiben';
+
+  @override
+  String get bankScoreLabel => 'Treffer';
+
+  @override
+  String get bankViewImport => 'Import';
+
+  @override
+  String get bankViewHistory => 'Verlauf';
+
+  @override
+  String get bankViewRules => 'Regeln';
+
+  @override
+  String get bankViewTemplates => 'Vorlagen';
+
+  @override
+  String get bankHistoryDetail => 'Details';
+
+  @override
+  String get bankHistoryRetry => 'Wiederholen';
+
+  @override
+  String get bankHistoryReview => 'Prüfen';
+
+  @override
+  String get bankHistorySearch => 'Suchen';
+
+  @override
+  String get bankHistorySearchHint => 'Dateiname, Vorlage oder Status suchen';
+
+  @override
+  String get bankHistoryEmpty => 'Noch keine Importe vorhanden.';
+
+  @override
+  String get bankHistoryImportAction => 'Datei wählen';
+
+  @override
+  String get bankHistoryNextPage => 'Weiter';
+
+  @override
+  String get bankHistoryPrevPage => 'Zurück';
+
+  @override
+  String get bankDetailImported => 'Importiert';
+
+  @override
+  String get bankDetailDuplicates => 'Duplikate';
+
+  @override
+  String get bankDetailFailed => 'Fehler';
+
+  @override
+  String get bankDetailUnresolved => 'Offen';
+
+  @override
+  String get bankDetailFileRejection => 'Dateiabweisung';
+
+  @override
+  String get bankDetailErrorRows => 'fehlerhafte Zeilen';
+
+  @override
+  String get bankDetailSeeHistory => 'Details in der Historie';
+
+  @override
+  String get bankDiagnosticFile => 'Datei';
+
+  @override
+  String get bankDiagnosticRow => 'Zeile';
+
+  @override
+  String get bankDetailsUnavailable => 'Details nicht verfügbar';
 }

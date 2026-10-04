@@ -2419,6 +2419,282 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Treffer konnten nicht geladen werden. Automatische Verknüpfung ist deaktiviert.'**
   String get bankCandidatesUnavailable;
+
+  /// No description provided for @bankRulesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Regeln'**
+  String get bankRulesTitle;
+
+  /// No description provided for @bankRulePattern.
+  ///
+  /// In de, this message translates to:
+  /// **'Muster (Verwendungszweck)'**
+  String get bankRulePattern;
+
+  /// No description provided for @bankRuleCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get bankRuleCategory;
+
+  /// No description provided for @bankRulePriority.
+  ///
+  /// In de, this message translates to:
+  /// **'Priorität'**
+  String get bankRulePriority;
+
+  /// No description provided for @bankRuleActive.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktiv'**
+  String get bankRuleActive;
+
+  /// No description provided for @bankRuleNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Regel'**
+  String get bankRuleNew;
+
+  /// No description provided for @bankRuleEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Regel bearbeiten'**
+  String get bankRuleEdit;
+
+  /// No description provided for @bankRuleDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Regel löschen'**
+  String get bankRuleDelete;
+
+  /// No description provided for @bankRuleSave.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern'**
+  String get bankRuleSave;
+
+  /// No description provided for @bankRuleCancel.
+  ///
+  /// In de, this message translates to:
+  /// **'Abbrechen'**
+  String get bankRuleCancel;
+
+  /// No description provided for @bankRuleEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Regeln vorhanden. Lege eine Regel an, um Importe automatisch zu kategorisieren.'**
+  String get bankRuleEmpty;
+
+  /// No description provided for @bankRuleDisabled.
+  ///
+  /// In de, this message translates to:
+  /// **'Deaktiviert'**
+  String get bankRuleDisabled;
+
+  /// No description provided for @bankTemplatesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlagen'**
+  String get bankTemplatesTitle;
+
+  /// No description provided for @bankTemplateNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Eigene Vorlage'**
+  String get bankTemplateNew;
+
+  /// No description provided for @bankTemplateEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlage bearbeiten'**
+  String get bankTemplateEdit;
+
+  /// No description provided for @bankTemplateName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name'**
+  String get bankTemplateName;
+
+  /// No description provided for @bankTemplateProtected.
+  ///
+  /// In de, this message translates to:
+  /// **'Vordefiniert – geschützt'**
+  String get bankTemplateProtected;
+
+  /// No description provided for @bankTemplateDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlage löschen'**
+  String get bankTemplateDelete;
+
+  /// No description provided for @bankModeLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Importmodus'**
+  String get bankModeLabel;
+
+  /// No description provided for @bankModeManual.
+  ///
+  /// In de, this message translates to:
+  /// **'Manuell'**
+  String get bankModeManual;
+
+  /// No description provided for @bankModeAutomatic.
+  ///
+  /// In de, this message translates to:
+  /// **'Automatisch'**
+  String get bankModeAutomatic;
+
+  /// No description provided for @bankModeOverride.
+  ///
+  /// In de, this message translates to:
+  /// **'Einmalig für diesen Import überschreiben'**
+  String get bankModeOverride;
+
+  /// No description provided for @bankScoreLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Treffer'**
+  String get bankScoreLabel;
+
+  /// No description provided for @bankViewImport.
+  ///
+  /// In de, this message translates to:
+  /// **'Import'**
+  String get bankViewImport;
+
+  /// No description provided for @bankViewHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Verlauf'**
+  String get bankViewHistory;
+
+  /// No description provided for @bankViewRules.
+  ///
+  /// In de, this message translates to:
+  /// **'Regeln'**
+  String get bankViewRules;
+
+  /// No description provided for @bankViewTemplates.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlagen'**
+  String get bankViewTemplates;
+
+  /// No description provided for @bankHistoryDetail.
+  ///
+  /// In de, this message translates to:
+  /// **'Details'**
+  String get bankHistoryDetail;
+
+  /// No description provided for @bankHistoryRetry.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederholen'**
+  String get bankHistoryRetry;
+
+  /// No description provided for @bankHistoryReview.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfen'**
+  String get bankHistoryReview;
+
+  /// No description provided for @bankHistorySearch.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen'**
+  String get bankHistorySearch;
+
+  /// No description provided for @bankHistorySearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Dateiname, Vorlage oder Status suchen'**
+  String get bankHistorySearchHint;
+
+  /// No description provided for @bankHistoryEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Importe vorhanden.'**
+  String get bankHistoryEmpty;
+
+  /// No description provided for @bankHistoryImportAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei wählen'**
+  String get bankHistoryImportAction;
+
+  /// No description provided for @bankHistoryNextPage.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiter'**
+  String get bankHistoryNextPage;
+
+  /// No description provided for @bankHistoryPrevPage.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get bankHistoryPrevPage;
+
+  /// No description provided for @bankDetailImported.
+  ///
+  /// In de, this message translates to:
+  /// **'Importiert'**
+  String get bankDetailImported;
+
+  /// No description provided for @bankDetailDuplicates.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplikate'**
+  String get bankDetailDuplicates;
+
+  /// No description provided for @bankDetailFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehler'**
+  String get bankDetailFailed;
+
+  /// No description provided for @bankDetailUnresolved.
+  ///
+  /// In de, this message translates to:
+  /// **'Offen'**
+  String get bankDetailUnresolved;
+
+  /// No description provided for @bankDetailFileRejection.
+  ///
+  /// In de, this message translates to:
+  /// **'Dateiabweisung'**
+  String get bankDetailFileRejection;
+
+  /// No description provided for @bankDetailErrorRows.
+  ///
+  /// In de, this message translates to:
+  /// **'fehlerhafte Zeilen'**
+  String get bankDetailErrorRows;
+
+  /// No description provided for @bankDetailSeeHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Details in der Historie'**
+  String get bankDetailSeeHistory;
+
+  /// No description provided for @bankDiagnosticFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei'**
+  String get bankDiagnosticFile;
+
+  /// No description provided for @bankDiagnosticRow.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeile'**
+  String get bankDiagnosticRow;
+
+  /// No description provided for @bankDetailsUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Details nicht verfügbar'**
+  String get bankDetailsUnavailable;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
