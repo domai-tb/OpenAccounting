@@ -16,3 +16,10 @@ Annual EÜR is the only accounting report consumer in scope. It SHALL use the ex
 - **WHEN** the user selects a configured fiscal year
 - **THEN** the report SHALL be unavailable for that selection
 - **AND** SHALL NOT show a calendar-year result with the fiscal-year label
+
+#### Scenario: Explicit calendar-year EÜR remains available
+
+- **GIVEN** the company has a non-January business-year start and the user explicitly selects a calendar-year period for EÜR
+- **WHEN** the accepted EÜR calculation supports that calendar-year period
+- **THEN** EÜR SHALL remain available for the selected calendar year
+- **AND** the result SHALL be labeled as a calendar year, not as a configured business year

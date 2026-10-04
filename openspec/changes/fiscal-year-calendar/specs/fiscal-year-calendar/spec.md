@@ -102,3 +102,10 @@ Settings SHALL provide a localized, keyboard-accessible company business-year co
 - **WHEN** the user selects a valid month and activates Save by keyboard
 - **THEN** the same typed save and confirmation flow SHALL run as for pointer input
 - **AND** the resulting state SHALL be announced with a localized semantic status
+
+#### Scenario: Save failure keeps the fiscal setting accessible and unchanged
+
+- **GIVEN** a previously persisted start month and a localized Settings form
+- **WHEN** saving a different valid month fails
+- **THEN** the form SHALL retain the last persisted month as active and announce a localized retryable error
+- **AND** keyboard focus SHALL remain on or return to the failed Save action without announcing success
