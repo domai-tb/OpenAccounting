@@ -1,0 +1,60 @@
+## Test Plan
+
+<!-- Every OpenSpec scenario is mapped to a named test. All entries start red. -->
+
+| Requirement | Scenario | Test File | Test Name | Initial State |
+|-------------|----------|-----------|-----------|---------------|
+| specs/accounting/spec.md → Kategorien | Approved catalog category has traceable mappings | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_001_approved_catalog_category_has_traceable_mappings | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Category with SKR mapping | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_002_category_with_skr_mapping | 🔴 red |
+| specs/accounting/spec.md → Kategorien | User-defined category is not described as a standard mapping | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_003_user_defined_category_is_not_described_as_a_stan | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Unmapped user category remains explicitly unmapped | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_004_unmapped_user_category_remains_explicitly_unmapp | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Editing a catalog mapping requires review | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_005_editing_a_catalog_mapping_requires_review | 🔴 red |
+| specs/accounting/spec.md → Kategorien | User-modified SKR account | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_006_user_modified_skr_account | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Legacy category values are retained but untrusted | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_007_legacy_category_values_are_retained_but_untruste | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Legacy mapping cannot drive a new posting before review | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_008_legacy_mapping_cannot_drive_a_new_posting_before | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Unmapped category labels an independently balanced posting | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_009_unmapped_category_labels_an_independently_balanc | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Inactive category | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_010_inactive_category | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Category description | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_011_category_description | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Unmapped category does not receive an invented account | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_012_unmapped_category_does_not_receive_an_invented_a | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Category with missing SKR mapping | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_013_category_with_missing_skr_mapping | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Category review is unavailable until its workspace is accepted | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_014_category_review_is_unavailable_until_its_workspa | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Inactive category warning does not replace mapping review | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_015_inactive_category_warning_does_not_replace_mappi | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Eligible inactive category keeps the recurring warning policy | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_016_eligible_inactive_category_keeps_the_recurring_w | 🔴 red |
+| specs/accounting/spec.md → Kategorien | Unmapped inactive category is used only without category mappings | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_017_unmapped_inactive_category_is_used_only_without | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | User-configured output is identified | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_018_user_configured_output_is_identified | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | Unresolved mapping stops the output | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_019_unresolved_mapping_stops_the_output | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | EÜR detects categories missing a report line | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_020_e_r_detects_categories_missing_a_report_line | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | EÜR detects a missing category reference | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_021_e_r_detects_a_missing_category_reference | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | DATEV detects missing category account mappings | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_022_datev_detects_missing_category_account_mappings | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | DATEV records both account slot sources | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_023_datev_records_both_account_slot_sources | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | DATEV rejects an unresolved account slot | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_024_datev_rejects_an_unresolved_account_slot | 🔴 red |
+| specs/accounting/spec.md → EÜR and DATEV disclose or reject category mapping provenance | User-confirmed mapping is visible and recorded | test/features/accounting/category_mapping_provenance_test.dart | test_accounting_catalog_025_user_confirmed_mapping_is_visible_and_recorded | 🔴 red |
+| specs/db/spec.md → Seed Data | Fresh profile without an approved category catalog | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_026_fresh_profile_without_an_approved_category_catal | 🔴 red |
+| specs/db/spec.md → Seed Data | USt-Sätze Seeded | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_027_ust_s_tze_seeded | 🔴 red |
+| specs/db/spec.md → Seed Data | Nummernkreise Seeded | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_028_nummernkreise_seeded | 🔴 red |
+| specs/db/spec.md → Seed Data | Kategorien Seeded With SKR Accounts | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_029_kategorien_seeded_with_skr_accounts | 🔴 red |
+| specs/db/spec.md → Seed Data | Approved category manifest is seeded with provenance | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_030_approved_category_manifest_is_seeded_with_proven | 🔴 red |
+| specs/db/spec.md → Seed Data | Unapproved manifest is rejected | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_031_unapproved_manifest_is_rejected | 🔴 red |
+| specs/db/spec.md → Seed Data | Existing categories are preserved during migration | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_032_existing_categories_are_preserved_during_migrati | 🔴 red |
+| specs/db/spec.md → Seed Data | Seed restart preserves reviewed category values | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_033_seed_restart_preserves_reviewed_category_values | 🔴 red |
+| specs/db/spec.md → Seed Data | Seed Data Not Duplicated on Restart | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_034_seed_data_not_duplicated_on_restart | 🔴 red |
+| specs/db/spec.md → Table Definitions | All Tables Created on Fresh Install | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_035_all_tables_created_on_fresh_install | 🔴 red |
+| specs/db/spec.md → Table Definitions | Pre-v9 profile is valid before later feature migrations | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_mig | 🔴 red |
+| specs/db/spec.md → Table Definitions | Missing v7 payment table is created by the v7-to-v8 migration | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to | 🔴 red |
+| specs/db/spec.md → Table Definitions | Missing payment table at v8 or later preserves the incomplete signal | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_t | 🔴 red |
+| specs/db/spec.md → Table Definitions | Current payment table repair preserves existing rows | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_039_current_payment_table_repair_preserves_existing | 🔴 red |
+| specs/db/spec.md → Table Definitions | V8-to-v9 migration adds shared markers and mileage tables | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_milea | 🔴 red |
+| specs/db/spec.md → Table Definitions | V10 migration adds category history | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_041_v10_migration_adds_category_history | 🔴 red |
+| specs/db/spec.md → Table Definitions | Unknown lazy-table state is not repaired by initialization | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_init | 🔴 red |
+| specs/db/spec.md → Table Definitions | Table Count Verification | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_043_table_count_verification | 🔴 red |
+| specs/db/spec.md → Table Definitions | Unknown or malformed application tables fail schema health | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_sch | 🔴 red |
+| specs/db/spec.md → Table Definitions | Missing Table Detection | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_045_missing_table_detection | 🔴 red |
+| specs/db/spec.md → Category mapping provenance is persisted | Provenance migration preserves and marks existing categories | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_046_provenance_migration_preserves_and_marks_existin | 🔴 red |
+| specs/db/spec.md → Category mapping provenance is persisted | Mapping status and values update atomically | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_047_mapping_status_and_values_update_atomically | 🔴 red |
+| specs/db/spec.md → Category mapping provenance is persisted | Export records persist the mapping provenance snapshot | test/core/db/accounting_catalog_migration_test.dart | test_accounting_catalog_048_export_records_persist_the_mapping_provenance_sn | 🔴 red |
+
+## Coverage Notes
+
+- 48 scenarios across all accounting and database delta specs have named tests.
+- Seed, migration, row-preservation, and history invariants use database tests; reporting resolution and user provenance use accounting service tests.
+- Test paths and names define future implementation coverage; no tests were run while creating the planning artifacts.

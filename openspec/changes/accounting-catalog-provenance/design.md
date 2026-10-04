@@ -29,7 +29,7 @@ Rejected: copy mappings from examples or infer them from an official-looking num
 
 ### Keep provenance separate from mutable category values
 
-Persist a mapping status (`catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, or `unmapped`) plus the catalog entry/source release when one exists. Catalog-derived values begin `catalog_verified`. Editing any mapping field moves the whole mapping to `review_required`; it becomes `user_confirmed` only after the user reviews all populated mapping fields. The original catalog release remains visible as the baseline, while the current status makes clear that edited values are no longer catalog-verified. Unmapped user categories remain valid for entry where no accounting mapping is needed, but cannot silently participate in a mapping-dependent output.
+Persist a mapping status (`catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, or `unmapped`) plus the catalog entry/source release when one exists. Catalog-derived values begin `catalog_verified`. Editing any mapping field moves the whole mapping to `review_required`; it becomes `user_confirmed` only after the user reviews all populated mapping fields. The original catalog release remains visible as the baseline, while the current status makes clear that edited values are no longer catalog-verified. An unmapped category may label a balanced posting only when that posting supplies account and tax data independently; it cannot participate in an operation that requires category mapping values. Legacy or edited mapping values likewise block only operations that consume those values; they are never silently treated as verified.
 
 Rejected: a single `system_seeded` boolean or matching a category name/number pattern. Neither distinguishes an edited mapping from a verified one.
 
@@ -41,9 +41,13 @@ Rejected: rewrite rows whose values happen to equal the synthetic formula. A use
 
 ### Make EÜR and DATEV disclose or reject unresolved category mappings
 
-EÜR and DATEV may use `catalog_verified` category mappings. They may use `user_confirmed` mappings only while clearly identifying them as user-configured and not source-verified in the preview and persisted export metadata. They must stop with the affected category IDs when an in-scope category mapping is `legacy_unverified`, `review_required`, or `unmapped`, or when a required report mapping is absent. No implicit `1200`/`8400` or other default account is produced. GuV is not changed by this proposal because its report owner has not accepted a provenance contract.
+EÜR and DATEV may use `catalog_verified` category mappings. They may use `user_confirmed` mappings only while clearly identifying them as user-configured and not source-verified in the preview and persisted export metadata. Each persisted output snapshot records the exact resolved mapping values and immutable history-row IDs used. DATEV resolves the `Konto` and `Gegenkonto` slots independently from their corresponding posting legs; each snapshot records the slot, exact number, source, and category/history reference when applicable. A configured company account is eligible only when the posting leg explicitly selects it. Generation fails with affected journal/category IDs if either required slot has no eligible source. No implicit `1200`/`8400` or other default account is produced. GuV is not changed by this proposal because its report owner has not accepted a provenance contract.
 
 Rejected: silently omit unresolved rows or substitute a generic account, because either can make an incomplete result look complete.
+
+### Keep category activation separate from mapping trust
+
+Deactivation hides a category from new-entry selectors but does not change its provenance status. An otherwise eligible deactivated category may be used by an already configured recurring booking only when the accepted posting contract permits it and the occurrence displays the inactive-category warning. Category status blocks a posting only when the posting needs mapping values from that category; an inactive warning never counts as a mapping review.
 
 ## Risks / Trade-offs
 
