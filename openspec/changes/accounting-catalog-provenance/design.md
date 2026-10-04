@@ -11,7 +11,7 @@ The category table currently stores editable values directly, and existing profi
 - Never create or report synthetic SKR/EÜR/EKS mappings as a standard catalog.
 - Preserve existing rows and user changes while making their mapping trust status explicit.
 - Let new catalog values be traced to an approved source release and distinguish later user-confirmed values.
-- Keep accounting outputs from silently treating unresolved values as authoritative.
+- Keep EÜR and DATEV from silently treating unresolved category values as authoritative. GuV remains outside this change until its report owner accepts an output-provenance contract.
 
 **Non-Goals:**
 
@@ -39,9 +39,9 @@ Use the existing backup-before-migration and transactional migration path. Class
 
 Rejected: rewrite rows whose values happen to equal the synthetic formula. A user may have edited another field or may intentionally depend on the existing row ID.
 
-### Make mapping-dependent output disclose or reject unresolved values
+### Make EÜR and DATEV disclose or reject unresolved category mappings
 
-EÜR, GuV, and DATEV may use `catalog_verified` mappings. They may use `user_confirmed` mappings only while clearly identifying them as user-configured and not source-verified in the preview and export metadata. They must stop with the affected category IDs when any contributing mapping is `legacy_unverified`, `review_required`, or `unmapped`. No implicit `1200`/`8400` or other default account is produced for an unresolved category.
+EÜR and DATEV may use `catalog_verified` category mappings. They may use `user_confirmed` mappings only while clearly identifying them as user-configured and not source-verified in the preview and persisted export metadata. They must stop with the affected category IDs when an in-scope category mapping is `legacy_unverified`, `review_required`, or `unmapped`, or when a required report mapping is absent. No implicit `1200`/`8400` or other default account is produced. GuV is not changed by this proposal because its report owner has not accepted a provenance contract.
 
 Rejected: silently omit unresolved rows or substitute a generic account, because either can make an incomplete result look complete.
 
@@ -57,10 +57,10 @@ Rejected: silently omit unresolved rows or substitute a generic account, because
 2. Add provenance fields through the versioned migration, transactionally mark existing category rows `legacy_unverified`, and verify that all existing values, IDs, active flags, and references are unchanged.
 3. Remove the formulaic seed. Seed only entries from the approved manifest; otherwise leave the profile unconfigured. Make repeated seed and migration runs idempotent.
 4. Add explicit mapping review to the category workspace, preserve original source release when mappings are edited, and require review after any mapping-field change.
-5. Validate EÜR/GuV/DATEV inputs against mapping status; include user-configured provenance and reject unresolved categories without fallback accounts.
+5. Validate EÜR/DATEV inputs against mapping status; include user-configured provenance and reject unresolved categories without fallback accounts.
 6. Update docs and maintained specs to describe the unconfigured and provenance states. Rollback restores the pre-migration backup; do not drop provenance fields or revert category values in-place.
 
 ## Open Questions
 
 - Which exact SKR edition/source may be bundled, under what redistribution terms, and who signs off the EÜR/EKS relationships? No catalog values can be shipped until this is answered.
-- The category editing route is proposed separately by `master-data-workspaces-and-crud`; implementation must coordinate the explicit review action with that route and may not expose legacy rows as trusted while the route is unavailable.
+- Category review is owned by the `/categories` workspace in `master-data-workspaces-and-crud`. This change is gated on that workspace's route and review action being accepted and available. Until then, category provenance is read-only, legacy/unreviewed mappings remain blocked from new postings and mapping-dependent outputs, and no hidden setter may mark them trusted.

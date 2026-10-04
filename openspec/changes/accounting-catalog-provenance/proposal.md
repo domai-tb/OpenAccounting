@@ -7,7 +7,7 @@ The archived `seed-master-data-contract` says curated SKR03/SKR04 and EÜR/EKS m
 - Remove synthetic category mappings from the seed contract and allow default mapped categories only from an approved, versioned catalog manifest.
 - Track whether category mappings are source-verified, explicitly user-confirmed, unresolved legacy data, or unmapped. Preserve source and user-edit history without treating manual edits as official mappings.
 - Preserve existing category IDs, values, active state, and journal references during upgrades; require explicit review before legacy mappings affect new postings or mapped reports/exports.
-- Prevent EÜR/GuV/DATEV from silently consuming unresolved mappings or inventing fallback account numbers; identify user-configured mappings as such in generated output.
+- Prevent EÜR and DATEV from silently consuming unresolved category mappings or inventing fallback account numbers; identify user-configured mappings as such in generated output. GuV is outside this change until its report owner has an accepted mapping-provenance contract.
 - Correct the category-seed claims in maintained specifications and user documentation.
 
 No SKR account or tax-line values are proposed here. Adding a bundled catalog is gated on approval of its exact source and edition, redistribution rights, and accounting review of the SKR/EÜR/EKS relationships.
@@ -25,4 +25,4 @@ None.
 
 ## Impact
 
-`lib/core/db/seed.dart`, a versioned database migration, category persistence/edit flows, EÜR/GuV/DATEV mapping consumers, `openspec/specs/{db,accounting}`, and `docs/02-buchhaltung.md` / `docs/03-kunden-stammdaten.md`. The bank-template portion of the archived seed proposal is outside this change.
+`lib/core/db/seed.dart`, a versioned database migration, category persistence/edit flows, EÜR/DATEV mapping consumers, `openspec/specs/{db,accounting}`, and `docs/02-buchhaltung.md` / `docs/03-kunden-stammdaten.md`. GuV remains outside scope. The bank-template portion of the archived seed proposal is outside this change.

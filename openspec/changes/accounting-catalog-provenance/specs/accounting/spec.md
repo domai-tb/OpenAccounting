@@ -2,7 +2,7 @@
 
 ### Requirement: Kategorien
 
-The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance. It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Each category SHALL distinguish `catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, and `unmapped` status as applicable. A manual edit to any mapping field SHALL set the category to `review_required`; `user_confirmed` requires an explicit review of every populated mapping field. User-confirmed mappings MUST remain distinguishable from catalog-verified mappings.
+The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance. It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Each category SHALL distinguish `catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, and `unmapped` status as applicable. A manual edit to any mapping field SHALL set the category to `review_required`; `user_confirmed` requires an explicit review of every populated mapping field. User-confirmed mappings MUST remain distinguishable from catalog-verified mappings. The review action SHALL be reachable from the accepted `/categories` workspace specified by `master-data-workspaces-and-crud`; until that workspace is accepted and available, provenance remains read-only and untrusted mappings stay blocked.
 
 #### Scenario: Approved catalog category has traceable mappings
 
@@ -80,9 +80,16 @@ The system SHALL provide categories with stable IDs, name, description, activati
 - **WHEN** a DATEV export requires that account mapping
 - **THEN** export resolution reports the category as unresolved and does not substitute a default account
 
-### Requirement: Mapping-dependent reports and exports disclose provenance
+#### Scenario: Category review is unavailable until its workspace is accepted
 
-EÜR, GuV, and DATEV SHALL use only `catalog_verified` or explicitly `user_confirmed` category mappings. Output using user-confirmed mappings MUST identify them as user-configured and not source-verified in the preview and persisted export metadata. If an output depends on a `legacy_unverified`, `review_required`, or `unmapped` category, generation MUST fail with the affected category IDs and MUST NOT silently omit those entries or substitute a default account.
+- **GIVEN** a category has `legacy_unverified` or `review_required` status and the accepted `/categories` workspace is not available
+- **WHEN** a user attempts to review its mapping
+- **THEN** the system SHALL keep the category status unchanged and identify the unavailable review workflow
+- **AND** new postings and mapping-dependent output SHALL remain blocked for that category
+
+### Requirement: EÜR and DATEV disclose or reject category mapping provenance
+
+EÜR and DATEV SHALL use only `catalog_verified` or explicitly `user_confirmed` category mappings. Before grouping or filtering, EÜR SHALL left-join every journal row selected by its existing accepted period, posting, and correction rules to its category and validate provenance and required `euer_zeile`; a missing category, missing required mapping, or ineligible provenance status MUST block output with the affected journal/category IDs. DATEV SHALL use an explicit `konto_id.datev_kontonummer` when present; otherwise a row requiring a category SKR account MUST use an eligible category mapping. Output using user-confirmed mappings MUST identify them as user-configured and not source-verified in the preview and persisted export metadata. GuV is outside this requirement and remains governed by its maintained report contract. If EÜR or DATEV depends on a `legacy_unverified`, `review_required`, or `unmapped` category, or if a required category mapping is absent, generation MUST fail with the affected category IDs and MUST NOT silently omit those entries or substitute a default account.
 
 #### Scenario: User-configured output is identified
 
@@ -96,3 +103,31 @@ EÜR, GuV, and DATEV SHALL use only `catalog_verified` or explicitly `user_confi
 - **WHEN** generation is requested
 - **THEN** generation fails with those category IDs
 - **AND** no successful report/export is recorded and no fallback account is emitted
+
+#### Scenario: EÜR detects categories missing a report line
+
+- **GIVEN** an in-scope journal entry in the selected EÜR period references a category with no `euer_zeile` or a provenance status other than `catalog_verified` or `user_confirmed`
+- **WHEN** the EÜR source rows are left-joined to categories before mapping filters or grouping
+- **THEN** generation fails with the affected journal and category IDs
+- **AND** the entry is not silently excluded from the report
+
+#### Scenario: EÜR detects a missing category reference
+
+- **GIVEN** an in-scope journal entry in the selected EÜR period has no category or references a missing category row
+- **WHEN** EÜR completeness is checked before calculation
+- **THEN** generation fails with the affected journal entry ID
+- **AND** the entry is not silently excluded from the report
+
+#### Scenario: DATEV detects missing category account mappings
+
+- **GIVEN** an in-scope DATEV journal row has no explicit `konto_id.datev_kontonummer` and requires a category SKR account that is absent or has a provenance status other than `catalog_verified` or `user_confirmed`
+- **WHEN** DATEV account resolution runs
+- **THEN** export fails with the affected category IDs
+- **AND** no fallback account such as `1200` or `8400` is emitted
+
+#### Scenario: User-confirmed mapping is visible and recorded
+
+- **GIVEN** an EÜR or DATEV output uses one or more `user_confirmed` category mappings
+- **WHEN** the preview and persisted export are produced
+- **THEN** both identify those mappings as user-configured and not source-verified
+- **AND** the export metadata records the category IDs and mapping status snapshot
