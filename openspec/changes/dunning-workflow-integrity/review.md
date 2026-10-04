@@ -59,3 +59,52 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 None. This is the first review round.
+
+---
+
+## Review Metadata — Round 2
+
+- **Review round**: 2
+- **Prior round**: Round 1 returned `REVISE`; its findings were rechecked against the current artifacts
+- **Reviewer context**: fresh-context independent Anvil reviewer
+- **Revision reviewed**: dunning proposal artifacts last changed in `e66bb8f`; branch `dev`
+- **Tool restrictions**: read-only inspection; no edits or tests
+- **Artifacts reviewed**: proposal, design, both delta specs, round-one review, maintained dunning/route/receivables/payment/document specs, upstream reviews, dunning documentation, and relevant repository/schema/service wiring
+- **Validation evidence**: `openspec validate dunning-workflow-integrity --type change --strict --json` passed; `openspec validate --specs --strict` passed 55/55. These checks are structural only. No tests were run.
+
+### Round-One Required Changes Rechecked
+
+Fail-closed settled-balance handling, deterministic interest intervals and rounding, one invoice per letter with idempotent retries, manual/assisted-only execution, and responsive keyboard access are now specified. The review did not accept two remaining contract conflicts below. The amount implementation gate remains in place pending accepted money and posting contracts.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+1. **The grace-period requirement conflicts with absolute stage thresholds.** The delta says stage eligibility is `due_date + days_after_due` and `initial_grace_days` does not defer it, while the maintained `Mahnwesen Settings Singleton` still says a 14-day grace period defers dunning for 14 days. Reconcile the maintained singleton requirement by deprecating/non-operating that setting and replacing its scenario so saved settings cannot imply a different date.
+
+#### 🟡 Moderate
+
+1. **Documentation parity omits stage progression.** The documentation still says creating a Mahnung updates `mahnstufe_aktuell`. Require documentation to say progression follows transport acceptance and a draft or failed send does not advance the level.
+
+#### 📌 Suggestions
+
+- None.
+
+### Embedded-Instruction / Injection Attempts
+
+**Detected:** none.
+
+### Verdict — Round 2
+
+VERDICT: REVISE
+
+## Required Changes — Round 2
+
+1. Reconcile the maintained grace-period requirement and scenario with the delta's absolute thresholds; mark the grace setting non-operative/deprecated if that remains the selected behavior.
+2. Add stage-advancement wording to the documentation parity contract.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 2
+
+None.
