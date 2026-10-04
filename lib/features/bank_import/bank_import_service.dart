@@ -85,6 +85,45 @@ class BankImportService {
 
   // ── Score ──────────────────────────────────────────────────────────
 
+  /// Loads eligible match candidates: journal rows with a valid persisted
+  /// integer ID. Failures propagate so callers show an unavailable state
+  /// instead of a fabricated no-match.
+  Future<List<Map<String, Object?>>> loadMatchCandidates() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
+    return rows.where((row) => (row['id'] as num?)?.toInt() != null).toList(growable: false);
+  }
+
+  /// Ranks candidates for [tx] by score descending, journal ID ascending.
+  /// Review displays the top entry with its confidence label; the ranking is
+  /// deterministic for tied scores.
+  Future<List<MatchCandidate>> rankCandidates(RawTx tx) async {
+    final List<Map<String, Object?>> journals = await loadMatchCandidates();
+    final List<MatchCandidate> ranked = <MatchCandidate>[];
+    for (final j in journals) {
+      final int? id = (j['id'] as num?)?.toInt();
+      if (id == null) continue;
+      ranked.add(
+        MatchCandidate(
+          journalId: id,
+          score: computeScore(tx, j),
+          datum: j['datum']?.toString(),
+          betrag: j['betrag']?.toString(),
+          beschreibung: (j['beschreibung'] ?? j['bezeichnung'])?.toString(),
+        ),
+      );
+    }
+    ranked.sort((a, b) => b.score != a.score ? b.score.compareTo(a.score) : a.journalId.compareTo(b.journalId));
+    return ranked;
+  }
+
+  /// Localized confidence label: 90–100 high, 70–89 medium, 50–69 low, else none.
+  String confidenceLabel(int score, AppLocalizations l10n) {
+    if (score >= 90) return l10n.bankConfidenceHigh;
+    if (score >= 70) return l10n.bankConfidenceMedium;
+    if (score >= 50) return l10n.bankConfidenceLow;
+    return l10n.bankConfidenceNone;
+  }
+
   /// Score 0..100 between [tx] and a journal row.
   /// Discrete 40/30/30: amount within 0.01 => 40, date within 7d => 30, partner similarity >80% => 30.
   /// Threshold 90 requires all three (ponytail: no partial auto-book, conservative by design).
@@ -240,12 +279,16 @@ class BankImportService {
     // remains linked to an auditable import. Do not import without history.
     final int importId = await _createHistory(kontoId: kontoId, dateiname: dateiname, template: template, l10n: l10n);
 
-    // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters)
+    // Preload journals for scoring (ponytail: full scan ceiling — indexed per-konto if scale matters).
+    // A load failure is unavailable, never a no-match: automatic linking is
+    // disabled for the whole import but the user may still proceed.
     List<Map<String, Object?>> journals = <Map<String, Object?>>[];
+    bool candidatesUnavailable = false;
     try {
-      journals = await executor.runSelect('SELECT * FROM journal', const <Object?>[]);
+      journals = await loadMatchCandidates();
     } catch (_) {
       journals = <Map<String, Object?>>[];
+      candidatesUnavailable = true;
     }
 
     for (int index = 0; index < rawTxs.length; index++) {
@@ -285,20 +328,27 @@ class BankImportService {
         final int? kategorieId = tx.kategorieId ?? await applyRules(tx.verwendungszweck);
         final bool wasAutoCategorized = !hasReviewedCategory && kategorieId != null;
 
-        // Score match against journals — pick best >=90 (requires all three 40+30+30).
+        // Score match against journals — link only a unique top candidate
+        // scoring at least 90 in automatic mode. Tied tops stay unlinked;
+        // manual mode never links suggestions (explicit selection only).
         int? matchedJournalId = tx.journalId;
-        if (matchedJournalId == null && journals.isNotEmpty) {
+        if (matchedJournalId == null && !candidatesUnavailable && journals.isNotEmpty) {
           int bestScore = -1;
           int? bestId;
+          int topCount = 0;
           for (final j in journals) {
             final int score = computeScore(tx, j);
             if (score > bestScore) {
               bestScore = score;
               final Object? journalId = j['id'];
               bestId = journalId == null ? null : (journalId as num).toInt();
+              topCount = 1;
+            } else if (score == bestScore) {
+              topCount++;
             }
           }
-          if (bestScore < 90 || mode.toLowerCase() != 'automatisch') {
+          final bool uniqueTop = topCount == 1;
+          if (!uniqueTop || bestScore < 90 || mode.toLowerCase() != 'automatisch') {
             bestId = null;
           }
           matchedJournalId = bestId;
@@ -386,6 +436,7 @@ class BankImportService {
       failedRows: failures,
       importId: importId,
       historyUpdated: historyUpdated,
+      candidatesUnavailable: candidatesUnavailable,
     );
   }
 

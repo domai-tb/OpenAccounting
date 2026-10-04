@@ -679,5 +679,10 @@
           }
       }
   },
-  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required"
+  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required",
+  "bankConfidenceHigh": "Hohe Übereinstimmung",
+  "bankConfidenceMedium": "Mittlere Übereinstimmung",
+  "bankConfidenceLow": "Geringe Übereinstimmung",
+  "bankConfidenceNone": "Keine Übereinstimmung",
+  "bankCandidatesUnavailable": "Treffer konnten nicht geladen werden. Automatische Verknüpfung ist deaktiviert."
 }

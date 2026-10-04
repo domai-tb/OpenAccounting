@@ -4,18 +4,18 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 
 ## 1. Score-Based Matching
 
-- [ ] 1.1 Write failing test: `test_high_confidence_match` in `test/features/bank_import/bank_import_service_test.dart` for “High-confidence match” (assert it fails for the right reason).
-- [ ] 1.2 Implement the behavior specified by “High-confidence match” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 1.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 1.4 Write failing test: `test_no_match` in `test/features/bank_import/bank_import_service_test.dart` for “No match” (assert it fails for the right reason).
-- [ ] 1.5 Implement the behavior specified by “No match” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 1.6 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 1.7 Write failing test: `test_tied_top_candidates_are_not_auto_linked` in `test/features/bank_import/bank_import_service_test.dart` for “Tied top candidates are not auto-linked” (assert it fails for the right reason).
-- [ ] 1.8 Implement the behavior specified by “Tied top candidates are not auto-linked” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 1.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 1.10 Write failing test: `test_candidate_query_failure_is_not_a_no_match` in `test/features/bank_import/bank_import_service_test.dart` for “Candidate query failure is not a no-match” (assert it fails for the right reason).
-- [ ] 1.11 Implement the behavior specified by “Candidate query failure is not a no-match” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 1.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 1.1 Write failing test: `test_high_confidence_match` in `test/features/bank_import/bank_import_service_test.dart` for “High-confidence match” (assert it fails for the right reason).
+- [x] 1.2 Implement the behavior specified by “High-confidence match” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 1.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 1.4 Write failing test: `test_no_match` in `test/features/bank_import/bank_import_service_test.dart` for “No match” (assert it fails for the right reason).
+- [x] 1.5 Implement the behavior specified by “No match” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 1.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 1.7 Write failing test: `test_tied_top_candidates_are_not_auto_linked` in `test/features/bank_import/bank_import_service_test.dart` for “Tied top candidates are not auto-linked” (assert it fails for the right reason).
+- [x] 1.8 Implement the behavior specified by “Tied top candidates are not auto-linked” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 1.9 Refactor the related code; focused tests and the full suite stay green.
+- [x] 1.10 Write failing test: `test_candidate_query_failure_is_not_a_no_match` in `test/features/bank_import/bank_import_service_test.dart` for “Candidate query failure is not a no-match” (assert it fails for the right reason).
+- [x] 1.11 Implement the behavior specified by “Candidate query failure is not a no-match” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 1.12 Refactor the related code; focused tests and the full suite stay green.
 
 ## 2. Auto-Filter Rule CRUD
 
@@ -61,24 +61,24 @@ Each scenario follows red-green-refactor order. Keep import and retry writes ato
 - [x] 4.7 Write failing test: `test_failed_mode_migration_rolls_back` in `test/features/bank_import/import_mode_migration_test.dart` for “Failed mode migration rolls back” (assert it fails for the right reason).
 - [x] 4.8 Implement the behavior specified by “Failed mode migration rolls back” in `specs/bank-import/spec.md` to pass the preceding test.
 - [x] 4.9 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.10 Write failing test: `test_automatic_mode` in `test/features/bank_import/import_mode_test.dart` for “Automatic mode” (assert it fails for the right reason).
-- [ ] 4.11 Implement the behavior specified by “Automatic mode” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.12 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 4.13 Write failing test: `test_manual_mode` in `test/features/bank_import/import_mode_test.dart` for “Manual mode” (assert it fails for the right reason).
-- [ ] 4.14 Implement the behavior specified by “Manual mode” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 4.15 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.10 Write failing test: `test_automatic_mode` in `test/features/bank_import/import_mode_test.dart` for “Automatic mode” (assert it fails for the right reason).
+- [x] 4.11 Implement the behavior specified by “Automatic mode” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.12 Refactor the related code; focused tests and the full suite stay green.
+- [x] 4.13 Write failing test: `test_manual_mode` in `test/features/bank_import/import_mode_test.dart` for “Manual mode” (assert it fails for the right reason).
+- [x] 4.14 Implement the behavior specified by “Manual mode” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 4.15 Refactor the related code; focused tests and the full suite stay green.
 - [x] 4.16 Write failing test: `test_import_mode_remains_profile_scoped` in `test/features/bank_import/import_mode_migration_test.dart` for “Import mode remains profile-scoped” (assert it fails for the right reason).
 - [x] 4.17 Implement the behavior specified by “Import mode remains profile-scoped” in `specs/bank-import/spec.md` to pass the preceding test.
 - [x] 4.18 Refactor the related code; focused tests and the full suite stay green.
 
 ## 5. Per-Session Import Mode Override
 
-- [ ] 5.1 Write failing test: `test_override_for_single_import` in `test/features/bank_import/import_mode_test.dart` for “Override for single import” (assert it fails for the right reason).
-- [ ] 5.2 Implement the behavior specified by “Override for single import” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 5.3 Refactor the related code; focused tests and the full suite stay green.
-- [ ] 5.4 Write failing test: `test_override_does_not_persist` in `test/features/bank_import/import_mode_test.dart` for “Override does not persist” (assert it fails for the right reason).
-- [ ] 5.5 Implement the behavior specified by “Override does not persist” in `specs/bank-import/spec.md` to pass the preceding test.
-- [ ] 5.6 Refactor the related code; focused tests and the full suite stay green.
+- [x] 5.1 Write failing test: `test_override_for_single_import` in `test/features/bank_import/import_mode_test.dart` for “Override for single import” (assert it fails for the right reason).
+- [x] 5.2 Implement the behavior specified by “Override for single import” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 5.3 Refactor the related code; focused tests and the full suite stay green.
+- [x] 5.4 Write failing test: `test_override_does_not_persist` in `test/features/bank_import/import_mode_test.dart` for “Override does not persist” (assert it fails for the right reason).
+- [x] 5.5 Implement the behavior specified by “Override does not persist” in `specs/bank-import/spec.md` to pass the preceding test.
+- [x] 5.6 Refactor the related code; focused tests and the full suite stay green.
 
 ## 6. Banking workspace follows the design system
 

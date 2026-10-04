@@ -7,10 +7,10 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/bank-import/spec.md → Score-Based Matching | High-confidence match | test/features/bank_import/bank_import_service_test.dart | test_high_confidence_match | 🔴 red |
-| specs/bank-import/spec.md → Score-Based Matching | No match | test/features/bank_import/bank_import_service_test.dart | test_no_match | 🔴 red |
-| specs/bank-import/spec.md → Score-Based Matching | Tied top candidates are not auto-linked | test/features/bank_import/bank_import_service_test.dart | test_tied_top_candidates_are_not_auto_linked | 🔴 red |
-| specs/bank-import/spec.md → Score-Based Matching | Candidate query failure is not a no-match | test/features/bank_import/bank_import_service_test.dart | test_candidate_query_failure_is_not_a_no_match | 🔴 red |
+| specs/bank-import/spec.md → Score-Based Matching | High-confidence match | test/features/bank_import/bank_import_service_test.dart | test_high_confidence_match | 🟢 green |
+| specs/bank-import/spec.md → Score-Based Matching | No match | test/features/bank_import/bank_import_service_test.dart | test_no_match | 🟢 green |
+| specs/bank-import/spec.md → Score-Based Matching | Tied top candidates are not auto-linked | test/features/bank_import/bank_import_service_test.dart | test_tied_top_candidates_are_not_auto_linked | 🟢 green |
+| specs/bank-import/spec.md → Score-Based Matching | Candidate query failure is not a no-match | test/features/bank_import/bank_import_service_test.dart | test_candidate_query_failure_is_not_a_no_match | 🟢 green |
 | specs/bank-import/spec.md → Auto-Filter Rule CRUD | Create filter rule | test/features/bank_import/category_rule_repository_test.dart | test_create_filter_rule | 🟢 green |
 | specs/bank-import/spec.md → Auto-Filter Rule CRUD | Reject an invalid filter rule | test/features/bank_import/category_rule_repository_test.dart | test_reject_an_invalid_filter_rule | 🟢 green |
 | specs/bank-import/spec.md → Auto-Filter Rule CRUD | Equal-priority rules use rule ID order | test/features/bank_import/category_rule_repository_test.dart | test_equal_priority_rules_use_rule_id_order | 🟢 green |
@@ -23,11 +23,11 @@
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Missing profile mode defaults to manual | test/features/bank_import/import_mode_migration_test.dart | test_missing_profile_mode_defaults_to_manual | 🟢 green |
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Version-9 profile migrates without changing company data | test/features/bank_import/import_mode_migration_test.dart | test_version_9_profile_migrates_without_changing_company_data | 🟢 green |
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Failed mode migration rolls back | test/features/bank_import/import_mode_migration_test.dart | test_failed_mode_migration_rolls_back | 🟢 green |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Automatic mode | test/features/bank_import/import_mode_test.dart | test_automatic_mode | 🔴 red |
-| specs/bank-import/spec.md → Manual vs Automatic Mode | Manual mode | test/features/bank_import/import_mode_test.dart | test_manual_mode | 🔴 red |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Automatic mode | test/features/bank_import/import_mode_test.dart | test_automatic_mode | 🟢 green |
+| specs/bank-import/spec.md → Manual vs Automatic Mode | Manual mode | test/features/bank_import/import_mode_test.dart | test_manual_mode | 🟢 green |
 | specs/bank-import/spec.md → Manual vs Automatic Mode | Import mode remains profile-scoped | test/features/bank_import/import_mode_migration_test.dart | test_import_mode_remains_profile_scoped | 🟢 green |
-| specs/bank-import/spec.md → Per-Session Import Mode Override | Override for single import | test/features/bank_import/import_mode_test.dart | test_override_for_single_import | 🔴 red |
-| specs/bank-import/spec.md → Per-Session Import Mode Override | Override does not persist | test/features/bank_import/import_mode_test.dart | test_override_does_not_persist | 🔴 red |
+| specs/bank-import/spec.md → Per-Session Import Mode Override | Override for single import | test/features/bank_import/import_mode_test.dart | test_override_for_single_import | 🟢 green |
+| specs/bank-import/spec.md → Per-Session Import Mode Override | Override does not persist | test/features/bank_import/import_mode_test.dart | test_override_does_not_persist | 🟢 green |
 | specs/bank-import/spec.md → Banking workspace follows the design system | Banking resolves the typed use case | test/features/routed_surface/bank_import_test.dart | test_banking_resolves_the_typed_use_case | 🔴 red |
 | specs/bank-import/spec.md → Banking workspace follows the design system | Rule controls work from the keyboard | test/features/routed_surface/bank_import_test.dart | test_rule_controls_work_from_the_keyboard | 🔴 red |
 | specs/bank-import/spec.md → Banking workspace follows the design system | History and review controls work from the keyboard | test/features/routed_surface/bank_import_test.dart | test_history_and_review_controls_work_from_the_keyboard | 🔴 red |
@@ -36,7 +36,7 @@
 | specs/bank-import/spec.md → Bank Transactions Table | Transaction linked to journal entry | test/features/bank_import/bank_import_service_test.dart | test_transaction_linked_to_journal_entry | 🔴 red |
 | specs/bank-import/spec.md → Bank Transactions Table | Transaction stored without journal link | test/features/bank_import/bank_import_service_test.dart | test_transaction_stored_without_journal_link | 🔴 red |
 | specs/bank-import/spec.md → Bank Transactions Table | Import assigns row review status from its decisions | test/features/bank_import/bank_import_service_test.dart | test_import_assigns_row_review_status_from_its_decisions | 🔴 red |
-| specs/bank-import/spec.md → Bank Transactions Table | Automatic mode does not link a low-confidence candidate | test/features/bank_import/bank_import_service_test.dart | test_automatic_mode_does_not_link_a_low_confidence_candidate | 🔴 red |
+| specs/bank-import/spec.md → Bank Transactions Table | Automatic mode does not link a low-confidence candidate | test/features/bank_import/bank_import_service_test.dart | test_automatic_mode_does_not_link_a_low_confidence_candidate | 🟢 green |
 | specs/bank-import/spec.md → Bank Transactions Table | Explicit review closes a new row | test/features/bank_import/bank_import_service_test.dart | test_explicit_review_closes_a_new_row | 🔴 red |
 | specs/bank-import-recovery-surface/spec.md → Import history is actionable | History row opens details | test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart | test_history_row_opens_details | 🔴 red |
 | specs/bank-import-recovery-surface/spec.md → Import history is actionable | Empty history offers import | test/integration/audit/bank-import-confidence-and-rule-workspace_test.dart | test_empty_history_offers_import | 🔴 red |

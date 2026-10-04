@@ -2389,6 +2389,36 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Duplicate override limit reached (100) — manual cleanup required'**
   String get bankDuplicateOverrideLimit;
+
+  /// No description provided for @bankConfidenceHigh.
+  ///
+  /// In de, this message translates to:
+  /// **'Hohe Übereinstimmung'**
+  String get bankConfidenceHigh;
+
+  /// No description provided for @bankConfidenceMedium.
+  ///
+  /// In de, this message translates to:
+  /// **'Mittlere Übereinstimmung'**
+  String get bankConfidenceMedium;
+
+  /// No description provided for @bankConfidenceLow.
+  ///
+  /// In de, this message translates to:
+  /// **'Geringe Übereinstimmung'**
+  String get bankConfidenceLow;
+
+  /// No description provided for @bankConfidenceNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Übereinstimmung'**
+  String get bankConfidenceNone;
+
+  /// No description provided for @bankCandidatesUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Treffer konnten nicht geladen werden. Automatische Verknüpfung ist deaktiviert.'**
+  String get bankCandidatesUnavailable;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

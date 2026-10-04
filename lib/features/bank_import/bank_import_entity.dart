@@ -148,6 +148,7 @@ class ImportResult {
     this.failedRows = const <ImportRowFailure>[],
     this.importId,
     this.historyUpdated = true,
+    this.candidatesUnavailable = false,
   });
 
   final int imported;
@@ -173,6 +174,11 @@ class ImportResult {
   /// False only when the database could not finalize the history row.
   final bool historyUpdated;
 
+  /// True when candidate journal entries could not be loaded. Suggestions
+  /// then show an unavailable state (never a fabricated 0%/no-match), and
+  /// automatic linking is disabled for the import.
+  final bool candidatesUnavailable;
+
   /// Retry-ready rows from this result.
   List<RawTx> get retryableRows => failedRows.map((failure) => failure.transaction).toList(growable: false);
 
@@ -182,6 +188,16 @@ class ImportResult {
   bool get isPartial => status == 'teilweise';
 
   bool get isFailed => status == 'fehlgeschlagen';
+}
+
+/// One ranked journal candidate for a bank transaction in Review.
+class MatchCandidate {
+  const MatchCandidate({required this.journalId, required this.score, this.datum, this.betrag, this.beschreibung});
+  final int journalId;
+  final int score;
+  final String? datum;
+  final String? betrag;
+  final String? beschreibung;
 }
 
 /// Thrown when CSV cannot be parsed or no template matches.

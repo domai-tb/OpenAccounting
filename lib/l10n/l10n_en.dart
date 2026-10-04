@@ -1241,4 +1241,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bankDuplicateOverrideLimit => 'Duplicate override limit reached (100) — manual cleanup required';
+
+  @override
+  String get bankConfidenceHigh => 'High match';
+
+  @override
+  String get bankConfidenceMedium => 'Medium match';
+
+  @override
+  String get bankConfidenceLow => 'Low match';
+
+  @override
+  String get bankConfidenceNone => 'No match';
+
+  @override
+  String get bankCandidatesUnavailable => 'Candidates could not be loaded. Automatic linking is disabled.';
 }

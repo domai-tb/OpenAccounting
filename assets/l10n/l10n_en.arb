@@ -679,5 +679,10 @@
           }
       }
   },
-  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required"
+  "bankDuplicateOverrideLimit": "Duplicate override limit reached (100) — manual cleanup required",
+  "bankConfidenceHigh": "High match",
+  "bankConfidenceMedium": "Medium match",
+  "bankConfidenceLow": "Low match",
+  "bankConfidenceNone": "No match",
+  "bankCandidatesUnavailable": "Candidates could not be loaded. Automatic linking is disabled."
 }

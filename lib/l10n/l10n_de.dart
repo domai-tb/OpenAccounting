@@ -1247,4 +1247,20 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bankDuplicateOverrideLimit => 'Duplicate override limit reached (100) — manual cleanup required';
+
+  @override
+  String get bankConfidenceHigh => 'Hohe Übereinstimmung';
+
+  @override
+  String get bankConfidenceMedium => 'Mittlere Übereinstimmung';
+
+  @override
+  String get bankConfidenceLow => 'Geringe Übereinstimmung';
+
+  @override
+  String get bankConfidenceNone => 'Keine Übereinstimmung';
+
+  @override
+  String get bankCandidatesUnavailable =>
+      'Treffer konnten nicht geladen werden. Automatische Verknüpfung ist deaktiviert.';
 }
