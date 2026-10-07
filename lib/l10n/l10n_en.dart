@@ -1443,4 +1443,73 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fiscalYearInvalid => 'Month must be between 1 and 12';
+
+  @override
+  String get quickBookingsTitle => 'Quick bookings';
+
+  @override
+  String get quickBookingNew => 'New quick booking';
+
+  @override
+  String get quickBookingEdit => 'Edit quick booking';
+
+  @override
+  String get quickBookingDelete => 'Delete quick booking';
+
+  @override
+  String get quickBookingSave => 'Save';
+
+  @override
+  String get quickBookingCancel => 'Cancel';
+
+  @override
+  String get quickBookingName => 'Name';
+
+  @override
+  String get quickBookingDirection => 'Direction';
+
+  @override
+  String get quickBookingDirectionIn => 'Income';
+
+  @override
+  String get quickBookingDirectionOut => 'Expense';
+
+  @override
+  String get quickBookingAccount => 'Account';
+
+  @override
+  String get quickBookingCategory => 'Category';
+
+  @override
+  String get quickBookingTaxRate => 'Tax rate';
+
+  @override
+  String get quickBookingModus => 'Input mode';
+
+  @override
+  String get quickBookingModusNetto => 'Net';
+
+  @override
+  String get quickBookingModusBrutto => 'Gross';
+
+  @override
+  String get quickBookingAmount => 'Amount';
+
+  @override
+  String get quickBookingDescription => 'Description';
+
+  @override
+  String get quickBookingExecute => 'Execute';
+
+  @override
+  String get quickBookingReviewRequired => 'Review required';
+
+  @override
+  String get quickBookingUnavailable => 'Execution unavailable';
+
+  @override
+  String get quickBookingEnterAmount => 'Enter amount';
+
+  @override
+  String get quickBookingEmpty => 'No quick bookings yet.';
 }

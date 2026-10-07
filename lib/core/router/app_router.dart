@@ -134,7 +134,10 @@ GoRouter createRouter(AppDatabase db) {
               ),
             ],
           ),
-          GoRoute(path: '/banking', builder: (context, state) => const BankImportPage()),
+          GoRoute(
+            path: '/banking',
+            builder: (context, state) => BankImportPage(routeUri: state.uri),
+          ),
           GoRoute(
             path: '/contacts',
             builder: (context, state) => const ContactsPage(),

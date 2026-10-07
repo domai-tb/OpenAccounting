@@ -72,7 +72,7 @@ void main() {
 
     Future<int> journalCount() async {
       final rows = await db.executor.runSelect('SELECT COUNT(*) AS c FROM journal', const []);
-      return ((rows.single['c']! as num)).toInt();
+      return (rows.single['c']! as num).toInt();
     }
 
     test('test_quick_booking_preset', () async {

@@ -2791,6 +2791,144 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Monat muss zwischen 1 und 12 liegen'**
   String get fiscalYearInvalid;
+
+  /// No description provided for @quickBookingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Schnellbuchungen'**
+  String get quickBookingsTitle;
+
+  /// No description provided for @quickBookingNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Schnellbuchung'**
+  String get quickBookingNew;
+
+  /// No description provided for @quickBookingEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Schnellbuchung bearbeiten'**
+  String get quickBookingEdit;
+
+  /// No description provided for @quickBookingDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Schnellbuchung löschen'**
+  String get quickBookingDelete;
+
+  /// No description provided for @quickBookingSave.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern'**
+  String get quickBookingSave;
+
+  /// No description provided for @quickBookingCancel.
+  ///
+  /// In de, this message translates to:
+  /// **'Abbrechen'**
+  String get quickBookingCancel;
+
+  /// No description provided for @quickBookingName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name'**
+  String get quickBookingName;
+
+  /// No description provided for @quickBookingDirection.
+  ///
+  /// In de, this message translates to:
+  /// **'Richtung'**
+  String get quickBookingDirection;
+
+  /// No description provided for @quickBookingDirectionIn.
+  ///
+  /// In de, this message translates to:
+  /// **'Einnahme'**
+  String get quickBookingDirectionIn;
+
+  /// No description provided for @quickBookingDirectionOut.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgabe'**
+  String get quickBookingDirectionOut;
+
+  /// No description provided for @quickBookingAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Konto'**
+  String get quickBookingAccount;
+
+  /// No description provided for @quickBookingCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get quickBookingCategory;
+
+  /// No description provided for @quickBookingTaxRate.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuersatz'**
+  String get quickBookingTaxRate;
+
+  /// No description provided for @quickBookingModus.
+  ///
+  /// In de, this message translates to:
+  /// **'Eingabemodus'**
+  String get quickBookingModus;
+
+  /// No description provided for @quickBookingModusNetto.
+  ///
+  /// In de, this message translates to:
+  /// **'Netto'**
+  String get quickBookingModusNetto;
+
+  /// No description provided for @quickBookingModusBrutto.
+  ///
+  /// In de, this message translates to:
+  /// **'Brutto'**
+  String get quickBookingModusBrutto;
+
+  /// No description provided for @quickBookingAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag'**
+  String get quickBookingAmount;
+
+  /// No description provided for @quickBookingDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Beschreibung'**
+  String get quickBookingDescription;
+
+  /// No description provided for @quickBookingExecute.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausführen'**
+  String get quickBookingExecute;
+
+  /// No description provided for @quickBookingReviewRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfung erforderlich'**
+  String get quickBookingReviewRequired;
+
+  /// No description provided for @quickBookingUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausführung nicht verfügbar'**
+  String get quickBookingUnavailable;
+
+  /// No description provided for @quickBookingEnterAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag eingeben'**
+  String get quickBookingEnterAmount;
+
+  /// No description provided for @quickBookingEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Schnellbuchungen vorhanden.'**
+  String get quickBookingEmpty;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

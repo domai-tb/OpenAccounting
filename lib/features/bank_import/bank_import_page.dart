@@ -6,6 +6,7 @@ import 'package:file_selector/file_selector.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
@@ -25,6 +26,9 @@ import 'package:openaccounting/features/bank_import/bank_rules_view.dart';
 import 'package:openaccounting/features/bank_import/bank_templates_view.dart';
 import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
 import 'package:openaccounting/features/bank_import/bank_template.dart';
+import 'package:openaccounting/features/quick_booking/quick_booking_execution.dart';
+import 'package:openaccounting/features/quick_booking/quick_booking_repository.dart';
+import 'package:openaccounting/features/quick_booking/quick_bookings_view.dart';
 
 /// ponytail: German literals here are display strings for bank workflow; migrate to l10n via AppLocalizations when ARB coverage expands.
 /// Locale literals for sidebar/app shell already via l10n; this page pending full centralization (minimal diff per subtask 12).
@@ -34,12 +38,39 @@ final bankImportServiceProvider = Provider<BankImportService>((ref) {
   return BankImportService(db.executor);
 });
 
+final quickBookingRepositoryProvider = Provider<QuickBookingRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return QuickBookingRepository(db.executor);
+});
+
 /// Optional file reader seam for widget tests and desktop integrations.
 typedef BankImportFileReader = Future<List<int>> Function(String path);
 
 const int _maxImportFileBytes = 20 * 1024 * 1024;
 
-enum _BankImportView { import, history, rules, templates }
+enum _BankImportView {
+  import,
+  history,
+  rules,
+  templates,
+  quickBookings;
+
+  static _BankImportView fromQueryValue(String? value) => switch (value) {
+    'history' => history,
+    'rules' => rules,
+    'templates' => templates,
+    'quick-bookings' => quickBookings,
+    _ => import,
+  };
+
+  String get queryValue => switch (this) {
+    import => 'import',
+    history => 'history',
+    rules => 'rules',
+    templates => 'templates',
+    quickBookings => 'quick-bookings',
+  };
+}
 
 enum _BankImportStage { upload, review, result }
 
@@ -53,6 +84,7 @@ class BankImportPage extends ConsumerStatefulWidget {
     this.initialContent,
     this.initialFileName = 'import.csv',
     this.initialTemplate,
+    this.routeUri,
     super.key,
   });
 
@@ -73,6 +105,8 @@ class BankImportPage extends ConsumerStatefulWidget {
   /// Optional template preselection for deep links and integrations that know the source format.
   final BankTemplate? initialTemplate;
 
+  final Uri? routeUri;
+
   @override
   ConsumerState<BankImportPage> createState() => _BankImportPageState();
 }
@@ -83,6 +117,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   final List<BankTemplate> _templates = <BankTemplate>[];
   final List<_BankAccountOption> _accounts = <_BankAccountOption>[];
   final List<_BankCategoryOption> _categories = <_BankCategoryOption>[];
+  final List<({int id, String label})> _taxRates = <({int id, String label})>[];
   final List<_EditableBankRow> _rows = <_EditableBankRow>[];
   final List<_HistoryEntry> _rejectedAttempts = <_HistoryEntry>[];
   final Map<int, _ImportOutcome> _outcomesByImportId = <int, _ImportOutcome>{};
@@ -97,6 +132,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   String? _fileName;
   String? _errorMessage;
   String? _pageDataError;
+  String? _quickBookingOptionsError;
   String? _noticeMessage;
   String? _historyError;
   _ImportOutcome? _outcome;
@@ -138,6 +174,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   @override
   void initState() {
     super.initState();
+    _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
     _pathController = TextEditingController();
     _selectedTemplate = widget.initialTemplate;
     final String? initialContent = widget.initialContent;
@@ -147,6 +184,14 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _pathController.text = widget.initialFileName;
     }
     unawaited(_loadPageData());
+  }
+
+  @override
+  void didUpdateWidget(covariant BankImportPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.routeUri != oldWidget.routeUri) {
+      _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
+    }
   }
 
   @override
@@ -161,6 +206,8 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     List<BankTemplate> templates = <BankTemplate>[];
     List<Map<String, Object?>> accountRows = <Map<String, Object?>>[];
     List<Map<String, Object?>> categoryRows = <Map<String, Object?>>[];
+    List<Map<String, Object?>> taxRateRows = <Map<String, Object?>>[];
+    String? quickBookingOptionsError;
 
     try {
       templates = await _service.loadTemplates();
@@ -177,6 +224,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     } catch (error, stackTrace) {
       debugPrint('bank_import accounts failed: $error\n$stackTrace');
       dataError = _l10n.dataLoadError;
+      quickBookingOptionsError = _l10n.dataLoadError;
     }
 
     try {
@@ -187,6 +235,18 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     } catch (error, stackTrace) {
       debugPrint('bank_import categories failed: $error\n$stackTrace');
       dataError ??= _l10n.bankCategoriesLoadFailed;
+      quickBookingOptionsError ??= _l10n.bankCategoriesLoadFailed;
+    }
+
+    try {
+      taxRateRows = await _db.executor.runSelect(
+        'SELECT id, bezeichnung FROM ust_saetze ORDER BY id',
+        const <Object?>[],
+      );
+    } catch (error, stackTrace) {
+      debugPrint('bank_import tax rates failed: $error\n$stackTrace');
+      dataError ??= _l10n.dataLoadError;
+      quickBookingOptionsError ??= _l10n.dataLoadError;
     }
 
     final List<_HistoryEntry> history = await _readHistory();
@@ -216,6 +276,11 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _categories
         ..clear()
         ..addAll(categoryRows.map((Map<String, Object?> row) => _BankCategoryOption.fromRow(row, l10n: _l10n)));
+      _taxRates
+        ..clear()
+        ..addAll(
+          taxRateRows.map((Map<String, Object?> row) => (id: _asInt(row['id'])!, label: _asString(row['bezeichnung']))),
+        );
       _selectedAccountId = _accounts.isEmpty ? null : _accounts.first.id;
       _selectedTemplate = resolvedTemplate;
       _profileMode = profileMode;
@@ -223,6 +288,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _history = history;
       _historyError = null;
       _pageDataError = dataError;
+      _quickBookingOptionsError = quickBookingOptionsError;
       _errorMessage = dataError;
       _isLoading = false;
     });
@@ -1728,6 +1794,50 @@ LIMIT 100
     );
   }
 
+  void _changeView(_BankImportView value) {
+    final Uri? routeUri = widget.routeUri;
+    if (routeUri == null) {
+      setState(() => _view = value);
+      return;
+    }
+
+    // Keep repeated filters by passing each query value's iterable through Uri.replace.
+    final Map<String, dynamic> queryParameters = Map<String, dynamic>.from(routeUri.queryParametersAll);
+    queryParameters['view'] = value.queryValue;
+    context.go(routeUri.replace(queryParameters: queryParameters).toString());
+  }
+
+  Widget _buildQuickBookingsView() {
+    final Widget workspace = QuickBookingsView(
+      repository: ref.watch(quickBookingRepositoryProvider),
+      executorPort: const UnavailableQuickBookingPosting(),
+      konten: <({int id, String name})>[
+        for (final _BankAccountOption account in _accounts) (id: account.id, name: account.name),
+      ],
+      categories: <({int id, String name})>[
+        for (final _BankCategoryOption category in _categories) (id: category.id, name: category.name),
+      ],
+      taxRates: _taxRates,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (_quickBookingOptionsError != null) ...<Widget>[
+          _buildMessage(_quickBookingOptionsError!, isError: true),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _isBusy ? null : () => unawaited(_retryPageData()),
+              icon: const Icon(Icons.refresh),
+              label: Text(_l10n.actionRetry),
+            ),
+          ),
+        ],
+        Expanded(child: workspace),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Widget content = _isLoading
@@ -1741,6 +1851,7 @@ LIMIT 100
               ],
             ),
             _BankImportView.templates => BankTemplatesView(useCase: _banking),
+            _BankImportView.quickBookings => _buildQuickBookingsView(),
             _BankImportView.import => _buildImportView(),
           };
     return AppPage(
@@ -1753,12 +1864,16 @@ LIMIT 100
           PopupMenuButton<_BankImportView>(
             icon: const Icon(Icons.menu),
             tooltip: _l10n.sidebarBanking,
-            onSelected: (_BankImportView value) => setState(() => _view = value),
+            onSelected: _changeView,
             itemBuilder: (BuildContext context) => <PopupMenuEntry<_BankImportView>>[
               PopupMenuItem<_BankImportView>(value: _BankImportView.import, child: Text(_l10n.bankViewImport)),
               PopupMenuItem<_BankImportView>(value: _BankImportView.history, child: Text(_l10n.bankViewHistory)),
               PopupMenuItem<_BankImportView>(value: _BankImportView.rules, child: Text(_l10n.bankViewRules)),
               PopupMenuItem<_BankImportView>(value: _BankImportView.templates, child: Text(_l10n.bankViewTemplates)),
+              PopupMenuItem<_BankImportView>(
+                value: _BankImportView.quickBookings,
+                child: Text(_l10n.quickBookingsTitle),
+              ),
             ],
           ),
         ],

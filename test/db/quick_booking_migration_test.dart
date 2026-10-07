@@ -38,7 +38,7 @@ void main() {
         ]),
       );
       final betrag = cols.where((c) => c['name'] == 'betrag').single;
-      expect((betrag['notnull'] as num).toInt(), 0);
+      expect((betrag['notnull']! as num).toInt(), 0);
 
       await db.executor.runInsert(
         'INSERT INTO schnellbuchungen (name, art, ust_satz_id, eingabemodus) VALUES (?, ?, ?, ?)',
@@ -147,7 +147,7 @@ CREATE TABLE schnellbuchungen (
             );
             rebuiltSchemaObserved =
                 rebuiltNames.containsAll(<String>['art', 'ust_satz_id', 'eingabemodus']) &&
-                (rebuiltBetrag['notnull'] as num).toInt() == 0;
+                (rebuiltBetrag['notnull']! as num).toInt() == 0;
             throw StateError('Injected failure after v12 quick-booking rebuild');
           },
         ),
@@ -178,7 +178,7 @@ CREATE TABLE schnellbuchungen (
         const <Object?>[],
       );
 
-      expect((beforeColumns.singleWhere((row) => row['name'] == 'betrag')['notnull'] as num).toInt(), 1);
+      expect((beforeColumns.singleWhere((row) => row['name'] == 'betrag')['notnull']! as num).toInt(), 1);
       expect(beforeRows.single['id'], legacyId);
       expect(afterSchema, beforeSchema);
       expect(afterColumns, beforeColumns);

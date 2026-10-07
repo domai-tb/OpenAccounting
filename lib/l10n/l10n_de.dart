@@ -1450,4 +1450,73 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get fiscalYearInvalid => 'Monat muss zwischen 1 und 12 liegen';
+
+  @override
+  String get quickBookingsTitle => 'Schnellbuchungen';
+
+  @override
+  String get quickBookingNew => 'Neue Schnellbuchung';
+
+  @override
+  String get quickBookingEdit => 'Schnellbuchung bearbeiten';
+
+  @override
+  String get quickBookingDelete => 'Schnellbuchung löschen';
+
+  @override
+  String get quickBookingSave => 'Speichern';
+
+  @override
+  String get quickBookingCancel => 'Abbrechen';
+
+  @override
+  String get quickBookingName => 'Name';
+
+  @override
+  String get quickBookingDirection => 'Richtung';
+
+  @override
+  String get quickBookingDirectionIn => 'Einnahme';
+
+  @override
+  String get quickBookingDirectionOut => 'Ausgabe';
+
+  @override
+  String get quickBookingAccount => 'Konto';
+
+  @override
+  String get quickBookingCategory => 'Kategorie';
+
+  @override
+  String get quickBookingTaxRate => 'Steuersatz';
+
+  @override
+  String get quickBookingModus => 'Eingabemodus';
+
+  @override
+  String get quickBookingModusNetto => 'Netto';
+
+  @override
+  String get quickBookingModusBrutto => 'Brutto';
+
+  @override
+  String get quickBookingAmount => 'Betrag';
+
+  @override
+  String get quickBookingDescription => 'Beschreibung';
+
+  @override
+  String get quickBookingExecute => 'Ausführen';
+
+  @override
+  String get quickBookingReviewRequired => 'Prüfung erforderlich';
+
+  @override
+  String get quickBookingUnavailable => 'Ausführung nicht verfügbar';
+
+  @override
+  String get quickBookingEnterAmount => 'Betrag eingeben';
+
+  @override
+  String get quickBookingEmpty => 'Keine Schnellbuchungen vorhanden.';
 }
