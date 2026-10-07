@@ -310,7 +310,7 @@ CREATE TABLE forderung_zahlungen (
         const [],
       );
       final names = rows.map((r) => r['name'].toString()).toSet();
-      expect(names.length, 41);
+      expect(names.length, 44);
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t));
       }

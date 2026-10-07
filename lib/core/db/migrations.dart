@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/core/db/backup_service.dart';
+import 'package:openaccounting/core/db/lazy_feature_table.dart';
 
 /// Migration runner per spec §Schema Versioning + §Migration System.
 /// Handles PRAGMA user_version, backup-before-migrate, post-hooks.
@@ -13,7 +14,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 12;
+  static const int currentVersion = 13;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -26,6 +27,60 @@ class MigrationRunner {
 
   Future<void> setUserVersion(int v) async {
     await executor.runCustom('PRAGMA user_version = $v');
+  }
+
+  Future<SchemaHealthReport> inspectSchemaHealth() async {
+    final int version = await getUserVersion();
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+      const <Object?>[],
+    );
+    final Set<String> actualTables = <String>{for (final row in rows) row['name'].toString()};
+    final Set<String> knownTables = <String>{...requiredTables, ..._featureOwnedTables};
+    final Set<String> requiredForVersion = <String>{
+      ...requiredTables,
+      for (final entry in _featureTableVersions.entries)
+        if (version >= entry.value) entry.key,
+    };
+
+    final List<String> missingTables = <String>[
+      for (final table in requiredForVersion)
+        if (!actualTables.contains(table)) table,
+    ]..sort();
+    final List<String> unknownTables = <String>[
+      for (final table in actualTables)
+        if (!knownTables.contains(table)) table,
+    ]..sort();
+    final bool healthy = version <= currentVersion && missingTables.isEmpty && unknownTables.isEmpty;
+
+    final bool lazyTablesComplete = await _lazyOccurrenceTablesComplete(version, actualTables);
+
+    return SchemaHealthReport(
+      schemaVersion: version,
+      isHealthy: healthy,
+      isCompleteForVersion13Export: healthy && version >= currentVersion && lazyTablesComplete,
+      missingTables: missingTables,
+      unknownTables: unknownTables,
+    );
+  }
+
+  Future<bool> _lazyOccurrenceTablesComplete(int version, Set<String> actualTables) async {
+    if (version < currentVersion || !actualTables.contains('feature_table_state')) return false;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT table_name, state FROM feature_table_state ORDER BY table_name',
+      const <Object?>[],
+    );
+    final Map<String, String> states = <String, String>{
+      for (final row in rows) row['table_name'].toString(): row['state'].toString(),
+    };
+    if (states.length != LazyFeatureTableInitializer.tableNames.length) return false;
+
+    for (final table in LazyFeatureTableInitializer.tableNames) {
+      final bool exists = actualTables.contains(table);
+      final String? state = states[table];
+      if (!((state == 'never_initialized' && !exists) || (state == 'initialized' && exists))) return false;
+    }
+    return true;
   }
 
   Future<bool> hasAnyTables() async {
@@ -47,6 +102,15 @@ class MigrationRunner {
     final version = await getUserVersion();
     final hasTables = await hasAnyTables();
 
+    if (version > currentVersion) {
+      throw StateError(
+        'Database schema version $version is newer than application version $currentVersion. '
+        'Downgrade not supported.',
+      );
+    }
+
+    await _verifyPaymentTableRequiredAtVersion(version);
+
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
       if (await _receivableFeatureNeedsRepair()) {
@@ -54,13 +118,6 @@ class MigrationRunner {
         return true;
       }
       return false;
-    }
-
-    if (version > currentVersion) {
-      throw StateError(
-        'Database schema version $version is newer than application version $currentVersion. '
-        'Downgrade not supported.',
-      );
     }
 
     if (version == 0 && !hasTables) {
@@ -139,6 +196,7 @@ class MigrationRunner {
       await _migrateBankImportMode();
       await _migrateFiscalYearStart();
       await _migrateQuickBookingPresets();
+      await _migrateProfilePortabilityTables(freshProfile: true);
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -242,6 +300,45 @@ class MigrationRunner {
       await _migrateFiscalYearStart();
       await _migrateQuickBookingPresets();
     }
+    if (version == 13) {
+      await _migrateTo(12, createSchema);
+      await _migrateProfilePortabilityTables(freshProfile: false);
+    }
+  }
+
+  Future<void> _migrateProfilePortabilityTables({required bool freshProfile}) async {
+    await executor.runCustom(_featureTableStateTableSql);
+    await executor.runCustom(_mileageTripsTableSql);
+    await executor.runCustom(_mileageTripCorrectionsTableSql);
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX IF NOT EXISTS mileage_trip_corrections_active_trip_unique '
+      "ON mileage_trip_corrections(trip_id) WHERE state IN ('draft', 'applied')",
+    );
+
+    for (final tableName in const <String>['buchungsvorlagen_occurrences', 'rechnungsvorlagen_occurrences']) {
+      final existingTable = await executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        <Object?>[tableName],
+      );
+      final state = freshProfile
+          ? 'never_initialized'
+          : existingTable.isEmpty
+          ? 'unknown'
+          : 'initialized';
+      await executor.runInsert('INSERT OR IGNORE INTO feature_table_state (table_name, state) VALUES (?, ?)', <Object?>[
+        tableName,
+        state,
+      ]);
+    }
+
+    final required = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+      "('feature_table_state', 'mileage_trips', 'mileage_trip_corrections')",
+      const <Object?>[],
+    );
+    if (required.length != 3) {
+      throw StateError('Profilinventar konnte nicht vollständig erstellt werden');
+    }
   }
 
   Future<void> _runFeatureDdlCallback(Future<void> Function(QueryExecutor executor)? callback) async {
@@ -287,6 +384,19 @@ class MigrationRunner {
     };
     if (!required.every((name) => columns.any((row) => row['name'] == name))) return true;
     return !(await _receivableFeatureHasRequiredConstraints());
+  }
+
+  Future<void> _verifyPaymentTableRequiredAtVersion(int version) async {
+    if (version < _featureTableVersions['forderung_zahlungen']!) return;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
+      const <Object?>[],
+    );
+    if (rows.isEmpty) {
+      throw StateError(
+        'Datenbank unvollständig: forderung_zahlungen fehlt bei Schema-Version $version; automatische Reparatur gestoppt.',
+      );
+    }
   }
 
   Future<bool> _receivableFeatureHasRequiredConstraints() async {
@@ -803,6 +913,51 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
   }
 }
 
+/// Result of checking the application tables against the profile's stored schema version.
+class SchemaHealthReport {
+  /// Creates a schema health result.
+  const SchemaHealthReport({
+    required this.schemaVersion,
+    required this.isHealthy,
+    required this.isCompleteForVersion13Export,
+    required this.missingTables,
+    required this.unknownTables,
+  });
+
+  /// The profile's stored SQLite schema version.
+  final int schemaVersion;
+
+  /// Whether the tables required at [schemaVersion] are present and known.
+  final bool isHealthy;
+
+  /// Whether the inventory is complete enough for a version-13 profile export.
+  final bool isCompleteForVersion13Export;
+
+  /// Required application tables that are absent at [schemaVersion].
+  final List<String> missingTables;
+
+  /// Application tables that are not in the known inventory.
+  final List<String> unknownTables;
+}
+
+const Set<String> _featureOwnedTables = <String>{
+  'forderung_zahlungen',
+  'buchungsvorlagen_occurrences',
+  'rechnungsvorlagen_occurrences',
+  'mileage_trips',
+  'mileage_trip_corrections',
+  'category_mapping_history',
+  'feature_table_state',
+};
+
+const Map<String, int> _featureTableVersions = <String, int>{
+  'forderung_zahlungen': 8,
+  'category_mapping_history': 9,
+  'feature_table_state': 13,
+  'mileage_trips': 13,
+  'mileage_trip_corrections': 13,
+};
+
 const String _rechnungenTableSql = '''
 CREATE TABLE rechnungen (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -854,4 +1009,69 @@ CREATE TABLE IF NOT EXISTS forderung_zahlungen (
   requested_betrag_cents INTEGER,
   fingerprint_direction TEXT,
   fingerprint_date_policy TEXT
+)''';
+
+const String _featureTableStateTableSql = '''
+CREATE TABLE IF NOT EXISTS feature_table_state (
+  table_name TEXT PRIMARY KEY NOT NULL CHECK (table_name IN (
+    'buchungsvorlagen_occurrences',
+    'rechnungsvorlagen_occurrences'
+  )),
+  state TEXT NOT NULL CHECK (state IN ('never_initialized', 'initialized', 'unknown'))
+)''';
+
+const String _mileageTripsTableSql = '''
+CREATE TABLE IF NOT EXISTS mileage_trips (
+  id TEXT PRIMARY KEY NOT NULL,
+  trip_date TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK (trim(purpose) <> ''),
+  business_context TEXT NOT NULL CHECK (trim(business_context) <> ''),
+  distance_hundredths_km INTEGER NOT NULL CHECK (distance_hundredths_km BETWEEN 1 AND 999999999999),
+  state TEXT NOT NULL CHECK (state IN ('unresolved', 'calculated', 'posted', 'corrected', 'voided')),
+  policy_id TEXT,
+  policy_source TEXT,
+  policy_version TEXT,
+  policy_effective_from TEXT,
+  policy_effective_to TEXT,
+  calculated_amount NUMERIC(12,2),
+  calculated_at TEXT,
+  posting_event_id TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (
+    (policy_id IS NULL AND policy_source IS NULL AND policy_version IS NULL
+      AND policy_effective_from IS NULL AND policy_effective_to IS NULL
+      AND calculated_amount IS NULL AND calculated_at IS NULL)
+    OR
+    (trim(policy_id) <> '' AND trim(policy_source) <> '' AND trim(policy_version) <> ''
+      AND policy_effective_from IS NOT NULL AND policy_effective_to IS NOT NULL
+      AND calculated_amount IS NOT NULL AND calculated_amount >= 0 AND calculated_at IS NOT NULL)
+  ),
+  CHECK (
+    (state = 'unresolved' AND calculated_amount IS NULL AND posting_event_id IS NULL)
+    OR
+    (state = 'calculated' AND calculated_amount IS NOT NULL AND posting_event_id IS NULL)
+    OR
+    (state IN ('posted', 'corrected', 'voided') AND calculated_amount IS NOT NULL
+      AND posting_event_id IS NOT NULL AND trim(posting_event_id) <> '')
+  )
+)''';
+
+const String _mileageTripCorrectionsTableSql = '''
+CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
+  id TEXT PRIMARY KEY NOT NULL,
+  trip_id TEXT NOT NULL REFERENCES mileage_trips(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('replace', 'void')),
+  replacement_trip_id TEXT UNIQUE REFERENCES mileage_trips(id) ON DELETE RESTRICT,
+  reason TEXT NOT NULL CHECK (trim(reason) <> ''),
+  state TEXT NOT NULL CHECK (state IN ('draft', 'applied', 'cancelled')),
+  accounting_correction_id TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  applied_at TEXT,
+  CHECK ((kind = 'replace' AND replacement_trip_id IS NOT NULL AND replacement_trip_id <> trip_id)
+      OR (kind = 'void' AND replacement_trip_id IS NULL)),
+  CHECK ((state = 'draft' AND accounting_correction_id IS NULL AND applied_at IS NULL)
+      OR (state = 'applied' AND accounting_correction_id IS NOT NULL
+        AND trim(accounting_correction_id) <> '' AND applied_at IS NOT NULL)
+      OR (state = 'cancelled' AND accounting_correction_id IS NULL AND applied_at IS NULL))
 )''';

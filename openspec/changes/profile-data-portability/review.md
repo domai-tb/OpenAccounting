@@ -153,3 +153,95 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 3
 
 None.
+
+---
+
+## Review Metadata — Round 4
+
+- **Review round**: 4
+- **Prior round**: Round 3 approved the proposal/design/spec artifacts and explicitly excluded the downstream test plan and tasks; this round reviewed those artifacts and rechecked rounds 1–3.
+- **Reviewer context**: fresh-context independent reviewer; no proposal-authoring transcript
+- **Revision reviewed**: branch `dev`, HEAD `2185e1656aa977a1729776513c3fd8bb01e0ee29` plus current working-tree changes
+- **Tool restrictions**: source and proposal inspection; no implementation or tests; appended this review only
+- **Artifacts reviewed**: proposal, design, all three delta specs, test plan, tasks, review rounds 1–3, `lib/core/db/migrations.dart`, `lib/core/db/database.dart`, and the active `customer-data-disclosure-export` and `mileage-entry-workflow` changes
+- **Validation evidence**: `openspec validate profile-data-portability --type change --strict --json` passed 1/1 with no issues. Structural validation only. The test plan maps 35 scenarios to 105 red/green/refactor tasks. No tests were run.
+
+### Prior Findings Rechecked
+
+- Round 1: the archive and record formats are versioned; file exclusion metadata omits host paths; lazy-table absence has durable `never_initialized`/`initialized`/`unknown` states; and the payment-table check is before any repair that could recreate a missing table.
+- Round 2: the database inventory separates 39 existing base tables, `feature_table_state`, and six feature-owned tables; v7-to-v8 still creates a missing payment table; absence at v8 or later fails closed.
+- Round 3 source facts: `MigrationRunner.currentVersion` is 12; `category_mapping_history` is introduced by `_migrateCategoryProvenance()` at v9; `AppDatabase.allTableNames` remains the 39-name base list. The proposed marker and mileage migration at v13 is therefore sequential against the current source.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+None.
+
+#### 🟡 Moderate
+
+1. **The payment-table scenario title contradicts its required behavior.** The modified receivable spec names the scenario “A current v8 profile repairs a missing feature table transactionally,” but its body requires the pre-repair check to stop initialization and leave the table absent. The test-plan row and tasks 5.19–5.21 repeat the misleading title, while test ID 032 correctly says `stops_on_missing_payment_table`. Rename the scenario consistently in the receivable delta, test plan, and task labels to state that a v8-or-later profile stops before repairing a missing payment table; keep test ID 032.
+
+2. **Queued dependency: active consumers still specify incompatible migration versions.** This proposal now places `feature_table_state` and mileage tables at v13 and category history at v9. The active customer-disclosure change still specifies marker/mileage at v9, category history at v10, and a supported v10 export. The active mileage change still uses a v8 baseline, v9 marker/mileage migration, and v10 category history. This drift does not invalidate this owner contract, which matches current source, but it blocks treating the combined migration and customer exporter as one accepted implementation plan. Queue a follow-up cycle before either dependent implementation: rebase the customer-disclosure `specs/db/spec.md`, `specs/customer-data-disclosure-export/spec.md`, `design.md`, `test-plan.md`, and `tasks.md` to the accepted shared inventory; rebase mileage `proposal.md`, `design.md`, `specs/db/spec.md`, `test-plan.md`, and `tasks.md` to the v12 baseline, v13 marker/mileage migration, and v9 category history. Do not run competing v9 and v13 migration plans.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 4
+
+VERDICT: APPROVE_WITH_CHANGES
+
+## Required Changes — Round 4
+
+1. Rename the payment-table scenario consistently in the receivable delta, test plan, and task labels so the scenario title matches the fail-closed behavior in its body.
+2. Keep the customer-disclosure and mileage rebases as queued dependencies before implementation of their shared migration/export contracts, as detailed above. This is not a blocker to the profile portability owner contract.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 4
+
+None.
+
+---
+
+## Review Metadata — Round 5
+
+- **Review round**: 5
+- **Review date**: 2026-10-07
+- **Prior round**: Round 4 returned `APPROVE_WITH_CHANGES`; this fresh review rechecked its requested scenario rename and the queued migration-version dependencies.
+- **Reviewer context**: fresh-context independent reviewer; no proposal-authoring transcript
+- **Revision reviewed**: branch `dev`, HEAD `2185e16` plus the current working-tree changes
+- **Tool restrictions**: read-only artifact and source inspection; appended this review only; no implementation or tests
+- **Artifacts reviewed**: proposal, design, all three active delta specs, test plan, tasks, review rounds 1–4, maintained receivable specification, database migration source, and the active customer-disclosure and mileage dependency artifacts
+- **Validation evidence**: `openspec validate profile-data-portability --type change --strict --json` passed with `valid: true` and no issues. Structural validation only. No tests were run.
+
+### Round-4 Correction and Recheck
+
+1. **Withdraw the scenario-rename request.** The maintained `receivable-request-fingerprint-and-conditional-writeoff` specification requires the exact scenario heading `A current v8 profile repairs a missing feature table transactionally`. The active delta retains that heading. Its normative body requires the v8-or-later pre-repair check to stop initialization, preserve the absent table, and expose no services. Test-plan row 032 and tasks 5.19–5.21 retain the required heading, while the single test ID `test_profile_data_portability_032_a_current_version_profile_stops_on_missing_payment_table` correctly names the fail-closed behavior. Renaming the scenario would violate the maintained heading contract; adding an alias would create a second scenario/test mapping. Round 4 finding 1 was a false positive and is resolved without changing the delta, labels, or test count.
+
+2. **Keep the consumer rebases queued as separate work.** Current source has `MigrationRunner.currentVersion = 12` and introduces `category_mapping_history` at v9. This owner change correctly places the shared marker and mileage tables at v13 and category history at v9. The active customer-disclosure and mileage artifacts still describe their older v9/v10 plans. That version drift remains real and must be rebased in a later OpenSpec cycle before either dependent implementation. It does not block approval of this owner change; the dependency queue is already recorded in Round 4, and the workflow handles one OpenSpec change per cycle.
+
+3. **Runtime behavior remains implementation work.** Current `MigrationRunner.run` routes a missing current-version payment table to repair, and `_migrateReceivableFeature` creates it. The new pre-repair guard is therefore not yet implemented. The active delta specifies the guard and test 032 plans to cover it; this approval is limited to the planning artifacts and does not certify runtime behavior.
+
+### Findings — Round 5
+
+#### 🔴 Critical (blocking)
+
+None.
+
+#### 🟡 Moderate
+
+None for the profile-portability owner change. The customer-disclosure and mileage version rebases remain queued before their dependent implementations.
+
+### Verdict — Round 5
+
+VERDICT: APPROVE
+
+No required artifact changes remain for this owner change. The review correction preserves the exact maintained scenario heading and its single test mapping.
+
+CHANGES_APPLIED: appended this Round 5 review only; no implementation or tests were added or run.
+
+### Rebuttals — Round 5
+
+Round 4 required change 1 is withdrawn for the strict-validation and one-test-per-scenario reasons above. Round 4 required change 2 remains a queued dependency rebase, not a blocker to this owner change.

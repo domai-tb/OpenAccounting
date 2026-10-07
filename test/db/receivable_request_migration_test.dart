@@ -3,6 +3,7 @@ import 'package:drift/drift.dart'
 import 'package:drift/native.dart' as drift_native;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 
 void main() {
@@ -50,7 +51,7 @@ void main() {
       addTearDown(db.close);
       await db.ensureOpen();
 
-      expect(await _userVersion(native), 12);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
       final List<String> columns = await _columnNames(native, 'forderung_zahlungen');
       expect(
         columns,
@@ -92,7 +93,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 40);
+      expect(await _allTableCount(native), 43);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
@@ -106,8 +107,8 @@ void main() {
       );
       // No fabricated historical payment rows.
       expect(await _rowCount(native, 'forderung_zahlungen'), 0);
-      expect(await _userVersion(native), 12);
-      expect(await _allTableCount(native), 41);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+      expect(await _allTableCount(native), 44);
     });
 
     test('test_present_v7_relation_table_repairs_missing_constraints', () async {
@@ -148,10 +149,10 @@ void main() {
       expect(row['datum'], '2026-02-02');
       expect(row['idempotency_key'], 'legacy-repair');
       expect(row['requested_betrag_cents'], isNull);
-      expect(await _userVersion(native), 12);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
       // Base schema stays exactly 39 tables plus the feature table.
-      expect(await _baseTableCount(native), 40);
-      expect(await _allTableCount(native), 41);
+      expect(await _baseTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
     });
 
     test('test_duplicate_legacy_key_rolls_migration_back', () async {
@@ -193,7 +194,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 40);
+      expect(await _allTableCount(native), 43);
 
       final AppDatabase db = AppDatabase.forTesting(
         native,
@@ -202,7 +203,7 @@ void main() {
       addTearDown(db.close);
       await _expectSchemaMigrationFailed(db);
 
-      expect(await _allTableCount(native), 40);
+      expect(await _allTableCount(native), 43);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _userVersion(native), 7);
       expect(db.isOpen, isFalse);
@@ -259,30 +260,30 @@ void main() {
       expect(() => failing.kategorienRepository, throwsStateError);
       // Rolled back to the v7 fixture: version, base tables, and seed/trigger state unchanged.
       expect(await _userVersion(native), 7);
-      expect(await _allTableCount(native), 40);
+      expect(await _allTableCount(native), 43);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _triggerCount(native), triggerCountBefore);
       expect(await _seedRowCount(native), seedRowsBefore);
     });
 
-    test('test_current_v12_repairs_missing_feature_table_transactionally', () async {
+    test('test_current_v13_missing_payment_table_fails_closed', () async {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
-      await seed.executor.runCustom('PRAGMA user_version = 12');
-      expect(await _allTableCount(native), 40);
+      expect(await _allTableCount(native), 43);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
-      await db.ensureOpen();
+      final ForderungenException error = await _expectSchemaMigrationFailed(db);
 
-      expect(await _tableExists(native, 'forderung_zahlungen'), isTrue);
-      expect(await _userVersion(native), 12);
-      expect(await _baseTableCount(native), 40);
-      expect(await _allTableCount(native), 41);
-      expect(db.isOpen, isTrue);
+      expect(error.cause, isA<StateError>());
+      expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+      expect(await _baseTableCount(native), 43);
+      expect(await _allTableCount(native), 43);
+      expect(db.isOpen, isFalse);
     });
 
-    test('test_current_v12_repairs_all_columns_when_constraints_are_missing', () async {
+    test('test_current_v13_repairs_all_columns_when_constraints_are_missing', () async {
       final AppDatabase seed = await _seedV8(native);
       await seed.executor.runCustom('DROP TABLE forderung_zahlungen');
       await seed.executor.runCustom('''
@@ -298,8 +299,6 @@ CREATE TABLE forderung_zahlungen (
   fingerprint_direction TEXT,
   fingerprint_date_policy TEXT
 )''');
-      await seed.executor.runCustom('PRAGMA user_version = 12');
-
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
       await db.ensureOpen();
@@ -309,10 +308,10 @@ CREATE TABLE forderung_zahlungen (
         await _indexNames(native, 'forderung_zahlungen'),
         containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
       );
-      expect(await _userVersion(native), 12);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
     });
 
-    test('test_fresh_upgrade_current_v12_repair_and_rollback_share_raw_begin_migration_path', () async {
+    test('test_fresh_upgrade_current_v13_repair_and_rollback_share_raw_begin_migration_path', () async {
       // Fixture A: fresh empty profile.
       final drift_native.NativeDatabase freshNative = drift_native.NativeDatabase.memory();
       final List<String> freshStatements = <String>[];
@@ -328,7 +327,7 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(freshDdl, greaterThan(freshBegin));
       expect(freshDdl, lessThan(freshCommit));
-      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = 12');
+      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = 13');
       expect(freshVersion, greaterThan(freshBegin));
       expect(freshVersion, lessThan(freshCommit));
       expect(
@@ -338,7 +337,7 @@ CREATE TABLE forderung_zahlungen (
         greaterThan(freshCommit),
       );
       expect(freshStatements.indexWhere((String s) => s.startsWith('INSERT OR IGNORE')), greaterThan(freshCommit));
-      expect(await _userVersion(freshNative), 12);
+      expect(await _userVersion(freshNative), MigrationRunner.currentVersion);
       await fresh.close();
 
       // Fixture B: v7 upgrade.
@@ -359,7 +358,7 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(upgradeDdl, greaterThan(upgradeBegin));
       expect(upgradeDdl, lessThan(upgradeCommit));
-      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = 12');
+      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = 13');
       expect(upgradeVersion, greaterThan(upgradeBegin));
       expect(upgradeVersion, lessThan(upgradeCommit));
       expect(
@@ -368,7 +367,7 @@ CREATE TABLE forderung_zahlungen (
         ),
         greaterThan(upgradeCommit),
       );
-      expect(await _userVersion(upgradeNative), 12);
+      expect(await _userVersion(upgradeNative), MigrationRunner.currentVersion);
       expect(await _tableExists(upgradeNative, 'forderung_zahlungen'), isTrue);
       await upgraded.close();
 
@@ -377,6 +376,7 @@ CREATE TABLE forderung_zahlungen (
       final AppDatabase repairSeed = AppDatabase.forTesting(repairNative);
       await repairSeed.ensureOpen();
       await _dropFeatureTable(repairSeed.executor);
+      await _createMalformedPaymentTable(repairSeed.executor);
       final List<String> repairStatements = <String>[];
       final AppDatabase repaired = AppDatabase.forTesting(_RecordingExecutor(repairNative, repairStatements));
       await repaired.ensureOpen();
@@ -389,12 +389,12 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(repairDdl, greaterThan(repairBegin));
       expect(repairDdl, lessThan(repairCommit));
-      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = 12');
+      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = 13');
       expect(repairVersion, greaterThan(repairBegin));
       expect(repairVersion, lessThan(repairCommit));
       expect(repairStatements.indexWhere((String s) => s.contains('CREATE TRIGGER')), greaterThan(repairCommit));
       expect(repairStatements.indexWhere((String s) => s.startsWith('INSERT OR IGNORE')), greaterThan(repairCommit));
-      expect(await _userVersion(repairNative), 12);
+      expect(await _userVersion(repairNative), MigrationRunner.currentVersion);
       expect(await _tableExists(repairNative, 'forderung_zahlungen'), isTrue);
       await repaired.close();
 
@@ -403,6 +403,7 @@ CREATE TABLE forderung_zahlungen (
       final AppDatabase failSeed = AppDatabase.forTesting(failNative);
       await failSeed.ensureOpen();
       await _dropFeatureTable(failSeed.executor);
+      await _createMalformedPaymentTable(failSeed.executor);
       final List<String> failStatements = <String>[];
       final AppDatabase failing = AppDatabase.forTesting(
         _RecordingExecutor(failNative, failStatements),
@@ -426,9 +427,10 @@ CREATE TABLE forderung_zahlungen (
         isFalse,
       );
       expect(failStatements.any((String s) => s.startsWith('INSERT OR IGNORE')), isFalse);
-      expect(await _userVersion(failNative), 12);
-      expect(await _allTableCount(failNative), 40);
-      expect(await _tableExists(failNative, 'forderung_zahlungen'), isFalse);
+      expect(await _userVersion(failNative), MigrationRunner.currentVersion);
+      expect(await _allTableCount(failNative), 44);
+      expect(await _tableExists(failNative, 'forderung_zahlungen'), isTrue);
+      expect(await _columnNames(failNative, 'forderung_zahlungen'), contains('requested_betrag_cents'));
       expect(failing.isOpen, isFalse);
       await failing.close();
     });
@@ -442,6 +444,20 @@ Future<AppDatabase> _seedV8(QueryExecutor executor) async {
 }
 
 Future<void> _dropFeatureTable(QueryExecutor executor) => executor.runCustom('DROP TABLE forderung_zahlungen');
+
+Future<void> _createMalformedPaymentTable(QueryExecutor executor) => executor.runCustom('''
+CREATE TABLE forderung_zahlungen (
+  id INTEGER PRIMARY KEY,
+  forderung_id INTEGER,
+  journal_id INTEGER,
+  betrag NUMERIC,
+  typ TEXT,
+  datum TEXT,
+  idempotency_key TEXT,
+  requested_betrag_cents INTEGER,
+  fingerprint_direction TEXT,
+  fingerprint_date_policy TEXT
+)''');
 
 Future<ForderungenException> _expectSchemaMigrationFailed(AppDatabase db) async {
   try {

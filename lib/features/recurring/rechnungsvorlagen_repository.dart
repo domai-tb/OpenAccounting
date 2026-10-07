@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/core/db/lazy_feature_table.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 
@@ -62,14 +63,18 @@ class RechnungsVorlagenRepository {
   Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
 
   Future<void> _ensureSchema() async {
-    await executor.runCustom('''
+    await LazyFeatureTableInitializer.ensure(
+      executor: executor,
+      tableName: 'rechnungsvorlagen_occurrences',
+      createTableSql: '''
 CREATE TABLE IF NOT EXISTS rechnungsvorlagen_occurrences (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   vorlage_id INTEGER NOT NULL REFERENCES rechnungsvorlagen(id),
   faelligkeit TEXT NOT NULL,
   rechnung_id INTEGER NOT NULL REFERENCES rechnungen(id),
   UNIQUE(vorlage_id, faelligkeit)
-)''');
+)''',
+    );
     await _ensureRechnungenLineageColumn();
   }
 

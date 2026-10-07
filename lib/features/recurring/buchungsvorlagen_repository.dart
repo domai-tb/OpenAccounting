@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/core/db/lazy_feature_table.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 
@@ -66,6 +67,19 @@ class BuchungsVorlagenRepository {
   Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
 
   Future<void> _ensureSchema() async {
+    await LazyFeatureTableInitializer.ensure(
+      executor: executor,
+      tableName: 'buchungsvorlagen_occurrences',
+      createTableSql: '''
+CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  vorlage_id INTEGER NOT NULL REFERENCES buchungsvorlagen(id),
+  faelligkeit TEXT NOT NULL,
+  journal_id INTEGER REFERENCES journal(id),
+  rechnung_id INTEGER REFERENCES rechnungen(id),
+  UNIQUE(vorlage_id, faelligkeit)
+)''',
+    );
     for (final ({String name, String definition}) column in <({String name, String definition})>[
       (name: 'ust_satz', definition: 'NUMERIC(12,2) DEFAULT 19'),
       (name: 'eingabemodus', definition: "TEXT DEFAULT 'brutto'"),
@@ -79,15 +93,6 @@ class BuchungsVorlagenRepository {
         throw StateError('Buchungsvorlage konnte Spalte ${column.name} nicht verifizieren');
       }
     }
-    await executor.runCustom('''
-CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  vorlage_id INTEGER NOT NULL REFERENCES buchungsvorlagen(id),
-  faelligkeit TEXT NOT NULL,
-  journal_id INTEGER REFERENCES journal(id),
-  rechnung_id INTEGER REFERENCES rechnungen(id),
-  UNIQUE(vorlage_id, faelligkeit)
-)''');
   }
 
   Future<BuchungsVorlage> create({

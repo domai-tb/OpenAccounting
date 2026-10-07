@@ -81,7 +81,7 @@ CREATE TABLE schnellbuchungen (
       await runner.setUserVersion(11);
       await runner.run(createSchema: () async {});
 
-      expect(await runner.getUserVersion(), 12);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
       final rows = await db.executor.runSelect('SELECT * FROM schnellbuchungen WHERE id = ?', <Object?>[legacyId]);
       expect(rows.single['name'], 'Alt');
       expect(rows.single['betrag'].toString(), contains('42.5'));
