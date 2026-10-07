@@ -69,6 +69,65 @@
   "actionBack": "Back",
   "actionSkip": "Skip",
   "searchHint": "Search…",
+  "globalSearchButton": "Global search",
+  "globalSearchShortcutUnavailable": "Global search (keyboard shortcut unavailable)",
+  "globalSearchTitle": "Search or run a command",
+  "globalSearchPlaceholder": "Search invoices, contacts, receipts, transactions, settings, or commands",
+  "globalSearchEmptyPrompt": "Start typing to search",
+  "globalSearchNoResults": "No matches for this search",
+  "globalSearchLoading": "Searching…",
+  "globalSearchPartialFailure": "Some local records could not be searched.",
+  "globalSearchSourceUnavailable": "{source} could not be searched.",
+  "@globalSearchSourceUnavailable": {
+    "placeholders": { "source": { "type": "String" } }
+  },
+  "globalSearchInvoiceType": "Invoice",
+  "globalSearchContactType": "Contact",
+  "globalSearchReceiptType": "Receipt",
+  "globalSearchBankTransactionType": "Bank transaction",
+  "globalSearchDestinationType": "Destination",
+  "globalSearchCommandType": "Command",
+  "globalSearchSettingsDestination": "Settings",
+  "globalSearchNewInvoiceCommand": "New invoice",
+  "globalSearchInvoiceFallback": "Invoice #{id}",
+  "@globalSearchInvoiceFallback": {
+    "placeholders": { "id": { "type": "String" } }
+  },
+  "globalSearchReceiptFallback": "Receipt #{id}",
+  "@globalSearchReceiptFallback": {
+    "placeholders": { "id": { "type": "String" } }
+  },
+  "globalSearchTransactionFallback": "Transaction #{id}",
+  "@globalSearchTransactionFallback": {
+    "placeholders": { "id": { "type": "String" } }
+  },
+  "bankSelectedTransactionTitle": "Selected bank transaction",
+  "bankTransactionInvalidSelection": "The transaction link is invalid.",
+  "bankTransactionNotFound": "This bank transaction is not available in the active profile.",
+  "bankTransactionLoadFailed": "The bank transaction could not be loaded.",
+  "bankTransactionCounterparty": "Counterparty",
+  "bankTransactionPurpose": "Remittance",
+  "bankTransactionAmount": "Amount",
+  "bankTransactionStatus": "Status",
+  "filterDateFrom": "Date from",
+  "filterDateTo": "Date to",
+  "filterStatusExact": "Exact status",
+  "filterAmountFrom": "Amount from",
+  "filterAmountTo": "Amount to",
+  "filterApply": "Apply filters",
+  "filterClearAll": "Clear all filters",
+  "filterInvalidDateRange": "The start date must be on or before the end date.",
+  "filterInvalidAmount": "Enter a valid amount with up to two decimal places.",
+  "filterInvalidAmountRange": "The minimum amount must be on or below the maximum amount.",
+  "filterPreviousPage": "Previous page",
+  "filterNextPage": "Next page",
+  "filterPageCount": "Page {page} of {pages}",
+  "@filterPageCount": {
+    "placeholders": {
+      "page": { "type": "int" },
+      "pages": { "type": "int" }
+    }
+  },
   "loading": "Loading…",
   "loadError": "Data could not be loaded",
   "emptyResults": "No matches",
@@ -515,6 +574,8 @@
   "bankDelimiterComma": "Comma",
   "bankHeaderSubtitleHistory": "Traceable import history",
   "bankHeaderSubtitleImport": "File import with review before saving",
+  "bankHeaderSubtitleTransactions": "Search and filter saved bank transactions",
+  "bankViewTransactions": "Transactions",
   "bankNoAccountSelected": "no account",
   "bankAccountFallback": "Account {id}",
   "@bankAccountFallback": {

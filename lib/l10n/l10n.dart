@@ -506,6 +506,252 @@ abstract class AppLocalizations {
   /// **'Suchen…'**
   String get searchHint;
 
+  /// No description provided for @globalSearchButton.
+  ///
+  /// In de, this message translates to:
+  /// **'Globale Suche'**
+  String get globalSearchButton;
+
+  /// No description provided for @globalSearchShortcutUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Globale Suche (Tastenkürzel nicht verfügbar)'**
+  String get globalSearchShortcutUnavailable;
+
+  /// No description provided for @globalSearchTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen oder Befehl ausführen'**
+  String get globalSearchTitle;
+
+  /// No description provided for @globalSearchPlaceholder.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnungen, Kontakte, Belege, Transaktionen, Einstellungen oder Befehle suchen'**
+  String get globalSearchPlaceholder;
+
+  /// No description provided for @globalSearchEmptyPrompt.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchbegriff eingeben'**
+  String get globalSearchEmptyPrompt;
+
+  /// No description provided for @globalSearchNoResults.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Treffer für diese Suche'**
+  String get globalSearchNoResults;
+
+  /// No description provided for @globalSearchLoading.
+  ///
+  /// In de, this message translates to:
+  /// **'Suche läuft…'**
+  String get globalSearchLoading;
+
+  /// No description provided for @globalSearchPartialFailure.
+  ///
+  /// In de, this message translates to:
+  /// **'Einige lokale Datensätze konnten nicht durchsucht werden.'**
+  String get globalSearchPartialFailure;
+
+  /// No description provided for @globalSearchSourceUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'{source} konnten nicht durchsucht werden.'**
+  String globalSearchSourceUnavailable(String source);
+
+  /// No description provided for @globalSearchInvoiceType.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnung'**
+  String get globalSearchInvoiceType;
+
+  /// No description provided for @globalSearchContactType.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontakt'**
+  String get globalSearchContactType;
+
+  /// No description provided for @globalSearchReceiptType.
+  ///
+  /// In de, this message translates to:
+  /// **'Beleg'**
+  String get globalSearchReceiptType;
+
+  /// No description provided for @globalSearchBankTransactionType.
+  ///
+  /// In de, this message translates to:
+  /// **'Banktransaktion'**
+  String get globalSearchBankTransactionType;
+
+  /// No description provided for @globalSearchDestinationType.
+  ///
+  /// In de, this message translates to:
+  /// **'Ziel'**
+  String get globalSearchDestinationType;
+
+  /// No description provided for @globalSearchCommandType.
+  ///
+  /// In de, this message translates to:
+  /// **'Befehl'**
+  String get globalSearchCommandType;
+
+  /// No description provided for @globalSearchSettingsDestination.
+  ///
+  /// In de, this message translates to:
+  /// **'Einstellungen'**
+  String get globalSearchSettingsDestination;
+
+  /// No description provided for @globalSearchNewInvoiceCommand.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Rechnung'**
+  String get globalSearchNewInvoiceCommand;
+
+  /// No description provided for @globalSearchInvoiceFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnung Nr. {id}'**
+  String globalSearchInvoiceFallback(String id);
+
+  /// No description provided for @globalSearchReceiptFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Beleg Nr. {id}'**
+  String globalSearchReceiptFallback(String id);
+
+  /// No description provided for @globalSearchTransactionFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Transaktion Nr. {id}'**
+  String globalSearchTransactionFallback(String id);
+
+  /// No description provided for @bankSelectedTransactionTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgewählte Banktransaktion'**
+  String get bankSelectedTransactionTitle;
+
+  /// No description provided for @bankTransactionInvalidSelection.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Transaktionslink ist ungültig.'**
+  String get bankTransactionInvalidSelection;
+
+  /// No description provided for @bankTransactionNotFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Diese Banktransaktion ist im aktiven Profil nicht verfügbar.'**
+  String get bankTransactionNotFound;
+
+  /// No description provided for @bankTransactionLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Banktransaktion konnte nicht geladen werden.'**
+  String get bankTransactionLoadFailed;
+
+  /// No description provided for @bankTransactionCounterparty.
+  ///
+  /// In de, this message translates to:
+  /// **'Gegenkonto'**
+  String get bankTransactionCounterparty;
+
+  /// No description provided for @bankTransactionPurpose.
+  ///
+  /// In de, this message translates to:
+  /// **'Verwendungszweck'**
+  String get bankTransactionPurpose;
+
+  /// No description provided for @bankTransactionAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag'**
+  String get bankTransactionAmount;
+
+  /// No description provided for @bankTransactionStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Status'**
+  String get bankTransactionStatus;
+
+  /// No description provided for @filterDateFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum ab'**
+  String get filterDateFrom;
+
+  /// No description provided for @filterDateTo.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum bis'**
+  String get filterDateTo;
+
+  /// No description provided for @filterStatusExact.
+  ///
+  /// In de, this message translates to:
+  /// **'Exakter Status'**
+  String get filterStatusExact;
+
+  /// No description provided for @filterAmountFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag ab'**
+  String get filterAmountFrom;
+
+  /// No description provided for @filterAmountTo.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag bis'**
+  String get filterAmountTo;
+
+  /// No description provided for @filterApply.
+  ///
+  /// In de, this message translates to:
+  /// **'Filter anwenden'**
+  String get filterApply;
+
+  /// No description provided for @filterClearAll.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Filter löschen'**
+  String get filterClearAll;
+
+  /// No description provided for @filterInvalidDateRange.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Startdatum muss vor oder am Enddatum liegen.'**
+  String get filterInvalidDateRange;
+
+  /// No description provided for @filterInvalidAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Gib einen gültigen Betrag mit höchstens zwei Nachkommastellen ein.'**
+  String get filterInvalidAmount;
+
+  /// No description provided for @filterInvalidAmountRange.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Mindestbetrag muss kleiner oder gleich dem Höchstbetrag sein.'**
+  String get filterInvalidAmountRange;
+
+  /// No description provided for @filterPreviousPage.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorherige Seite'**
+  String get filterPreviousPage;
+
+  /// No description provided for @filterNextPage.
+  ///
+  /// In de, this message translates to:
+  /// **'Nächste Seite'**
+  String get filterNextPage;
+
+  /// No description provided for @filterPageCount.
+  ///
+  /// In de, this message translates to:
+  /// **'Seite {page} von {pages}'**
+  String filterPageCount(int page, int pages);
+
   /// No description provided for @loading.
   ///
   /// In de, this message translates to:
@@ -1927,6 +2173,18 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Dateiimport mit Prüfung vor dem Speichern'**
   String get bankHeaderSubtitleImport;
+
+  /// No description provided for @bankHeaderSubtitleTransactions.
+  ///
+  /// In de, this message translates to:
+  /// **'Gespeicherte Banktransaktionen suchen und filtern'**
+  String get bankHeaderSubtitleTransactions;
+
+  /// No description provided for @bankViewTransactions.
+  ///
+  /// In de, this message translates to:
+  /// **'Transaktionen'**
+  String get bankViewTransactions;
 
   /// No description provided for @bankNoAccountSelected.
   ///

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/core/router/typed_workspace_search.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/l10n/l10n.dart';
@@ -17,9 +18,11 @@ import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_status_chip.dart';
+import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/features/bank_import/bank_import_entity.dart';
 import 'package:openaccounting/features/bank_import/bank_import_service.dart';
+import 'package:openaccounting/features/bank_import/bank_transaction_selection.dart';
 import 'package:openaccounting/features/bank_import/bank_history_review_dialog.dart';
 import 'package:openaccounting/features/bank_import/bank_import_mode_repository.dart';
 import 'package:openaccounting/features/bank_import/bank_rules_view.dart';
@@ -53,13 +56,15 @@ enum _BankImportView {
   history,
   rules,
   templates,
-  quickBookings;
+  quickBookings,
+  transactions;
 
   static _BankImportView fromQueryValue(String? value) => switch (value) {
     'history' => history,
     'rules' => rules,
     'templates' => templates,
     'quick-bookings' => quickBookings,
+    'transactions' => transactions,
     _ => import,
   };
 
@@ -69,10 +74,13 @@ enum _BankImportView {
     rules => 'rules',
     templates => 'templates',
     quickBookings => 'quick-bookings',
+    transactions => 'transactions',
   };
 }
 
 enum _BankImportStage { upload, review, result }
+
+enum _BankTransactionSelectionState { none, invalid, loading, notFound, unavailable, selected }
 
 /// Production banking surface: file input, template choice, review, import,
 /// recovery, and auditable history.
@@ -137,6 +145,11 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   String? _historyError;
   _ImportOutcome? _outcome;
   _BankImportView _view = _BankImportView.import;
+  _BankTransactionSelectionState _transactionSelectionState = _BankTransactionSelectionState.none;
+  BankTransactionSelection? _selectedTransaction;
+  int? _selectedTransactionId;
+  int _transactionSelectionRequest = 0;
+  bool _hasTransactionSelection = false;
   _BankImportStage _stage = _BankImportStage.upload;
   bool _isLoading = true;
   bool _historyLoading = false;
@@ -176,6 +189,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     super.initState();
     _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
     _pathController = TextEditingController();
+    _resolveTransactionSelection();
     _selectedTemplate = widget.initialTemplate;
     final String? initialContent = widget.initialContent;
     if (initialContent != null) {
@@ -191,7 +205,65 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.routeUri != oldWidget.routeUri) {
       _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
+      _resolveTransactionSelection();
     }
+  }
+
+  void _resolveTransactionSelection() {
+    final List<String>? values = widget.routeUri?.queryParametersAll['transactionId'];
+    _hasTransactionSelection = values != null;
+    _selectedTransaction = null;
+    _selectedTransactionId = null;
+    final int request = ++_transactionSelectionRequest;
+    if (values == null) {
+      _transactionSelectionState = _BankTransactionSelectionState.none;
+      return;
+    }
+    if (values.length != 1) {
+      _transactionSelectionState = _BankTransactionSelectionState.invalid;
+      return;
+    }
+    final int? id = int.tryParse(values.single);
+    if (id == null || id <= 0) {
+      _transactionSelectionState = _BankTransactionSelectionState.invalid;
+      return;
+    }
+    _selectedTransactionId = id;
+    _transactionSelectionState = _BankTransactionSelectionState.loading;
+    unawaited(_loadSelectedTransaction(id, request));
+  }
+
+  Future<void> _loadSelectedTransaction(int id, int request) async {
+    try {
+      final BankTransactionSelection? transaction = await ref
+          .read(bankTransactionSelectionRepositoryProvider)
+          .findById(id);
+      if (!mounted || request != _transactionSelectionRequest) return;
+      setState(() {
+        _selectedTransaction = transaction;
+        _transactionSelectionState = transaction == null
+            ? _BankTransactionSelectionState.notFound
+            : _BankTransactionSelectionState.selected;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('bank transaction selection failed: $error\n$stackTrace');
+      if (!mounted || request != _transactionSelectionRequest) return;
+      setState(() {
+        _selectedTransaction = null;
+        _transactionSelectionState = _BankTransactionSelectionState.unavailable;
+      });
+    }
+  }
+
+  void _retrySelectedTransaction() {
+    final int? id = _selectedTransactionId;
+    if (id == null) return;
+    final int request = ++_transactionSelectionRequest;
+    setState(() {
+      _selectedTransaction = null;
+      _transactionSelectionState = _BankTransactionSelectionState.loading;
+    });
+    unawaited(_loadSelectedTransaction(id, request));
   }
 
   @override
@@ -1742,6 +1814,110 @@ LIMIT 100
     );
   }
 
+  Widget _buildTransactionSelectionPanel() {
+    final BankTransactionSelection? transaction = _selectedTransaction;
+    switch (_transactionSelectionState) {
+      case _BankTransactionSelectionState.none:
+        return const SizedBox.shrink();
+      case _BankTransactionSelectionState.invalid:
+        return KeyedSubtree(
+          key: const ValueKey<String>('bank_transaction_selection_invalid'),
+          child: _buildSectionCard(
+            title: _l10n.bankSelectedTransactionTitle,
+            icon: Icons.error_outline,
+            children: <Widget>[_buildMessage(_l10n.bankTransactionInvalidSelection, isError: true)],
+          ),
+        );
+      case _BankTransactionSelectionState.loading:
+        return KeyedSubtree(
+          key: const ValueKey<String>('bank_transaction_selection_loading'),
+          child: _buildSectionCard(
+            title: _l10n.bankSelectedTransactionTitle,
+            icon: Icons.account_balance,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(_l10n.globalSearchLoading),
+                ],
+              ),
+            ],
+          ),
+        );
+      case _BankTransactionSelectionState.notFound:
+        return KeyedSubtree(
+          key: const ValueKey<String>('bank_transaction_selection_not_found'),
+          child: _buildSectionCard(
+            title: _l10n.bankSelectedTransactionTitle,
+            icon: Icons.search_off,
+            children: <Widget>[_buildMessage(_l10n.bankTransactionNotFound, isError: true)],
+          ),
+        );
+      case _BankTransactionSelectionState.unavailable:
+        return KeyedSubtree(
+          key: const ValueKey<String>('bank_transaction_selection_unavailable'),
+          child: _buildSectionCard(
+            title: _l10n.bankSelectedTransactionTitle,
+            icon: Icons.error_outline,
+            children: <Widget>[
+              _buildMessage(_l10n.bankTransactionLoadFailed, isError: true),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _retrySelectedTransaction,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(_l10n.actionRetry),
+                ),
+              ),
+            ],
+          ),
+        );
+      case _BankTransactionSelectionState.selected:
+        if (transaction == null) return const SizedBox.shrink();
+        return KeyedSubtree(
+          key: const ValueKey<String>('bank_selected_transaction'),
+          child: _buildSectionCard(
+            title: _l10n.bankSelectedTransactionTitle,
+            icon: Icons.account_balance,
+            children: <Widget>[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_l10n.bankTransactionCounterparty),
+                subtitle: Text(
+                  transaction.counterpartyName.isNotEmpty
+                      ? transaction.counterpartyName
+                      : transaction.counterpartyAccount.isNotEmpty
+                      ? transaction.counterpartyAccount
+                      : _l10n.recordIdLabel('${transaction.id}'),
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_l10n.bankTransactionPurpose),
+                subtitle: Text(transaction.purpose.isEmpty ? '—' : transaction.purpose),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_l10n.dateLabel),
+                subtitle: Text(transaction.date.isEmpty ? '—' : transaction.date),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_l10n.bankTransactionAmount),
+                subtitle: MoneyText(transaction.amount, locale: _activeLocale, textAlign: TextAlign.left),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_l10n.bankTransactionStatus),
+                subtitle: Text(transaction.status.isEmpty ? '—' : transaction.status),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+
   Widget _buildMessage(String message, {required bool isError}) {
     final Color color = isError
         ? Theme.of(context).colorScheme.errorContainer
@@ -1838,9 +2014,38 @@ LIMIT 100
     );
   }
 
+  Widget _buildTransactionList() {
+    final Uri route = widget.routeUri ?? Uri(path: '/banking');
+    final TypedWorkspaceCriteriaParseResult parsed = parseTypedWorkspaceRouteCriteria(
+      TypedWorkspaceDomain.bankTransactions,
+      route.queryParameters,
+    );
+    return TypedWorkspaceSurface(
+      title: _l10n.bankViewTransactions,
+      subtitle: _l10n.bankHeaderSubtitleTransactions,
+      icon: Icons.account_balance,
+      criteria: parsed.criteria,
+      invalidFields: parsed.invalidFields,
+      topContent: _hasTransactionSelection ? _buildTransactionSelectionPanel() : null,
+      onCriteriaChanged: (TypedWorkspaceSearchCriteria criteria) {
+        final Map<String, String> parameters = typedWorkspaceRouteParameters(route.queryParameters, criteria);
+        context.go(typedWorkspaceRoute('/banking', parameters));
+      },
+      onOpen: (TypedWorkspaceRecord record) {
+        if (record is! BankTransactionWorkspaceRecord) return;
+        final Map<String, String> parameters = Map<String, String>.from(route.queryParameters)
+          ..['transactionId'] = '${record.id}';
+        context.go(typedWorkspaceRoute('/banking', parameters));
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Widget content = _isLoading
+    if (_view == _BankImportView.transactions) return _buildTransactionList();
+    final Widget content = _view == _BankImportView.transactions
+        ? _buildTransactionList()
+        : _isLoading
         ? const Center(child: CircularProgressIndicator())
         : switch (_view) {
             _BankImportView.history => _buildHistoryView(),
@@ -1852,13 +2057,27 @@ LIMIT 100
             ),
             _BankImportView.templates => BankTemplatesView(useCase: _banking),
             _BankImportView.quickBookings => _buildQuickBookingsView(),
+            _BankImportView.transactions => _buildTransactionList(),
             _BankImportView.import => _buildImportView(),
           };
+    final Widget pageContent = _hasTransactionSelection
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              _buildTransactionSelectionPanel(),
+              Expanded(child: content),
+            ],
+          )
+        : content;
     return AppPage(
       maxWidth: 1400,
       header: AppPageHeader(
         title: _l10n.sidebarBanking,
-        subtitle: _view == _BankImportView.history ? _l10n.bankHeaderSubtitleHistory : _l10n.bankHeaderSubtitleImport,
+        subtitle: switch (_view) {
+          _BankImportView.history => _l10n.bankHeaderSubtitleHistory,
+          _BankImportView.transactions => _l10n.bankHeaderSubtitleTransactions,
+          _ => _l10n.bankHeaderSubtitleImport,
+        },
         showFilterToolbar: false,
         actions: <Widget>[
           PopupMenuButton<_BankImportView>(
@@ -1868,6 +2087,10 @@ LIMIT 100
             itemBuilder: (BuildContext context) => <PopupMenuEntry<_BankImportView>>[
               PopupMenuItem<_BankImportView>(value: _BankImportView.import, child: Text(_l10n.bankViewImport)),
               PopupMenuItem<_BankImportView>(value: _BankImportView.history, child: Text(_l10n.bankViewHistory)),
+              PopupMenuItem<_BankImportView>(
+                value: _BankImportView.transactions,
+                child: Text(_l10n.bankViewTransactions),
+              ),
               PopupMenuItem<_BankImportView>(value: _BankImportView.rules, child: Text(_l10n.bankViewRules)),
               PopupMenuItem<_BankImportView>(value: _BankImportView.templates, child: Text(_l10n.bankViewTemplates)),
               PopupMenuItem<_BankImportView>(
@@ -1878,7 +2101,7 @@ LIMIT 100
           ),
         ],
       ),
-      child: content,
+      child: pageContent,
     );
   }
 

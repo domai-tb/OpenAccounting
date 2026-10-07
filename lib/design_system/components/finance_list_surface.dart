@@ -251,8 +251,14 @@ class _ListSummary extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       child: Row(
         children: <Widget>[
-          Text(label, style: Theme.of(context).textTheme.titleSmall),
-          const Spacer(),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
           Text('$count $resultLabel', style: Theme.of(context).textTheme.bodySmall),
         ],
       ),

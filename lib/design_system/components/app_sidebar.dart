@@ -6,24 +6,57 @@ import 'package:openaccounting/l10n/l10n.dart';
 
 /// Persistent sidebar per DESIGN §4.
 /// 240 px expanded, 72 px rail with tooltip, drawer <900 handled by AppShell.
-class AppSidebar extends StatelessWidget {
-  const AppSidebar({required this.isCompact, required this.isSelected, required this.onToggle, super.key});
+class AppSidebar extends StatefulWidget {
+  const AppSidebar({
+    required this.isCompact,
+    required this.isSelected,
+    required this.onToggle,
+    required this.onGlobalSearch,
+    required this.globalSearchShortcutAvailable,
+    super.key,
+  });
 
   final bool isCompact;
   final bool Function(String) isSelected;
   final VoidCallback onToggle;
+  final VoidCallback onGlobalSearch;
+  final bool globalSearchShortcutAvailable;
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar> {
+  final Map<String, FocusNode> _focusNodes = <String, FocusNode>{};
+
+  @override
+  void dispose() {
+    for (final FocusNode node in _focusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
 
   Widget _header(BuildContext context) {
     final AppLocalizations? l10n = AppLocalizations.of(context);
     final String menuLabel = l10n?.sidebarMenu ?? 'Menü';
-    if (isCompact) {
+    final String searchTooltip = widget.globalSearchShortcutAvailable
+        ? l10n?.globalSearchButton ?? 'Globale Suche'
+        : l10n?.globalSearchShortcutUnavailable ?? 'Globale Suche (Tastenkürzel nicht verfügbar)';
+    if (widget.isCompact) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
         child: Column(
           children: <Widget>[
             const Icon(Icons.account_balance_wallet, size: 32),
             const SizedBox(height: AppSpacing.sm),
-            IconButton(icon: const Icon(Icons.menu), tooltip: menuLabel, onPressed: onToggle),
+            IconButton(
+              key: const ValueKey<String>('global_search_button'),
+              icon: const Icon(Icons.search),
+              tooltip: searchTooltip,
+              onPressed: widget.onGlobalSearch,
+            ),
+            IconButton(icon: const Icon(Icons.menu), tooltip: menuLabel, onPressed: widget.onToggle),
           ],
         ),
       );
@@ -35,7 +68,13 @@ class AppSidebar extends StatelessWidget {
           const Icon(Icons.account_balance_wallet, size: 32),
           const SizedBox(width: AppSpacing.sm),
           const Expanded(child: Text('OpenAccounting', overflow: TextOverflow.ellipsis)),
-          IconButton(icon: const Icon(Icons.menu), tooltip: menuLabel, onPressed: onToggle),
+          IconButton(
+            key: const ValueKey<String>('global_search_button'),
+            icon: const Icon(Icons.search),
+            tooltip: searchTooltip,
+            onPressed: widget.onGlobalSearch,
+          ),
+          IconButton(icon: const Icon(Icons.menu), tooltip: menuLabel, onPressed: widget.onToggle),
         ],
       ),
     );
@@ -50,11 +89,11 @@ class AppSidebar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            if (!isCompact)
+            if (!widget.isCompact)
               Expanded(child: Text(l10n?.workspaceLocalProfile ?? 'Lokales Profil', overflow: TextOverflow.ellipsis))
             else
               const Icon(Icons.business, size: 20),
-            if (!isCompact) const Icon(Icons.arrow_drop_down, size: 16),
+            if (!widget.isCompact) const Icon(Icons.arrow_drop_down, size: 16),
           ],
         ),
         onSelected: (String value) => context.go(value),
@@ -95,27 +134,35 @@ class AppSidebar extends StatelessWidget {
     final Color selectedColor = scheme.onSecondaryContainer;
 
     Widget item(IconData icon, String label, String path) {
-      final bool selected = isSelected(path);
+      final bool selected = widget.isSelected(path);
+      final FocusNode focusNode = _focusNodes.putIfAbsent(path, FocusNode.new);
       void activate() {
         if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
           Navigator.of(context).pop();
         }
         context.go(path);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && focusNode.canRequestFocus) focusNode.requestFocus();
+        });
       }
 
       final ListTile tile = ListTile(
         leading: Icon(icon, color: selected ? selectedColor : null),
-        title: isCompact ? null : Text(label),
+        title: widget.isCompact ? null : Text(label),
         selected: selected,
         selectedTileColor: selectedTileColor,
         selectedColor: selectedColor,
         onTap: activate,
       );
       final Widget withFocus = Semantics(
+        container: true,
+        excludeSemantics: true,
         button: true,
         selected: selected,
         label: label,
+        onTap: activate,
         child: Focus(
+          focusNode: focusNode,
           onKeyEvent: (FocusNode node, KeyEvent event) {
             if (event is KeyDownEvent &&
                 (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.space)) {
@@ -127,7 +174,7 @@ class AppSidebar extends StatelessWidget {
           child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48, minWidth: 72), child: tile),
         ),
       );
-      if (isCompact) {
+      if (widget.isCompact) {
         return Tooltip(message: label, child: withFocus);
       }
       return withFocus;
@@ -140,7 +187,7 @@ class AppSidebar extends StatelessWidget {
         const Divider(),
         _workspaceSelector(context),
         const Divider(),
-        if (!isCompact)
+        if (!widget.isCompact)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
             child: Text(
@@ -149,7 +196,7 @@ class AppSidebar extends StatelessWidget {
             ),
           ),
         item(Icons.dashboard, l10n?.sidebarOverview ?? 'Übersicht', '/'),
-        if (!isCompact)
+        if (!widget.isCompact)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
             child: Text(
@@ -162,7 +209,7 @@ class AppSidebar extends StatelessWidget {
         item(Icons.account_balance, l10n?.sidebarBanking ?? 'Bank & Zahlungen', '/banking'),
         item(Icons.contacts, l10n?.sidebarContacts ?? 'Kontakte', '/contacts'),
         item(Icons.inventory_2_outlined, l10n?.routeInventory ?? 'Inventory', '/inventory'),
-        if (!isCompact)
+        if (!widget.isCompact)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
             child: Text(

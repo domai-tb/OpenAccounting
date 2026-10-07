@@ -657,10 +657,17 @@ Future<_ProductionHarness> _exerciseSidebarKeyboard(
   final Finder tile = find.widgetWithText(ListTile, destinationLabel);
   expect(tile, findsOneWidget, reason: 'sidebar must expose $destinationLabel');
 
-  final SemanticsNode node = tester.getSemantics(find.bySemanticsLabel(destinationLabel).first);
-  expect(node.label, destinationLabel, reason: 'semantics announce the localized name');
-  expect(node.hasFlag(SemanticsFlag.isButton), isTrue, reason: 'destination exposes its button role');
-  expect(node.hasFlag(SemanticsFlag.isSelected), isFalse, reason: 'destination starts unselected');
+  final Finder destinationSemantics = find.ancestor(
+    of: tile,
+    matching: find.byWidgetPredicate(
+      (Widget widget) => widget is Semantics && widget.properties.label == destinationLabel,
+    ),
+  );
+  expect(destinationSemantics, findsOneWidget, reason: 'semantics label the destination');
+  final Semantics semanticsNode = tester.widget<Semantics>(destinationSemantics);
+  expect(semanticsNode.properties.label, destinationLabel, reason: 'semantics announce the localized name');
+  expect(semanticsNode.properties.button, isTrue, reason: 'destination exposes its button role');
+  expect(semanticsNode.properties.selected, isFalse, reason: 'destination starts unselected');
 
   final FocusNode focus = Focus.of(tester.element(tile));
   focus.requestFocus();
@@ -674,9 +681,13 @@ Future<_ProductionHarness> _exerciseSidebarKeyboard(
 
   final Finder selectedTile = find.widgetWithText(ListTile, destinationLabel);
   expect(tester.widget<ListTile>(selectedTile).selected, isTrue, reason: 'activated destination is selected');
-  final Semantics selectedSemantics = tester.widget<Semantics>(
-    find.ancestor(of: selectedTile, matching: find.byType(Semantics)).first,
+  final Finder selectedSemanticsFinder = find.ancestor(
+    of: selectedTile,
+    matching: find.byWidgetPredicate(
+      (Widget widget) => widget is Semantics && widget.properties.label == destinationLabel,
+    ),
   );
+  final Semantics selectedSemantics = tester.widget<Semantics>(selectedSemanticsFinder);
   expect(selectedSemantics.properties.label, destinationLabel);
   expect(selectedSemantics.properties.button, isTrue);
   expect(selectedSemantics.properties.selected, isTrue, reason: 'selected state is announced through semantics');
@@ -782,8 +793,8 @@ final RegExp _codePrefixPattern = RegExp(
 );
 final RegExp _sqlLinePattern = RegExp(r'\b(SELECT|WHERE|BETWEEN|COALESCE|VALUES|INSERT|UPDATE|CASE|FROM)\b');
 final RegExp _ibanPattern = RegExp(r'^[A-Z]{2}\d');
-final RegExp _lowercasePhrasePattern = RegExp(r'^[a-z_][a-z0-9_]* [a-z_(]');
-final RegExp _identifierListPattern = RegExp(r'^[a-z_][a-z0-9_]*, ');
+final RegExp _lowercasePhrasePattern = RegExp('^[a-z_][a-z0-9_]* [a-z_(]');
+final RegExp _identifierListPattern = RegExp('^[a-z_][a-z0-9_]*, ');
 
 /// All non-metadata string values from both ARB catalogs.
 Set<String> _catalogValues() {

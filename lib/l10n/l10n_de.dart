@@ -217,6 +217,140 @@ class AppLocalizationsDe extends AppLocalizations {
   String get searchHint => 'Suchen…';
 
   @override
+  String get globalSearchButton => 'Globale Suche';
+
+  @override
+  String get globalSearchShortcutUnavailable => 'Globale Suche (Tastenkürzel nicht verfügbar)';
+
+  @override
+  String get globalSearchTitle => 'Suchen oder Befehl ausführen';
+
+  @override
+  String get globalSearchPlaceholder =>
+      'Rechnungen, Kontakte, Belege, Transaktionen, Einstellungen oder Befehle suchen';
+
+  @override
+  String get globalSearchEmptyPrompt => 'Suchbegriff eingeben';
+
+  @override
+  String get globalSearchNoResults => 'Keine Treffer für diese Suche';
+
+  @override
+  String get globalSearchLoading => 'Suche läuft…';
+
+  @override
+  String get globalSearchPartialFailure => 'Einige lokale Datensätze konnten nicht durchsucht werden.';
+
+  @override
+  String globalSearchSourceUnavailable(String source) {
+    return '$source konnten nicht durchsucht werden.';
+  }
+
+  @override
+  String get globalSearchInvoiceType => 'Rechnung';
+
+  @override
+  String get globalSearchContactType => 'Kontakt';
+
+  @override
+  String get globalSearchReceiptType => 'Beleg';
+
+  @override
+  String get globalSearchBankTransactionType => 'Banktransaktion';
+
+  @override
+  String get globalSearchDestinationType => 'Ziel';
+
+  @override
+  String get globalSearchCommandType => 'Befehl';
+
+  @override
+  String get globalSearchSettingsDestination => 'Einstellungen';
+
+  @override
+  String get globalSearchNewInvoiceCommand => 'Neue Rechnung';
+
+  @override
+  String globalSearchInvoiceFallback(String id) {
+    return 'Rechnung Nr. $id';
+  }
+
+  @override
+  String globalSearchReceiptFallback(String id) {
+    return 'Beleg Nr. $id';
+  }
+
+  @override
+  String globalSearchTransactionFallback(String id) {
+    return 'Transaktion Nr. $id';
+  }
+
+  @override
+  String get bankSelectedTransactionTitle => 'Ausgewählte Banktransaktion';
+
+  @override
+  String get bankTransactionInvalidSelection => 'Der Transaktionslink ist ungültig.';
+
+  @override
+  String get bankTransactionNotFound => 'Diese Banktransaktion ist im aktiven Profil nicht verfügbar.';
+
+  @override
+  String get bankTransactionLoadFailed => 'Die Banktransaktion konnte nicht geladen werden.';
+
+  @override
+  String get bankTransactionCounterparty => 'Gegenkonto';
+
+  @override
+  String get bankTransactionPurpose => 'Verwendungszweck';
+
+  @override
+  String get bankTransactionAmount => 'Betrag';
+
+  @override
+  String get bankTransactionStatus => 'Status';
+
+  @override
+  String get filterDateFrom => 'Datum ab';
+
+  @override
+  String get filterDateTo => 'Datum bis';
+
+  @override
+  String get filterStatusExact => 'Exakter Status';
+
+  @override
+  String get filterAmountFrom => 'Betrag ab';
+
+  @override
+  String get filterAmountTo => 'Betrag bis';
+
+  @override
+  String get filterApply => 'Filter anwenden';
+
+  @override
+  String get filterClearAll => 'Alle Filter löschen';
+
+  @override
+  String get filterInvalidDateRange => 'Das Startdatum muss vor oder am Enddatum liegen.';
+
+  @override
+  String get filterInvalidAmount => 'Gib einen gültigen Betrag mit höchstens zwei Nachkommastellen ein.';
+
+  @override
+  String get filterInvalidAmountRange => 'Der Mindestbetrag muss kleiner oder gleich dem Höchstbetrag sein.';
+
+  @override
+  String get filterPreviousPage => 'Vorherige Seite';
+
+  @override
+  String get filterNextPage => 'Nächste Seite';
+
+  @override
+  String filterPageCount(int page, int pages) {
+    return 'Seite $page von $pages';
+  }
+
+  @override
   String get loading => 'Wird geladen…';
 
   @override
@@ -993,6 +1127,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bankHeaderSubtitleImport => 'Dateiimport mit Prüfung vor dem Speichern';
+
+  @override
+  String get bankHeaderSubtitleTransactions => 'Gespeicherte Banktransaktionen suchen und filtern';
+
+  @override
+  String get bankViewTransactions => 'Transaktionen';
 
   @override
   String get bankNoAccountSelected => 'kein Konto';

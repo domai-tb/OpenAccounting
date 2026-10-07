@@ -12,6 +12,7 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
+import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 
 void main() {
   test('test_analyzer_and_integration_test_gates_1_1_analyzer_gate_passes', () async {
@@ -85,9 +86,11 @@ void main() {
         );
         expect(find.byKey(const ValueKey<String>('bank-import-workflow')), findsOneWidget);
       } else {
-        final Finder surface = route == AppRoute.settings || route == AppRoute.help
-            ? find.byType(AppPage)
-            : find.byType(FinanceListSurface);
+        final Finder surface = switch (route) {
+          AppRoute.settings || AppRoute.help => find.byType(AppPage),
+          AppRoute.invoices || AppRoute.receipts => find.byType(TypedWorkspaceSurface),
+          _ => find.byType(FinanceListSurface),
+        };
         expect(surface, findsOneWidget, reason: 'Route ${route.path} must expose its reviewable workspace surface');
       }
     }

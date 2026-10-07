@@ -217,6 +217,139 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search…';
 
   @override
+  String get globalSearchButton => 'Global search';
+
+  @override
+  String get globalSearchShortcutUnavailable => 'Global search (keyboard shortcut unavailable)';
+
+  @override
+  String get globalSearchTitle => 'Search or run a command';
+
+  @override
+  String get globalSearchPlaceholder => 'Search invoices, contacts, receipts, transactions, settings, or commands';
+
+  @override
+  String get globalSearchEmptyPrompt => 'Start typing to search';
+
+  @override
+  String get globalSearchNoResults => 'No matches for this search';
+
+  @override
+  String get globalSearchLoading => 'Searching…';
+
+  @override
+  String get globalSearchPartialFailure => 'Some local records could not be searched.';
+
+  @override
+  String globalSearchSourceUnavailable(String source) {
+    return '$source could not be searched.';
+  }
+
+  @override
+  String get globalSearchInvoiceType => 'Invoice';
+
+  @override
+  String get globalSearchContactType => 'Contact';
+
+  @override
+  String get globalSearchReceiptType => 'Receipt';
+
+  @override
+  String get globalSearchBankTransactionType => 'Bank transaction';
+
+  @override
+  String get globalSearchDestinationType => 'Destination';
+
+  @override
+  String get globalSearchCommandType => 'Command';
+
+  @override
+  String get globalSearchSettingsDestination => 'Settings';
+
+  @override
+  String get globalSearchNewInvoiceCommand => 'New invoice';
+
+  @override
+  String globalSearchInvoiceFallback(String id) {
+    return 'Invoice #$id';
+  }
+
+  @override
+  String globalSearchReceiptFallback(String id) {
+    return 'Receipt #$id';
+  }
+
+  @override
+  String globalSearchTransactionFallback(String id) {
+    return 'Transaction #$id';
+  }
+
+  @override
+  String get bankSelectedTransactionTitle => 'Selected bank transaction';
+
+  @override
+  String get bankTransactionInvalidSelection => 'The transaction link is invalid.';
+
+  @override
+  String get bankTransactionNotFound => 'This bank transaction is not available in the active profile.';
+
+  @override
+  String get bankTransactionLoadFailed => 'The bank transaction could not be loaded.';
+
+  @override
+  String get bankTransactionCounterparty => 'Counterparty';
+
+  @override
+  String get bankTransactionPurpose => 'Remittance';
+
+  @override
+  String get bankTransactionAmount => 'Amount';
+
+  @override
+  String get bankTransactionStatus => 'Status';
+
+  @override
+  String get filterDateFrom => 'Date from';
+
+  @override
+  String get filterDateTo => 'Date to';
+
+  @override
+  String get filterStatusExact => 'Exact status';
+
+  @override
+  String get filterAmountFrom => 'Amount from';
+
+  @override
+  String get filterAmountTo => 'Amount to';
+
+  @override
+  String get filterApply => 'Apply filters';
+
+  @override
+  String get filterClearAll => 'Clear all filters';
+
+  @override
+  String get filterInvalidDateRange => 'The start date must be on or before the end date.';
+
+  @override
+  String get filterInvalidAmount => 'Enter a valid amount with up to two decimal places.';
+
+  @override
+  String get filterInvalidAmountRange => 'The minimum amount must be on or below the maximum amount.';
+
+  @override
+  String get filterPreviousPage => 'Previous page';
+
+  @override
+  String get filterNextPage => 'Next page';
+
+  @override
+  String filterPageCount(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
   String get loading => 'Loading…';
 
   @override
@@ -987,6 +1120,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bankHeaderSubtitleImport => 'File import with review before saving';
+
+  @override
+  String get bankHeaderSubtitleTransactions => 'Search and filter saved bank transactions';
+
+  @override
+  String get bankViewTransactions => 'Transactions';
 
   @override
   String get bankNoAccountSelected => 'no account';

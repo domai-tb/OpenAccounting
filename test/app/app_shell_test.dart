@@ -344,17 +344,17 @@ void main() {
 
       // Click menu control temporarily expands per DESIGN §4 — currently missing
       // Look for any IconButton inside AppSidebar that triggers temporary expand
-      final iconButtonsInSidebar = find.descendant(of: find.byType(AppSidebar), matching: find.byType(IconButton));
+      final menuButton = find.descendant(of: find.byType(AppSidebar), matching: find.byIcon(Icons.menu));
       expect(
-        iconButtonsInSidebar,
-        findsWidgets,
+        menuButton,
+        findsOneWidget,
         reason:
             'Compact rail must have menu control (IconButton) to temporarily expand per DESIGN §4 — '
             'AppSidebar currently has no IconButton in compact. Add menu control that expands 72→240 temporarily.',
       );
       // Attempt temporary expand: tap and expect width 240
-      if (iconButtonsInSidebar.evaluate().isNotEmpty) {
-        await tester.tap(iconButtonsInSidebar.first);
+      if (menuButton.evaluate().isNotEmpty) {
+        await tester.tap(menuButton);
         await tester.pumpAndSettle();
         final afterBoxes = tester.widgetList<SizedBox>(find.byType(SizedBox)).toList();
         final expanded = afterBoxes.any((SizedBox s) => s.width == 240.0);
@@ -457,18 +457,18 @@ void main() {
       expect(has240, isTrue, reason: 'Initially expanded at 1400 with pref true must be 240');
 
       // Collapse toggle must exist and persist per D2 — currently missing IconButton
-      final collapseButtons = find.descendant(of: find.byType(AppSidebar), matching: find.byType(IconButton));
+      final collapseButton = find.descendant(of: find.byType(AppSidebar), matching: find.byIcon(Icons.menu));
       expect(
-        collapseButtons,
-        findsWidgets,
+        collapseButton,
+        findsOneWidget,
         reason:
             'Sidebar collapse toggle (IconButton) missing per D2 — AppSidebar header must have '
             'toggle that calls SidebarController.toggle() and persists to SharedPreferences '
             'openaccounting.sidebar_expanded.',
       );
 
-      if (collapseButtons.evaluate().isNotEmpty) {
-        await tester.tap(collapseButtons.first);
+      if (collapseButton.evaluate().isNotEmpty) {
+        await tester.tap(collapseButton);
         await tester.pumpAndSettle();
         final prefs = await SharedPreferences.getInstance();
         final saved = prefs.getBool('openaccounting.sidebar_expanded');

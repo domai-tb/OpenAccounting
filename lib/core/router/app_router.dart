@@ -15,12 +15,14 @@ import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
+import 'package:openaccounting/core/router/typed_workspace_search.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
+import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
@@ -107,7 +109,15 @@ GoRouter createRouter(AppDatabase db) {
             builder: (context, state) {
               final typ = state.uri.queryParameters['typ'];
               final status = state.uri.queryParameters['status'];
-              return InvoicesPage(filterTyp: typ, filterStatus: status);
+              return InvoicesPage(
+                filterTyp: typ,
+                filterStatus: status,
+                routeParameters: state.uri.queryParameters,
+                workspaceParse: parseTypedWorkspaceRouteCriteria(
+                  TypedWorkspaceDomain.invoices,
+                  state.uri.queryParameters,
+                ),
+              );
             },
             routes: <RouteBase>[
               GoRoute(path: 'new', builder: (context, state) => const InvoiceDraftPage()),
@@ -122,7 +132,13 @@ GoRouter createRouter(AppDatabase db) {
           ),
           GoRoute(
             path: '/receipts',
-            builder: (context, state) => const ReceiptsPage(),
+            builder: (context, state) => ReceiptsPage(
+              routeParameters: state.uri.queryParameters,
+              workspaceParse: parseTypedWorkspaceRouteCriteria(
+                TypedWorkspaceDomain.receipts,
+                state.uri.queryParameters,
+              ),
+            ),
             routes: <RouteBase>[
               GoRoute(
                 path: ':id',
@@ -252,10 +268,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 });
 
 class InvoicesPage extends ConsumerWidget {
-  const InvoicesPage({this.filterTyp, this.filterStatus, super.key});
+  const InvoicesPage({
+    this.filterTyp,
+    this.filterStatus,
+    this.routeParameters = const <String, String>{},
+    this.workspaceParse,
+    super.key,
+  });
 
   final String? filterTyp;
   final String? filterStatus;
+  final Map<String, String> routeParameters;
+  final TypedWorkspaceCriteriaParseResult? workspaceParse;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -273,8 +297,27 @@ class InvoicesPage extends ConsumerWidget {
       onPrimaryAction: () => context.go('/invoices/new'),
       filterTyp: filterTyp,
       filterStatus: filterStatus,
+      workspaceCriteria:
+          workspaceParse?.criteria ??
+          TypedWorkspaceSearchCriteria(
+            domain: TypedWorkspaceDomain.invoices,
+            status: filterStatus,
+            invoiceType: filterTyp,
+          ),
+      workspaceInvalidFields: workspaceParse?.invalidFields ?? const <TypedWorkspaceFilterField>{},
+      onWorkspaceCriteriaChanged: (TypedWorkspaceSearchCriteria criteria) =>
+          context.go(typedWorkspaceRoute('/invoices', typedWorkspaceRouteParameters(routeParameters, criteria))),
+      onOpenWorkspaceRecord: (TypedWorkspaceRecord record) => context.go(
+        typedWorkspaceRoute(
+          '/invoices/${record.id}',
+          typedWorkspaceRouteParameters(routeParameters, workspaceParse?.criteria ?? criteriaFromFilters()),
+        ),
+      ),
     );
   }
+
+  TypedWorkspaceSearchCriteria criteriaFromFilters() =>
+      TypedWorkspaceSearchCriteria(domain: TypedWorkspaceDomain.invoices, status: filterStatus, invoiceType: filterTyp);
 }
 
 class InvoiceDraftPage extends ConsumerStatefulWidget {
@@ -574,7 +617,10 @@ class InvoiceDetailPage extends StatelessWidget {
 }
 
 class ReceiptsPage extends ConsumerWidget {
-  const ReceiptsPage({super.key});
+  const ReceiptsPage({this.routeParameters = const <String, String>{}, this.workspaceParse, super.key});
+
+  final Map<String, String> routeParameters;
+  final TypedWorkspaceCriteriaParseResult? workspaceParse;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -586,6 +632,20 @@ class ReceiptsPage extends ConsumerWidget {
       subtitle: l10n.receiptsSubtitle,
       emptyTitle: l10n.emptyEntries,
       emptyMessage: l10n.receiptsSubtitle,
+      workspaceCriteria:
+          workspaceParse?.criteria ?? const TypedWorkspaceSearchCriteria(domain: TypedWorkspaceDomain.receipts),
+      workspaceInvalidFields: workspaceParse?.invalidFields ?? const <TypedWorkspaceFilterField>{},
+      onWorkspaceCriteriaChanged: (TypedWorkspaceSearchCriteria criteria) =>
+          context.go(typedWorkspaceRoute('/receipts', typedWorkspaceRouteParameters(routeParameters, criteria))),
+      onOpenWorkspaceRecord: (TypedWorkspaceRecord record) => context.go(
+        typedWorkspaceRoute(
+          '/receipts/${record.id}',
+          typedWorkspaceRouteParameters(
+            routeParameters,
+            workspaceParse?.criteria ?? const TypedWorkspaceSearchCriteria(domain: TypedWorkspaceDomain.receipts),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -965,6 +1025,10 @@ class ProductionRoutePage extends ConsumerWidget {
     this.emptyMessage,
     this.emptyActionLabel,
     this.onEmptyAction,
+    this.workspaceCriteria,
+    this.workspaceInvalidFields = const <TypedWorkspaceFilterField>{},
+    this.onWorkspaceCriteriaChanged,
+    this.onOpenWorkspaceRecord,
     super.key,
   });
 
@@ -980,9 +1044,27 @@ class ProductionRoutePage extends ConsumerWidget {
   final String? emptyMessage;
   final String? emptyActionLabel;
   final VoidCallback? onEmptyAction;
+  final TypedWorkspaceSearchCriteria? workspaceCriteria;
+  final Set<TypedWorkspaceFilterField> workspaceInvalidFields;
+  final ValueChanged<TypedWorkspaceSearchCriteria>? onWorkspaceCriteriaChanged;
+  final ValueChanged<TypedWorkspaceRecord>? onOpenWorkspaceRecord;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final TypedWorkspaceSearchCriteria? criteria = workspaceCriteria;
+    if (criteria != null) {
+      return TypedWorkspaceSurface(
+        title: title,
+        icon: icon,
+        subtitle: subtitle,
+        primaryActionLabel: primaryActionLabel,
+        onPrimaryAction: onPrimaryAction,
+        criteria: criteria,
+        invalidFields: workspaceInvalidFields,
+        onCriteriaChanged: onWorkspaceCriteriaChanged ?? (_) {},
+        onOpen: onOpenWorkspaceRecord,
+      );
+    }
     return FinanceListSurface(
       table: table,
       title: title,

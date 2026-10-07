@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
 
@@ -15,6 +16,7 @@ abstract final class DesktopShortcutAccelerators {
   static const String showHide = 'Ctrl+Shift+I';
   static const String newInvoice = 'Ctrl+Shift+N';
   static const String focusSearch = 'Ctrl+F';
+  static String get globalSearch => defaultTargetPlatform == TargetPlatform.macOS ? 'Meta+K' : 'Ctrl+K';
   static const String navigateEingang = 'Ctrl+Shift+E';
   static const String newBuchung = '+';
   static const String toggleEinnahme = 'E';
@@ -44,6 +46,9 @@ class HotkeyManagerBackend implements HotkeyBackend {
         break;
       case 'f':
         k = LogicalKeyboardKey.keyF;
+        break;
+      case 'k':
+        k = LogicalKeyboardKey.keyK;
         break;
       case 'e':
         k = LogicalKeyboardKey.keyE;
@@ -123,8 +128,11 @@ class _UnsupportedHotkeyBackend implements HotkeyBackend {
 
 abstract class DesktopShortcutsService {
   bool get isRegistered;
+  bool get isGlobalSearchRegistered;
   String? get lastWarning;
   Future<bool> register();
+  Future<bool> registerGlobalSearch();
+  Future<void> unregisterGlobalSearch();
   Future<void> unregister();
   void Function()? get onShowHide;
   set onShowHide(void Function()? value);
@@ -132,6 +140,8 @@ abstract class DesktopShortcutsService {
   set onNewInvoice(void Function()? value);
   void Function()? get onFocusSearch;
   set onFocusSearch(void Function()? value);
+  void Function()? get onGlobalSearch;
+  set onGlobalSearch(void Function()? value);
   void Function()? get onNavigateEingang;
   set onNavigateEingang(void Function()? value);
   void Function()? get onOpenBuchung;
@@ -165,6 +175,7 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
     _onShowHide = _handleShowHide;
     _onNewInvoice = _handleNewInvoice;
     _onFocusSearch = () {};
+    _onGlobalSearch = () {};
     _onNavigateEingang = () {};
     _onOpenBuchung = () {};
     _onToggleArt = () {};
@@ -176,18 +187,22 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
   final void Function(String)? _onWarning;
 
   bool _isRegistered = false;
+  bool _isGlobalSearchRegistered = false;
   String? _lastWarning;
   bool _isVisible = false;
 
   late void Function()? _onShowHide;
   late void Function()? _onNewInvoice;
   late void Function()? _onFocusSearch;
+  late void Function()? _onGlobalSearch;
   late void Function()? _onNavigateEingang;
   late void Function()? _onOpenBuchung;
   late void Function()? _onToggleArt;
 
   @override
   bool get isRegistered => _isRegistered;
+  @override
+  bool get isGlobalSearchRegistered => _isGlobalSearchRegistered;
   @override
   String? get lastWarning => _lastWarning;
   @override
@@ -202,6 +217,10 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
   void Function()? get onFocusSearch => _onFocusSearch;
   @override
   set onFocusSearch(void Function()? value) => _onFocusSearch = value;
+  @override
+  void Function()? get onGlobalSearch => _onGlobalSearch;
+  @override
+  set onGlobalSearch(void Function()? value) => _onGlobalSearch = value;
   @override
   void Function()? get onNavigateEingang => _onNavigateEingang;
   @override
@@ -254,6 +273,7 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
           DesktopShortcutAccelerators.focusSearch,
           () async => _onFocusSearch?.call(),
         ),
+        await _registerGlobalSearchIntent(),
         await _hotkeys.register(
           'navigateEingang',
           DesktopShortcutAccelerators.navigateEingang,
@@ -281,6 +301,7 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
         _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
         _onWarning?.call(_lastWarning!);
         await _hotkeys.unregisterAll();
+        _isGlobalSearchRegistered = false;
         _isRegistered = false;
         return false;
       }
@@ -291,17 +312,80 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
       _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
       _onWarning?.call(_lastWarning!);
       _isRegistered = false;
+      _isGlobalSearchRegistered = false;
       return false;
     } on PlatformException catch (_) {
       _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
       _onWarning?.call(_lastWarning!);
       _isRegistered = false;
+      _isGlobalSearchRegistered = false;
       return false;
     } catch (_) {
       _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
       _onWarning?.call(_lastWarning!);
       _isRegistered = false;
+      _isGlobalSearchRegistered = false;
       return false;
+    }
+  }
+
+  Future<bool> _registerGlobalSearchIntent() async {
+    if (_isGlobalSearchRegistered) return true;
+    final bool registered = await _hotkeys.register(
+      'globalSearch',
+      DesktopShortcutAccelerators.globalSearch,
+      () async => _onGlobalSearch?.call(),
+    );
+    _isGlobalSearchRegistered = registered;
+    return registered;
+  }
+
+  @override
+  Future<bool> registerGlobalSearch() async {
+    if (kIsWeb) {
+      _isGlobalSearchRegistered = false;
+      _lastWarning = null;
+      return false;
+    }
+    try {
+      final bool registered = await _registerGlobalSearchIntent();
+      if (!registered) {
+        _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
+        _onWarning?.call(_lastWarning!);
+      } else {
+        _lastWarning = null;
+      }
+      return registered;
+    } on MissingPluginException catch (_) {
+      _isGlobalSearchRegistered = false;
+      _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
+      _onWarning?.call(_lastWarning!);
+      return false;
+    } on PlatformException catch (_) {
+      _isGlobalSearchRegistered = false;
+      _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
+      _onWarning?.call(_lastWarning!);
+      return false;
+    } catch (_) {
+      _isGlobalSearchRegistered = false;
+      _lastWarning = 'Tastenkombination wird bereits von einer anderen Anwendung verwendet';
+      _onWarning?.call(_lastWarning!);
+      return false;
+    }
+  }
+
+  @override
+  Future<void> unregisterGlobalSearch() async {
+    try {
+      await _hotkeys.unregister('globalSearch');
+    } on MissingPluginException catch (_) {
+      return;
+    } on PlatformException catch (_) {
+      return;
+    } catch (_) {
+      return;
+    } finally {
+      _isGlobalSearchRegistered = false;
     }
   }
 
@@ -317,6 +401,7 @@ class DesktopShortcutsServiceImpl implements DesktopShortcutsService {
       return;
     }
     _isRegistered = false;
+    _isGlobalSearchRegistered = false;
   }
 }
 
@@ -340,3 +425,7 @@ DesktopShortcutsService createDesktopShortcutsService({
     onWarning: onWarning,
   );
 }
+
+final globalSearchShortcutServiceProvider = Provider<DesktopShortcutsService>((ref) {
+  return createDesktopShortcutsService(windowBackend: WindowManagerBackend(), navigate: (_) {});
+});
