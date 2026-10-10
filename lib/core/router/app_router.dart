@@ -27,6 +27,7 @@ import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
+import 'package:openaccounting/features/contextual_accounting_tax_guidance/contextual_guidance_help_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
@@ -983,38 +984,7 @@ class HelpPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    return AppPage(
-      header: AppPageHeader(title: l10n.routeHelp, showFilterToolbar: false),
-      child: ListView(
-        children: <Widget>[
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(l10n.settingsLanguage),
-            subtitle: Text(l10n.settingsAppearance),
-          ),
-          ListTile(
-            leading: const Icon(Icons.storage_outlined),
-            title: Text(l10n.localTitle),
-            subtitle: Text(l10n.localDescription),
-          ),
-          ListTile(
-            leading: const Icon(Icons.receipt_long),
-            title: Text(l10n.routeInvoices),
-            subtitle: Text(l10n.actionNewInvoice),
-          ),
-          const SizedBox(height: 16),
-          AppCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.verified_user_outlined),
-              title: Text(l10n.localTitle),
-              subtitle: Text(l10n.localDescription),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const ContextualGuidanceHelpPage();
   }
 }
 

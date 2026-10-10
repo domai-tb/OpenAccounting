@@ -846,5 +846,53 @@
   "featureModuleThresholdActive": "GuV-Schwelle erreicht. GuV bleibt aktiviert.",
   "featureModuleSaveError": "Speichern fehlgeschlagen. Erneut versuchen.",
   "featureModuleUnavailableTitle": "Modul nicht verfügbar",
-  "featureModuleUnavailableDescription": "Dieses Modul ist deaktiviert. Keine Daten wurden geändert."
+  "featureModuleUnavailableDescription": "Dieses Modul ist deaktiviert. Keine Daten wurden geändert.",
+  "guidanceExplainAction": "Erklärung",
+  "guidanceSearchHint": "Hilfe-Themen suchen …",
+  "guidanceEmptyResults": "Keine geprüfte Hilfe zu dieser Suche.",
+  "guidanceLocationLabel": "Ort: {route} · {control}",
+  "@guidanceLocationLabel": {
+    "placeholders": {
+      "route": { "type": "String" },
+      "control": { "type": "String" }
+    }
+  },
+  "guidanceContractLabel": "Vertrag: {contract} · {revision}",
+  "@guidanceContractLabel": {
+    "placeholders": {
+      "contract": { "type": "String" },
+      "revision": { "type": "String" }
+    }
+  },
+  "guidanceNoAdviceNote": "Hinweis: Diese Erklärung beschreibt das Verhalten der App und ist keine Steuerberatung.",
+  "guidanceTitleSkrMapping": "SKR-Zuordnung der Kategorie",
+  "guidanceBodySkrMapping": "Legt fest, welchem Standardkonto des Kontenrahmens (SKR 03/04) diese Kategorie in Auswertungen zugeordnet wird. Die Zuordnung steuert, in welcher Zeile der Auswertung Beträge dieser Kategorie erscheinen. Sie ändert keine Buchungen und ersetzt keine steuerliche Kontenwahl.",
+  "guidanceTitleJournalImmutability": "Unveränderbarkeit des Journals",
+  "guidanceBodyJournalImmutability": "Abgeschlossene Journalbuchungen können nicht nachträglich geändert oder gelöscht werden. Fehler werden ausschließlich über eine Stornobuchung mit Gegenbuchung korrigiert. So bleibt die Buchungshistorie lückenlos nachvollziehbar.",
+  "guidanceTitleJournalStorno": "Stornobuchung",
+  "guidanceBodyJournalStorno": "Erstellt eine Gegenbuchung, die die ursprüngliche Buchung rechnerisch aufhebt. Die Originalbuchung bleibt erhalten und sichtbar. Erst nach der Stornobuchung kann bei Bedarf neu gebucht werden.",
+  "guidanceTitleJournalGroup": "Journalgruppe",
+  "guidanceBodyJournalGroup": "Fasst zusammengehörende Buchungen eines Vorgangs zu einer Gruppe zusammen. Die Gruppe dient der Übersicht und Filterung in Auswertungen. Sie ändert weder Beträge noch Steuersätze.",
+  "guidanceTitleEuerInputTaxClaim": "Vorsteuerabzug in der EÜR",
+  "guidanceBodyEuerInputTaxClaim": "Gibt an, in welcher Richtung geltend gemachte Vorsteuer in die EÜR-Finalisierung einfließt. Die Einstellung wirkt sich auf die ausgewiesenen Betriebsausgaben der Periode aus. Ob und in welcher Höhe Vorsteuer geltend gemacht werden kann, prüft die App nicht; maßgeblich ist § 15 UStG.",
+  "guidanceTitleForderungStatus": "Forderungsstatus",
+  "guidanceBodyForderungStatus": "Zeigt den Bearbeitungsstand einer offenen Forderung: offen, teilbezahlt, bezahlt oder überfällig. Der Status steuert, ob die Forderung in Mahnläufen und Übersichten offener Posten erscheint. Er ändert keine Rechnungsbeträge.",
+  "guidanceTitleForderungOverpayment": "Überzahlungs-Hinweis",
+  "guidanceBodyForderungOverpayment": "Markiert eine Zahlung, die den offenen Forderungsbetrag übersteigt. Der überzahlte Betrag wird im Überzahlungs-Protokoll festgehalten und steht für Zuordnung oder Erstattung bereit. Es erfolgt keine automatische Verrechnung ohne deine Buchung.",
+  "guidanceTitleVerbindlichkeitPayment": "Verbindlichkeitszahlung",
+  "guidanceBodyVerbindlichkeitPayment": "Erfasst eine geleistete Zahlung auf eine offene Verbindlichkeit. Die Zahlung mindert den offenen Saldo des Lieferanten und erscheint im Zahlungsjournal. Fälligkeits- und Skontoprüfung übernimmt die App nicht.",
+  "guidanceTitleMahnungFeeInterest": "Mahngebühr und Verzugszinsen",
+  "guidanceBodyMahnungFeeInterest": "Erfasst pauschale Mahngebühren und berechnete Verzugszinsen eines Mahnlaufs. Die Beträge erhöhen die offene Forderung und werden im Mahnverlauf dokumentiert. Die App prüft nicht, ob und in welcher Höhe Gebühren oder Zinsen nach §§ 286, 288 BGB zulässig sind.",
+  "guidanceTitleBankMatchStatus": "Trefferstatus der Zuordnung",
+  "guidanceBodyBankMatchStatus": "Zeigt, wie sicher die App eine Banktransaktion einer Rechnung oder Kategorie zuordnet: Vorschlag oder bestätigt. Nur bestätigte Zuordnungen wirken sich auf offene Posten aus. Vorschläge mit geringer Trefferquote werden nie automatisch bestätigt.",
+  "guidanceTitleBankClassification": "Manuelle Klassifizierung",
+  "guidanceBodyBankClassification": "Überschreibt den automatisch vorgeschlagenen Geschäftsvorfall einer Transaktion (betrieblich, privat oder gemischt). Die Überschreibung gilt für diese Transaktion und steuert ihre steuerliche Auswertung. Regeln für wiederkehrende Fälle legst du separat an.",
+  "guidanceTitleAngebotStatus": "Angebotsstatus",
+  "guidanceBodyAngebotStatus": "Verfolgt den Stand eines Angebots von Entwurf über versendet und angenommen bis abgelehnt oder abgelaufen. Nur ein angenommenes Angebot kann in einen Auftrag überführt werden. Der Status hat keine steuerliche Wirkung.",
+  "guidanceTitleAuftragStatus": "Auftragsstatus",
+  "guidanceBodyAuftragStatus": "Verfolgt den Stand eines Auftrags von bestätigt über in Bearbeitung bis abgeschlossen oder storniert. Der Abschluss gibt die zugehörige Rechnung zur Erstellung frei. Stornierte Aufträge bleiben zu Nachweiszwecken erhalten.",
+  "guidanceTitleCorrectionCreditSign": "Vorzeichen der Korrekturbeträge",
+  "guidanceBodyCorrectionCreditSign": "Korrekturbeträge behalten ihr Vorzeichen, damit die Umsatzsteuer-Mathematik der Ursprungsrechnung erhalten bleibt. Eine Gutschrift mindert, eine Nachbelastung erhöht die Bemessungsgrundlage. Die App erstellt keine umsatzsteuerliche Würdigung des Korrekturgrunds; das Verhalten ist auf unterstützte Korrekturfälle beschränkt.",
+  "guidanceTitleTaxSpecial25a": "Differenzbesteuerung nach § 25a UStG",
+  "guidanceBodyTaxSpecial25a": "Kennzeichnet Umsätze, deren Bemessungsgrundlage die Marge statt des Gesamtpreises ist. Die App weist solche Umsätze in der Steuerübersicht gesondert aus. Ob die Voraussetzungen des § 25a UStG erfüllt sind, prüft die App nicht; nicht unterstützte Konstellationen werden als nicht verfügbar ausgewiesen."
 }

@@ -1699,4 +1699,131 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureModuleUnavailableDescription => 'This module is disabled. No data was changed.';
+
+  @override
+  String get guidanceExplainAction => 'Explanation';
+
+  @override
+  String get guidanceSearchHint => 'Search help topics…';
+
+  @override
+  String get guidanceEmptyResults => 'No reviewed help for this search.';
+
+  @override
+  String guidanceLocationLabel(String route, String control) {
+    return 'Location: $route · $control';
+  }
+
+  @override
+  String guidanceContractLabel(String contract, String revision) {
+    return 'Contract: $contract · $revision';
+  }
+
+  @override
+  String get guidanceNoAdviceNote => 'Note: This explanation describes app behavior and is not tax advice.';
+
+  @override
+  String get guidanceTitleSkrMapping => 'SKR mapping of the category';
+
+  @override
+  String get guidanceBodySkrMapping =>
+      'Defines which standard chart-of-accounts (SKR 03/04) account this category is assigned to in reports. The mapping controls the report line where amounts of this category appear. It changes no postings and does not replace a tax account choice.';
+
+  @override
+  String get guidanceTitleJournalImmutability => 'Immutability of the journal';
+
+  @override
+  String get guidanceBodyJournalImmutability =>
+      'Completed journal postings cannot be edited or deleted afterwards. Errors are corrected only through a reversal posting with a counter-entry. This keeps the posting history fully traceable.';
+
+  @override
+  String get guidanceTitleJournalStorno => 'Reversal posting';
+
+  @override
+  String get guidanceBodyJournalStorno =>
+      'Creates a counter-entry that arithmetically cancels the original posting. The original posting stays preserved and visible. Only after the reversal can a corrected posting be made if needed.';
+
+  @override
+  String get guidanceTitleJournalGroup => 'Journal group';
+
+  @override
+  String get guidanceBodyJournalGroup =>
+      'Groups related postings of one transaction for overview and filtering in reports. It changes neither amounts nor tax rates.';
+
+  @override
+  String get guidanceTitleEuerInputTaxClaim => 'Input-tax claim in the EÜR';
+
+  @override
+  String get guidanceBodyEuerInputTaxClaim =>
+      'States the direction in which claimed input tax flows into EÜR finalization. The setting affects the reported business expenses of the period. The app does not check whether or to what extent input tax can be claimed; § 15 UStG (German VAT Act) applies.';
+
+  @override
+  String get guidanceTitleForderungStatus => 'Receivable status';
+
+  @override
+  String get guidanceBodyForderungStatus =>
+      'Shows the processing state of an open receivable: open, partially paid, paid, or overdue. The status controls whether the item appears in dunning runs and open-item overviews. It changes no invoice amounts.';
+
+  @override
+  String get guidanceTitleForderungOverpayment => 'Overpayment notice';
+
+  @override
+  String get guidanceBodyForderungOverpayment =>
+      'Marks a payment that exceeds the open receivable amount. The excess is recorded in the overpayment log and kept available for allocation or refund. No automatic offsetting happens without your posting.';
+
+  @override
+  String get guidanceTitleVerbindlichkeitPayment => 'Payable payment';
+
+  @override
+  String get guidanceBodyVerbindlichkeitPayment =>
+      'Records a payment made against an open payable. The payment reduces the supplier open balance and appears in the payment journal. The app does not check due dates or cash-discount eligibility.';
+
+  @override
+  String get guidanceTitleMahnungFeeInterest => 'Dunning fees and late interest';
+
+  @override
+  String get guidanceBodyMahnungFeeInterest =>
+      'Records flat dunning fees and calculated late-payment interest of a dunning run. The amounts increase the open receivable and are documented in the dunning history. The app does not check whether or what amount of fees or interest is permitted under §§ 286, 288 BGB (German Civil Code).';
+
+  @override
+  String get guidanceTitleBankMatchStatus => 'Match status of the assignment';
+
+  @override
+  String get guidanceBodyBankMatchStatus =>
+      'Shows how confidently the app assigns a bank transaction to an invoice or category: suggested or confirmed. Only confirmed assignments affect open items. Low-score suggestions are never confirmed automatically.';
+
+  @override
+  String get guidanceTitleBankClassification => 'Manual classification';
+
+  @override
+  String get guidanceBodyBankClassification =>
+      'Overrides the automatically suggested business nature of a transaction (business, private, or mixed). The override applies to this transaction and controls its tax reporting. Rules for recurring cases are created separately.';
+
+  @override
+  String get guidanceTitleAngebotStatus => 'Quote status';
+
+  @override
+  String get guidanceBodyAngebotStatus =>
+      'Tracks a quote from draft through sent and accepted to rejected or expired. Only an accepted quote can be converted into an order. The status has no tax effect.';
+
+  @override
+  String get guidanceTitleAuftragStatus => 'Order status';
+
+  @override
+  String get guidanceBodyAuftragStatus =>
+      'Tracks an order from confirmed through in progress to completed or cancelled. Completion releases the related invoice for creation. Cancelled orders are kept for record purposes.';
+
+  @override
+  String get guidanceTitleCorrectionCreditSign => 'Sign of correction amounts';
+
+  @override
+  String get guidanceBodyCorrectionCreditSign =>
+      'Correction amounts keep their sign so the VAT mathematics of the original invoice is preserved. A credit reduces, an additional charge increases the taxable base. The app performs no VAT assessment of the correction reason; the behavior is limited to supported correction cases.';
+
+  @override
+  String get guidanceTitleTaxSpecial25a => 'Margin taxation under § 25a UStG';
+
+  @override
+  String get guidanceBodyTaxSpecial25a =>
+      'Marks supplies whose taxable base is the margin rather than the total price. The app reports such supplies separately in the tax overview. The app does not check whether the conditions of § 25a UStG are met; unsupported constellations are shown as unavailable.';
 }

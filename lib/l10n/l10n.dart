@@ -3283,6 +3283,222 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.'**
   String get featureModuleUnavailableDescription;
+
+  /// No description provided for @guidanceExplainAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Erklärung'**
+  String get guidanceExplainAction;
+
+  /// No description provided for @guidanceSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Hilfe-Themen suchen …'**
+  String get guidanceSearchHint;
+
+  /// No description provided for @guidanceEmptyResults.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine geprüfte Hilfe zu dieser Suche.'**
+  String get guidanceEmptyResults;
+
+  /// No description provided for @guidanceLocationLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Ort: {route} · {control}'**
+  String guidanceLocationLabel(String route, String control);
+
+  /// No description provided for @guidanceContractLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Vertrag: {contract} · {revision}'**
+  String guidanceContractLabel(String contract, String revision);
+
+  /// No description provided for @guidanceNoAdviceNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Hinweis: Diese Erklärung beschreibt das Verhalten der App und ist keine Steuerberatung.'**
+  String get guidanceNoAdviceNote;
+
+  /// No description provided for @guidanceTitleSkrMapping.
+  ///
+  /// In de, this message translates to:
+  /// **'SKR-Zuordnung der Kategorie'**
+  String get guidanceTitleSkrMapping;
+
+  /// No description provided for @guidanceBodySkrMapping.
+  ///
+  /// In de, this message translates to:
+  /// **'Legt fest, welchem Standardkonto des Kontenrahmens (SKR 03/04) diese Kategorie in Auswertungen zugeordnet wird. Die Zuordnung steuert, in welcher Zeile der Auswertung Beträge dieser Kategorie erscheinen. Sie ändert keine Buchungen und ersetzt keine steuerliche Kontenwahl.'**
+  String get guidanceBodySkrMapping;
+
+  /// No description provided for @guidanceTitleJournalImmutability.
+  ///
+  /// In de, this message translates to:
+  /// **'Unveränderbarkeit des Journals'**
+  String get guidanceTitleJournalImmutability;
+
+  /// No description provided for @guidanceBodyJournalImmutability.
+  ///
+  /// In de, this message translates to:
+  /// **'Abgeschlossene Journalbuchungen können nicht nachträglich geändert oder gelöscht werden. Fehler werden ausschließlich über eine Stornobuchung mit Gegenbuchung korrigiert. So bleibt die Buchungshistorie lückenlos nachvollziehbar.'**
+  String get guidanceBodyJournalImmutability;
+
+  /// No description provided for @guidanceTitleJournalStorno.
+  ///
+  /// In de, this message translates to:
+  /// **'Stornobuchung'**
+  String get guidanceTitleJournalStorno;
+
+  /// No description provided for @guidanceBodyJournalStorno.
+  ///
+  /// In de, this message translates to:
+  /// **'Erstellt eine Gegenbuchung, die die ursprüngliche Buchung rechnerisch aufhebt. Die Originalbuchung bleibt erhalten und sichtbar. Erst nach der Stornobuchung kann bei Bedarf neu gebucht werden.'**
+  String get guidanceBodyJournalStorno;
+
+  /// No description provided for @guidanceTitleJournalGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Journalgruppe'**
+  String get guidanceTitleJournalGroup;
+
+  /// No description provided for @guidanceBodyJournalGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Fasst zusammengehörende Buchungen eines Vorgangs zu einer Gruppe zusammen. Die Gruppe dient der Übersicht und Filterung in Auswertungen. Sie ändert weder Beträge noch Steuersätze.'**
+  String get guidanceBodyJournalGroup;
+
+  /// No description provided for @guidanceTitleEuerInputTaxClaim.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorsteuerabzug in der EÜR'**
+  String get guidanceTitleEuerInputTaxClaim;
+
+  /// No description provided for @guidanceBodyEuerInputTaxClaim.
+  ///
+  /// In de, this message translates to:
+  /// **'Gibt an, in welcher Richtung geltend gemachte Vorsteuer in die EÜR-Finalisierung einfließt. Die Einstellung wirkt sich auf die ausgewiesenen Betriebsausgaben der Periode aus. Ob und in welcher Höhe Vorsteuer geltend gemacht werden kann, prüft die App nicht; maßgeblich ist § 15 UStG.'**
+  String get guidanceBodyEuerInputTaxClaim;
+
+  /// No description provided for @guidanceTitleForderungStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Forderungsstatus'**
+  String get guidanceTitleForderungStatus;
+
+  /// No description provided for @guidanceBodyForderungStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeigt den Bearbeitungsstand einer offenen Forderung: offen, teilbezahlt, bezahlt oder überfällig. Der Status steuert, ob die Forderung in Mahnläufen und Übersichten offener Posten erscheint. Er ändert keine Rechnungsbeträge.'**
+  String get guidanceBodyForderungStatus;
+
+  /// No description provided for @guidanceTitleForderungOverpayment.
+  ///
+  /// In de, this message translates to:
+  /// **'Überzahlungs-Hinweis'**
+  String get guidanceTitleForderungOverpayment;
+
+  /// No description provided for @guidanceBodyForderungOverpayment.
+  ///
+  /// In de, this message translates to:
+  /// **'Markiert eine Zahlung, die den offenen Forderungsbetrag übersteigt. Der überzahlte Betrag wird im Überzahlungs-Protokoll festgehalten und steht für Zuordnung oder Erstattung bereit. Es erfolgt keine automatische Verrechnung ohne deine Buchung.'**
+  String get guidanceBodyForderungOverpayment;
+
+  /// No description provided for @guidanceTitleVerbindlichkeitPayment.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbindlichkeitszahlung'**
+  String get guidanceTitleVerbindlichkeitPayment;
+
+  /// No description provided for @guidanceBodyVerbindlichkeitPayment.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfasst eine geleistete Zahlung auf eine offene Verbindlichkeit. Die Zahlung mindert den offenen Saldo des Lieferanten und erscheint im Zahlungsjournal. Fälligkeits- und Skontoprüfung übernimmt die App nicht.'**
+  String get guidanceBodyVerbindlichkeitPayment;
+
+  /// No description provided for @guidanceTitleMahnungFeeInterest.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahngebühr und Verzugszinsen'**
+  String get guidanceTitleMahnungFeeInterest;
+
+  /// No description provided for @guidanceBodyMahnungFeeInterest.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfasst pauschale Mahngebühren und berechnete Verzugszinsen eines Mahnlaufs. Die Beträge erhöhen die offene Forderung und werden im Mahnverlauf dokumentiert. Die App prüft nicht, ob und in welcher Höhe Gebühren oder Zinsen nach §§ 286, 288 BGB zulässig sind.'**
+  String get guidanceBodyMahnungFeeInterest;
+
+  /// No description provided for @guidanceTitleBankMatchStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Trefferstatus der Zuordnung'**
+  String get guidanceTitleBankMatchStatus;
+
+  /// No description provided for @guidanceBodyBankMatchStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeigt, wie sicher die App eine Banktransaktion einer Rechnung oder Kategorie zuordnet: Vorschlag oder bestätigt. Nur bestätigte Zuordnungen wirken sich auf offene Posten aus. Vorschläge mit geringer Trefferquote werden nie automatisch bestätigt.'**
+  String get guidanceBodyBankMatchStatus;
+
+  /// No description provided for @guidanceTitleBankClassification.
+  ///
+  /// In de, this message translates to:
+  /// **'Manuelle Klassifizierung'**
+  String get guidanceTitleBankClassification;
+
+  /// No description provided for @guidanceBodyBankClassification.
+  ///
+  /// In de, this message translates to:
+  /// **'Überschreibt den automatisch vorgeschlagenen Geschäftsvorfall einer Transaktion (betrieblich, privat oder gemischt). Die Überschreibung gilt für diese Transaktion und steuert ihre steuerliche Auswertung. Regeln für wiederkehrende Fälle legst du separat an.'**
+  String get guidanceBodyBankClassification;
+
+  /// No description provided for @guidanceTitleAngebotStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Angebotsstatus'**
+  String get guidanceTitleAngebotStatus;
+
+  /// No description provided for @guidanceBodyAngebotStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Verfolgt den Stand eines Angebots von Entwurf über versendet und angenommen bis abgelehnt oder abgelaufen. Nur ein angenommenes Angebot kann in einen Auftrag überführt werden. Der Status hat keine steuerliche Wirkung.'**
+  String get guidanceBodyAngebotStatus;
+
+  /// No description provided for @guidanceTitleAuftragStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Auftragsstatus'**
+  String get guidanceTitleAuftragStatus;
+
+  /// No description provided for @guidanceBodyAuftragStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Verfolgt den Stand eines Auftrags von bestätigt über in Bearbeitung bis abgeschlossen oder storniert. Der Abschluss gibt die zugehörige Rechnung zur Erstellung frei. Stornierte Aufträge bleiben zu Nachweiszwecken erhalten.'**
+  String get guidanceBodyAuftragStatus;
+
+  /// No description provided for @guidanceTitleCorrectionCreditSign.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorzeichen der Korrekturbeträge'**
+  String get guidanceTitleCorrectionCreditSign;
+
+  /// No description provided for @guidanceBodyCorrectionCreditSign.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrekturbeträge behalten ihr Vorzeichen, damit die Umsatzsteuer-Mathematik der Ursprungsrechnung erhalten bleibt. Eine Gutschrift mindert, eine Nachbelastung erhöht die Bemessungsgrundlage. Die App erstellt keine umsatzsteuerliche Würdigung des Korrekturgrunds; das Verhalten ist auf unterstützte Korrekturfälle beschränkt.'**
+  String get guidanceBodyCorrectionCreditSign;
+
+  /// No description provided for @guidanceTitleTaxSpecial25a.
+  ///
+  /// In de, this message translates to:
+  /// **'Differenzbesteuerung nach § 25a UStG'**
+  String get guidanceTitleTaxSpecial25a;
+
+  /// No description provided for @guidanceBodyTaxSpecial25a.
+  ///
+  /// In de, this message translates to:
+  /// **'Kennzeichnet Umsätze, deren Bemessungsgrundlage die Marge statt des Gesamtpreises ist. Die App weist solche Umsätze in der Steuerübersicht gesondert aus. Ob die Voraussetzungen des § 25a UStG erfüllt sind, prüft die App nicht; nicht unterstützte Konstellationen werden als nicht verfügbar ausgewiesen.'**
+  String get guidanceBodyTaxSpecial25a;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -1707,4 +1707,132 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get featureModuleUnavailableDescription => 'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.';
+
+  @override
+  String get guidanceExplainAction => 'Erklärung';
+
+  @override
+  String get guidanceSearchHint => 'Hilfe-Themen suchen …';
+
+  @override
+  String get guidanceEmptyResults => 'Keine geprüfte Hilfe zu dieser Suche.';
+
+  @override
+  String guidanceLocationLabel(String route, String control) {
+    return 'Ort: $route · $control';
+  }
+
+  @override
+  String guidanceContractLabel(String contract, String revision) {
+    return 'Vertrag: $contract · $revision';
+  }
+
+  @override
+  String get guidanceNoAdviceNote =>
+      'Hinweis: Diese Erklärung beschreibt das Verhalten der App und ist keine Steuerberatung.';
+
+  @override
+  String get guidanceTitleSkrMapping => 'SKR-Zuordnung der Kategorie';
+
+  @override
+  String get guidanceBodySkrMapping =>
+      'Legt fest, welchem Standardkonto des Kontenrahmens (SKR 03/04) diese Kategorie in Auswertungen zugeordnet wird. Die Zuordnung steuert, in welcher Zeile der Auswertung Beträge dieser Kategorie erscheinen. Sie ändert keine Buchungen und ersetzt keine steuerliche Kontenwahl.';
+
+  @override
+  String get guidanceTitleJournalImmutability => 'Unveränderbarkeit des Journals';
+
+  @override
+  String get guidanceBodyJournalImmutability =>
+      'Abgeschlossene Journalbuchungen können nicht nachträglich geändert oder gelöscht werden. Fehler werden ausschließlich über eine Stornobuchung mit Gegenbuchung korrigiert. So bleibt die Buchungshistorie lückenlos nachvollziehbar.';
+
+  @override
+  String get guidanceTitleJournalStorno => 'Stornobuchung';
+
+  @override
+  String get guidanceBodyJournalStorno =>
+      'Erstellt eine Gegenbuchung, die die ursprüngliche Buchung rechnerisch aufhebt. Die Originalbuchung bleibt erhalten und sichtbar. Erst nach der Stornobuchung kann bei Bedarf neu gebucht werden.';
+
+  @override
+  String get guidanceTitleJournalGroup => 'Journalgruppe';
+
+  @override
+  String get guidanceBodyJournalGroup =>
+      'Fasst zusammengehörende Buchungen eines Vorgangs zu einer Gruppe zusammen. Die Gruppe dient der Übersicht und Filterung in Auswertungen. Sie ändert weder Beträge noch Steuersätze.';
+
+  @override
+  String get guidanceTitleEuerInputTaxClaim => 'Vorsteuerabzug in der EÜR';
+
+  @override
+  String get guidanceBodyEuerInputTaxClaim =>
+      'Gibt an, in welcher Richtung geltend gemachte Vorsteuer in die EÜR-Finalisierung einfließt. Die Einstellung wirkt sich auf die ausgewiesenen Betriebsausgaben der Periode aus. Ob und in welcher Höhe Vorsteuer geltend gemacht werden kann, prüft die App nicht; maßgeblich ist § 15 UStG.';
+
+  @override
+  String get guidanceTitleForderungStatus => 'Forderungsstatus';
+
+  @override
+  String get guidanceBodyForderungStatus =>
+      'Zeigt den Bearbeitungsstand einer offenen Forderung: offen, teilbezahlt, bezahlt oder überfällig. Der Status steuert, ob die Forderung in Mahnläufen und Übersichten offener Posten erscheint. Er ändert keine Rechnungsbeträge.';
+
+  @override
+  String get guidanceTitleForderungOverpayment => 'Überzahlungs-Hinweis';
+
+  @override
+  String get guidanceBodyForderungOverpayment =>
+      'Markiert eine Zahlung, die den offenen Forderungsbetrag übersteigt. Der überzahlte Betrag wird im Überzahlungs-Protokoll festgehalten und steht für Zuordnung oder Erstattung bereit. Es erfolgt keine automatische Verrechnung ohne deine Buchung.';
+
+  @override
+  String get guidanceTitleVerbindlichkeitPayment => 'Verbindlichkeitszahlung';
+
+  @override
+  String get guidanceBodyVerbindlichkeitPayment =>
+      'Erfasst eine geleistete Zahlung auf eine offene Verbindlichkeit. Die Zahlung mindert den offenen Saldo des Lieferanten und erscheint im Zahlungsjournal. Fälligkeits- und Skontoprüfung übernimmt die App nicht.';
+
+  @override
+  String get guidanceTitleMahnungFeeInterest => 'Mahngebühr und Verzugszinsen';
+
+  @override
+  String get guidanceBodyMahnungFeeInterest =>
+      'Erfasst pauschale Mahngebühren und berechnete Verzugszinsen eines Mahnlaufs. Die Beträge erhöhen die offene Forderung und werden im Mahnverlauf dokumentiert. Die App prüft nicht, ob und in welcher Höhe Gebühren oder Zinsen nach §§ 286, 288 BGB zulässig sind.';
+
+  @override
+  String get guidanceTitleBankMatchStatus => 'Trefferstatus der Zuordnung';
+
+  @override
+  String get guidanceBodyBankMatchStatus =>
+      'Zeigt, wie sicher die App eine Banktransaktion einer Rechnung oder Kategorie zuordnet: Vorschlag oder bestätigt. Nur bestätigte Zuordnungen wirken sich auf offene Posten aus. Vorschläge mit geringer Trefferquote werden nie automatisch bestätigt.';
+
+  @override
+  String get guidanceTitleBankClassification => 'Manuelle Klassifizierung';
+
+  @override
+  String get guidanceBodyBankClassification =>
+      'Überschreibt den automatisch vorgeschlagenen Geschäftsvorfall einer Transaktion (betrieblich, privat oder gemischt). Die Überschreibung gilt für diese Transaktion und steuert ihre steuerliche Auswertung. Regeln für wiederkehrende Fälle legst du separat an.';
+
+  @override
+  String get guidanceTitleAngebotStatus => 'Angebotsstatus';
+
+  @override
+  String get guidanceBodyAngebotStatus =>
+      'Verfolgt den Stand eines Angebots von Entwurf über versendet und angenommen bis abgelehnt oder abgelaufen. Nur ein angenommenes Angebot kann in einen Auftrag überführt werden. Der Status hat keine steuerliche Wirkung.';
+
+  @override
+  String get guidanceTitleAuftragStatus => 'Auftragsstatus';
+
+  @override
+  String get guidanceBodyAuftragStatus =>
+      'Verfolgt den Stand eines Auftrags von bestätigt über in Bearbeitung bis abgeschlossen oder storniert. Der Abschluss gibt die zugehörige Rechnung zur Erstellung frei. Stornierte Aufträge bleiben zu Nachweiszwecken erhalten.';
+
+  @override
+  String get guidanceTitleCorrectionCreditSign => 'Vorzeichen der Korrekturbeträge';
+
+  @override
+  String get guidanceBodyCorrectionCreditSign =>
+      'Korrekturbeträge behalten ihr Vorzeichen, damit die Umsatzsteuer-Mathematik der Ursprungsrechnung erhalten bleibt. Eine Gutschrift mindert, eine Nachbelastung erhöht die Bemessungsgrundlage. Die App erstellt keine umsatzsteuerliche Würdigung des Korrekturgrunds; das Verhalten ist auf unterstützte Korrekturfälle beschränkt.';
+
+  @override
+  String get guidanceTitleTaxSpecial25a => 'Differenzbesteuerung nach § 25a UStG';
+
+  @override
+  String get guidanceBodyTaxSpecial25a =>
+      'Kennzeichnet Umsätze, deren Bemessungsgrundlage die Marge statt des Gesamtpreises ist. Die App weist solche Umsätze in der Steuerübersicht gesondert aus. Ob die Voraussetzungen des § 25a UStG erfüllt sind, prüft die App nicht; nicht unterstützte Konstellationen werden als nicht verfügbar ausgewiesen.';
 }

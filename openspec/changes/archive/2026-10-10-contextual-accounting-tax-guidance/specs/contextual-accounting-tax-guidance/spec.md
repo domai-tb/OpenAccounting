@@ -2,14 +2,21 @@
 
 ### Requirement: Supported accounting and tax controls have reviewed context guidance
 
-The maintainer coverage inventory for the first release SHALL contain exactly the finite stable IDs listed in `design.md` under Initial Guidance Inventory, each with one of three states: reviewed, missing, or review-needed. Each reviewed entry SHALL provide German and English titles and explanations, identify the owning capability contract and revision, and describe the application's behavior and required inputs. The coverage inventory is a maintainer-facing verification artifact and SHALL NOT be rendered as an end-user warning or missing-help control. Only a reviewed entry SHALL have a user-visible contextual guidance affordance. The content SHALL NOT recommend a user's tax treatment, infer eligibility, promise legal compliance, or describe unsupported behavior as available. A field or status without a reviewed entry SHALL have no contextual guidance affordance or fabricated fallback. Missing or review-needed guidance SHALL NOT disable otherwise supported field behavior.
+The maintainer coverage inventory for the first release SHALL contain exactly the finite stable IDs listed in `design.md` under Initial Guidance Inventory, each with its listed UI route and control/status ID and one of three states: reviewed, missing, or review-needed. The first-release reviewed set is all 15 stable IDs; each SHALL provide reviewed German and English titles and explanations, identify the owning capability contract and revision, and describe the application's behavior and required inputs. Each release-set entry SHALL be attached to its listed route/control or status and SHALL be listed and searchable in the `/help` glossary. The coverage inventory is a maintainer-facing verification artifact and SHALL NOT be rendered as an end-user warning or missing-help control. Only a reviewed entry SHALL have a user-visible contextual guidance affordance. The content SHALL NOT recommend a user's tax treatment, infer eligibility, promise legal compliance, or describe unsupported behavior as available. A field or status without a reviewed entry SHALL have no contextual guidance affordance or fabricated fallback. Missing or review-needed guidance SHALL NOT disable otherwise supported field behavior.
 
 #### Scenario: Initial coverage inventory is finite and traceable
 
 - **GIVEN** the first release guidance catalog is assembled
 - **WHEN** its coverage inventory is validated
-- **THEN** it SHALL contain exactly the stable IDs listed in the design inventory, one accepted owning-contract reference and revision per ID, and one allowed coverage state per ID
+- **THEN** it SHALL contain exactly the stable IDs listed in the design inventory, one accepted owning-contract reference and revision per ID, one listed UI route and control/status ID per ID, and one allowed coverage state per ID
 - **AND** the inventory SHALL remain maintainer-facing rather than appearing as a warning in the end-user workspace.
+
+#### Scenario: Release set is present, attached, and searchable
+
+- **GIVEN** the first-release reviewed set of all 15 stable IDs with reviewed German and English copy
+- **WHEN** the release catalog and Help glossary are validated
+- **THEN** each release-set entry SHALL be attached to its listed route/control or status affordance
+- **AND** each release-set entry SHALL be listed and searchable in `/help` by its localized terms with the same content as its field affordance.
 
 #### Scenario: User opens guidance for a supported field
 
@@ -51,13 +58,13 @@ Any entry whose meaning depends on current German law SHALL record its jurisdict
 
 ### Requirement: Help provides a searchable glossary for contextual entries
 
-The `/help` workspace SHALL expose the same reviewed accounting/tax guidance entries used by form controls, grouped by workflow and searchable by localized title and terms. Opening a glossary entry SHALL show its full explanation and relevant application location when available. The page SHALL remain local, require no network access, and SHALL NOT contain advice or unsupported feature claims.
+The `/help` workspace SHALL expose the same reviewed accounting/tax guidance entries used by form controls, grouped by workflow and searchable by localized title and terms. It SHALL list and make searchable every entry in the finite first-release reviewed set. Opening a glossary entry SHALL show its full explanation and relevant application location when available. The page SHALL remain local, require no network access, and SHALL NOT contain advice or unsupported feature claims.
 
 #### Scenario: Search and open a help entry
 
 - **GIVEN** the user is in Help with reviewed guidance entries available
 - **WHEN** they search a German or English term and open a result
-- **THEN** Help SHALL show the matching localized explanation and its related field/workflow references
+- **THEN** Help SHALL show the matching localized explanation and its related field/workflow references including the listed UI route and control/status ID
 - **AND** the same content entry SHALL be returned by its contextual field affordance.
 
 #### Scenario: No glossary result is available

@@ -3,7 +3,6 @@
 ## Purpose
 Core application routing, provider wiring, database lifecycle, and top-level page structure.
 
-
 ## Requirements
 
 ### Requirement: Application Routing
@@ -177,6 +176,7 @@ WHEN the user clicks "Erneut versuchen"
 AND the integration is now reachable
 THEN the app SHALL dismiss the error screen
 AND navigate to the previously requested route
+
 ### Requirement: Keyboard Shortcuts
 
 The application SHALL support the following global keyboard shortcuts: Ctrl+F (focus search), Ctrl+Shift+E (navigate to Eingangsrechnungen), + (open new Buchung dialog in Journal), and E/A (toggle Einnahme/Ausgabe in Buchung form). A global zoom shortcut SHALL adjust the app scale factor.
@@ -325,6 +325,7 @@ GIVEN an enabled optional integration is unavailable
 WHEN the app performs a permitted recovery check
 THEN it MAY check the configured endpoint
 AND when the integration responds again, refresh the affected view
+
 ### Requirement: Local Storage
 
 User preferences including theme mode, sidebar state, zoom factor, and last-used filters SHALL persist in SharedPreferences.
@@ -397,3 +398,21 @@ GIVEN the user has selected multiple documents
 WHEN the user clicks "ZIP exportieren"
 THEN a native file save dialog SHALL appear
 AND the ZIP SHALL contain one PDF per selected document
+
+### Requirement: Help workspace
+
+The `/help` route SHALL provide a typed, localized Help workspace. It SHALL include a searchable glossary of reviewed accounting and tax guidance entries and SHALL use the same stable entry content as in-context field explanations. Missing or review-needed coverage states are maintainer-only and SHALL NOT appear as end-user missing-help warnings or placeholder affordances. The workspace SHALL show an honest empty state when no reviewed entries match and SHALL not present static placeholder tiles as accounting guidance.
+
+#### Scenario: Help opens with reviewed contextual entries
+
+- **GIVEN** the Help catalog contains reviewed entries
+- **WHEN** the user opens `/help`
+- **THEN** the page SHALL group and display those entries with localized names and workflow locations
+- **AND** opening an entry SHALL show its full reviewed explanation.
+
+#### Scenario: Search finds no reviewed entry
+
+- **GIVEN** no reviewed entry matches the user's query
+- **WHEN** the user searches Help
+- **THEN** the page SHALL show a localized no-results state
+- **AND** SHALL not show unrelated or invented content.
