@@ -61,6 +61,7 @@ void main() {
         await profileDirectory.delete(recursive: true);
       });
       await legacyDatabase.ensureOpen();
+      await BuchungsVorlagenRepository(legacyDatabase.executor).ensureSchema();
       await legacyDatabase.executor.runCustom('DROP TABLE mileage_trip_corrections');
       await legacyDatabase.executor.runCustom('DROP TABLE mileage_trips');
       await legacyDatabase.executor.runCustom('DROP TABLE feature_table_state');
@@ -90,9 +91,13 @@ void main() {
         const <Object?>[],
       );
       expect(markerRows, <Map<String, Object?>>[
-        <String, Object?>{'table_name': 'buchungsvorlagen_occurrences', 'state': 'unknown'},
+        <String, Object?>{'table_name': 'buchungsvorlagen_occurrences', 'state': 'initialized'},
         <String, Object?>{'table_name': 'rechnungsvorlagen_occurrences', 'state': 'unknown'},
       ]);
+
+      final SchemaHealthReport health = await runner.inspectSchemaHealth();
+      expect(health.isHealthy, isTrue);
+      expect(health.isCompleteForVersion13Export, isFalse);
     });
 
     test('test_profile_data_portability_002_pre_v13_profile_is_valid_before_marker_migration', () async {
@@ -363,6 +368,34 @@ CREATE TABLE kategorien (
         );
         expect(state.single['state'], 'unknown');
       }
+    });
+
+    test('test_profile_data_portability_marker_table_mismatch_fails_schema_health', () async {
+      await BuchungsVorlagenRepository(database.executor).ensureSchema();
+      await database.executor.runCustom(
+        "UPDATE feature_table_state SET state = 'never_initialized' WHERE table_name = 'buchungsvorlagen_occurrences'",
+      );
+
+      final MigrationRunner runner = MigrationRunner(
+        executor: database.executor,
+        profileDir: Directory.systemTemp.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final SchemaHealthReport health = await runner.inspectSchemaHealth();
+
+      expect(health.isHealthy, isFalse);
+      expect(health.isCompleteForVersion13Export, isFalse);
+
+      await database.executor.runCustom(
+        "UPDATE feature_table_state SET state = 'initialized' WHERE table_name = 'buchungsvorlagen_occurrences'",
+      );
+      await database.executor.runCustom('DROP TABLE buchungsvorlagen_occurrences');
+      expect((await runner.inspectSchemaHealth()).isHealthy, isFalse);
+
+      await database.executor.runCustom(
+        "DELETE FROM feature_table_state WHERE table_name = 'buchungsvorlagen_occurrences'",
+      );
+      expect((await runner.inspectSchemaHealth()).isHealthy, isFalse);
     });
   });
 }

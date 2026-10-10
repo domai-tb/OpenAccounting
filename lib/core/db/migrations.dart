@@ -51,21 +51,22 @@ class MigrationRunner {
       for (final table in actualTables)
         if (!knownTables.contains(table)) table,
     ]..sort();
-    final bool healthy = version <= currentVersion && missingTables.isEmpty && unknownTables.isEmpty;
-
-    final bool lazyTablesComplete = await _lazyOccurrenceTablesComplete(version, actualTables);
+    final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
+    final bool healthy =
+        version <= currentVersion && missingTables.isEmpty && unknownTables.isEmpty && lazyTables.healthy;
 
     return SchemaHealthReport(
       schemaVersion: version,
       isHealthy: healthy,
-      isCompleteForVersion13Export: healthy && version >= currentVersion && lazyTablesComplete,
+      isCompleteForVersion13Export: healthy && version >= currentVersion && lazyTables.complete,
       missingTables: missingTables,
       unknownTables: unknownTables,
     );
   }
 
-  Future<bool> _lazyOccurrenceTablesComplete(int version, Set<String> actualTables) async {
-    if (version < currentVersion || !actualTables.contains('feature_table_state')) return false;
+  Future<({bool healthy, bool complete})> _inspectLazyOccurrenceTables(int version, Set<String> actualTables) async {
+    if (version < currentVersion) return (healthy: true, complete: false);
+    if (!actualTables.contains('feature_table_state')) return (healthy: false, complete: false);
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT table_name, state FROM feature_table_state ORDER BY table_name',
       const <Object?>[],
@@ -73,14 +74,22 @@ class MigrationRunner {
     final Map<String, String> states = <String, String>{
       for (final row in rows) row['table_name'].toString(): row['state'].toString(),
     };
-    if (states.length != LazyFeatureTableInitializer.tableNames.length) return false;
+    if (rows.length != LazyFeatureTableInitializer.tableNames.length ||
+        states.length != LazyFeatureTableInitializer.tableNames.length) {
+      return (healthy: false, complete: false);
+    }
 
+    bool complete = true;
     for (final table in LazyFeatureTableInitializer.tableNames) {
       final bool exists = actualTables.contains(table);
       final String? state = states[table];
-      if (!((state == 'never_initialized' && !exists) || (state == 'initialized' && exists))) return false;
+      final bool neverInitialized = state == 'never_initialized' && !exists;
+      final bool initialized = state == 'initialized' && exists;
+      final bool unknown = state == 'unknown' && !exists;
+      if (!(neverInitialized || initialized || unknown)) return (healthy: false, complete: false);
+      if (unknown) complete = false;
     }
-    return true;
+    return (healthy: true, complete: complete);
   }
 
   Future<bool> hasAnyTables() async {
