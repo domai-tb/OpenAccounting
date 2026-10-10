@@ -397,5 +397,137 @@ CREATE TABLE kategorien (
       );
       expect((await runner.inspectSchemaHealth()).isHealthy, isFalse);
     });
+
+    test('test_profile_data_portability_009_table_count_verification', () async {
+      final Directory profileDirectory = await Directory.systemTemp.createTemp('profile_portability_count_');
+      final AppDatabase legacyDatabase = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      addTearDown(() async {
+        await legacyDatabase.close();
+        await profileDirectory.delete(recursive: true);
+      });
+      await legacyDatabase.ensureOpen();
+      await BuchungsVorlagenRepository(legacyDatabase.executor).ensureSchema();
+      await legacyDatabase.executor.runCustom("INSERT INTO kategorien (bezeichnung) VALUES ('Counted category')");
+      await legacyDatabase.executor.runCustom('DROP TABLE mileage_trip_corrections');
+      await legacyDatabase.executor.runCustom('DROP TABLE mileage_trips');
+      await legacyDatabase.executor.runCustom('DROP TABLE feature_table_state');
+      await legacyDatabase.executor.runCustom('PRAGMA user_version = 12');
+
+      final MigrationRunner runner = MigrationRunner(
+        executor: legacyDatabase.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final bool migrated = await runner.run(createSchema: () async {});
+
+      expect(migrated, isTrue);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
+      final List<Map<String, Object?>> rows = await legacyDatabase.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        const <Object?>[],
+      );
+      final Set<String> tableNames = <String>{for (final row in rows) row['name'].toString()};
+      // v14 inventory: 39 base + feature_table_state + 4 migration-required
+      // tables + only the initialized lazy table.
+      expect(tableNames, hasLength(45));
+      expect(tableNames, containsAll(AppDatabase.allTableNames));
+      expect(
+        tableNames,
+        containsAll(<String>{
+          'feature_table_state',
+          'forderung_zahlungen',
+          'category_mapping_history',
+          'mileage_trips',
+          'mileage_trip_corrections',
+        }),
+      );
+      expect(tableNames, contains('buchungsvorlagen_occurrences'));
+      expect(tableNames, isNot(contains('rechnungsvorlagen_occurrences')));
+
+      final List<Map<String, Object?>> categories = await legacyDatabase.executor.runSelect(
+        "SELECT bezeichnung FROM kategorien WHERE bezeichnung = 'Counted category'",
+        const <Object?>[],
+      );
+      expect(categories, hasLength(1));
+
+      final SchemaHealthReport health = await runner.inspectSchemaHealth();
+      expect(health.isHealthy, isTrue);
+      expect(health.isCompleteForVersion13Export, isFalse);
+    });
+
+    test('test_profile_data_portability_010_unknown_or_malformed_application_tables_fail_sch', () async {
+      final MigrationRunner runner = MigrationRunner(
+        executor: database.executor,
+        profileDir: Directory.systemTemp.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+
+      await database.executor.runCustom('CREATE TABLE rogue_portability_table (id INTEGER PRIMARY KEY)');
+      final SchemaHealthReport rogueHealth = await runner.inspectSchemaHealth();
+      expect(rogueHealth.isHealthy, isFalse);
+      expect(rogueHealth.isCompleteForVersion13Export, isFalse);
+      expect(rogueHealth.unknownTables, contains('rogue_portability_table'));
+      await runner.run(createSchema: () async {});
+      final List<Map<String, Object?>> rogueTable = await database.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rogue_portability_table'",
+        const <Object?>[],
+      );
+      expect(rogueTable, hasLength(1));
+      expect((await runner.inspectSchemaHealth()).isHealthy, isFalse);
+      await database.executor.runCustom('DROP TABLE rogue_portability_table');
+
+      await database.executor.runCustom('DROP TABLE forderung_zahlungen');
+      await database.executor.runCustom('''
+CREATE TABLE forderung_zahlungen (
+  id INTEGER PRIMARY KEY,
+  forderung_id INTEGER,
+  betrag NUMERIC
+)''');
+      final SchemaHealthReport malformedHealth = await runner.inspectSchemaHealth();
+      expect(malformedHealth.isHealthy, isFalse);
+      expect(malformedHealth.isCompleteForVersion13Export, isFalse);
+      expect(malformedHealth.malformedTables, contains('forderung_zahlungen'));
+    });
+
+    test('test_profile_data_portability_011_missing_table_detection', () async {
+      final Directory profileDirectory = await Directory.systemTemp.createTemp('profile_portability_rollback_');
+      final AppDatabase legacyDatabase = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      addTearDown(() async {
+        await legacyDatabase.close();
+        await profileDirectory.delete(recursive: true);
+      });
+      await legacyDatabase.ensureOpen();
+      await legacyDatabase.executor.runCustom("INSERT INTO kategorien (bezeichnung) VALUES ('Rollback category')");
+      await legacyDatabase.executor.runCustom('DROP TABLE mileage_trip_corrections');
+      await legacyDatabase.executor.runCustom('DROP TABLE mileage_trips');
+      await legacyDatabase.executor.runCustom('DROP TABLE feature_table_state');
+      await legacyDatabase.executor.runCustom('PRAGMA user_version = 12');
+
+      final MigrationRunner runner = MigrationRunner(
+        executor: legacyDatabase.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      await expectLater(
+        runner.run(
+          createSchema: () async {},
+          afterFeatureSchemaDdl: (executor) async => throw StateError('CREATE TABLE mileage_trips failed'),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(await runner.getUserVersion(), 12);
+      final List<Map<String, Object?>> partialTables = await legacyDatabase.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+        "('feature_table_state', 'mileage_trips', 'mileage_trip_corrections')",
+        const <Object?>[],
+      );
+      expect(partialTables, isEmpty);
+      final List<Map<String, Object?>> categories = await legacyDatabase.executor.runSelect(
+        "SELECT bezeichnung FROM kategorien WHERE bezeichnung = 'Rollback category'",
+        const <Object?>[],
+      );
+      expect(categories, hasLength(1));
+    });
   });
 }

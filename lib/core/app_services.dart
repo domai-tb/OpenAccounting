@@ -12,11 +12,13 @@ import 'package:openaccounting/features/mahnwesen/sperrung_service.dart';
 import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
 import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
+import 'package:openaccounting/features/setup/profile_export_service.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
+import 'package:path/path.dart' as p;
 
 /// Aggregated use-cases for the application.
 /// Pages resolve from here instead of constructing repositories directly.
@@ -46,6 +48,14 @@ class AppServices {
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final IncomeTaxScheduleAvailabilityUseCase incomeTax = const IncomeTaxScheduleAvailabilityUseCase();
   late final WizardService setup = WizardService(repository: SetupRepository(_db.executor), profileId: _db.profileDir);
+
+  late final ProfileExportService profileExport = _createProfileExport();
+
+  ProfileExportService _createProfileExport() {
+    final String? directory = _db.profileDir;
+    final String label = directory == null || directory.isEmpty ? 'Profil' : p.basename(directory);
+    return ProfileExportService(executor: _db.executor, profileDir: directory ?? '', profileLabel: label);
+  }
 }
 
 /// Provides the aggregated application services.

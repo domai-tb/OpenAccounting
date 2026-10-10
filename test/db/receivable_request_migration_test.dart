@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
+import 'package:openaccounting/features/einkommen/forderungen_usecases.dart';
 
 void main() {
   group('receivable request fingerprint migration', () {
@@ -433,6 +434,374 @@ CREATE TABLE forderung_zahlungen (
       expect(await _columnNames(failNative, 'forderung_zahlungen'), contains('requested_betrag_cents'));
       expect(failing.isOpen, isFalse);
       await failing.close();
+    });
+  });
+
+  group('profile data portability scenarios 026 to 035', () {
+    late drift_native.NativeDatabase native;
+
+    setUp(() => native = drift_native.NativeDatabase.memory());
+
+    tearDown(() => native.close());
+
+    test('test_profile_data_portability_026_a_v7_lazy_table_migrates_without_changing_legacy', () async {
+      final AppDatabase seed = await _seedV8(native);
+      final int partnerId = await seed.executor.runInsert(
+        "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Portability', 'A', '10115', 'Berlin', 'DE')",
+        const <Object?>[],
+      );
+      final int forderungId = await seed.executor.runInsert(
+        'INSERT INTO forderungen (betrag, anfangsbetrag, status, typ, partner_typ, partner_id) VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>[100, 100, 'offen', 'rechnung', 'kunde', partnerId],
+      );
+      final int journalId = await seed.executor.runInsert(
+        "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES ('2026-03-05', 'legacy payment', '10.00', 'zahlung', NULL, CURRENT_TIMESTAMP)",
+        const <Object?>[],
+      );
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom(
+        'CREATE TABLE forderung_zahlungen (id INTEGER PRIMARY KEY, forderung_id INTEGER, journal_id INTEGER, '
+        'betrag NUMERIC, typ TEXT, datum TEXT, idempotency_key TEXT)',
+      );
+      await seed.executor.runCustom(
+        'INSERT INTO forderung_zahlungen (id, forderung_id, journal_id, betrag, typ, datum, idempotency_key) '
+        "VALUES (1, $forderungId, $journalId, '10.00', 'zahlung', '2026-03-05', 'legacy-1')",
+      );
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await db.ensureOpen();
+
+      // Adaptation: spec 'becomes 8' predates v9-v14; the v7 step runs in the shared upgrade to currentVersion.
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+      final List<Map<String, Object?>> rows = await native.runSelect(
+        'SELECT betrag, typ, datum, idempotency_key, requested_betrag_cents, fingerprint_direction, '
+        'fingerprint_date_policy FROM forderung_zahlungen',
+        const <Object?>[],
+      );
+      expect(rows, hasLength(1));
+      expect(num.parse(rows.single['betrag'].toString()), 10);
+      expect(rows.single['typ'], 'zahlung');
+      expect(rows.single['datum'], '2026-03-05');
+      expect(rows.single['idempotency_key'], 'legacy-1');
+      // Keyed legacy row with missing fingerprint fields is legacy-unknown; nothing is inferred.
+      expect(rows.single['requested_betrag_cents'], isNull);
+      expect(rows.single['fingerprint_direction'], isNull);
+      expect(rows.single['fingerprint_date_policy'], isNull);
+    });
+
+    test('test_profile_data_portability_027_a_missing_v7_relation_table_is_created_safely', () async {
+      final AppDatabase seed = await _seedV8(native);
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await db.ensureOpen();
+
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+      expect(await _tableExists(native, 'forderung_zahlungen'), isTrue);
+      expect(await _foreignKeyTargets(native, 'forderung_zahlungen'), containsAll(<String>['forderungen', 'journal']));
+      expect(
+        await _indexNames(native, 'forderung_zahlungen'),
+        containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
+      );
+      expect(await _rowCount(native, 'forderung_zahlungen'), 0);
+    });
+
+    test('test_profile_data_portability_028_a_present_v7_relation_table_repairs_missing_cons', () async {
+      final AppDatabase seed = await _seedV8(native);
+      final int journalId = await seed.executor.runInsert(
+        "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES ('2026-04-02', 'legacy repair', '7.00', 'zahlung', NULL, CURRENT_TIMESTAMP)",
+        const <Object?>[],
+      );
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom(
+        'CREATE TABLE forderung_zahlungen (id INTEGER PRIMARY KEY, forderung_id INTEGER, journal_id INTEGER, '
+        'betrag NUMERIC, typ TEXT, datum TEXT, idempotency_key TEXT)',
+      );
+      await seed.executor.runCustom(
+        'INSERT INTO forderung_zahlungen (id, forderung_id, journal_id, betrag, typ, datum, idempotency_key) '
+        "VALUES (1, 1, $journalId, '7.00', 'zahlung', '2026-04-02', 'legacy-repair')",
+      );
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+      expect(await _indexNames(native, 'forderung_zahlungen'), isEmpty);
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await db.ensureOpen();
+
+      expect(
+        await _indexNames(native, 'forderung_zahlungen'),
+        containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
+      );
+      final Map<String, Object?> row = (await native.runSelect(
+        'SELECT betrag, typ, datum, idempotency_key FROM forderung_zahlungen WHERE id = 1',
+        const <Object?>[],
+      )).single;
+      expect(num.parse(row['betrag'].toString()), 7);
+      expect(row['typ'], 'zahlung');
+      expect(row['datum'], '2026-04-02');
+      expect(row['idempotency_key'], 'legacy-repair');
+      // Spec '39-name count' is AppDatabase.allTableNames, unchanged by the repair.
+      expect(AppDatabase.allTableNames, hasLength(39));
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+    });
+
+    test('test_profile_data_portability_029_a_duplicate_legacy_key_rolls_the_migration_back', () async {
+      final AppDatabase seed = await _seedV8(native);
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom(
+        'CREATE TABLE forderung_zahlungen (id INTEGER PRIMARY KEY, forderung_id INTEGER, journal_id INTEGER, '
+        'betrag NUMERIC, typ TEXT, datum TEXT, idempotency_key TEXT)',
+      );
+      await seed.executor.runCustom(
+        "INSERT INTO forderung_zahlungen (id, idempotency_key) VALUES (1, 'duplicate'), (2, 'duplicate')",
+      );
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+      final int tablesBefore = await _allTableCount(native);
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await _expectSchemaMigrationFailed(db);
+
+      expect(await _userVersion(native), 7);
+      expect(await _columnNames(native, 'forderung_zahlungen'), isNot(contains('requested_betrag_cents')));
+      expect(await _indexNames(native, 'forderung_zahlungen'), isEmpty);
+      expect(await _rowCount(native, 'forderung_zahlungen'), 2);
+      expect(await _allTableCount(native), tablesBefore);
+    });
+
+    test('test_profile_data_portability_030_a_migration_failure_preserves_the_base_table_cou', () async {
+      final AppDatabase seed = await _seedV8(native);
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+      // Adaptation: '39 base tables' predates v9/v13/v14 feature tables; baseline is 43 without the feature table.
+      expect(await _baseTableCount(native), 43);
+      expect(await _allTableCount(native), 43);
+
+      final AppDatabase db = AppDatabase.forTesting(
+        native,
+        afterFeatureSchemaDdl: (QueryExecutor executor) async => throw StateError('forced DDL failure'),
+      );
+      addTearDown(db.close);
+      await _expectSchemaMigrationFailed(db);
+
+      expect(await _baseTableCount(native), 43);
+      expect(await _allTableCount(native), 43);
+      expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
+      expect(await _userVersion(native), 7);
+      expect(db.isOpen, isFalse);
+      expect(() => db.kundenRepository, throwsStateError);
+    });
+
+    test('test_profile_data_portability_031_appdatabase_post_ddl_failure_rolls_back_before_s', () async {
+      final AppDatabase seed = await _seedV8(native);
+      await _dropFeatureTable(seed.executor);
+      await seed.executor.runCustom('PRAGMA user_version = 7');
+      final int triggerCountBefore = await _triggerCount(native);
+      final int seedRowsBefore = await _seedRowCount(native);
+
+      bool observedFeatureTable = false;
+      final AppDatabase failing = AppDatabase.forTesting(
+        native,
+        afterFeatureSchemaDdl: (QueryExecutor executor) async {
+          final List<Map<String, Object?>> table = await executor.runSelect(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
+            const <Object?>[],
+          );
+          observedFeatureTable = table.isNotEmpty;
+          throw StateError('feature failure');
+        },
+      );
+      addTearDown(failing.close);
+      final ForderungenException error = await _expectSchemaMigrationFailed(failing);
+
+      expect(observedFeatureTable, isTrue);
+      expect(error.code, ForderungenErrorCode.schemaMigrationFailed);
+      expect(error.toString(), isNot(contains('CREATE TABLE')));
+      expect(failing.isOpen, isFalse);
+      expect(await _userVersion(native), 7);
+      expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
+      expect(await _triggerCount(native), triggerCountBefore);
+      expect(await _seedRowCount(native), seedRowsBefore);
+    });
+
+    test('test_profile_data_portability_032_a_current_version_profile_stops_on_missing_payment_table', () async {
+      final AppDatabase seed = await _seedV8(native);
+      await _dropFeatureTable(seed.executor);
+      // Fixture is already current: the pre-repair version-vs-presence check
+      // (user_version >= 8 with the table absent) must stop before any repair DDL.
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await _expectSchemaMigrationFailed(db);
+
+      expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+      expect(db.isOpen, isFalse);
+      expect(() => db.kundenRepository, throwsStateError);
+    });
+
+    test('test_profile_data_portability_033_a_current_version_repair_preserves_a_present_pay', () async {
+      final AppDatabase seed = await _seedV8(native);
+      final int partnerId = await seed.executor.runInsert(
+        "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Present Repair', 'A', '10115', 'Berlin', 'DE')",
+        const <Object?>[],
+      );
+      final int forderungId = await seed.executor.runInsert(
+        'INSERT INTO forderungen (betrag, anfangsbetrag, status, typ, partner_typ, partner_id) VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>[100, 100, 'offen', 'rechnung', 'kunde', partnerId],
+      );
+      final int journalId = await seed.executor.runInsert(
+        "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES ('2026-05-02', 'present repair', '9.00', 'zahlung', NULL, CURRENT_TIMESTAMP)",
+        const <Object?>[],
+      );
+      await seed.executor.runCustom('DROP TABLE forderung_zahlungen');
+      await seed.executor.runCustom('''
+CREATE TABLE forderung_zahlungen (
+  id INTEGER PRIMARY KEY,
+  forderung_id INTEGER,
+  journal_id INTEGER,
+  betrag NUMERIC,
+  typ TEXT,
+  datum TEXT,
+  idempotency_key TEXT,
+  requested_betrag_cents INTEGER,
+  fingerprint_direction TEXT,
+  fingerprint_date_policy TEXT
+)''');
+      await seed.executor.runCustom(
+        'INSERT INTO forderung_zahlungen (id, forderung_id, journal_id, betrag, typ, datum, idempotency_key) '
+        "VALUES (1, $forderungId, $journalId, '9.00', 'zahlung', '2026-05-02', 'present-key')",
+      );
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+
+      final AppDatabase db = AppDatabase.forTesting(native);
+      addTearDown(db.close);
+      await db.ensureOpen();
+
+      expect(
+        await _indexNames(native, 'forderung_zahlungen'),
+        containsAll(<String>['forderung_zahlungen_key_unique', 'forderung_zahlungen_journal_unique']),
+      );
+      final Map<String, Object?> row = (await native.runSelect(
+        'SELECT betrag, typ, datum, idempotency_key FROM forderung_zahlungen WHERE id = 1',
+        const <Object?>[],
+      )).single;
+      expect(num.parse(row['betrag'].toString()), 9);
+      expect(row['typ'], 'zahlung');
+      expect(row['datum'], '2026-05-02');
+      expect(row['idempotency_key'], 'present-key');
+      expect(await _userVersion(native), MigrationRunner.currentVersion);
+    });
+
+    test(
+      'test_profile_data_portability_034_fresh_startup_schema_upgrade_current_version_repair_and_rollback',
+      () async {
+        // Fresh startup uses the shared raw-BEGIN path.
+        final drift_native.NativeDatabase freshNative = drift_native.NativeDatabase.memory();
+        final List<String> freshStatements = <String>[];
+        final AppDatabase fresh = AppDatabase.forTesting(_RecordingExecutor(freshNative, freshStatements));
+        await fresh.ensureOpen();
+        final int freshBegin = freshStatements.indexOf('BEGIN');
+        final int freshCommit = freshStatements.indexOf('COMMIT');
+        expect(freshBegin, greaterThanOrEqualTo(0));
+        expect(freshBegin, lessThan(freshCommit));
+        final int freshDdl = freshStatements.indexWhere(
+          (String s) => s.startsWith('CREATE TABLE') && s.contains('FORDERUNG_ZAHLUNGEN'),
+        );
+        expect(freshDdl, greaterThan(freshBegin));
+        expect(freshDdl, lessThan(freshCommit));
+        await fresh.close();
+
+        // v7 upgrade uses the same raw-BEGIN path.
+        final drift_native.NativeDatabase upgradeNative = drift_native.NativeDatabase.memory();
+        final AppDatabase upgradeSeed = AppDatabase.forTesting(upgradeNative);
+        await upgradeSeed.ensureOpen();
+        await _dropFeatureTable(upgradeSeed.executor);
+        await upgradeSeed.executor.runCustom('PRAGMA user_version = 7');
+        final List<String> upgradeStatements = <String>[];
+        final AppDatabase upgraded = AppDatabase.forTesting(_RecordingExecutor(upgradeNative, upgradeStatements));
+        await upgraded.ensureOpen();
+        final int upgradeBegin = upgradeStatements.indexOf('BEGIN');
+        final int upgradeCommit = upgradeStatements.indexOf('COMMIT');
+        expect(upgradeBegin, greaterThanOrEqualTo(0));
+        expect(upgradeBegin, lessThan(upgradeCommit));
+        final int upgradeDdl = upgradeStatements.indexWhere(
+          (String s) => s.startsWith('CREATE TABLE') && s.contains('FORDERUNG_ZAHLUNGEN'),
+        );
+        expect(upgradeDdl, greaterThan(upgradeBegin));
+        expect(upgradeDdl, lessThan(upgradeCommit));
+        await upgraded.close();
+
+        // Injected failure after DDL rolls back on the same raw path: BEGIN then ROLLBACK, never COMMIT.
+        final drift_native.NativeDatabase failNative = drift_native.NativeDatabase.memory();
+        final AppDatabase failSeed = AppDatabase.forTesting(failNative);
+        await failSeed.ensureOpen();
+        await _dropFeatureTable(failSeed.executor);
+        await failSeed.executor.runCustom('PRAGMA user_version = 7');
+        final List<String> failStatements = <String>[];
+        final AppDatabase failing = AppDatabase.forTesting(
+          _RecordingExecutor(failNative, failStatements),
+          afterFeatureSchemaDdl: (QueryExecutor executor) async => throw StateError('forced repair failure'),
+        );
+        await _expectSchemaMigrationFailed(failing);
+        final int failBegin = failStatements.indexOf('BEGIN');
+        expect(failBegin, greaterThanOrEqualTo(0));
+        expect(failStatements, contains('ROLLBACK'));
+        expect(failStatements, isNot(contains('COMMIT')));
+        final int failRollback = failStatements.indexWhere((String s) => s == 'ROLLBACK', failBegin);
+        expect(failRollback, greaterThan(failBegin));
+        expect(failing.isOpen, isFalse);
+        await failing.close();
+      },
+    );
+
+    test('test_profile_data_portability_035_a_request_cannot_claim_a_legacy_key', () async {
+      final AppDatabase seed = await _seedV8(native);
+      addTearDown(seed.close);
+      final ForderungenRepository repo = ForderungenRepository(seed.executor);
+      final int partnerId = await seed.executor.runInsert(
+        "INSERT INTO kunden (anrede, name, strasse, plz, ort, land) VALUES ('Herr', 'Legacy Key', 'A', '10115', 'Berlin', 'DE')",
+        const <Object?>[],
+      );
+      final Forderung created = await repo.create(
+        typ: 'rechnung',
+        betrag: 100,
+        partnerTyp: 'kunde',
+        partnerId: partnerId,
+      );
+      final int journalId = await seed.executor.runInsert(
+        "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, rechnung_id, erstellungsdatum) VALUES ('2026-06-05', 'legacy key', '10.00', 'zahlung', NULL, CURRENT_TIMESTAMP)",
+        const <Object?>[],
+      );
+      // Legacy row: keyed but with no reconstructible fingerprint (NULL fingerprint columns).
+      await seed.executor.runInsert(
+        'INSERT INTO forderung_zahlungen (forderung_id, journal_id, betrag, typ, datum, idempotency_key) '
+        "VALUES (?, ?, '10.00', 'zahlung', '2026-06-05', 'legacy-1')",
+        <Object?>[created.id, journalId],
+      );
+      final int journalCountBefore = await _rowCount(native, 'journal');
+      final int relationCountBefore = await _rowCount(native, 'forderung_zahlungen');
+      final Forderung? before = await repo.findById(created.id);
+
+      final ForderungenUseCases useCases = ForderungenUseCases(repo);
+      try {
+        await useCases.zahlungBuchen(forderungId: created.id, betrag: 10, idempotencyKey: 'legacy-1');
+        fail('expected ForderungenException with code legacyFingerprintUnknown');
+      } on ForderungenException catch (error) {
+        expect(error.code, ForderungenErrorCode.legacyFingerprintUnknown);
+      }
+
+      // Journal count, relation count, and Forderung balances remain unchanged.
+      expect(await _rowCount(native, 'journal'), journalCountBefore);
+      expect(await _rowCount(native, 'forderung_zahlungen'), relationCountBefore);
+      final Forderung? after = await repo.findById(created.id);
+      expect(after?.betrag, before?.betrag);
+      expect(after?.status, before?.status);
     });
   });
 }

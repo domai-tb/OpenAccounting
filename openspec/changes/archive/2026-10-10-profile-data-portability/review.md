@@ -245,3 +245,48 @@ CHANGES_APPLIED: appended this Round 5 review only; no implementation or tests w
 ### Rebuttals — Round 5
 
 Round 4 required change 1 is withdrawn for the strict-validation and one-test-per-scenario reasons above. Round 4 required change 2 remains a queued dependency rebase, not a blocker to this owner change.
+
+---
+
+## Review Metadata — Round 6 (focused re-review tasked as "Round 4")
+
+- **Review round**: 6 (spawning task labels this "Round 4"; headings for Rounds 4 and 5 already exist above, so the next free number is used to keep headings unique)
+- **Prior round**: Round 5 returned `APPROVE`; Round 3 returned `APPROVE` per task background; this focused re-review rechecks only the single post-Round-3 edit described by the task
+- **Reviewer context**: fresh-context independent reviewer; no proposal-authoring transcript
+- **Tool restrictions**: read-only file inspection; no shell commands; no test runs; appended this review only
+- **Artifacts reviewed**: delta `openspec/changes/profile-data-portability/specs/db/spec.md` Table Definitions block (lines 1–112), maintained `openspec/specs/db/spec.md` Table Definitions scenarios (lines 93–99 and 123–129), and review rounds 1–5 above
+- **Validation evidence**: none in this round (no shell/test per task constraints); structural validation not re-run
+
+### Focused checks
+
+- (a) **Byte-identical wording — HOLDS.** Delta `Pre-v9 profile is valid before later feature migrations` (5 GIVEN/WHEN/THEN lines) is word-for-word identical to the maintained counterpart, including `version-8 profile unhealthy` and `ineligible for a complete version-10 export`. Delta `V8-to-v9 migration adds shared markers and mileage tables` (5 GIVEN/WHEN/THEN lines) is word-for-word identical to the maintained counterpart, including `coordinated v9 transaction` and `increment user_version to 9`.
+- (b) **Placement matches maintained order — HOLDS.** Delta places Pre-v9 immediately before `Missing v7 payment table is created by the v7-to-v8 migration`, matching maintained order (Pre-v9 before Missing-v7). Delta places V8-to-v9 immediately before `V9 migration adds category history`, matching maintained order (V8-to-v9 before V9-category-history).
+- (c) **Nothing else changed — HOLDS within readable scope, with a caveat.** The delta Table Definitions block retains the v13 owner contract (39 base + marker + six feature tables, v13 marker/mileage, v9 category history, v7-to-v8 payment creation, v8+ fail-closed guard) alongside the two copied v9-era scenarios, which is exactly the preservation the task describes. Caveat: with no shell/diff access this round, comparison against the Round-3 revision hash was not possible; the check is current-content consistency, not a byte-diff against history.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+None.
+
+#### 🟡 Moderate
+
+None.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 6
+
+VERDICT: APPROVE
+
+## Required Changes — Round 6
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 6
+
+None.

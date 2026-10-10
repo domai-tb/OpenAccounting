@@ -29,6 +29,14 @@ A complete version-13 inventory SHALL be valid only when all 39 existing base ta
 - **THEN** those not-yet-required v13 tables SHALL NOT make the version-12 profile unhealthy
 - **AND** the profile SHALL remain ineligible for a complete version-13 export until normal sequential migrations succeed
 
+#### Scenario: Pre-v9 profile is valid before later feature migrations
+
+- **GIVEN** a profile at schema version 8 has the 39 existing base tables and a valid forderung_zahlungen table
+- **AND** feature_table_state, mileage_trips, and mileage_trip_corrections are absent
+- **WHEN** schema health is checked before migration
+- **THEN** those not-yet-required v9 tables SHALL NOT make the version-8 profile unhealthy
+- **AND** the profile SHALL remain ineligible for a complete version-10 export until normal sequential migrations succeed
+
 #### Scenario: Missing v7 payment table is created by the v7-to-v8 migration
 
 - **GIVEN** a profile below schema version 8 has no forderung_zahlungen table
@@ -58,6 +66,14 @@ A complete version-13 inventory SHALL be valid only when all 39 existing base ta
 - **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v13 transaction
 - **AND** it SHALL mark existing valid lazy occurrence tables initialized and absent lazy tables unknown
 - **AND** it SHALL increment user_version to 13 only after successful verification
+
+#### Scenario: V8-to-v9 migration adds shared markers and mileage tables
+
+- **GIVEN** a valid profile is at schema version 8 with forderung_zahlungen present
+- **WHEN** the next sequential migration runs
+- **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v9 transaction
+- **AND** it SHALL mark existing valid lazy occurrence tables initialized and absent lazy tables unknown
+- **AND** it SHALL increment user_version to 9 only after successful verification
 
 #### Scenario: V9 migration adds category history
 

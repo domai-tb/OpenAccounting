@@ -29,6 +29,8 @@ import 'package:openaccounting/design_system/components/typed_workspace_surface.
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/contextual_accounting_tax_guidance/contextual_guidance_help_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
+import 'package:openaccounting/features/setup/profile_data_section.dart';
+import 'package:openaccounting/features/setup/profile_export_service.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
@@ -813,6 +815,18 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
     }
   }
 
+  ProfileExportService? _resolveProfileExportService() {
+    try {
+      final AppScope? scope = AppScope.maybeOf(context);
+      if (scope != null) {
+        return scope.services.profileExport;
+      }
+      return ref.read(appServicesProvider).profileExport;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _createProfile() async {
     final AppLocalizations l10n = appLocalizationsOf(context);
     final TextEditingController controller = TextEditingController();
@@ -955,6 +969,9 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           FeatureModuleSettingsSection(
             service: FeatureModuleService(repository: FeatureModuleRepository(ref.read(appDatabaseProvider).executor)),
           ),
+          const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          ProfileDataSection(exportService: _resolveProfileExportService()),
           const SizedBox(height: 16),
           Text(l10n.settingsPrivacyDescription),
           const SizedBox(height: 16),

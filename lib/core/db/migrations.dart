@@ -52,9 +52,20 @@ class MigrationRunner {
       for (final table in actualTables)
         if (!knownTables.contains(table)) table,
     ]..sort();
+    final List<String> malformedTables = <String>[];
+    for (final String table in requiredForVersion) {
+      if (actualTables.contains(table) && !await _hasDeclaredSchema(table)) {
+        malformedTables.add(table);
+      }
+    }
+    malformedTables.sort();
     final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
     final bool healthy =
-        version <= currentVersion && missingTables.isEmpty && unknownTables.isEmpty && lazyTables.healthy;
+        version <= currentVersion &&
+        missingTables.isEmpty &&
+        unknownTables.isEmpty &&
+        malformedTables.isEmpty &&
+        lazyTables.healthy;
 
     return SchemaHealthReport(
       schemaVersion: version,
@@ -62,6 +73,7 @@ class MigrationRunner {
       isCompleteForVersion13Export: healthy && version >= currentVersion && lazyTables.complete,
       missingTables: missingTables,
       unknownTables: unknownTables,
+      malformedTables: malformedTables,
     );
   }
 
@@ -91,6 +103,25 @@ class MigrationRunner {
       if (unknown) complete = false;
     }
     return (healthy: true, complete: complete);
+  }
+
+  /// Verifies the declared schema of a version-required feature table. Base
+  /// tables keep presence-only checks; a feature table with missing columns
+  /// or constraints fails health so no exporter can claim completeness.
+  Future<bool> _hasDeclaredSchema(String table) async {
+    final Set<String>? requiredColumns = _declaredSchemaColumns[table];
+    if (requiredColumns != null) {
+      final List<Map<String, Object?>> columns = await executor.runSelect(
+        'PRAGMA table_info($table)',
+        const <Object?>[],
+      );
+      final Set<String> names = <String>{for (final row in columns) row['name'].toString()};
+      if (!requiredColumns.every(names.contains)) return false;
+    }
+    if (table == 'forderung_zahlungen') {
+      return _receivableFeatureHasRequiredConstraints();
+    }
+    return true;
   }
 
   Future<bool> hasAnyTables() async {
@@ -985,6 +1016,7 @@ class SchemaHealthReport {
     required this.isCompleteForVersion13Export,
     required this.missingTables,
     required this.unknownTables,
+    required this.malformedTables,
   });
 
   /// The profile's stored SQLite schema version.
@@ -1001,6 +1033,9 @@ class SchemaHealthReport {
 
   /// Application tables that are not in the known inventory.
   final List<String> unknownTables;
+
+  /// Version-required tables that are present with an invalid declared schema.
+  final List<String> malformedTables;
 }
 
 const Set<String> _featureOwnedTables = <String>{
@@ -1019,6 +1054,35 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'feature_table_state': 13,
   'mileage_trips': 13,
   'mileage_trip_corrections': 13,
+};
+
+// shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
+const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
+  'forderung_zahlungen': <String>{
+    'id',
+    'forderung_id',
+    'journal_id',
+    'betrag',
+    'typ',
+    'datum',
+    'idempotency_key',
+    'requested_betrag_cents',
+    'fingerprint_direction',
+    'fingerprint_date_policy',
+  },
+  'category_mapping_history': <String>{'id', 'kategorie_id', 'geaendert_am', 'aktion', 'nachher_mapping_json'},
+  'mileage_trips': <String>{
+    'id',
+    'trip_date',
+    'purpose',
+    'business_context',
+    'distance_hundredths_km',
+    'state',
+    'created_at',
+    'updated_at',
+  },
+  'mileage_trip_corrections': <String>{'id', 'trip_id', 'kind', 'reason', 'state', 'created_at'},
+  'feature_table_state': <String>{'table_name', 'state'},
 };
 
 const String _rechnungenTableSql = '''
