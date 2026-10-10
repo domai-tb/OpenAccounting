@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/core/db/seed.dart';
+import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
+import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 
 /// Category mapping provenance: seed, migration, and persistence scenarios
@@ -249,6 +251,62 @@ CREATE TABLE kategorien (
       expect(unchanged?.kontoSkr03, '8002');
     });
 
+    test('test_accounting_catalog_035_all_tables_created_on_fresh_install', () async {
+      final fresh = await openFresh();
+      final rows = await fresh.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        const [],
+      );
+      final names = rows.map((row) => row['name'].toString()).toSet();
+      expect(names.length, 44);
+      for (final table in AppDatabase.allTableNames) {
+        expect(names, contains(table));
+      }
+      expect(
+        names,
+        containsAll(<String>[
+          'feature_table_state',
+          'forderung_zahlungen',
+          'mileage_trips',
+          'mileage_trip_corrections',
+          'category_mapping_history',
+        ]),
+      );
+      expect(names, isNot(contains('buchungsvorlagen_occurrences')));
+      expect(names, isNot(contains('rechnungsvorlagen_occurrences')));
+      final markers = await fresh.executor.runSelect(
+        'SELECT table_name, state FROM feature_table_state ORDER BY table_name',
+        const [],
+      );
+      expect(markers.map((row) => (row['table_name'], row['state'])), <(Object?, Object?)>[
+        ('buchungsvorlagen_occurrences', 'never_initialized'),
+        ('rechnungsvorlagen_occurrences', 'never_initialized'),
+      ]);
+      expect(
+        await MigrationRunner(executor: fresh.executor, profileDir: profileDirectory.path).getUserVersion(),
+        MigrationRunner.currentVersion,
+      );
+    });
+
+    test('test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations', () async {
+      final fresh = await openFresh();
+      await fresh.executor.runCustom('DROP TABLE mileage_trip_corrections');
+      await fresh.executor.runCustom('DROP TABLE mileage_trips');
+      await fresh.executor.runCustom('DROP TABLE feature_table_state');
+      await fresh.executor.runCustom('PRAGMA user_version = 8');
+      final runner = MigrationRunner(
+        executor: fresh.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final health = await runner.inspectSchemaHealth();
+      expect(health.isHealthy, isTrue);
+      expect(health.isCompleteForVersion13Export, isFalse);
+      expect(await runner.getUserVersion(), 8);
+      await runner.run(createSchema: () async {});
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
+    });
+
     test('test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration', () async {
       final db = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
       await db.ensureOpen();
@@ -263,6 +321,33 @@ CREATE TABLE kategorien (
       );
       expect(tables, hasLength(1));
       expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
+    });
+
+    test('test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal', () async {
+      final db = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      await db.ensureOpen();
+      addTearDown(db.close);
+      await db.executor.runCustom('DROP TABLE forderung_zahlungen');
+      await db.executor.runCustom('PRAGMA user_version = 8');
+      final runner = MigrationRunner(
+        executor: db.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final health = await runner.inspectSchemaHealth();
+      expect(health.isHealthy, isFalse);
+      expect(health.isCompleteForVersion13Export, isFalse);
+      expect(health.missingTables, contains('forderung_zahlungen'));
+      await expectLater(
+        runner.run(createSchema: () async {}),
+        throwsA(isA<StateError>().having((error) => error.message, 'message', contains('forderung_zahlungen'))),
+      );
+      expect(await runner.getUserVersion(), 8);
+      final paymentTable = await db.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
+        const [],
+      );
+      expect(paymentTable, isEmpty);
     });
 
     test('test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows', () async {
@@ -303,6 +388,49 @@ CREATE TABLE forderung_zahlungen (
       expect(rows.single['typ'], 'zahlung');
     });
 
+    test('test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables', () async {
+      // Executed reassignment: markers/mileage are owned by the v13
+      // profile-portability migration, category history by the v9 migration
+      // here. Verifies the coordinated creation + classification contract at
+      // its owned version (v12 -> v13), mirroring the owner behavior.
+      final legacy = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
+      await legacy.ensureOpen();
+      addTearDown(legacy.close);
+      await BuchungsVorlagenRepository(legacy.executor).ensureSchema();
+      await legacy.executor.runCustom('DROP TABLE mileage_trip_corrections');
+      await legacy.executor.runCustom('DROP TABLE mileage_trips');
+      await legacy.executor.runCustom('DROP TABLE feature_table_state');
+      await legacy.executor.runCustom('PRAGMA user_version = 12');
+      final runner = MigrationRunner(
+        executor: legacy.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final migrated = await runner.run(createSchema: () async {});
+      expect(migrated, isTrue);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
+      final tables = await legacy.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+        "('feature_table_state', 'mileage_trips', 'mileage_trip_corrections')",
+        const <Object?>[],
+      );
+      expect(
+        tables.map((row) => row['name']),
+        containsAll(<String>['feature_table_state', 'mileage_trips', 'mileage_trip_corrections']),
+      );
+      final markers = await legacy.executor.runSelect(
+        'SELECT table_name, state FROM feature_table_state ORDER BY table_name',
+        const <Object?>[],
+      );
+      expect(markers, <Map<String, Object?>>[
+        <String, Object?>{'table_name': 'buchungsvorlagen_occurrences', 'state': 'initialized'},
+        <String, Object?>{'table_name': 'rechnungsvorlagen_occurrences', 'state': 'unknown'},
+      ]);
+      final health = await runner.inspectSchemaHealth();
+      expect(health.isHealthy, isTrue);
+      expect(health.isCompleteForVersion13Export, isFalse);
+    });
+
     test('test_accounting_catalog_043_table_count_verification', () async {
       final fresh = await openFresh();
       final rows = await fresh.executor.runSelect(
@@ -315,6 +443,84 @@ CREATE TABLE forderung_zahlungen (
         expect(names, contains(t));
       }
       expect(names, containsAll(<String>['forderung_zahlungen', 'category_mapping_history']));
+    });
+
+    test('test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization', () async {
+      final fresh = await openFresh();
+      await BuchungsVorlagenRepository(fresh.executor).ensureSchema();
+      await RechnungsVorlagenRepository(fresh.executor).ensureSchema();
+      for (final table in <String>['buchungsvorlagen_occurrences', 'rechnungsvorlagen_occurrences']) {
+        await fresh.executor.runCustom('DROP TABLE $table');
+        await fresh.executor.runCustom('UPDATE feature_table_state SET state = ? WHERE table_name = ?', <Object?>[
+          'unknown',
+          table,
+        ]);
+      }
+      await expectLater(BuchungsVorlagenRepository(fresh.executor).ensureSchema(), throwsA(isA<StateError>()));
+      await expectLater(RechnungsVorlagenRepository(fresh.executor).ensureSchema(), throwsA(isA<StateError>()));
+      for (final table in <String>['buchungsvorlagen_occurrences', 'rechnungsvorlagen_occurrences']) {
+        final occurrenceTable = await fresh.executor.runSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          <Object?>[table],
+        );
+        expect(occurrenceTable, isEmpty);
+        final state = await fresh.executor.runSelect(
+          'SELECT state FROM feature_table_state WHERE table_name = ?',
+          <Object?>[table],
+        );
+        expect(state.single['state'], 'unknown');
+      }
+    });
+
+    test('test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health', () async {
+      // Case 1: required table absent at its required schema version.
+      final missing = await openFresh();
+      await missing.executor.runCustom('DROP TABLE mileage_trips');
+      final missingRunner = MigrationRunner(
+        executor: missing.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final missingHealth = await missingRunner.inspectSchemaHealth();
+      expect(missingHealth.isHealthy, isFalse);
+      expect(missingHealth.isCompleteForVersion13Export, isFalse);
+      expect(missingHealth.missingTables, contains('mileage_trips'));
+
+      // Case 2: undeclared application table present; no silent replacement.
+      final rogue = await openFresh();
+      await rogue.executor.runCustom('CREATE TABLE rogue_table (id INTEGER PRIMARY KEY)');
+      final rogueRunner = MigrationRunner(
+        executor: rogue.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final rogueHealth = await rogueRunner.inspectSchemaHealth();
+      expect(rogueHealth.isHealthy, isFalse);
+      expect(rogueHealth.isCompleteForVersion13Export, isFalse);
+      expect(rogueHealth.unknownTables, contains('rogue_table'));
+      await rogueRunner.run(createSchema: () async {});
+      final rogueTable = await rogue.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rogue_table'",
+        const <Object?>[],
+      );
+      expect(rogueTable, hasLength(1));
+      expect((await rogueRunner.inspectSchemaHealth()).isHealthy, isFalse);
+
+      // Case 3: marker/table mismatch (malformed declared state).
+      final mismatch = await openFresh();
+      await BuchungsVorlagenRepository(mismatch.executor).ensureSchema();
+      await mismatch.executor.runCustom(
+        "UPDATE feature_table_state SET state = 'never_initialized' "
+        "WHERE table_name = 'buchungsvorlagen_occurrences'",
+      );
+      final mismatchRunner = MigrationRunner(
+        executor: mismatch.executor,
+        profileDir: profileDirectory.path,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final mismatchHealth = await mismatchRunner.inspectSchemaHealth();
+      expect(mismatchHealth.isHealthy, isFalse);
+      expect(mismatchHealth.isCompleteForVersion13Export, isFalse);
     });
 
     test('test_accounting_catalog_045_missing_table_detection', () async {

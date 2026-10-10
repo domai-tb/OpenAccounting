@@ -120,36 +120,36 @@
 > lazy-table state), 044 (unknown-table health needs a health-check API).
 > Implemented here: 037, 039, 043, 045.
 
-- [ ] 4.1 Write failing test `test_accounting_catalog_035_all_tables_created_on_fresh_install` in `test/db/accounting_catalog_migration_test.dart` for scenario "All Tables Created on Fresh Install" (assert the expected failure).
-- [ ] 4.2 Implement the specified behavior for "All Tables Created on Fresh Install" to pass the test.
-- [ ] 4.3 Refactor this behavior; rerun `test_accounting_catalog_035_all_tables_created_on_fresh_install` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.4 Write failing test `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` for scenario "Pre-v9 profile is valid before later feature migrations" (assert the expected failure).
-- [ ] 4.5 Implement the specified behavior for "Pre-v9 profile is valid before later feature migrations" to pass the test.
-- [ ] 4.6 Refactor this behavior; rerun `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.1 Write failing test `test_accounting_catalog_035_all_tables_created_on_fresh_install` in `test/db/accounting_catalog_migration_test.dart` for scenario "All Tables Created on Fresh Install" (assert the expected failure).
+- [x] 4.2 Implement the specified behavior for "All Tables Created on Fresh Install" to pass the test.
+- [x] 4.3 Refactor this behavior; rerun `test_accounting_catalog_035_all_tables_created_on_fresh_install` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.4 Write failing test `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` for scenario "Pre-v9 profile is valid before later feature migrations" (assert the expected failure).
+- [x] 4.5 Implement the specified behavior for "Pre-v9 profile is valid before later feature migrations" to pass the test.
+- [x] 4.6 Refactor this behavior; rerun `test_accounting_catalog_036_pre_v9_profile_is_valid_before_later_feature_migrations` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [x] 4.7 Write failing test `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing v7 payment table is created by the v7-to-v8 migration" (assert the expected failure).
 - [x] 4.8 Implement the specified behavior for "Missing v7 payment table is created by the v7-to-v8 migration" to pass the test.
 - [x] 4.9 Refactor this behavior; rerun `test_accounting_catalog_037_missing_v7_payment_table_is_created_by_the_v7_to_v8_migration` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.10 Write failing test `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing payment table at v8 or later preserves the incomplete signal" (assert the expected failure).
-- [ ] 4.11 Implement the specified behavior for "Missing payment table at v8 or later preserves the incomplete signal" to pass the test.
-- [ ] 4.12 Refactor this behavior; rerun `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.10 Write failing test `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing payment table at v8 or later preserves the incomplete signal" (assert the expected failure).
+- [x] 4.11 Implement the specified behavior for "Missing payment table at v8 or later preserves the incomplete signal" to pass the test.
+- [x] 4.12 Refactor this behavior; rerun `test_accounting_catalog_038_missing_payment_table_at_v8_or_later_preserves_the_incomplete_signal` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [x] 4.13 Write failing test `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` for scenario "Current payment table repair preserves existing rows" (assert the expected failure).
 - [x] 4.14 Implement the specified behavior for "Current payment table repair preserves existing rows" to pass the test.
 - [x] 4.15 Refactor this behavior; rerun `test_accounting_catalog_039_current_payment_table_repair_preserves_existing_rows` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.16 Write failing test `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` for scenario "V8-to-v9 migration adds shared markers and mileage tables" (assert the expected failure).
-- [ ] 4.17 Implement the specified behavior for "V8-to-v9 migration adds shared markers and mileage tables" to pass the test.
-- [ ] 4.18 Refactor this behavior; rerun `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.16 Write failing test `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` for scenario "V8-to-v9 migration adds shared markers and mileage tables" (assert the expected failure).
+- [x] 4.17 Implement the specified behavior for "V8-to-v9 migration adds shared markers and mileage tables" to pass the test.
+- [x] 4.18 Refactor this behavior; rerun `test_accounting_catalog_040_v8_to_v9_migration_adds_shared_markers_and_mileage_tables` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [x] 4.19 Write failing test `test_accounting_catalog_041_v9_migration_adds_category_history` in `test/db/accounting_catalog_migration_test.dart` for scenario "V9 migration adds category history" (assert the expected failure).
 - [x] 4.20 Implement the specified behavior for "V9 migration adds category history" to pass the test.
 - [x] 4.21 Refactor this behavior; rerun `test_accounting_catalog_041_v9_migration_adds_category_history` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.22 Write failing test `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown lazy-table state is not repaired by initialization" (assert the expected failure).
-- [ ] 4.23 Implement the specified behavior for "Unknown lazy-table state is not repaired by initialization" to pass the test.
-- [ ] 4.24 Refactor this behavior; rerun `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.22 Write failing test `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown lazy-table state is not repaired by initialization" (assert the expected failure).
+- [x] 4.23 Implement the specified behavior for "Unknown lazy-table state is not repaired by initialization" to pass the test.
+- [x] 4.24 Refactor this behavior; rerun `test_accounting_catalog_042_unknown_lazy_table_state_is_not_repaired_by_initialization` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [x] 4.25 Write failing test `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` for scenario "Table Count Verification" (assert the expected failure).
 - [x] 4.26 Implement the specified behavior for "Table Count Verification" to pass the test.
 - [x] 4.27 Refactor this behavior; rerun `test_accounting_catalog_043_table_count_verification` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
-- [ ] 4.28 Write failing test `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown or malformed application tables fail schema health" (assert the expected failure).
-- [ ] 4.29 Implement the specified behavior for "Unknown or malformed application tables fail schema health" to pass the test.
-- [ ] 4.30 Refactor this behavior; rerun `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
+- [x] 4.28 Write failing test `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` for scenario "Unknown or malformed application tables fail schema health" (assert the expected failure).
+- [x] 4.29 Implement the specified behavior for "Unknown or malformed application tables fail schema health" to pass the test.
+- [x] 4.30 Refactor this behavior; rerun `test_accounting_catalog_044_unknown_or_malformed_application_tables_fail_schema_health` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.
 - [x] 4.31 Write failing test `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` for scenario "Missing Table Detection" (assert the expected failure).
 - [x] 4.32 Implement the specified behavior for "Missing Table Detection" to pass the test.
 - [x] 4.33 Refactor this behavior; rerun `test_accounting_catalog_045_missing_table_detection` in `test/db/accounting_catalog_migration_test.dart` and keep the full suite green.

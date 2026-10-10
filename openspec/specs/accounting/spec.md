@@ -41,38 +41,118 @@ The system SHALL maintain a journal of all booking entries with GoBD-immutable p
 
 ### Requirement: Kategorien
 
-The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance (`catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, `unmapped`). It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Without such a manifest, a fresh profile has no preconfigured mappings (explicit unconfigured state).
+The system SHALL provide categories with stable IDs, name, description, activation status, optional SKR03/SKR04/EÜR/EKS mappings, and mapping provenance. It MUST NOT claim a fixed minimum count or present mappings as standard unless they came from an approved, versioned catalog manifest. Each category SHALL distinguish `catalog_verified`, `user_confirmed`, `legacy_unverified`, `review_required`, and `unmapped` status as applicable. A manual edit to any mapping field SHALL set the category to `review_required`; `user_confirmed` requires an explicit review of every populated mapping field. User-confirmed mappings MUST remain distinguishable from catalog-verified mappings. A posting or output that requires category mapping values SHALL consume only `catalog_verified` or `user_confirmed` values; no mappings SHALL be inferred for `legacy_unverified`, `review_required`, or `unmapped`. A balanced posting with independently supplied account and tax data MAY retain an unmapped category as a descriptive label without consuming its mapping fields. The review action SHALL be reachable from the accepted `/settings/categories` workspace specified by `master-data-workspaces-and-crud`; until that workspace is accepted and available, provenance remains read-only and untrusted mappings stay blocked from mapping-dependent operations.
+
+#### Scenario: Approved catalog category has traceable mappings
+
+- **GIVEN** an approved manifest entry supplies a category and applicable accounting mappings
+- **WHEN** the category is persisted
+- **THEN** its values match the manifest entry and it records the stable entry key, source version, and `catalog_verified` status
 
 #### Scenario: Category with SKR mapping
 
-- GIVEN a category is created from an approved manifest entry or explicitly reviewed by the user
-- WHEN the category is persisted
-- THEN it SHALL record its applicable mapping values together with their provenance status and source
+- **GIVEN** an approved manifest entry supplies applicable SKR03 and SKR04 mappings
+- **WHEN** a category is created from that entry
+- **THEN** both account values match the entry and the category records its source version and `catalog_verified` status
+
+#### Scenario: User-defined category is not described as a standard mapping
+
+- **GIVEN** a user creates a category without an approved manifest entry and enters accounting mapping values
+- **WHEN** the category is persisted
+- **THEN** it is marked `user_confirmed` only after the user explicitly reviews all populated mappings
+- **AND** the UI identifies it as user-configured rather than catalog-verified
+
+#### Scenario: Unmapped user category remains explicitly unmapped
+
+- **GIVEN** a user creates a category without accounting mapping values
+- **WHEN** the category is persisted
+- **THEN** it has `unmapped` status and no generated mapping value
+
+#### Scenario: Editing a catalog mapping requires review
+
+- **GIVEN** a category has `catalog_verified` status and a user edits any accounting mapping field
+- **WHEN** the edit is saved
+- **THEN** its status becomes `review_required` while the prior catalog source/version remains recorded as baseline provenance
+- **AND** it is not represented as catalog-verified until reviewed
 
 #### Scenario: User-modified SKR account
 
-- GIVEN a user overrides the SKR03 account for a category
-- WHEN the override is saved
-- THEN the entered value SHALL be preserved and the category SHALL become `review_required`
-- AND it SHALL NOT be used as a catalog-verified mapping until all populated mapping fields are explicitly reviewed
+- **GIVEN** a user overrides the SKR03 account for a category
+- **WHEN** the override is saved
+- **THEN** the entered value is preserved and the category becomes `review_required`
+- **AND** it cannot be used as a catalog-verified mapping until all populated mapping fields are explicitly reviewed
+
+#### Scenario: Legacy category values are retained but untrusted
+
+- **GIVEN** a category existed before provenance migration
+- **WHEN** the category is loaded after migration
+- **THEN** all pre-migration values and references remain unchanged and its status is `legacy_unverified`
+- **AND** it remains readable in historical journal views
+
+#### Scenario: Legacy mapping cannot drive a new posting before review
+
+- **GIVEN** a category has `legacy_unverified` status
+- **WHEN** the user attempts a new journal entry whose account or tax treatment depends on the category mapping
+- **THEN** the entry is rejected with that category's ID and a mapping-review action
+
+#### Scenario: Unmapped category labels an independently balanced posting
+
+- **GIVEN** a category has `unmapped` status and the posting request supplies all required balanced account and tax data independently
+- **WHEN** the journal entry is validated
+- **THEN** the entry MAY retain the category as a descriptive label without deriving an account or tax value from it
+- **AND** the category status remains `unmapped`
 
 #### Scenario: Inactive category
 
-- GIVEN a category with aktiv=0
-- WHEN the booking form is displayed
-- THEN the category SHALL not appear in dropdowns, but existing journal entries referencing it SHALL remain visible
+- **GIVEN** a category with `aktiv=0`
+- **WHEN** the booking form is displayed
+- **THEN** the category does not appear in new-entry dropdowns, but existing journal entries referencing it remain visible
 
 #### Scenario: Category description
 
-- GIVEN a category with beschreibung set
-- WHEN a user selects the category in the booking form
-- THEN the booking form SHALL display the description as a hint
+- **GIVEN** a category with `beschreibung` set
+- **WHEN** a user selects the category in the booking form
+- **THEN** the booking form displays the description as a hint
+
+#### Scenario: Unmapped category does not receive an invented account
+
+- **GIVEN** a category has no SKR mapping
+- **WHEN** a journal entry or export resolves its category account
+- **THEN** the mapping remains absent and no default or formula-generated account number is substituted
 
 #### Scenario: Category with missing SKR mapping
 
-- GIVEN a category with konto_skr03 = NULL or konto_skr04 = NULL
-- WHEN a journal entry or export requires that account mapping
-- THEN export resolution SHALL report the category as unresolved and SHALL NOT substitute a default account
+- **GIVEN** a category has `konto_skr03` or `konto_skr04` set to NULL
+- **WHEN** a DATEV export requires that account mapping
+- **THEN** export resolution reports the category as unresolved and does not substitute a default account
+
+#### Scenario: Category review is unavailable until its workspace is accepted
+
+- **GIVEN** a category has `legacy_unverified` or `review_required` status and the accepted `/settings/categories` workspace is not available
+- **WHEN** a user attempts to review its mapping
+- **THEN** the system SHALL keep the category status unchanged and identify the unavailable review workflow
+- **AND** new postings and mapping-dependent output SHALL remain blocked for that category
+
+#### Scenario: Inactive category warning does not replace mapping review
+
+- **GIVEN** a recurring booking references a deactivated category whose status is `legacy_unverified` or `review_required` and whose mapping is required by the posting
+- **WHEN** the user confirms the reviewed occurrence
+- **THEN** the mapping status SHALL block posting even if the occurrence also displays the inactive-category warning
+- **AND** the category SHALL remain blocked until its mapping provenance is explicitly reviewed
+
+#### Scenario: Eligible inactive category keeps the recurring warning policy
+
+- **GIVEN** a recurring booking references a deactivated category with `catalog_verified` or `user_confirmed` mapping status
+- **WHEN** the accepted shared posting contract permits the confirmed occurrence
+- **THEN** the inactive category SHALL retain the existing warning behavior
+- **AND** deactivation SHALL NOT change or upgrade its mapping provenance status
+
+#### Scenario: Unmapped inactive category is used only without category mappings
+
+- **GIVEN** a recurring booking references a deactivated `unmapped` category
+- **WHEN** its accepted posting contract receives all required account and tax data independently
+- **THEN** the occurrence MAY proceed with the existing inactive-category warning
+- **AND** no category mapping value SHALL be inferred or persisted as verified
 
 ### Requirement: EÜR (Einnahmen-Überschuss-Rechnung)
 
@@ -858,3 +938,63 @@ Annual EÜR is the only accounting report consumer in scope. It SHALL use the ex
 - **WHEN** the accepted EÜR calculation supports that calendar-year period
 - **THEN** EÜR SHALL remain available for the selected calendar year
 - **AND** the result SHALL be labeled as a calendar year, not as a configured business year
+
+### Requirement: EÜR and DATEV disclose or reject category mapping provenance
+
+EÜR and DATEV SHALL use only `catalog_verified` or explicitly `user_confirmed` category mappings. Before grouping or filtering, EÜR SHALL left-join every journal row selected by its existing accepted period, posting, and correction rules to its category and validate provenance and required `euer_zeile`; a missing category, missing required mapping, or ineligible provenance status MUST block output with the affected journal/category IDs. DATEV SHALL resolve its `Konto` and `Gegenkonto` slots independently from their corresponding posting legs. Each slot SHALL use an explicit account mapping or an eligible category mapping explicitly attached to that leg; a configured company account MAY be used only when the posting leg explicitly selects it. A company default SHALL NOT resolve both slots implicitly. The persisted export snapshot SHALL contain one record per emitted account slot with `journal_id`, slot name, exact account number, resolution source, and category ID plus immutable category-history row ID when a category mapping contributes. Output using user-confirmed mappings MUST identify them as user-configured and not source-verified in the preview and persisted export metadata. GuV is outside this requirement and remains governed by its maintained report contract. If either DATEV slot has no eligible source, or EÜR/DATEV depends on a `legacy_unverified`, `review_required`, or `unmapped` mapping, generation MUST fail with the affected journal/category IDs and MUST NOT silently omit those entries or substitute a default account.
+
+#### Scenario: User-configured output is identified
+
+- **GIVEN** a requested report or export uses only `catalog_verified` and `user_confirmed` mappings
+- **WHEN** the output is generated
+- **THEN** output metadata lists the catalog source version for verified mappings and identifies user-confirmed mappings as not source-verified
+
+#### Scenario: Unresolved mapping stops the output
+
+- **GIVEN** a requested report or export includes a contributing `legacy_unverified`, `review_required`, or `unmapped` category
+- **WHEN** generation is requested
+- **THEN** generation fails with those category IDs
+- **AND** no successful report/export is recorded and no fallback account is emitted
+
+#### Scenario: EÜR detects categories missing a report line
+
+- **GIVEN** an in-scope journal entry in the selected EÜR period references a category with no `euer_zeile` or a provenance status other than `catalog_verified` or `user_confirmed`
+- **WHEN** the EÜR source rows are left-joined to categories before mapping filters or grouping
+- **THEN** generation fails with the affected journal and category IDs
+- **AND** the entry is not silently excluded from the report
+
+#### Scenario: EÜR detects a missing category reference
+
+- **GIVEN** an in-scope journal entry in the selected EÜR period has no category or references a missing category row
+- **WHEN** EÜR completeness is checked before calculation
+- **THEN** generation fails with the affected journal entry ID
+- **AND** the entry is not silently excluded from the report
+
+#### Scenario: DATEV detects missing category account mappings
+
+- **GIVEN** an in-scope DATEV journal row has no explicit `konto_id.datev_kontonummer` and requires a category SKR account that is absent or has a provenance status other than `catalog_verified` or `user_confirmed`
+- **WHEN** DATEV account resolution runs
+- **THEN** export fails with the affected category IDs
+- **AND** no fallback account such as `1200` or `8400` is emitted
+
+#### Scenario: DATEV records both account slot sources
+
+- **GIVEN** a DATEV booking has distinct `Konto` and `Gegenkonto` source legs, with one explicit account mapping and one eligible category mapping
+- **WHEN** each slot is resolved independently
+- **THEN** the CSV row contains each exact account number in its corresponding slot
+- **AND** the persisted provenance snapshot records one account-slot entry per emitted value with its source, journal ID, and category/history reference when used
+- **AND** neither slot is labeled catalog-verified unless its category mapping is catalog-verified
+
+#### Scenario: DATEV rejects an unresolved account slot
+
+- **GIVEN** either DATEV account slot has no explicit account mapping or eligible category mapping attached to its posting leg
+- **WHEN** the export is generated
+- **THEN** generation fails with the journal ID and unresolved slot name
+- **AND** no company default or synthetic account is substituted
+
+#### Scenario: User-confirmed mapping is visible and recorded
+
+- **GIVEN** an EÜR or DATEV output uses one or more `user_confirmed` category mappings
+- **WHEN** the preview and persisted export are produced
+- **THEN** both identify those mappings as user-configured and not source-verified
+- **AND** the export metadata records the category IDs and mapping status snapshot

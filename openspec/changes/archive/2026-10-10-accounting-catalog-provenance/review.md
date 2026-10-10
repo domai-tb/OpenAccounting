@@ -138,3 +138,35 @@ CHANGES_APPLIED: n/a
 - Deferred to the v9-owner change: shared markers + mileage + lazy-unknown scenarios
   (036/040/042). Test paths corrected to `test/db/`; truncated test names expanded;
   docs/maintained-spec sync tracked as tasks 6.1–6.3.
+
+---
+
+## Review Round 4
+
+### Review Metadata
+
+- **Review round**: 4
+- **Prior round**: 3 (`APPROVE`, voided by post-round-3 edits per staleness clause)
+- **Reviewer context**: fresh independent reviewer; did not author the section move
+- **Tool restrictions**: read delta specs, maintained spec headers, and round 3 only; appended this review only; no shell/validation/tests per task instructions
+- **Artifacts reviewed**: `specs/accounting/spec.md` delta, `specs/db/spec.md` delta, maintained `openspec/specs/accounting/spec.md` headers (28 requirements), maintained `openspec/specs/db/spec.md` headers (14 requirements), `review.md` rounds 1–3 plus Implementation Note
+- **Validation evidence**: none rerun (no shell per task). Round-3 strict validation passed; the post-round-3 edit is a section-header move only.
+
+<!-- STALENESS: this verdict applies to proposal.md, design.md, and specs/ as
+reviewed in round 4. Any later edit to those artifacts voids this verdict. -->
+
+### Findings
+
+None. The single post-round-3 edit holds on all checks:
+
+- (a) Moved requirement has no maintained counterpart: delta `EÜR and DATEV disclose or reject category mapping provenance` matches none of the 28 maintained accounting headers. Closest headers (`EÜR (Einnahmen-Überschuss-Rechnung)`, `DATEV EXTF Export`) are not name-matches, so `## ADDED Requirements` is correct and the archive-tooling rejection of unmatched MODIFIED is avoided.
+- (b) Move is content-preserving to the extent verifiable without shell: `## MODIFIED Requirements` now holds only `Kategorien`; `## ADDED Requirements` holds only the moved requirement with its full statement and 8 scenarios intact, no remnant or duplicate under MODIFIED, no truncation. Byte-level word-diff against the pre-move revision was not run (no shell per task); accepted per the single-edit scope statement plus the intact-block inspection above.
+- (c) Remaining MODIFIED `Kategorien` name-matches maintained `openspec/specs/accounting/spec.md:42` (`### Requirement: Kategorien`) exactly.
+- Db delta needs no split: MODIFIED `Seed Data` and `Table Definitions` name-match maintained db headers (`### Requirement: Seed Data`, `### Requirement: Table Definitions`); its third requirement (`Category mapping provenance is persisted`) is already under `## ADDED Requirements` with no maintained counterpart. Correct as-is.
+- No semantic change from the move: round-3 resolutions (independent Konto/Gegenkonto slots with per-slot snapshot, transactional `legacy_unverified`-default migration, `unmapped`-as-label policy) remain present in the current delta text.
+
+## Verdict
+
+VERDICT: APPROVE
+
+CHANGES_APPLIED: n/a
