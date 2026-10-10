@@ -8,6 +8,7 @@ import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
+import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/design_system/components/app_inspector.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
@@ -191,9 +192,47 @@ class _ContactRow {
   final VoidCallback onArchive;
 }
 
+/// Narrow-safe loading skeleton for the contacts workspace. Bars fill the
+/// available width so nothing overflows at 320px viewports.
+class _ContactListSkeleton extends StatelessWidget {
+  const _ContactListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Column(
+        children: <Widget>[
+          for (int index = 0; index < 5; index++)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Row(
+                children: <Widget>[
+                  SkeletonBox(width: 40, height: 40),
+                  SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        SkeletonBox(width: double.infinity, height: 16),
+                        SizedBox(height: AppSpacing.sm),
+                        SkeletonBox(width: double.infinity, height: 12),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: AppSpacing.lg),
+                  SkeletonBox(width: 72, height: 16),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class ContactsWorkspaceView extends ConsumerStatefulWidget {
   const ContactsWorkspaceView({super.key});
-
   @override
   ConsumerState<ContactsWorkspaceView> createState() => _ContactsWorkspaceViewState();
 }
@@ -411,7 +450,7 @@ class _ContactListBodyState extends ConsumerState<_ContactListBody> {
       ),
       builder: (BuildContext context, AsyncSnapshot<CustomerPage> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const _ContactListSkeleton();
         }
         if (snapshot.hasError) {
           WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError(snapshot.error!));
@@ -440,7 +479,7 @@ class _ContactListBodyState extends ConsumerState<_ContactListBody> {
       ),
       builder: (BuildContext context, AsyncSnapshot<SupplierPage> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const _ContactListSkeleton();
         }
         if (snapshot.hasError) {
           WidgetsBinding.instance.addPostFrameCallback((_) => widget.onError(snapshot.error!));

@@ -520,40 +520,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No entries yet'), findsOneWidget);
-    expect(
-      find.widgetWithText(FilledButton, 'Save'),
-      findsNWidgets(2),
-      reason: 'page-header action and empty-state primary action are both present',
-    );
-    expect(find.widgetWithText(TextButton, 'Refresh'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Create customer'), findsOneWidget);
+    expect(find.byTooltip('Create customer'), findsOneWidget);
     _expectOnScreen(tester, find.text('No entries yet'));
+    _expectOnScreen(tester, find.widgetWithText(FilledButton, 'Create customer'));
 
-    await harness.db.executor.runInsert('INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)', <Object?>[
-      'Ada Lovelace',
-      'Main Street 1',
-      '10115',
-      'Berlin',
-    ]);
-    await tester.tap(find.widgetWithText(TextButton, 'Refresh'));
+    await harness.db.executor.runInsert(
+      'INSERT INTO kunden (anrede, name, strasse, plz, ort, land, kundennummer) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['Herr', 'Ada Lovelace', 'Main Street 1', '10115', 'Berlin', 'DE', 'KD-0001'],
+    );
+    await tester.enterText(find.byType(TextField).first, 'Ada');
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
-    expect(find.text('Ada Lovelace'), findsOneWidget);
-    _expectOnScreen(tester, find.text('Ada Lovelace'));
+    expect(find.textContaining('Ada Lovelace'), findsOneWidget);
+    _expectOnScreen(tester, find.textContaining('Ada Lovelace'));
 
-    // Filtered empty state keeps both of its actions.
+    // Filtered empty state keeps its reset path.
     await tester.enterText(find.byType(TextField).first, 'zzz-no-match');
+    await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
-    expect(find.text('No matches'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Reset'), findsOneWidget);
-    expect(find.widgetWithText(TextButton, 'Refresh'), findsOneWidget);
+    expect(find.text('No entries yet'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, '');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ada Lovelace'), findsOneWidget);
 
-    // Error state through a failing refresh after the database closes.
+    // Error state through a failing reload after the database closes.
     await harness.db.close();
-    await tester.tap(find.widgetWithText(TextButton, 'Refresh'));
+    await tester.enterText(find.byType(TextField).first, 'zzz-retry');
     await tester.pumpAndSettle();
-    expect(find.text('Data could not be loaded'), findsOneWidget);
-    expect(find.text('The local database is unavailable.'), findsOneWidget);
+    expect(find.text('Data unavailable'), findsOneWidget);
+    expect(find.text('The data could not be loaded. Please retry.'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Retry'), findsOneWidget);
-    _expectOnScreen(tester, find.text('Data could not be loaded'));
+    _expectOnScreen(tester, find.text('Data unavailable'));
     _expectOnScreen(tester, find.widgetWithText(FilledButton, 'Retry'));
 
     // The error action stays reachable by keyboard and semantics.
@@ -566,11 +564,7 @@ void main() {
     expect(retryFocus.hasFocus, isTrue, reason: 'the error action must be visibly focusable');
     expect(await tester.sendKeyEvent(LogicalKeyboardKey.enter), isTrue, reason: 'Enter must activate Retry');
     await tester.pumpAndSettle();
-    expect(
-      find.text('Data could not be loaded'),
-      findsOneWidget,
-      reason: 'Retry keeps the route mounted with the error state',
-    );
+    expect(find.text('Data unavailable'), findsOneWidget, reason: 'Retry keeps the route mounted with the error state');
   });
 }
 

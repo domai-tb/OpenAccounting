@@ -28,6 +28,8 @@ Every production-visible label, action, tooltip, heading, dialog, loading messag
 - **WHEN** localization validation runs
 - **THEN** the validation SHALL fail with the source location, missing-key name, or stale app-spec requirement before the change can be accepted
 
+## ADDED Requirements
+
 ### Requirement: Active-locale accounting formatting
 
 Money, decimal, short-date, long-date, and semantic amount formatting SHALL receive the active locale from the production widget context or an equivalent explicit locale boundary. This contract covers `AppTypography.formatMoney`, `AppTypography.formatDate`, `AppTypography.formatDateLong`, the `app_money.dart` helpers and `MoneyText`, shared surfaces such as `finance_list_surface.dart`, and page/service formatter paths used by bank import, invoice/document, PDF, and other visible route states. Formatting helpers and shared amount widgets MUST NOT silently default production output to `de_DE` when English is active.
@@ -74,8 +76,6 @@ The application SHALL support German as the primary locale and English as the se
 - **GIVEN** the user selects English and the preference store rejects the write
 - **WHEN** the locale change completes
 - **THEN** the current session SHALL remain English and SHALL not throw an uncaught error or reset the active route
-
-## ADDED Requirements
 
 ### Requirement: Production route and ARB parity coverage
 
