@@ -16,6 +16,8 @@ The active business's Profile Manager preference SHALL be stored in the module c
 - **WHEN** navigation is rendered
 - **THEN** the Profile menu item is shown because multiple profiles override the saved preference
 
+## ADDED Requirements
+
 ### Requirement: Unternehmen — Durable optional module state
 
 The Unternehmen row SHALL store `feature_modules_json` as the canonical versioned JSON module-state object. Catalog version 1 SHALL initialize its `enabled` map with `profile_manager`, `inventory`, and `guv`, defaulting to false for a new profile. On an existing profile, the additive schema migration SHALL copy valid boolean values from `profilmanager_aktiv`, `lagerfuehrung_aktiv`, and `guv_aktiv` when each legacy column exists; absent or invalid values SHALL default to false. The migration SHALL preserve existing module state when the canonical JSON value already exists and is valid. Legacy columns SHALL remain intact as migration inputs but SHALL NOT be written or read as runtime state after backfill. Module-state reads and writes SHALL use the catalog application service and SHALL NOT alter module-owned business records.

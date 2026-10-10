@@ -3,7 +3,6 @@
 ## Purpose
 Per-article inventory activation, stock tracking, movement logging, and low-stock warnings.
 
-
 ## Requirements
 
 ### Requirement: Per-article inventory activation
@@ -234,21 +233,51 @@ AND a stock movement log entry SHALL be created with diff=-8.
 
 ### Requirement: Configurable inventory activation in settings
 
-The application settings (Unternehmen) SHALL include a `lagerführung_aktiv` boolean flag. When `lagerführung_aktiv = false`, the inventory-related UI elements (Lagerwarnung widget, stock fields in article form, stock warnings in invoice form) SHALL be hidden. This is a global toggle, not per-article.
+The Settings workspace SHALL expose inventory availability through the `inventory` entry in `unternehmen.feature_modules_json`, resolved by the module catalog. The documented `lagerführung_aktiv` setting (stored as `lagerfuehrung_aktiv` where present) SHALL be migration-only input and SHALL NOT be read or written as a runtime module switch. `artikel.lager_aktiv` SHALL remain the independent per-article stock-tracking flag. Article stock data SHALL retain the maintained fields `bestand_aktuell` (`NUMERIC(10,3)`, default 0), `bestand` (legacy stock value), `mindestbestand` (`NUMERIC(10,3)`, default 0), and `minusbestand_erlaubt` (boolean, default false).
+
+When the `inventory` module is disabled, inventory navigation, dashboard warnings, article stock fields, manual stock controls, inventory shortcuts, and invoice stock-warning indicators SHALL be hidden or unavailable. Disabling the module SHALL preserve article stock fields and movement records and SHALL NOT suppress the stock effects required by outgoing invoice finalization or storno. When enabled, invoice line items for tracked articles SHALL show a per-line warning when the line quantity exceeds `bestand_aktuell`; the warning SHALL NOT block saving a draft. Finalization SHALL follow the maintained stock confirmation flow, including the `minusbestand_erlaubt` override when the user confirms proceeding with insufficient stock.
 
 #### Scenario: Inventory globally disabled
 
-GIVEN `unternehmen.lagerführung_aktiv = false`
-WHEN the application loads
-THEN the Lagerwarnung widget SHALL NOT appear on the dashboard
-AND stock fields SHALL NOT appear in the article form
-AND stock warnings SHALL NOT appear in the invoice form.
+- **GIVEN** the catalog entry `inventory` is disabled for the active business
+- **WHEN** the application loads
+- **THEN** the `lagerführung_aktiv` / `lagerfuehrung_aktiv` legacy value is not consulted as a runtime switch
+- **AND** the Lagerwarnung widget, article stock fields, manual stock controls, inventory shortcuts, and invoice stock-warning indicators are hidden or unavailable
+- **AND** existing article stock values, per-article tracking flags, and movement records remain unchanged
 
 #### Scenario: Inventory globally enabled
 
-GIVEN `unternehmen.lagerführung_aktiv = true`
-WHEN the application loads
-THEN all inventory-related UI elements SHALL be visible.
+- **GIVEN** the catalog entry `inventory` is effectively enabled for the active business
+- **WHEN** the application loads
+- **THEN** the inventory entry points and article stock fields are available subject to each article's `lager_aktiv` value
+- **AND** invoice line items for tracked articles can display stock warnings
+
+#### Scenario: Per-article stock fields retain their maintained meaning
+
+- **GIVEN** the `inventory` module is effectively enabled
+- **WHEN** an article is displayed or edited
+- **THEN** `lager_aktiv` controls whether the article normally participates in stock tracking
+- **AND** `bestand_aktuell`, `bestand`, `mindestbestand`, and `minusbestand_erlaubt` retain their maintained stock, legacy compatibility, minimum, and negative-stock meanings
+
+#### Scenario: Invoice stock warning allows draft save
+
+- **GIVEN** the `inventory` module is effectively enabled and a tracked article has `bestand_aktuell=15` with an invoice line quantity of 20
+- **WHEN** the invoice line is rendered and the user saves the invoice as a draft
+- **THEN** a warning is shown on that line and the draft is saved successfully
+
+#### Scenario: Invoice stock warning uses maintained finalization confirmation
+
+- **GIVEN** the `inventory` module is effectively enabled and a tracked article has insufficient stock with `minusbestand_erlaubt=false`
+- **WHEN** the user finalizes an invoice containing that article
+- **THEN** the maintained confirmation flow asks whether to proceed or cancel
+- **AND** proceeding applies the maintained `minusbestand_erlaubt` override for affected articles
+
+#### Scenario: Disabled module does not suppress invoice stock effects
+
+- **GIVEN** the `inventory` module is disabled and an outgoing invoice contains an article that participates in stock tracking
+- **WHEN** the invoice is finalized or storniert
+- **THEN** the stock update or restoration required by the invoice lifecycle still occurs exactly once
+- **AND** module disablement does not rewrite the article stock values or movement history
 
 ### Requirement: Inventory movement storage
 

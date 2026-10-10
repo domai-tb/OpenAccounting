@@ -50,7 +50,7 @@ void main() {
       ]);
 
       final versionRows = await database.executor.runSelect('PRAGMA user_version', const []);
-      expect(versionRows.single.values.single, 13);
+      expect(versionRows.single.values.single, MigrationRunner.currentVersion);
     });
 
     test('test_profile_data_portability_006_v12_to_v13_migration_adds_shared_markers_and_mileage', () async {
@@ -75,7 +75,7 @@ void main() {
       final bool migrated = await runner.run(createSchema: () async {});
 
       expect(migrated, isTrue);
-      expect(await runner.getUserVersion(), 13);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
       final List<Map<String, Object?>> newTables = await legacyDatabase.executor.runSelect(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
         "('feature_table_state', 'mileage_trips', 'mileage_trip_corrections')",
@@ -194,7 +194,7 @@ void main() {
           runner.run(createSchema: () async {}),
           throwsA(isA<StateError>().having((error) => error.message, 'message', contains('forderung_zahlungen'))),
         );
-        expect(await runner.getUserVersion(), 13);
+        expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
         final List<Map<String, Object?>> paymentTable = await database.executor.runSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'forderung_zahlungen'",
           const <Object?>[],

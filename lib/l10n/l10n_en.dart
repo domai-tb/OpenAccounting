@@ -1651,4 +1651,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickBookingEmpty => 'No quick bookings yet.';
+
+  @override
+  String get featureModulesTitle => 'Features';
+
+  @override
+  String get featureModulesDescription => 'Enable optional modules individually.';
+
+  @override
+  String get featureModuleProfileManagerName => 'Profile Manager';
+
+  @override
+  String get featureModuleProfileManagerDescription => 'Profile overview with create, select, and rename.';
+
+  @override
+  String get featureModuleInventoryName => 'Inventory';
+
+  @override
+  String get featureModuleInventoryDescription => 'Stock warnings, balances, and manual corrections.';
+
+  @override
+  String get featureModuleGuvName => 'Profit and loss';
+
+  @override
+  String get featureModuleGuvDescription => 'Profit and loss statement from journal postings.';
+
+  @override
+  String get featureModuleEnabled => 'Enabled';
+
+  @override
+  String get featureModuleDisabled => 'Disabled';
+
+  @override
+  String get featureModuleUnavailable => 'Unavailable';
+
+  @override
+  String get featureModuleDataRetained => 'Disabling hides entries. Existing data is retained.';
+
+  @override
+  String get featureModuleThresholdActive => 'GuV threshold reached. GuV stays enabled.';
+
+  @override
+  String get featureModuleSaveError => 'Save failed. Please retry.';
+
+  @override
+  String get featureModuleUnavailableTitle => 'Module unavailable';
+
+  @override
+  String get featureModuleUnavailableDescription => 'This module is disabled. No data was changed.';
 }

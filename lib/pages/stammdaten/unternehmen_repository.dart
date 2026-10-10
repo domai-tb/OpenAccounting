@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_repository.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
 import 'package:path/path.dart' as p;
 
@@ -217,6 +218,7 @@ class UnternehmenRepository {
     _ColumnDefinition('einleitungstext_storno', 'TEXT'),
     _ColumnDefinition('schlusstext_storno', 'TEXT'),
     _ColumnDefinition('profilmanager_aktiv', 'INTEGER DEFAULT 0'),
+    _ColumnDefinition('feature_modules_json', 'TEXT'),
     _ColumnDefinition('iban', 'TEXT'),
     _ColumnDefinition('bic', 'TEXT'),
     _ColumnDefinition('finanzamt', 'TEXT'),
@@ -235,6 +237,9 @@ class UnternehmenRepository {
       await executor.runInsert('INSERT INTO unternehmen (id, name) VALUES (1, ?)', const <Object?>['Meine Firma']);
       rows = await _selectSafeRows();
     }
+    // Canonical module state defaults for fresh rows (NULL-only, no rewrite).
+    await FeatureModuleRepository(executor).ensureDefaults();
+    rows = await _selectSafeRows();
     return Unternehmen(id: 1, data: rows.single);
   }
 

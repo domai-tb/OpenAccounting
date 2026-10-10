@@ -830,5 +830,21 @@
   "quickBookingReviewRequired": "Review required",
   "quickBookingUnavailable": "Execution unavailable",
   "quickBookingEnterAmount": "Enter amount",
-  "quickBookingEmpty": "No quick bookings yet."
+  "quickBookingEmpty": "No quick bookings yet.",
+  "featureModulesTitle": "Features",
+  "featureModulesDescription": "Enable optional modules individually.",
+  "featureModuleProfileManagerName": "Profile Manager",
+  "featureModuleProfileManagerDescription": "Profile overview with create, select, and rename.",
+  "featureModuleInventoryName": "Inventory",
+  "featureModuleInventoryDescription": "Stock warnings, balances, and manual corrections.",
+  "featureModuleGuvName": "Profit and loss",
+  "featureModuleGuvDescription": "Profit and loss statement from journal postings.",
+  "featureModuleEnabled": "Enabled",
+  "featureModuleDisabled": "Disabled",
+  "featureModuleUnavailable": "Unavailable",
+  "featureModuleDataRetained": "Disabling hides entries. Existing data is retained.",
+  "featureModuleThresholdActive": "GuV threshold reached. GuV stays enabled.",
+  "featureModuleSaveError": "Save failed. Please retry.",
+  "featureModuleUnavailableTitle": "Module unavailable",
+  "featureModuleUnavailableDescription": "This module is disabled. No data was changed."
 }

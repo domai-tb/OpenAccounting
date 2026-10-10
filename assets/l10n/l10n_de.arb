@@ -830,5 +830,21 @@
   "quickBookingReviewRequired": "Prüfung erforderlich",
   "quickBookingUnavailable": "Ausführung nicht verfügbar",
   "quickBookingEnterAmount": "Betrag eingeben",
-  "quickBookingEmpty": "Keine Schnellbuchungen vorhanden."
+  "quickBookingEmpty": "Keine Schnellbuchungen vorhanden.",
+  "featureModulesTitle": "Funktionen",
+  "featureModulesDescription": "Optionale Module einzeln aktivieren.",
+  "featureModuleProfileManagerName": "Profilverwaltung",
+  "featureModuleProfileManagerDescription": "Profilübersicht mit Anlegen, Wählen und Umbenennen.",
+  "featureModuleInventoryName": "Lagerverwaltung",
+  "featureModuleInventoryDescription": "Lagerwarnungen, Bestände und manuelle Korrekturen.",
+  "featureModuleGuvName": "GuV",
+  "featureModuleGuvDescription": "Gewinn- und Verlustrechnung aus Journalbuchungen.",
+  "featureModuleEnabled": "Aktiviert",
+  "featureModuleDisabled": "Deaktiviert",
+  "featureModuleUnavailable": "Nicht verfügbar",
+  "featureModuleDataRetained": "Deaktivieren blendet Einträge aus. Bestehende Daten bleiben erhalten.",
+  "featureModuleThresholdActive": "GuV-Schwelle erreicht. GuV bleibt aktiviert.",
+  "featureModuleSaveError": "Speichern fehlgeschlagen. Erneut versuchen.",
+  "featureModuleUnavailableTitle": "Modul nicht verfügbar",
+  "featureModuleUnavailableDescription": "Dieses Modul ist deaktiviert. Keine Daten wurden geändert."
 }

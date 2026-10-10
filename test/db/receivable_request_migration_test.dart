@@ -327,7 +327,7 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(freshDdl, greaterThan(freshBegin));
       expect(freshDdl, lessThan(freshCommit));
-      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = 13');
+      final int freshVersion = freshStatements.indexOf('PRAGMA USER_VERSION = ${MigrationRunner.currentVersion}');
       expect(freshVersion, greaterThan(freshBegin));
       expect(freshVersion, lessThan(freshCommit));
       expect(
@@ -358,7 +358,7 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(upgradeDdl, greaterThan(upgradeBegin));
       expect(upgradeDdl, lessThan(upgradeCommit));
-      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = 13');
+      final int upgradeVersion = upgradeStatements.indexOf('PRAGMA USER_VERSION = ${MigrationRunner.currentVersion}');
       expect(upgradeVersion, greaterThan(upgradeBegin));
       expect(upgradeVersion, lessThan(upgradeCommit));
       expect(
@@ -389,7 +389,7 @@ CREATE TABLE forderung_zahlungen (
       );
       expect(repairDdl, greaterThan(repairBegin));
       expect(repairDdl, lessThan(repairCommit));
-      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = 13');
+      final int repairVersion = repairStatements.indexOf('PRAGMA USER_VERSION = ${MigrationRunner.currentVersion}');
       expect(repairVersion, greaterThan(repairBegin));
       expect(repairVersion, lessThan(repairCommit));
       expect(repairStatements.indexWhere((String s) => s.contains('CREATE TRIGGER')), greaterThan(repairCommit));

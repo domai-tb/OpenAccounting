@@ -8,6 +8,9 @@ import 'package:openaccounting/core/app_locale.dart';
 import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/features/fiscal_year/fiscal_year_repository.dart';
 import 'package:openaccounting/features/fiscal_year/fiscal_year_settings_section.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_repository.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_service.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_settings_section.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_schedules_view.dart';
 import 'package:openaccounting/core/app_services.dart';
@@ -947,6 +950,10 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
           ),
           const SizedBox(height: 16),
           FiscalYearSettingsSection(repository: FiscalYearRepository(ref.read(appDatabaseProvider).executor)),
+          const SizedBox(height: 16),
+          FeatureModuleSettingsSection(
+            service: FeatureModuleService(repository: FeatureModuleRepository(ref.read(appDatabaseProvider).executor)),
+          ),
           const SizedBox(height: 16),
           Text(l10n.settingsPrivacyDescription),
           const SizedBox(height: 16),

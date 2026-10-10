@@ -1659,4 +1659,52 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quickBookingEmpty => 'Keine Schnellbuchungen vorhanden.';
+
+  @override
+  String get featureModulesTitle => 'Funktionen';
+
+  @override
+  String get featureModulesDescription => 'Optionale Module einzeln aktivieren.';
+
+  @override
+  String get featureModuleProfileManagerName => 'Profilverwaltung';
+
+  @override
+  String get featureModuleProfileManagerDescription => 'Profilübersicht mit Anlegen, Wählen und Umbenennen.';
+
+  @override
+  String get featureModuleInventoryName => 'Lagerverwaltung';
+
+  @override
+  String get featureModuleInventoryDescription => 'Lagerwarnungen, Bestände und manuelle Korrekturen.';
+
+  @override
+  String get featureModuleGuvName => 'GuV';
+
+  @override
+  String get featureModuleGuvDescription => 'Gewinn- und Verlustrechnung aus Journalbuchungen.';
+
+  @override
+  String get featureModuleEnabled => 'Aktiviert';
+
+  @override
+  String get featureModuleDisabled => 'Deaktiviert';
+
+  @override
+  String get featureModuleUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get featureModuleDataRetained => 'Deaktivieren blendet Einträge aus. Bestehende Daten bleiben erhalten.';
+
+  @override
+  String get featureModuleThresholdActive => 'GuV-Schwelle erreicht. GuV bleibt aktiviert.';
+
+  @override
+  String get featureModuleSaveError => 'Speichern fehlgeschlagen. Erneut versuchen.';
+
+  @override
+  String get featureModuleUnavailableTitle => 'Modul nicht verfügbar';
+
+  @override
+  String get featureModuleUnavailableDescription => 'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.';
 }

@@ -3,7 +3,6 @@
 ## Purpose
 Multi-profile management with separate databases, profile switching, and workspace isolation.
 
-
 ## Requirements
 
 ### Requirement: Separate databases per profile
@@ -84,27 +83,25 @@ AND the current database SHALL remain loaded.
 
 ### Requirement: Profile manager UI
 
-The application SHALL provide a "Profile" menu entry accessible from the main navigation or settings. The Profile Manager SHALL display all profiles as a list with: profile name, database size, last modified timestamp. Actions: create new profile, select (switch), rename, delete. The Profile Manager SHALL be accessible only when `unternehmen.profilmanager_aktiv = true` OR when more than one profile exists.
+The application SHALL provide a `Profile` menu entry accessible from the main navigation or Settings. The Profile Manager SHALL display all profiles with name, database size, and last-modified timestamp, and support create, select, rename, and eligible delete actions. For exactly one profile, the entry SHALL be visible only when the module catalog resolves `profile_manager` as effectively enabled. When more than one profile exists, the entry SHALL be visible regardless of the saved catalog preference. Profile switching requires a process restart.
 
 #### Scenario: Profile manager accessible with multiple profiles
 
-GIVEN more than one profile directory exists
-WHEN the application loads
-THEN the Profile Manager menu entry SHALL be visible regardless of `profilmanager_aktiv` setting.
+- **GIVEN** more than one profile directory exists and the saved `profile_manager` preference is disabled
+- **WHEN** the application loads
+- **THEN** the Profile Manager menu entry is visible regardless of that preference
 
 #### Scenario: Profile manager hidden with single profile
 
-GIVEN exactly one profile exists
-AND `unternehmen.profilmanager_aktiv = false`
-WHEN the application loads
-THEN the Profile Manager menu entry SHALL be hidden.
+- **GIVEN** exactly one profile exists and the module catalog resolves `profile_manager` as disabled
+- **WHEN** the application loads
+- **THEN** the Profile Manager menu entry is hidden
 
 #### Scenario: Profile manager shown when explicitly activated
 
-GIVEN exactly one profile exists
-AND `unternehmen.profilmanager_aktiv = true`
-WHEN the application loads
-THEN the Profile Manager menu entry SHALL be visible.
+- **GIVEN** exactly one profile exists and the module catalog resolves `profile_manager` as enabled
+- **WHEN** the application loads
+- **THEN** the Profile Manager menu entry is visible
 
 ### Requirement: Auto-show profile manager when multiple profiles exist
 

@@ -3187,6 +3187,102 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Keine Schnellbuchungen vorhanden.'**
   String get quickBookingEmpty;
+
+  /// No description provided for @featureModulesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Funktionen'**
+  String get featureModulesTitle;
+
+  /// No description provided for @featureModulesDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Optionale Module einzeln aktivieren.'**
+  String get featureModulesDescription;
+
+  /// No description provided for @featureModuleProfileManagerName.
+  ///
+  /// In de, this message translates to:
+  /// **'Profilverwaltung'**
+  String get featureModuleProfileManagerName;
+
+  /// No description provided for @featureModuleProfileManagerDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Profilübersicht mit Anlegen, Wählen und Umbenennen.'**
+  String get featureModuleProfileManagerDescription;
+
+  /// No description provided for @featureModuleInventoryName.
+  ///
+  /// In de, this message translates to:
+  /// **'Lagerverwaltung'**
+  String get featureModuleInventoryName;
+
+  /// No description provided for @featureModuleInventoryDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Lagerwarnungen, Bestände und manuelle Korrekturen.'**
+  String get featureModuleInventoryDescription;
+
+  /// No description provided for @featureModuleGuvName.
+  ///
+  /// In de, this message translates to:
+  /// **'GuV'**
+  String get featureModuleGuvName;
+
+  /// No description provided for @featureModuleGuvDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Gewinn- und Verlustrechnung aus Journalbuchungen.'**
+  String get featureModuleGuvDescription;
+
+  /// No description provided for @featureModuleEnabled.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktiviert'**
+  String get featureModuleEnabled;
+
+  /// No description provided for @featureModuleDisabled.
+  ///
+  /// In de, this message translates to:
+  /// **'Deaktiviert'**
+  String get featureModuleDisabled;
+
+  /// No description provided for @featureModuleUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get featureModuleUnavailable;
+
+  /// No description provided for @featureModuleDataRetained.
+  ///
+  /// In de, this message translates to:
+  /// **'Deaktivieren blendet Einträge aus. Bestehende Daten bleiben erhalten.'**
+  String get featureModuleDataRetained;
+
+  /// No description provided for @featureModuleThresholdActive.
+  ///
+  /// In de, this message translates to:
+  /// **'GuV-Schwelle erreicht. GuV bleibt aktiviert.'**
+  String get featureModuleThresholdActive;
+
+  /// No description provided for @featureModuleSaveError.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern fehlgeschlagen. Erneut versuchen.'**
+  String get featureModuleSaveError;
+
+  /// No description provided for @featureModuleUnavailableTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Modul nicht verfügbar'**
+  String get featureModuleUnavailableTitle;
+
+  /// No description provided for @featureModuleUnavailableDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.'**
+  String get featureModuleUnavailableDescription;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

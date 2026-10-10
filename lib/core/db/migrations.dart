@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import 'package:openaccounting/core/db/backup_service.dart';
 import 'package:openaccounting/core/db/lazy_feature_table.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_state.dart';
 
 /// Migration runner per spec §Schema Versioning + §Migration System.
 /// Handles PRAGMA user_version, backup-before-migrate, post-hooks.
@@ -14,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 13;
+  static const int currentVersion = 14;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -205,6 +206,7 @@ class MigrationRunner {
       await _migrateBankImportMode();
       await _migrateFiscalYearStart();
       await _migrateQuickBookingPresets();
+      await _migrateFeatureModules();
       await _migrateProfilePortabilityTables(freshProfile: true);
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
@@ -312,6 +314,10 @@ class MigrationRunner {
     if (version == 13) {
       await _migrateTo(12, createSchema);
       await _migrateProfilePortabilityTables(freshProfile: false);
+    }
+    if (version == 14) {
+      await _migrateTo(13, createSchema);
+      await _migrateFeatureModules();
     }
   }
 
@@ -882,6 +888,54 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     ];
     if (!required.every(names.contains)) {
       throw StateError('Schnellbuchungen-Schema konnte nicht verifiziert werden');
+    }
+  }
+
+  /// Optional feature module state (v14, next sequential after the v13
+  /// baseline). Adds nullable `unternehmen.feature_modules_json` and
+  /// backfills NULL-only rows from legacy integer flags: only `0`/`1`
+  /// values are valid, absent or invalid values become `false`. Preserves
+  /// every non-NULL canonical value, all legacy columns and values,
+  /// unrelated company data, and the table count; touches no module-owned
+  /// business records. Runs inside the shared migration transaction, so
+  /// column creation, backfill, and the version bump commit atomically
+  /// and roll back together on failure.
+  Future<void> _migrateFeatureModules() async {
+    final tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'unternehmen'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Funktionsmodule brauchen die Tabelle unternehmen');
+    }
+    final columns = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    final names = <String>{for (final row in columns) row['name'].toString()};
+    if (!names.contains('feature_modules_json')) {
+      await executor.runCustom('ALTER TABLE unternehmen ADD COLUMN feature_modules_json TEXT');
+    }
+    const legacy = <String>['profilmanager_aktiv', 'lagerfuehrung_aktiv', 'guv_aktiv'];
+    final present = <String>[
+      for (final col in legacy)
+        if (names.contains(col)) col,
+    ];
+    final projection = <String>['id', ...present].join(', ');
+    final pending = await executor.runSelect(
+      'SELECT $projection FROM unternehmen WHERE feature_modules_json IS NULL',
+      const <Object?>[],
+    );
+    for (final row in pending) {
+      await executor.runUpdate('UPDATE unternehmen SET feature_modules_json = ? WHERE id = ?', <Object?>[
+        FeatureModuleState.backfillJson(
+          profilmanagerAktiv: present.contains('profilmanager_aktiv') ? row['profilmanager_aktiv'] : null,
+          lagerfuehrungAktiv: present.contains('lagerfuehrung_aktiv') ? row['lagerfuehrung_aktiv'] : null,
+          guvAktiv: present.contains('guv_aktiv') ? row['guv_aktiv'] : null,
+        ),
+        row['id'],
+      ]);
+    }
+    final verify = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
+    if (!verify.any((row) => row['name'] == 'feature_modules_json')) {
+      throw StateError('Funktionsmodul-Spalte konnte nicht verifiziert werden');
     }
   }
 
