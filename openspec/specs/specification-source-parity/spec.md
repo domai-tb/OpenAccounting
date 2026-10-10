@@ -29,6 +29,6 @@ Active desktop specifications SHALL agree that Flutter desktop is the source of 
 - **THEN** all desktop requirements SHALL name the same Flutter runtime contract and supported fallback behavior
 
 #### Scenario: Contradictory spec is rejected
-- **GIVEN** one active desktop spec requires Tauri while another forbids it
+- **GIVEN** one active desktop spec requires a retired runtime while another forbids it
 - **WHEN** the parity check runs
 - **THEN** validation SHALL fail and identify both conflicting requirements
