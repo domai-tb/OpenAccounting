@@ -50,11 +50,18 @@ class DashboardPageImpl extends ConsumerWidget {
         title: l10n.dashboardTitle, // ponytail: reuses sidebarOverview, add dedicated dashboardTitle when needed
         showFilterToolbar: false,
         actions: <Widget>[
-          FilledButton.icon(
-            onPressed: () => context.go('/invoices/new'),
-            icon: const Icon(Icons.add),
-            label: Text(l10n.actionNewInvoice),
-          ),
+          if (MediaQuery.sizeOf(context).width < 560)
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: l10n.actionNewInvoice,
+              onPressed: () => context.go('/invoices/new'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: () => context.go('/invoices/new'),
+              icon: const Icon(Icons.add),
+              label: Text(l10n.actionNewInvoice),
+            ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: l10n.settingsAppearance,
