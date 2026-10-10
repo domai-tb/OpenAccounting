@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/features/global_search/global_business_search_repository.dart';
 import 'package:openaccounting/features/global_search/global_search_entity.dart';
@@ -61,8 +63,26 @@ final globalBusinessSearchProvider = Provider<GlobalBusinessSearch>((ref) {
   return GlobalBusinessSearch(ref.watch(globalBusinessSearchRepositoryProvider));
 });
 
-final globalBusinessSearchResultsProvider = FutureProvider.family<GlobalBusinessSearchResponse, String>((ref, query) {
-  return ref.watch(globalBusinessSearchProvider).call(query);
+final globalBusinessSearchResultsProvider = FutureProvider.autoDispose.family<GlobalBusinessSearchResponse, String>((
+  ref,
+  query,
+) async {
+  final GlobalBusinessSearch search = ref.watch(globalBusinessSearchProvider);
+  if (query.trim().isEmpty) return search.call(query);
+  final Completer<void> debounce = Completer<void>();
+  final Timer timer = Timer(const Duration(milliseconds: 200), debounce.complete);
+  ref.onDispose(() {
+    timer.cancel();
+    if (!debounce.isCompleted) debounce.complete();
+  });
+  await debounce.future;
+  if (!ref.mounted) {
+    return GlobalBusinessSearchResponse(
+      results: const <GlobalBusinessSearchResult>[],
+      failedSources: const <GlobalSearchSource>{},
+    );
+  }
+  return search.call(query);
 });
 
 class _SourceResults {

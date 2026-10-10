@@ -49,6 +49,31 @@ final class _FakeWindowBackend implements WindowBackend {
   Future<void> close() async {}
 }
 
+final class _FailingGlobalBusinessSearch extends GlobalBusinessSearch {
+  _FailingGlobalBusinessSearch(AppDatabase db) : super(GlobalBusinessSearchRepository(db.executor));
+
+  @override
+  Future<GlobalBusinessSearchResponse> call(String rawQuery) async => GlobalBusinessSearchResponse(
+    results: const <GlobalBusinessSearchResult>[],
+    failedSources: GlobalSearchSource.values.toSet(),
+  );
+}
+
+final class _RecordingGlobalBusinessSearch extends GlobalBusinessSearch {
+  _RecordingGlobalBusinessSearch(AppDatabase db) : super(GlobalBusinessSearchRepository(db.executor));
+
+  final List<String> queries = <String>[];
+
+  @override
+  Future<GlobalBusinessSearchResponse> call(String rawQuery) async {
+    queries.add(rawQuery);
+    return GlobalBusinessSearchResponse(
+      results: const <GlobalBusinessSearchResult>[],
+      failedSources: const <GlobalSearchSource>{},
+    );
+  }
+}
+
 Future<({AppDatabase db, int invoiceId, int receiptId, int bankTransactionId})> _seedSearchDatabase() async {
   final AppDatabase db = createTestDatabase();
   await db.ensureOpen();
@@ -83,13 +108,27 @@ Future<({AppDatabase db, int invoiceId, int receiptId, int bankTransactionId})> 
 DesktopShortcutsServiceImpl _searchShortcuts(_RecordingHotkeyBackend hotkeys) =>
     DesktopShortcutsServiceImpl(hotkeyBackend: hotkeys, windowBackend: _FakeWindowBackend(), navigate: (_) {});
 
-Widget _routerApp(AppDatabase db, GoRouter router, DesktopShortcutsService service) => ProviderScope(
+Widget _routerApp(
+  AppDatabase db,
+  GoRouter router,
+  DesktopShortcutsService service, {
+  GlobalBusinessSearch? globalSearch,
+}) => ProviderScope(
   overrides: [
     appDatabaseProvider.overrideWithValue(db),
     globalSearchShortcutServiceProvider.overrideWithValue(service),
+    if (globalSearch != null) globalBusinessSearchProvider.overrideWithValue(globalSearch),
   ],
   child: MaterialApp.router(routerConfig: router),
 );
+
+Future<void> _pumpUntilSearchResult(WidgetTester tester, Finder expected) async {
+  for (int attempt = 0; attempt < 40; attempt++) {
+    await tester.pump(const Duration(milliseconds: 50));
+    if (expected.evaluate().isNotEmpty) return;
+  }
+  fail('Search result did not appear within 2 seconds');
+}
 
 void main() {
   test('test_find_and_open_a_business_record', () async {
@@ -161,7 +200,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey<String>('global_search_button')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'RE-SEARCH-42');
-    await tester.pumpAndSettle();
+    await _pumpUntilSearchResult(tester, find.byKey(const ValueKey<String>('global_search_result_0')));
     expect(find.byKey(const ValueKey<String>('global_search_result_0')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey<String>('global_search_result_0')));
     await tester.pumpAndSettle();
@@ -185,7 +224,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey<String>('global_search_button')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'Paper Office');
-    await tester.pumpAndSettle();
+    await _pumpUntilSearchResult(tester, find.text('Paper Office GmbH'));
     expect(find.text('Paper Office GmbH'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey<String>('global_search_result_0')));
     await tester.pumpAndSettle();
@@ -194,6 +233,60 @@ void main() {
     expect(router.routeInformationProvider.value.uri.queryParameters['transactionId'], '${fixture.bankTransactionId}');
     expect(find.byKey(const ValueKey<String>('bank_selected_transaction')), findsOneWidget);
     expect(find.text('Paper Office GmbH'), findsOneWidget);
+  });
+
+  testWidgets('test_source_failure_does_not_claim_no_matches', (WidgetTester tester) async {
+    final fixture = await _seedSearchDatabase();
+    addTearDown(fixture.db.close);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    final _RecordingHotkeyBackend hotkeys = _RecordingHotkeyBackend();
+    await tester.pumpWidget(
+      _routerApp(fixture.db, router, _searchShortcuts(hotkeys), globalSearch: _FailingGlobalBusinessSearch(fixture.db)),
+    );
+    await tester.pumpAndSettle();
+
+    await hotkeys.invokeGlobalSearch();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'no match');
+    await _pumpUntilSearchResult(tester, find.text('Erneut versuchen'));
+
+    expect(find.text('Keine Treffer für diese Suche'), findsNothing);
+  });
+
+  testWidgets('test_rapid_query_changes_only_search_latest_text', (WidgetTester tester) async {
+    final fixture = await _seedSearchDatabase();
+    addTearDown(fixture.db.close);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    final _RecordingGlobalBusinessSearch search = _RecordingGlobalBusinessSearch(fixture.db);
+    final _RecordingHotkeyBackend hotkeys = _RecordingHotkeyBackend();
+    await tester.pumpWidget(_routerApp(fixture.db, router, _searchShortcuts(hotkeys), globalSearch: search));
+    await tester.pumpAndSettle();
+
+    await hotkeys.invokeGlobalSearch();
+    await tester.pumpAndSettle();
+    search.queries.clear();
+    final Finder query = find.byKey(const ValueKey<String>('global_search_query'));
+    await tester.enterText(query, 'p');
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.enterText(query, 'pa');
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.enterText(query, 'par');
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(search.queries, isEmpty);
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    expect(search.queries, <String>['par']);
   });
 
   testWidgets('test_search_includes_supported_destination_and_command', (WidgetTester tester) async {
@@ -212,7 +305,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey<String>('global_search_button')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'Settings');
-    await tester.pumpAndSettle();
+    await _pumpUntilSearchResult(tester, find.byKey(const ValueKey<String>('global_search_result_0')));
     expect(find.text('Settings'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey<String>('global_search_result_0')));
     await tester.pumpAndSettle();
@@ -221,7 +314,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey<String>('global_search_button')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'New invoice');
-    await tester.pumpAndSettle();
+    await _pumpUntilSearchResult(tester, find.byKey(const ValueKey<String>('global_search_result_0')));
     expect(find.text('New invoice'), findsWidgets);
     await tester.tap(find.byKey(const ValueKey<String>('global_search_result_0')));
     await tester.pumpAndSettle();
@@ -272,8 +365,8 @@ void main() {
     await hotkeys.invokeGlobalSearch();
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'RE-SEARCH-42');
-    await tester.pumpAndSettle();
     final Finder invoiceResult = find.byKey(const ValueKey<String>('global_search_result_0'));
+    await _pumpUntilSearchResult(tester, invoiceResult);
     expect(invoiceResult, findsOneWidget);
     expect(tester.getSemantics(invoiceResult).label, contains('RE-SEARCH-42'));
     semantics.dispose();
@@ -316,6 +409,33 @@ void main() {
     expect(paletteBounds.left, greaterThanOrEqualTo(0));
     expect(paletteBounds.right, lessThanOrEqualTo(360));
     expect(find.byKey(const ValueKey<String>('global_search_query')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('test_narrow_window_palette_bounds_long_results', (WidgetTester tester) async {
+    final fixture = await _seedSearchDatabase();
+    addTearDown(fixture.db.close);
+    for (int index = 0; index < 12; index++) {
+      await fixture.db.executor.runInsert(
+        'INSERT INTO kunden (name, firma, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>['Viewport Contact $index', 'Viewport Company $index', 'Testweg 1', '10115', 'Berlin', null],
+      );
+    }
+    tester.view.physicalSize = const Size(360, 560);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    final _RecordingHotkeyBackend hotkeys = _RecordingHotkeyBackend();
+    await tester.pumpWidget(_routerApp(fixture.db, router, _searchShortcuts(hotkeys)));
+    await tester.pumpAndSettle();
+
+    await hotkeys.invokeGlobalSearch();
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey<String>('global_search_query')), 'Viewport');
+    await _pumpUntilSearchResult(tester, find.byKey(const ValueKey<String>('global_search_result_0')));
+    expect(find.byKey(const ValueKey<String>('global_search_result_0')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

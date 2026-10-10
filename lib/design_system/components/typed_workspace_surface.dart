@@ -63,7 +63,7 @@ class _TypedWorkspaceSurfaceState extends ConsumerState<TypedWorkspaceSurface> {
     super.didUpdateWidget(oldWidget);
     if (widget.criteria != oldWidget.criteria) {
       _criteria = widget.criteria;
-      _queryController.text = _criteria.text;
+      if (_queryController.text != _criteria.text) _queryController.text = _criteria.text;
       _statusController.text = _criteria.status ?? '';
       _amountFromController.text = _formatAmount(_criteria.amountFrom, locale: _activeLocale);
       _amountToController.text = _formatAmount(_criteria.amountTo, locale: _activeLocale);
@@ -343,6 +343,9 @@ class _TypedWorkspaceSurfaceState extends ConsumerState<TypedWorkspaceSurface> {
   Future<void> _openFilterEditor() async {
     final AppLocalizations l10n = appLocalizationsOf(context);
     final String locale = localeTag(Localizations.localeOf(context));
+    _statusController.text = _criteria.status ?? '';
+    _amountFromController.text = _formatAmount(_criteria.amountFrom, locale: locale);
+    _amountToController.text = _formatAmount(_criteria.amountTo, locale: locale);
     DateTime? dateFrom = _criteria.dateFrom;
     DateTime? dateTo = _criteria.dateTo;
     String? error;
@@ -485,7 +488,7 @@ class _TypedWorkspaceSurfaceState extends ConsumerState<TypedWorkspaceSurface> {
     setState(() {
       _criteria = next;
       _invalidFields = <TypedWorkspaceFilterField>{};
-      _queryController.text = next.text;
+      if (_queryController.text != next.text) _queryController.text = next.text;
       _statusController.text = next.status ?? '';
       final String locale = localeTag(Localizations.localeOf(context));
       _amountFromController.text = _formatAmount(next.amountFrom, locale: locale);

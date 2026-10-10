@@ -82,7 +82,7 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> {
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _results(context, query, response, items, l10n),
+                Flexible(child: _results(context, query, response, items, l10n)),
               ],
             ),
           ),
@@ -116,6 +116,7 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> {
         l10n,
       ),
       data: (GlobalBusinessSearchResponse data) => Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           for (final GlobalSearchSource source
@@ -126,22 +127,24 @@ class _GlobalSearchPageState extends ConsumerState<GlobalSearchPage> {
               () => ref.invalidate(globalBusinessSearchResultsProvider(query)),
               l10n,
             ),
-          if (items.isEmpty)
+          if (items.isEmpty && data.failedSources.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
               child: Text(l10n.globalSearchNoResults),
             )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 480),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: items.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final GlobalSearchItem item = items[index];
-                  final bool selected = index == _selectedIndex;
-                  return _resultTile(context, item, index, selected, l10n);
-                },
+          else if (items.isNotEmpty)
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 480),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: items.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final GlobalSearchItem item = items[index];
+                    final bool selected = index == _selectedIndex;
+                    return _resultTile(context, item, index, selected, l10n);
+                  },
+                ),
               ),
             ),
         ],

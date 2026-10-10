@@ -119,6 +119,23 @@ void main() {
       }
     });
 
+    testWidgets('test_card_clips_ink_to_rounded_corners', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: AppCard(child: InkWell(child: Text('Card content'))),
+          ),
+        ),
+      );
+
+      final Material cardMaterial = tester.widget<Material>(
+        find.descendant(of: find.byType(AppCard), matching: find.byType(Material)).first,
+      );
+      expect(cardMaterial.clipBehavior, Clip.antiAlias);
+      expect(cardMaterial.shape, isA<RoundedRectangleBorder>());
+      expect((cardMaterial.shape! as RoundedRectangleBorder).borderRadius, BorderRadius.circular(AppRadius.card));
+    });
+
     testWidgets('test_card_uses_tokens_not_raw_radius', (WidgetTester tester) async {
       // Guards against BorderRadius.circular(13) or raw 12 scattered.
       // AppCard source must reference AppRadius.card token per §42.

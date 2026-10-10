@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -204,9 +206,11 @@ num? parseLocalizedWorkspaceAmount(String raw, String locale) {
 }
 
 DateTime? _parseRouteDate(String? value) {
-  if (value == null || value.isEmpty) return null;
+  if (value == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return null;
   final DateTime? parsed = DateTime.tryParse(value);
-  return parsed == null ? null : DateTime(parsed.year, parsed.month, parsed.day);
+  if (parsed == null) return null;
+  final DateTime date = DateTime(parsed.year, parsed.month, parsed.day);
+  return _canonicalDate(date) == value ? date : null;
 }
 
 num? _parseRouteAmount(String? value) {
@@ -501,7 +505,22 @@ final typedWorkspaceSearchRepositoryProvider = Provider<TypedWorkspaceSearchRepo
   return TypedWorkspaceSearchRepository(db.executor);
 });
 
-final typedWorkspaceSearchResultsProvider =
-    FutureProvider.family<TypedWorkspaceSearchPage, TypedWorkspaceSearchCriteria>(
-      (ref, criteria) => ref.watch(typedWorkspaceSearchRepositoryProvider).search(criteria),
-    );
+final typedWorkspaceSearchResultsProvider = FutureProvider.autoDispose
+    .family<TypedWorkspaceSearchPage, TypedWorkspaceSearchCriteria>((ref, criteria) async {
+      final TypedWorkspaceSearchRepository repository = ref.watch(typedWorkspaceSearchRepositoryProvider);
+      if (criteria.text.trim().isEmpty) {
+        ref.keepAlive();
+        return repository.search(criteria);
+      }
+      final Completer<void> debounce = Completer<void>();
+      final Timer timer = Timer(const Duration(milliseconds: 200), debounce.complete);
+      ref.onDispose(() {
+        timer.cancel();
+        if (!debounce.isCompleted) debounce.complete();
+      });
+      await debounce.future;
+      if (!ref.mounted) {
+        return TypedWorkspaceSearchPage(records: const <TypedWorkspaceRecord>[], totalCount: 0, page: 1);
+      }
+      return repository.search(criteria);
+    });

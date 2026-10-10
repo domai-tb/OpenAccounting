@@ -13,6 +13,7 @@ import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
 
 void main() {
   test('test_analyzer_and_integration_test_gates_1_1_analyzer_gate_passes', () async {
@@ -89,6 +90,7 @@ void main() {
         final Finder surface = switch (route) {
           AppRoute.settings || AppRoute.help => find.byType(AppPage),
           AppRoute.invoices || AppRoute.receipts => find.byType(TypedWorkspaceSurface),
+          AppRoute.contacts => find.byType(ContactsWorkspaceView),
           _ => find.byType(FinanceListSurface),
         };
         expect(surface, findsOneWidget, reason: 'Route ${route.path} must expose its reviewable workspace surface');

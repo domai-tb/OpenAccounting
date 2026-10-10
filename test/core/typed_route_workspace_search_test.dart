@@ -31,6 +31,18 @@ final class _NoopWindowBackend implements WindowBackend {
   Future<void> close() async {}
 }
 
+final class _RecordingTypedWorkspaceSearchRepository extends TypedWorkspaceSearchRepository {
+  _RecordingTypedWorkspaceSearchRepository(super.executor);
+
+  final List<TypedWorkspaceSearchCriteria> searches = <TypedWorkspaceSearchCriteria>[];
+
+  @override
+  Future<TypedWorkspaceSearchPage> search(TypedWorkspaceSearchCriteria criteria) async {
+    searches.add(criteria);
+    return TypedWorkspaceSearchPage(records: const <TypedWorkspaceRecord>[], totalCount: 0, page: 1);
+  }
+}
+
 Future<({AppDatabase db, int invoiceId, int receiptId, int bankId})> _configuredDatabase() async {
   final AppDatabase db = createTestDatabase();
   await db.ensureOpen();
@@ -81,7 +93,7 @@ Future<({AppDatabase db, int invoiceId, int receiptId, int bankId})> _configured
   return (db: db, invoiceId: invoiceId, receiptId: receiptId, bankId: bankId);
 }
 
-Widget _app(AppDatabase db, GoRouter router) => ProviderScope(
+Widget _app(AppDatabase db, GoRouter router, {TypedWorkspaceSearchRepository? searchRepository}) => ProviderScope(
   overrides: [
     appDatabaseProvider.overrideWithValue(db),
     globalSearchShortcutServiceProvider.overrideWithValue(
@@ -91,6 +103,7 @@ Widget _app(AppDatabase db, GoRouter router) => ProviderScope(
         navigate: (_) {},
       ),
     ),
+    if (searchRepository != null) typedWorkspaceSearchRepositoryProvider.overrideWithValue(searchRepository),
   ],
   child: MaterialApp.router(
     locale: const Locale('en'),
@@ -187,6 +200,16 @@ void main() {
     );
   });
 
+  test('test_impossible_calendar_date_is_rejected', () {
+    final TypedWorkspaceCriteriaParseResult parsed = parseTypedWorkspaceRouteCriteria(
+      TypedWorkspaceDomain.invoices,
+      <String, String>{'dateFrom': '2026-02-31'},
+    );
+
+    expect(parsed.invalidFields, contains(TypedWorkspaceFilterField.dateFrom));
+    expect(parsed.criteria.dateFrom, isNull);
+  });
+
   testWidgets('test_clear_one_or_all_filters', (WidgetTester tester) async {
     final fixture = await _configuredDatabase();
     addTearDown(fixture.db.close);
@@ -214,6 +237,99 @@ void main() {
     await tester.tap(find.text('Clear all filters'));
     await tester.pumpAndSettle();
     expect(router.routeInformationProvider.value.uri.queryParameters, isEmpty);
+  });
+
+  testWidgets('test_search_keeps_caret_position_after_route_update', (WidgetTester tester) async {
+    final fixture = await _configuredDatabase();
+    addTearDown(fixture.db.close);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(fixture.db, router));
+    await tester.pumpAndSettle();
+    router.go('/invoices?q=Alice');
+    await tester.pumpAndSettle();
+
+    final TextField searchField = tester.widget<TextField>(find.byType(TextField).first);
+    final TextEditingController controller = searchField.controller!;
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    controller.selection = const TextSelection.collapsed(offset: 2);
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(text: 'AlXice', selection: TextSelection.collapsed(offset: 3)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.selection.baseOffset, 3);
+  });
+
+  testWidgets('test_cancelled_filter_edits_are_discarded', (WidgetTester tester) async {
+    final fixture = await _configuredDatabase();
+    addTearDown(fixture.db.close);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(fixture.db, router));
+    await tester.pumpAndSettle();
+    router.go('/invoices?status=offen');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    final Finder statusField = find.byWidgetPredicate(
+      (Widget widget) => widget is TextField && widget.decoration?.labelText == 'Exact status',
+    );
+    final Finder amountFromField = find.byWidgetPredicate(
+      (Widget widget) => widget is TextField && widget.decoration?.labelText == 'Amount from',
+    );
+    await tester.enterText(statusField, 'bezahlt');
+    await tester.enterText(amountFromField, '999');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(statusField).controller!.text, 'offen');
+    expect(tester.widget<TextField>(amountFromField).controller!.text, isEmpty);
+  });
+
+  testWidgets('test_rapid_workspace_query_changes_only_search_latest_text', (WidgetTester tester) async {
+    final fixture = await _configuredDatabase();
+    addTearDown(fixture.db.close);
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final GoRouter router = createRouter(fixture.db);
+    addTearDown(router.dispose);
+    final _RecordingTypedWorkspaceSearchRepository repository = _RecordingTypedWorkspaceSearchRepository(
+      fixture.db.executor,
+    );
+    await tester.pumpWidget(_app(fixture.db, router, searchRepository: repository));
+    await tester.pumpAndSettle();
+    router.go('/invoices');
+    await tester.pumpAndSettle();
+    repository.searches.clear();
+
+    final Finder query = find.byType(TextField).first;
+    await tester.enterText(query, 'p');
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.enterText(query, 'pa');
+    await tester.pump(const Duration(milliseconds: 80));
+    await tester.enterText(query, 'par');
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(repository.searches, isEmpty);
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pumpAndSettle();
+    expect(repository.searches.map((TypedWorkspaceSearchCriteria criteria) => criteria.text), <String>['par']);
   });
 
   testWidgets('test_filter_editor_reports_invalid_amount', (WidgetTester tester) async {

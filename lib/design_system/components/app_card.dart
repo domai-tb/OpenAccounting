@@ -30,7 +30,12 @@ class AppCard extends StatelessWidget {
         border: Border.all(color: borderColor, width: 1),
         // No boxShadow — elevation 0 per §10.
       ),
-      child: Padding(padding: padding ?? const EdgeInsets.all(AppSpacing.lg), child: child),
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding ?? const EdgeInsets.all(AppSpacing.lg), child: child),
+      ),
     );
   }
 }
