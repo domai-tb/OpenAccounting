@@ -3,7 +3,6 @@
 ## Purpose
 Master data management for customers (Kunden), suppliers (Lieferanten), articles (Artikel), and groups.
 
-
 ## Requirements
 
 ### Requirement: Kunden — CRUD
@@ -243,6 +242,7 @@ The Unternehmen record MUST store `pdf_vorlage` as the template identifier `stan
 - GIVEN pdf_vorlage = 'standard' and an invoice is finalized
 - WHEN the PDF is generated
 - THEN the generated PDF uses the standard template
+
 ### Requirement: Unternehmen — Unterschrift
 
 The Unternehmen record MAY store unterschrift_bild (path to signature image) and unterschrift_auf_rechnung (boolean). When both are set, the signature image MUST appear at the bottom of generated invoice PDFs.
@@ -466,3 +466,20 @@ Each customer MAY have associated Belege (customer documents: contracts, certifi
 - GIVEN a customer document has loeschdatum = 2026-02-15 and today is 2026-02-20
 - WHEN the customer document list is rendered
 - THEN the document is displayed with a red warning badge indicating it is overdue for deletion
+
+### Requirement: Company fiscal-year settings
+
+The company settings use case SHALL expose the persisted fiscal-year start month as typed company profile data and accept updates only for integer months 1 through 12. Settings SHALL default missing legacy values to the migration-provided January value, require explicit user confirmation before a change, and report persistence errors without presenting an unsaved value as active. UI code SHALL use the injected company settings boundary rather than issuing database queries.
+
+#### Scenario: Company settings display saved fiscal year
+
+- **GIVEN** a company profile has a valid saved start month
+- **WHEN** the user opens company settings
+- **THEN** the control SHALL show that month as the active business-year start
+
+#### Scenario: Company settings reject an invalid update
+
+- **GIVEN** a save request contains a month outside 1 through 12
+- **WHEN** the company settings use case validates the request
+- **THEN** it SHALL reject the request without modifying the company row
+- **AND** Settings SHALL show a localized validation error
