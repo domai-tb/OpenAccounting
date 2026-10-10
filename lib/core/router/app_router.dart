@@ -692,28 +692,28 @@ class TaxesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    final Map<String, String> query = GoRouterState.of(context).uri.queryParameters;
+    final Uri uri = GoRouterState.of(context).uri;
+    final Map<String, String> query = uri.queryParameters;
     if (query['view'] == 'income-tax-schedules') {
       final AppScope? scope = AppScope.maybeOf(context);
       if (scope == null) {
-        return ProductionRoutePage(
-          title: l10n.routeTaxes,
-          table: 'ustva_exporte',
-          icon: Icons.percent,
-          subtitle: l10n.incomeTaxUnavailable,
-          emptyTitle: l10n.emptyEntries,
-          emptyMessage: l10n.incomeTaxUnavailable,
+        return AppPage(
+          header: AppPageHeader(title: l10n.routeTaxes, showFilterToolbar: false),
+          child: Text(l10n.incomeTaxUnavailable),
         );
       }
       final IncomeTaxSchedule? schedule = IncomeTaxScheduleAvailabilityUseCase.parseSchedule(query['schedule']);
       return IncomeTaxSchedulesView(
         useCase: scope.services.incomeTax,
         initialSchedule: schedule,
-        onScheduleChanged: (IncomeTaxSchedule value) {
-          final Map<String, String> next = Map<String, String>.from(query);
-          next['schedule'] = value.name;
-          final String qs = next.entries.map((e) => '${e.key}=${e.value}').join('&');
-          context.go('/taxes?$qs');
+        onScheduleChanged: (IncomeTaxSchedule? value) {
+          final Map<String, List<String>> next = Map<String, List<String>>.from(uri.queryParametersAll);
+          if (value == null) {
+            next.remove('schedule');
+          } else {
+            next['schedule'] = <String>[value.name];
+          }
+          context.go(uri.replace(queryParameters: next).toString());
         },
       );
     }

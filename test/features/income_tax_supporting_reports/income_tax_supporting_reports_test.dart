@@ -50,7 +50,7 @@ void main() {
             body: IncomeTaxSchedulesView(
               useCase: useCase,
               initialSchedule: null,
-              onScheduleChanged: (IncomeTaxSchedule value) => selected = value,
+              onScheduleChanged: (IncomeTaxSchedule? value) => selected = value,
             ),
           ),
         ),

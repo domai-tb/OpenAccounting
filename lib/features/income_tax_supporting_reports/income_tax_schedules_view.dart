@@ -19,7 +19,7 @@ class IncomeTaxSchedulesView extends StatefulWidget {
 
   final IncomeTaxScheduleAvailabilityUseCase useCase;
   final IncomeTaxSchedule? initialSchedule;
-  final ValueChanged<IncomeTaxSchedule> onScheduleChanged;
+  final ValueChanged<IncomeTaxSchedule?> onScheduleChanged;
 
   @override
   State<IncomeTaxSchedulesView> createState() => _IncomeTaxSchedulesViewState();
@@ -71,8 +71,9 @@ class _IncomeTaxSchedulesViewState extends State<IncomeTaxSchedulesView> {
             ],
             selected: selected == null ? <IncomeTaxSchedule>{} : <IncomeTaxSchedule>{selected},
             onSelectionChanged: (Set<IncomeTaxSchedule> value) {
-              setState(() => _selected = value.single);
-              widget.onScheduleChanged(value.single);
+              final IncomeTaxSchedule? schedule = value.isEmpty ? null : value.single;
+              setState(() => _selected = schedule);
+              widget.onScheduleChanged(schedule);
             },
           ),
           const SizedBox(height: 16),
