@@ -3499,6 +3499,396 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Kennzeichnet Umsätze, deren Bemessungsgrundlage die Marge statt des Gesamtpreises ist. Die App weist solche Umsätze in der Steuerübersicht gesondert aus. Ob die Voraussetzungen des § 25a UStG erfüllt sind, prüft die App nicht; nicht unterstützte Konstellationen werden als nicht verfügbar ausgewiesen.'**
   String get guidanceBodyTaxSpecial25a;
+
+  /// No description provided for @contactsTabCustomers.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden'**
+  String get contactsTabCustomers;
+
+  /// No description provided for @contactsTabSuppliers.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferanten'**
+  String get contactsTabSuppliers;
+
+  /// No description provided for @filterArchived.
+  ///
+  /// In de, this message translates to:
+  /// **'Archiviert'**
+  String get filterArchived;
+
+  /// No description provided for @filterActive.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktiv'**
+  String get filterActive;
+
+  /// No description provided for @actionArchive.
+  ///
+  /// In de, this message translates to:
+  /// **'Archivieren'**
+  String get actionArchive;
+
+  /// No description provided for @actionRestore.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellen'**
+  String get actionRestore;
+
+  /// No description provided for @actionBulkArchive.
+  ///
+  /// In de, this message translates to:
+  /// **'Auswahl archivieren'**
+  String get actionBulkArchive;
+
+  /// No description provided for @actionEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Bearbeiten'**
+  String get actionEdit;
+
+  /// No description provided for @actionInspect.
+  ///
+  /// In de, this message translates to:
+  /// **'Ansehen'**
+  String get actionInspect;
+
+  /// No description provided for @actionOpen.
+  ///
+  /// In de, this message translates to:
+  /// **'Öffnen'**
+  String get actionOpen;
+
+  /// No description provided for @actionDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Löschen'**
+  String get actionDelete;
+
+  /// No description provided for @actionSaving.
+  ///
+  /// In de, this message translates to:
+  /// **'Wird gespeichert…'**
+  String get actionSaving;
+
+  /// No description provided for @actionConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Bestätigen'**
+  String get actionConfirm;
+
+  /// No description provided for @actionSelectCustomer.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde'**
+  String get actionSelectCustomer;
+
+  /// No description provided for @actionSelectSupplier.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferant'**
+  String get actionSelectSupplier;
+
+  /// No description provided for @actionCreateSupplier.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferant anlegen'**
+  String get actionCreateSupplier;
+
+  /// No description provided for @actionCreateArticle.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel anlegen'**
+  String get actionCreateArticle;
+
+  /// No description provided for @actionCreateGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe anlegen'**
+  String get actionCreateGroup;
+
+  /// No description provided for @actionCreateCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie anlegen'**
+  String get actionCreateCategory;
+
+  /// No description provided for @actionCreateAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Konto anlegen'**
+  String get actionCreateAccount;
+
+  /// No description provided for @actionCreateTaxRate.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuersatz anlegen'**
+  String get actionCreateTaxRate;
+
+  /// No description provided for @actionCreateNumberRange.
+  ///
+  /// In de, this message translates to:
+  /// **'Nummernkreis anlegen'**
+  String get actionCreateNumberRange;
+
+  /// No description provided for @contactTypeSelectionTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontaktart wählen'**
+  String get contactTypeSelectionTitle;
+
+  /// No description provided for @contactTypeSelectionMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Wähle, ob ein Kunden- oder Lieferantendatensatz geöffnet werden soll. Ohne Auswahl wird kein Datensatz geladen.'**
+  String get contactTypeSelectionMessage;
+
+  /// No description provided for @articleTypeSelectionTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikelart wählen'**
+  String get articleTypeSelectionTitle;
+
+  /// No description provided for @articleTypeSelectionMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Wähle, ob ein Artikel oder eine Warengruppe geöffnet werden soll. Ohne Auswahl wird kein Datensatz geladen.'**
+  String get articleTypeSelectionMessage;
+
+  /// No description provided for @archiveConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Archivieren bestätigen'**
+  String get archiveConfirmTitle;
+
+  /// No description provided for @archiveConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Datensatz erhält einen Archivzeitpunkt und bleibt für vorhandene Belege und Auswertungen erhalten.'**
+  String get archiveConfirmMessage;
+
+  /// No description provided for @restoreConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellen bestätigen'**
+  String get restoreConfirmTitle;
+
+  /// No description provided for @restoreConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Archivzeitpunkt wird entfernt und der Datensatz erscheint wieder in der Standardauswahl.'**
+  String get restoreConfirmMessage;
+
+  /// No description provided for @workspaceUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Daten nicht verfügbar'**
+  String get workspaceUnavailable;
+
+  /// No description provided for @workspaceUnavailableMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Daten konnten nicht geladen werden. Versuche es erneut.'**
+  String get workspaceUnavailableMessage;
+
+  /// No description provided for @saveFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Speichern fehlgeschlagen'**
+  String get saveFailed;
+
+  /// No description provided for @formRequiredField.
+  ///
+  /// In de, this message translates to:
+  /// **'Pflichtfeld'**
+  String get formRequiredField;
+
+  /// No description provided for @formName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name'**
+  String get formName;
+
+  /// No description provided for @formCompany.
+  ///
+  /// In de, this message translates to:
+  /// **'Firma'**
+  String get formCompany;
+
+  /// No description provided for @formStreet.
+  ///
+  /// In de, this message translates to:
+  /// **'Straße und Hausnummer'**
+  String get formStreet;
+
+  /// No description provided for @formPostalCode.
+  ///
+  /// In de, this message translates to:
+  /// **'PLZ'**
+  String get formPostalCode;
+
+  /// No description provided for @formCity.
+  ///
+  /// In de, this message translates to:
+  /// **'Ort'**
+  String get formCity;
+
+  /// No description provided for @formEmail.
+  ///
+  /// In de, this message translates to:
+  /// **'E-Mail'**
+  String get formEmail;
+
+  /// No description provided for @formPhone.
+  ///
+  /// In de, this message translates to:
+  /// **'Telefon'**
+  String get formPhone;
+
+  /// No description provided for @formVatId.
+  ///
+  /// In de, this message translates to:
+  /// **'USt-IdNr.'**
+  String get formVatId;
+
+  /// No description provided for @formIban.
+  ///
+  /// In de, this message translates to:
+  /// **'IBAN'**
+  String get formIban;
+
+  /// No description provided for @formDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Beschreibung'**
+  String get formDescription;
+
+  /// No description provided for @formSectionBasic.
+  ///
+  /// In de, this message translates to:
+  /// **'Grunddaten'**
+  String get formSectionBasic;
+
+  /// No description provided for @formSectionContact.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontakt'**
+  String get formSectionContact;
+
+  /// No description provided for @formSectionTax.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuer und Zahlung'**
+  String get formSectionTax;
+
+  /// No description provided for @customerEditTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde bearbeiten'**
+  String get customerEditTitle;
+
+  /// No description provided for @supplierEditTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferant bearbeiten'**
+  String get supplierEditTitle;
+
+  /// No description provided for @contactArchived.
+  ///
+  /// In de, this message translates to:
+  /// **'Archiviert'**
+  String get contactArchived;
+
+  /// No description provided for @routeArticles.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel'**
+  String get routeArticles;
+
+  /// No description provided for @articlesViewItems.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel'**
+  String get articlesViewItems;
+
+  /// No description provided for @articlesViewGroups.
+  ///
+  /// In de, this message translates to:
+  /// **'Warengruppen'**
+  String get articlesViewGroups;
+
+  /// No description provided for @settingsMasterData.
+  ///
+  /// In de, this message translates to:
+  /// **'Stammdaten'**
+  String get settingsMasterData;
+
+  /// No description provided for @settingsCompany.
+  ///
+  /// In de, this message translates to:
+  /// **'Firmendaten'**
+  String get settingsCompany;
+
+  /// No description provided for @settingsCategories.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorien'**
+  String get settingsCategories;
+
+  /// No description provided for @settingsAccounts.
+  ///
+  /// In de, this message translates to:
+  /// **'Bankkonten'**
+  String get settingsAccounts;
+
+  /// No description provided for @settingsTaxRates.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuersätze'**
+  String get settingsTaxRates;
+
+  /// No description provided for @settingsNumberRanges.
+  ///
+  /// In de, this message translates to:
+  /// **'Nummernkreise'**
+  String get settingsNumberRanges;
+
+  /// No description provided for @countCustomers.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunden'**
+  String get countCustomers;
+
+  /// No description provided for @countSuppliers.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferanten'**
+  String get countSuppliers;
+
+  /// No description provided for @countArticles.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel'**
+  String get countArticles;
+
+  /// No description provided for @countGroups.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppen'**
+  String get countGroups;
+
+  /// No description provided for @companySetupNeeded.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Firmendaten. Lege sie jetzt an.'**
+  String get companySetupNeeded;
+
+  /// No description provided for @numberRangeNextLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Nächste Nummer'**
+  String get numberRangeNextLabel;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

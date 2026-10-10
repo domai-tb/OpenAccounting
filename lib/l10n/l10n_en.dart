@@ -1826,4 +1826,203 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get guidanceBodyTaxSpecial25a =>
       'Marks supplies whose taxable base is the margin rather than the total price. The app reports such supplies separately in the tax overview. The app does not check whether the conditions of § 25a UStG are met; unsupported constellations are shown as unavailable.';
+
+  @override
+  String get contactsTabCustomers => 'Customers';
+
+  @override
+  String get contactsTabSuppliers => 'Suppliers';
+
+  @override
+  String get filterArchived => 'Archived';
+
+  @override
+  String get filterActive => 'Active';
+
+  @override
+  String get actionArchive => 'Archive';
+
+  @override
+  String get actionRestore => 'Restore';
+
+  @override
+  String get actionBulkArchive => 'Archive selection';
+
+  @override
+  String get actionEdit => 'Edit';
+
+  @override
+  String get actionInspect => 'Inspect';
+
+  @override
+  String get actionOpen => 'Open';
+
+  @override
+  String get actionDelete => 'Delete';
+
+  @override
+  String get actionSaving => 'Saving…';
+
+  @override
+  String get actionConfirm => 'Confirm';
+
+  @override
+  String get actionSelectCustomer => 'Customer';
+
+  @override
+  String get actionSelectSupplier => 'Supplier';
+
+  @override
+  String get actionCreateSupplier => 'Create supplier';
+
+  @override
+  String get actionCreateArticle => 'Create article';
+
+  @override
+  String get actionCreateGroup => 'Create group';
+
+  @override
+  String get actionCreateCategory => 'Create category';
+
+  @override
+  String get actionCreateAccount => 'Create account';
+
+  @override
+  String get actionCreateTaxRate => 'Create tax rate';
+
+  @override
+  String get actionCreateNumberRange => 'Create number range';
+
+  @override
+  String get contactTypeSelectionTitle => 'Choose contact type';
+
+  @override
+  String get contactTypeSelectionMessage =>
+      'Choose whether to open a customer or supplier record. No record is loaded without a selection.';
+
+  @override
+  String get articleTypeSelectionTitle => 'Choose article type';
+
+  @override
+  String get articleTypeSelectionMessage =>
+      'Choose whether to open an article or an article group. No record is loaded without a selection.';
+
+  @override
+  String get archiveConfirmTitle => 'Confirm archive';
+
+  @override
+  String get archiveConfirmMessage =>
+      'The record receives an archive timestamp and stays available to existing documents and reports.';
+
+  @override
+  String get restoreConfirmTitle => 'Confirm restore';
+
+  @override
+  String get restoreConfirmMessage =>
+      'The archive timestamp is removed and the record returns to the default selection.';
+
+  @override
+  String get workspaceUnavailable => 'Data unavailable';
+
+  @override
+  String get workspaceUnavailableMessage => 'The data could not be loaded. Please retry.';
+
+  @override
+  String get saveFailed => 'Save failed';
+
+  @override
+  String get formRequiredField => 'Required field';
+
+  @override
+  String get formName => 'Name';
+
+  @override
+  String get formCompany => 'Company';
+
+  @override
+  String get formStreet => 'Street and number';
+
+  @override
+  String get formPostalCode => 'Postal code';
+
+  @override
+  String get formCity => 'City';
+
+  @override
+  String get formEmail => 'Email';
+
+  @override
+  String get formPhone => 'Phone';
+
+  @override
+  String get formVatId => 'VAT ID';
+
+  @override
+  String get formIban => 'IBAN';
+
+  @override
+  String get formDescription => 'Description';
+
+  @override
+  String get formSectionBasic => 'Basic data';
+
+  @override
+  String get formSectionContact => 'Contact';
+
+  @override
+  String get formSectionTax => 'Tax and payment';
+
+  @override
+  String get customerEditTitle => 'Edit customer';
+
+  @override
+  String get supplierEditTitle => 'Edit supplier';
+
+  @override
+  String get contactArchived => 'Archived';
+
+  @override
+  String get routeArticles => 'Articles';
+
+  @override
+  String get articlesViewItems => 'Articles';
+
+  @override
+  String get articlesViewGroups => 'Article groups';
+
+  @override
+  String get settingsMasterData => 'Master data';
+
+  @override
+  String get settingsCompany => 'Company data';
+
+  @override
+  String get settingsCategories => 'Categories';
+
+  @override
+  String get settingsAccounts => 'Bank accounts';
+
+  @override
+  String get settingsTaxRates => 'Tax rates';
+
+  @override
+  String get settingsNumberRanges => 'Number ranges';
+
+  @override
+  String get countCustomers => 'customers';
+
+  @override
+  String get countSuppliers => 'suppliers';
+
+  @override
+  String get countArticles => 'articles';
+
+  @override
+  String get countGroups => 'groups';
+
+  @override
+  String get companySetupNeeded => 'No company data yet. Create it now.';
+
+  @override
+  String get numberRangeNextLabel => 'Next number';
 }

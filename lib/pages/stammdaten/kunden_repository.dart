@@ -34,6 +34,7 @@ class Kunde {
     this.dunningBlockedReason,
     required this.zugferdAktiv,
     this.note,
+    this.archivedAt,
   });
 
   final int id;
@@ -59,6 +60,9 @@ class Kunde {
   final String? dunningBlockedReason;
   final bool zugferdAktiv;
   final String? note;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
 
   String get kundennummer => debitorNr;
 
@@ -132,6 +136,7 @@ class KundenRepository {
     _ColumnDefinition('skonto_tage', 'INTEGER NOT NULL DEFAULT 0'),
     _ColumnDefinition('note', 'TEXT'),
     _ColumnDefinition('notiz', 'TEXT'),
+    _ColumnDefinition('archived_at', 'TEXT'),
   ];
 
   static const List<_ColumnDefinition> _nummernkreisColumns = <_ColumnDefinition>[
@@ -213,7 +218,7 @@ class KundenRepository {
 SELECT id, kundennummer, debitor_nr, anrede, name, firma, strasse, hausnummer,
        plz, ort, land, ust_idnr, steuernummer_ausland, telefon, email,
        zahlungsziel, skonto_prozent, skonto_tage, kreditlimit, mahngesperrt,
-       mahngesperrt_bis, mahngesperrt_grund, zugferd_aktiv, note, notiz
+       mahngesperrt_bis, mahngesperrt_grund, zugferd_aktiv, note, notiz, archived_at
 FROM kunden
 ''';
 
@@ -318,6 +323,108 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     await ensureSchema();
     final rows = await executor.runSelect('$_customerSelect ORDER BY id', const <Object?>[]);
     return rows.map(_kundeFromRow).toList(growable: false);
+  }
+
+  /// Bounded, deterministic workspace query over typed customer rows.
+  /// Archived rows are included unless excluded; pickers use [listForPicker].
+  Future<({List<Kunde> items, int totalCount, bool hasMore, int page, String effectiveSearch})> query({
+    String search = '',
+    bool includeArchived = true,
+    bool archivedOnly = false,
+    int limit = 25,
+    int page = 1,
+  }) async {
+    await ensureSchema();
+    final int safeLimit = limit.clamp(1, 100);
+    final int safePage = page < 1 ? 1 : page;
+    final String term = search.trim();
+    final List<String> predicates = <String>[];
+    final List<Object?> args = <Object?>[];
+    if (archivedOnly) {
+      predicates.add('archived_at IS NOT NULL');
+    } else if (!includeArchived) {
+      predicates.add('archived_at IS NULL');
+    }
+    if (term.isNotEmpty) {
+      predicates.add(
+        '(name LIKE ? COLLATE NOCASE OR firma LIKE ? COLLATE NOCASE OR '
+        'kundennummer LIKE ? COLLATE NOCASE OR debitor_nr LIKE ? COLLATE NOCASE OR '
+        'email LIKE ? COLLATE NOCASE OR ort LIKE ? COLLATE NOCASE)',
+      );
+      args.addAll(List<Object?>.filled(6, '%$term%'));
+    }
+    final String where = predicates.isEmpty ? '' : ' WHERE ${predicates.join(' AND ')}';
+    final List<Map<String, Object?>> countRows = await executor.runSelect(
+      'SELECT COUNT(*) AS total_count FROM kunden$where',
+      args,
+    );
+    final Object? rawCount = countRows.single['total_count'];
+    final int totalCount = rawCount is num ? rawCount.toInt() : int.tryParse(rawCount?.toString() ?? '') ?? 0;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      '$_customerSelect$where ORDER BY id LIMIT ? OFFSET ?',
+      <Object?>[...args, safeLimit, (safePage - 1) * safeLimit],
+    );
+    final List<Kunde> items = rows.map(_kundeFromRow).toList(growable: false);
+    return (
+      items: items,
+      totalCount: totalCount,
+      hasMore: safePage * safeLimit < totalCount,
+      page: safePage,
+      effectiveSearch: term,
+    );
+  }
+
+  /// New-document picker source: archived customers excluded by default.
+  Future<List<Kunde>> listForPicker({String search = '', bool includeArchived = false}) async {
+    final result = await query(search: search, includeArchived: includeArchived, limit: 100);
+    return result.items;
+  }
+
+  Future<List<Kunde>> listArchived() async {
+    final result = await query(archivedOnly: true, limit: 100);
+    return result.items;
+  }
+
+  /// Archive preserves the primary key and all references; sets one UTC timestamp.
+  Future<Kunde> archive(int id) async {
+    await ensureSchema();
+    final String now = DateTime.now().toUtc().toIso8601String();
+    final int updated = await executor.runUpdate('UPDATE kunden SET archived_at = ? WHERE id = ?', <Object?>[now, id]);
+    if (updated == 0) {
+      throw const KundenException('Kunde nicht gefunden');
+    }
+    final Kunde? stored = await findById(id);
+    if (stored == null) {
+      throw const KundenException('Kunde nicht gefunden');
+    }
+    return stored;
+  }
+
+  Future<Kunde> restore(int id) async {
+    await ensureSchema();
+    final int updated = await executor.runUpdate('UPDATE kunden SET archived_at = NULL WHERE id = ?', <Object?>[id]);
+    if (updated == 0) {
+      throw const KundenException('Kunde nicht gefunden');
+    }
+    final Kunde? stored = await findById(id);
+    if (stored == null) {
+      throw const KundenException('Kunde nicht gefunden');
+    }
+    return stored;
+  }
+
+  Future<void> bulkArchive(Iterable<int> ids) async {
+    await ensureSchema();
+    final String now = DateTime.now().toUtc().toIso8601String();
+    for (final int id in ids) {
+      final int updated = await executor.runUpdate('UPDATE kunden SET archived_at = ? WHERE id = ?', <Object?>[
+        now,
+        id,
+      ]);
+      if (updated == 0) {
+        throw KundenException('Kunde #$id nicht gefunden');
+      }
+    }
   }
 
   Future<Kunde> update(int id, Map<String, dynamic> values) async {
@@ -604,6 +711,7 @@ WHERE id = ?
       dunningBlockedReason: _asString(row['mahngesperrt_grund']),
       zugferdAktiv: _asBool(row['zugferd_aktiv']),
       note: _asString(row['note']) ?? _asString(row['notiz']),
+      archivedAt: _asString(row['archived_at']),
     );
   }
 

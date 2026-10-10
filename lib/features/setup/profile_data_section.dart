@@ -182,15 +182,18 @@ class _ProfileDataSectionState extends State<ProfileDataSection> {
   Widget _archiveRow() {
     final ProfileExportService service = widget.exportService!;
     return Card(
-      child: ListTile(
-        leading: const Icon(Icons.archive_outlined),
-        title: const Text('Vollständiges strukturiertes Profilarchiv'),
-        subtitle: const Text('Alle unterstützten Tabellen und Nachweise des aktiven Profils.'),
-        trailing: FilledButton(
-          onPressed: _busy
-              ? null
-              : () => unawaited(_run((String destination) => service.exportProfile(destinationPath: destination))),
-          child: const Text('Profil exportieren'),
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          leading: const Icon(Icons.archive_outlined),
+          title: const Text('Vollständiges strukturiertes Profilarchiv'),
+          subtitle: const Text('Alle unterstützten Tabellen und Nachweise des aktiven Profils.'),
+          trailing: FilledButton(
+            onPressed: _busy
+                ? null
+                : () => unawaited(_run((String destination) => service.exportProfile(destinationPath: destination))),
+            child: const Text('Profil exportieren'),
+          ),
         ),
       ),
     );
@@ -199,17 +202,20 @@ class _ProfileDataSectionState extends State<ProfileDataSection> {
   Widget _actionRow(ProfileDataExportAction action) {
     final Future<ProfileExportResult> Function(String destinationPath)? run = action.onRun;
     return Card(
-      child: ListTile(
-        leading: const Icon(Icons.outbox_outlined),
-        title: Text(action.scopeTitle),
-        subtitle: Text(
-          run == null
-              ? '${action.scopeDescription} Nicht verfügbar: kein registrierter Export.'
-              : action.scopeDescription,
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          leading: const Icon(Icons.outbox_outlined),
+          title: Text(action.scopeTitle),
+          subtitle: Text(
+            run == null
+                ? '${action.scopeDescription} Nicht verfügbar: kein registrierter Export.'
+                : action.scopeDescription,
+          ),
+          trailing: run == null
+              ? const OutlinedButton(onPressed: null, child: Text('Nicht verfügbar'))
+              : OutlinedButton(onPressed: _busy ? null : () => unawaited(_run(run)), child: const Text('Starten')),
         ),
-        trailing: run == null
-            ? const OutlinedButton(onPressed: null, child: Text('Nicht verfügbar'))
-            : OutlinedButton(onPressed: _busy ? null : () => unawaited(_run(run)), child: const Text('Starten')),
       ),
     );
   }

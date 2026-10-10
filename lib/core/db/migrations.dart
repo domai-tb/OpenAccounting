@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 14;
+  static const int currentVersion = 15;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -239,6 +239,7 @@ class MigrationRunner {
       await _migrateQuickBookingPresets();
       await _migrateFeatureModules();
       await _migrateProfilePortabilityTables(freshProfile: true);
+      await _migrateContactArchive();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -349,6 +350,10 @@ class MigrationRunner {
     if (version == 14) {
       await _migrateTo(13, createSchema);
       await _migrateFeatureModules();
+    }
+    if (version == 15) {
+      await _migrateTo(14, createSchema);
+      await _migrateContactArchive();
     }
   }
 
@@ -967,6 +972,34 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     final verify = await executor.runSelect('PRAGMA table_info(unternehmen)', const <Object?>[]);
     if (!verify.any((row) => row['name'] == 'feature_modules_json')) {
       throw StateError('Funktionsmodul-Spalte konnte nicht verifiziert werden');
+    }
+  }
+
+  /// Customer/supplier archive state (v15, next sequential after the v14
+  /// baseline). Adds nullable `archived_at TEXT` to `kunden` and
+  /// `lieferanten`; NULL means active, a UTC timestamp means archived.
+  /// Existing rows keep NULL so every identifier, value, and reference is
+  /// preserved. Runs inside the shared migration transaction, so DDL,
+  /// verification, and the version bump commit atomically.
+  Future<void> _migrateContactArchive() async {
+    for (final String table in const <String>['kunden', 'lieferanten']) {
+      final tables = await executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        <Object?>[table],
+      );
+      if (tables.isEmpty) {
+        throw StateError('Archivstatus braucht die Tabelle $table');
+      }
+    }
+    await _addColumnIfMissing('kunden', 'archived_at', 'TEXT');
+    await _addColumnIfMissing('lieferanten', 'archived_at', 'TEXT');
+    final archived = await executor.runSelect(
+      'SELECT COUNT(*) AS c FROM kunden WHERE archived_at IS NOT NULL '
+      'UNION ALL SELECT COUNT(*) AS c FROM lieferanten WHERE archived_at IS NOT NULL',
+      const <Object?>[],
+    );
+    if (archived.length != 2) {
+      throw StateError('Archivstatus konnte nicht verifiziert werden');
     }
   }
 

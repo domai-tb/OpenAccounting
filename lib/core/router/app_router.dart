@@ -35,8 +35,9 @@ import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
-import 'package:openaccounting/pages/stammdaten/contact_create_page.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_more_pages.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
 
 export 'package:openaccounting/app/app_shell.dart';
 
@@ -164,12 +165,32 @@ GoRouter createRouter(AppDatabase db) {
             path: '/contacts',
             builder: (context, state) => const ContactsPage(),
             routes: <RouteBase>[
-              GoRoute(path: 'new', builder: (context, state) => const ContactCreatePage()),
+              GoRoute(path: 'new', builder: (context, state) => const ContactCreateRoute()),
               GoRoute(
                 path: ':id',
                 builder: (context, state) {
                   final id = state.pathParameters['id']!;
                   return ContactDetailPage(id: id);
+                },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (context, state) => ContactFormRoute(recordId: state.pathParameters['id']),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/articles',
+            builder: (context, state) => const ArticlesPage(),
+            routes: <RouteBase>[
+              GoRoute(path: 'new', builder: (context, state) => const ArticleCreateRoute()),
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final id = state.pathParameters['id']!;
+                  return ArticleDetailRoute(id: id);
                 },
               ),
             ],
@@ -189,7 +210,17 @@ GoRouter createRouter(AppDatabase db) {
               ),
             ],
           ),
-          GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsPage(),
+            routes: <RouteBase>[
+              GoRoute(path: 'company', builder: (context, state) => const CompanySettingsRoute()),
+              GoRoute(path: 'categories', builder: (context, state) => const CategoriesRoute()),
+              GoRoute(path: 'accounts', builder: (context, state) => const BankAccountsRoute()),
+              GoRoute(path: 'tax-rates', builder: (context, state) => const TaxRatesRoute()),
+              GoRoute(path: 'number-ranges', builder: (context, state) => const NumberRangesRoute()),
+            ],
+          ),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
           GoRoute(path: '/inventory', builder: (context, state) => const InventoryUnavailablePage()),
@@ -661,19 +692,27 @@ class ContactsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    return ProductionRoutePage(
-      title: l10n.routeContacts,
-      table: 'kunden',
-      icon: Icons.people_outline,
-      subtitle: l10n.contactsSubtitle,
-      primaryActionLabel: l10n.actionSave,
-      onPrimaryAction: () => context.go('/contacts/new'),
-      emptyTitle: l10n.emptyEntries,
-      emptyMessage: l10n.contactsSubtitle,
-      emptyActionLabel: l10n.actionSave,
-      onEmptyAction: () => context.go('/contacts/new'),
-    );
+    return const ContactsWorkspaceView();
+  }
+}
+
+class ContactCreateRoute extends ConsumerWidget {
+  const ContactCreateRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ContactFormView();
+  }
+}
+
+class ContactFormRoute extends ConsumerWidget {
+  const ContactFormRoute({this.recordId, super.key});
+
+  final String? recordId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ContactFormView(recordId: recordId);
   }
 }
 
@@ -684,11 +723,81 @@ class ContactDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProductionRecordDetailPage(
-      table: 'kunden',
-      title: appLocalizationsOf(context).contactDetailTitle(id),
-      id: id,
-    );
+    return ContactRecordView(id: id);
+  }
+}
+
+class ArticlesPage extends ConsumerWidget {
+  const ArticlesPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ArticlesWorkspaceView();
+  }
+}
+
+class ArticleCreateRoute extends ConsumerWidget {
+  const ArticleCreateRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const ArticleFormView();
+  }
+}
+
+class ArticleDetailRoute extends ConsumerWidget {
+  const ArticleDetailRoute({required this.id, super.key});
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ArticleRecordView(id: id);
+  }
+}
+
+class CompanySettingsRoute extends ConsumerWidget {
+  const CompanySettingsRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const CompanySettingsView();
+  }
+}
+
+class CategoriesRoute extends ConsumerWidget {
+  const CategoriesRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const CategoriesView();
+  }
+}
+
+class BankAccountsRoute extends ConsumerWidget {
+  const BankAccountsRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const BankAccountsView();
+  }
+}
+
+class TaxRatesRoute extends ConsumerWidget {
+  const TaxRatesRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const TaxRatesView();
+  }
+}
+
+class NumberRangesRoute extends ConsumerWidget {
+  const NumberRangesRoute({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const NumberRangesView();
   }
 }
 
@@ -970,6 +1079,7 @@ class _SettingsContentState extends ConsumerState<_SettingsContent> {
             service: FeatureModuleService(repository: FeatureModuleRepository(ref.read(appDatabaseProvider).executor)),
           ),
           const SizedBox(height: 16),
+          const MasterDataSettingsSection(),
           const SizedBox(height: 16),
           ProfileDataSection(exportService: _resolveProfileExportService()),
           const SizedBox(height: 16),

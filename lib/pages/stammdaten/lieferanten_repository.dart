@@ -21,6 +21,7 @@ class Lieferant {
     required this.skontoProzent,
     required this.skontoTage,
     this.note,
+    this.archivedAt,
   });
 
   final int id;
@@ -42,6 +43,9 @@ class Lieferant {
   final num skontoProzent;
   final int skontoTage;
   final String? note;
+  final String? archivedAt;
+
+  bool get isArchived => archivedAt != null;
 
   String get lieferantennummer => kreditorNr;
 
@@ -74,6 +78,7 @@ class LieferantenRepository {
     _ColumnDefinition('skonto_prozent', 'NUMERIC(12,2) DEFAULT 0'),
     _ColumnDefinition('skonto_tage', 'INTEGER NOT NULL DEFAULT 0'),
     _ColumnDefinition('note', 'TEXT'),
+    _ColumnDefinition('archived_at', 'TEXT'),
     _ColumnDefinition('kreditor_nr', 'TEXT'),
     _ColumnDefinition('lieferantennummer', 'TEXT'),
   ];
@@ -143,7 +148,7 @@ class LieferantenRepository {
   static const String _lieferantSelect = '''
 SELECT id, lieferantennummer, kreditor_nr, anrede, name, firma, strasse, hausnummer,
        plz, ort, land, ust_idnr, steuernummer_ausland, telefon, email, iban,
-       zahlungsziel, skonto_prozent, skonto_tage, note
+       zahlungsziel, skonto_prozent, skonto_tage, note, archived_at
 FROM lieferanten
 ''';
 
@@ -238,6 +243,112 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     await ensureSchema();
     final rows = await executor.runSelect('$_lieferantSelect ORDER BY id', const <Object?>[]);
     return rows.map(_lieferantFromRow).toList(growable: false);
+  }
+
+  /// Bounded, deterministic workspace query over typed supplier rows.
+  Future<({List<Lieferant> items, int totalCount, bool hasMore, int page, String effectiveSearch})> query({
+    String search = '',
+    bool includeArchived = true,
+    bool archivedOnly = false,
+    int limit = 25,
+    int page = 1,
+  }) async {
+    await ensureSchema();
+    final int safeLimit = limit.clamp(1, 100);
+    final int safePage = page < 1 ? 1 : page;
+    final String term = search.trim();
+    final List<String> predicates = <String>[];
+    final List<Object?> args = <Object?>[];
+    if (archivedOnly) {
+      predicates.add('archived_at IS NOT NULL');
+    } else if (!includeArchived) {
+      predicates.add('archived_at IS NULL');
+    }
+    if (term.isNotEmpty) {
+      predicates.add(
+        '(name LIKE ? COLLATE NOCASE OR firma LIKE ? COLLATE NOCASE OR '
+        'lieferantennummer LIKE ? COLLATE NOCASE OR kreditor_nr LIKE ? COLLATE NOCASE OR '
+        'email LIKE ? COLLATE NOCASE OR ort LIKE ? COLLATE NOCASE)',
+      );
+      args.addAll(List<Object?>.filled(6, '%$term%'));
+    }
+    final String where = predicates.isEmpty ? '' : ' WHERE ${predicates.join(' AND ')}';
+    final List<Map<String, Object?>> countRows = await executor.runSelect(
+      'SELECT COUNT(*) AS total_count FROM lieferanten$where',
+      args,
+    );
+    final Object? rawCount = countRows.single['total_count'];
+    final int totalCount = rawCount is num ? rawCount.toInt() : int.tryParse(rawCount?.toString() ?? '') ?? 0;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      '$_lieferantSelect$where ORDER BY id LIMIT ? OFFSET ?',
+      <Object?>[...args, safeLimit, (safePage - 1) * safeLimit],
+    );
+    final List<Lieferant> items = rows.map(_lieferantFromRow).toList(growable: false);
+    return (
+      items: items,
+      totalCount: totalCount,
+      hasMore: safePage * safeLimit < totalCount,
+      page: safePage,
+      effectiveSearch: term,
+    );
+  }
+
+  /// New-document picker source: archived suppliers excluded by default.
+  Future<List<Lieferant>> listForPicker({String search = '', bool includeArchived = false}) async {
+    final result = await query(search: search, includeArchived: includeArchived, limit: 100);
+    return result.items;
+  }
+
+  Future<List<Lieferant>> listArchived() async {
+    final result = await query(archivedOnly: true, limit: 100);
+    return result.items;
+  }
+
+  /// Archive preserves the primary key and all references; sets one UTC timestamp.
+  Future<Lieferant> archive(int id) async {
+    await ensureSchema();
+    final String now = DateTime.now().toUtc().toIso8601String();
+    final int updated = await executor.runUpdate('UPDATE lieferanten SET archived_at = ? WHERE id = ?', <Object?>[
+      now,
+      id,
+    ]);
+    if (updated == 0) {
+      throw const LieferantenException('Lieferant nicht gefunden');
+    }
+    final Lieferant? stored = await findById(id);
+    if (stored == null) {
+      throw const LieferantenException('Lieferant nicht gefunden');
+    }
+    return stored;
+  }
+
+  Future<Lieferant> restore(int id) async {
+    await ensureSchema();
+    final int updated = await executor.runUpdate('UPDATE lieferanten SET archived_at = NULL WHERE id = ?', <Object?>[
+      id,
+    ]);
+    if (updated == 0) {
+      throw const LieferantenException('Lieferant nicht gefunden');
+    }
+    final Lieferant? stored = await findById(id);
+    if (stored == null) {
+      throw const LieferantenException('Lieferant nicht gefunden');
+    }
+    return stored;
+  }
+
+  Future<void> bulkArchive(Iterable<int> ids) async {
+    await ensureSchema();
+    final String now = DateTime.now().toUtc().toIso8601String();
+    for (final int id in ids) {
+      final int updated = await executor.runUpdate('UPDATE lieferanten SET archived_at = ? WHERE id = ?', <Object?>[
+        now,
+        id,
+      ]);
+      if (updated == 0) {
+        throw LieferantenException('Lieferant #$id nicht gefunden');
+      }
+    }
   }
 
   Future<Lieferant> update(int id, Map<String, dynamic> values) async {
@@ -446,6 +557,7 @@ WHERE id = ?
       skontoProzent: _asNum(row['skonto_prozent']) ?? 0,
       skontoTage: _asInt(row['skonto_tage']) ?? 0,
       note: _asString(row['note']),
+      archivedAt: _asString(row['archived_at']),
     );
   }
 

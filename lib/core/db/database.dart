@@ -524,6 +524,7 @@ CREATE TABLE IF NOT EXISTS kunden (
   zugferd_aktiv INTEGER NOT NULL DEFAULT 0 CHECK (zugferd_aktiv IN (0, 1)),
   note TEXT,
   notiz TEXT,
+  archived_at TEXT,
   erstellungsdatum TEXT DEFAULT CURRENT_TIMESTAMP
 )''',
   // 9 lieferanten
@@ -547,7 +548,8 @@ CREATE TABLE IF NOT EXISTS lieferanten (
   zahlungsziel INTEGER DEFAULT 14,
   skonto_prozent NUMERIC(12,2) DEFAULT 0,
   skonto_tage INTEGER NOT NULL DEFAULT 0,
-  note TEXT
+  note TEXT,
+  archived_at TEXT
 )''',
   // 10 artikel
   '''

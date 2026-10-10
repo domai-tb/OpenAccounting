@@ -323,6 +323,117 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     return ArtikelGruppe(id: id, name: name, beschreibung: beschreibung, typ: typ, aktiv: aktiv);
   }
 
+  Future<ArtikelGruppe?> findGruppeById(int id) async {
+    await ensureSchema();
+    final rows = await executor.runSelect('SELECT * FROM artikel_gruppen WHERE id = ?', <Object?>[id]);
+    if (rows.isEmpty) return null;
+    final Map<String, Object?> r = rows.single;
+    return ArtikelGruppe(
+      id: _asInt(r['id']) ?? 0,
+      name: _asString(r['name']) ?? '',
+      beschreibung: _asString(r['beschreibung']),
+      typ: _asString(r['typ']),
+      aktiv: _asBool(r['aktiv']),
+    );
+  }
+
+  Future<ArtikelGruppe> updateGruppe(int id, {String? name, String? beschreibung, String? typ, bool? aktiv}) async {
+    await ensureSchema();
+    final ArtikelGruppe? current = await findGruppeById(id);
+    if (current == null) throw const ArtikelException('Artikelgruppe nicht gefunden');
+    if (name != null && name.trim().isEmpty) throw const ArtikelException('Gruppenname ist Pflicht');
+    final Map<String, Object?> assignments = <String, Object?>{
+      'name': ?name,
+      'beschreibung': ?beschreibung,
+      'typ': ?typ,
+      if (aktiv != null) 'aktiv': aktiv ? 1 : 0,
+    };
+    if (assignments.isEmpty) return current;
+    final String sql = assignments.keys.map((String column) => '$column = ?').join(', ');
+    await executor.runUpdate('UPDATE artikel_gruppen SET $sql WHERE id = ?', <Object?>[...assignments.values, id]);
+    final ArtikelGruppe? updated = await findGruppeById(id);
+    if (updated == null) throw const ArtikelException('Artikelgruppe nicht gefunden');
+    return updated;
+  }
+
+  /// Bounded, deterministic workspace query over typed article rows.
+  Future<({List<Artikel> items, int totalCount, bool hasMore, int page, String effectiveSearch})> query({
+    String search = '',
+    int limit = 25,
+    int page = 1,
+  }) async {
+    await ensureSchema();
+    final int safeLimit = limit.clamp(1, 100);
+    final int safePage = page < 1 ? 1 : page;
+    final String term = search.trim();
+    final String where = term.isEmpty
+        ? ''
+        : ' WHERE (bezeichnung LIKE ? COLLATE NOCASE OR artikelnummer LIKE ? COLLATE NOCASE '
+              'OR beschreibung LIKE ? COLLATE NOCASE)';
+    final List<Object?> args = term.isEmpty ? const <Object?>[] : List<Object?>.filled(3, '%$term%');
+    final List<Map<String, Object?>> countRows = await executor.runSelect(
+      'SELECT COUNT(*) AS total_count FROM artikel$where',
+      args,
+    );
+    final Object? rawCount = countRows.single['total_count'];
+    final int totalCount = rawCount is num ? rawCount.toInt() : int.tryParse(rawCount?.toString() ?? '') ?? 0;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      '$_artikelSelect$where ORDER BY id LIMIT ? OFFSET ?',
+      <Object?>[...args, safeLimit, (safePage - 1) * safeLimit],
+    );
+    final List<Artikel> items = rows.map(_fromRow).toList(growable: false);
+    return (
+      items: items,
+      totalCount: totalCount,
+      hasMore: safePage * safeLimit < totalCount,
+      page: safePage,
+      effectiveSearch: term,
+    );
+  }
+
+  Future<({List<ArtikelGruppe> items, int totalCount, bool hasMore, int page, String effectiveSearch})> queryGruppen({
+    String search = '',
+    int limit = 25,
+    int page = 1,
+  }) async {
+    await ensureSchema();
+    final int safeLimit = limit.clamp(1, 100);
+    final int safePage = page < 1 ? 1 : page;
+    final String term = search.trim();
+    final String where = term.isEmpty
+        ? ''
+        : ' WHERE (name LIKE ? COLLATE NOCASE OR beschreibung LIKE ? COLLATE NOCASE)';
+    final List<Object?> args = term.isEmpty ? const <Object?>[] : List<Object?>.filled(2, '%$term%');
+    final List<Map<String, Object?>> countRows = await executor.runSelect(
+      'SELECT COUNT(*) AS total_count FROM artikel_gruppen$where',
+      args,
+    );
+    final Object? rawCount = countRows.single['total_count'];
+    final int totalCount = rawCount is num ? rawCount.toInt() : int.tryParse(rawCount?.toString() ?? '') ?? 0;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT * FROM artikel_gruppen$where ORDER BY id LIMIT ? OFFSET ?',
+      <Object?>[...args, safeLimit, (safePage - 1) * safeLimit],
+    );
+    final List<ArtikelGruppe> items = rows
+        .map(
+          (Map<String, Object?> r) => ArtikelGruppe(
+            id: _asInt(r['id']) ?? 0,
+            name: _asString(r['name']) ?? '',
+            beschreibung: _asString(r['beschreibung']),
+            typ: _asString(r['typ']),
+            aktiv: _asBool(r['aktiv']),
+          ),
+        )
+        .toList(growable: false);
+    return (
+      items: items,
+      totalCount: totalCount,
+      hasMore: safePage * safeLimit < totalCount,
+      page: safePage,
+      effectiveSearch: term,
+    );
+  }
+
   Future<List<Artikel>> lagerWarnungen() async {
     await ensureSchema();
     final rows = await executor.runSelect(

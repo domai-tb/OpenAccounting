@@ -1835,4 +1835,203 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get guidanceBodyTaxSpecial25a =>
       'Kennzeichnet Umsätze, deren Bemessungsgrundlage die Marge statt des Gesamtpreises ist. Die App weist solche Umsätze in der Steuerübersicht gesondert aus. Ob die Voraussetzungen des § 25a UStG erfüllt sind, prüft die App nicht; nicht unterstützte Konstellationen werden als nicht verfügbar ausgewiesen.';
+
+  @override
+  String get contactsTabCustomers => 'Kunden';
+
+  @override
+  String get contactsTabSuppliers => 'Lieferanten';
+
+  @override
+  String get filterArchived => 'Archiviert';
+
+  @override
+  String get filterActive => 'Aktiv';
+
+  @override
+  String get actionArchive => 'Archivieren';
+
+  @override
+  String get actionRestore => 'Wiederherstellen';
+
+  @override
+  String get actionBulkArchive => 'Auswahl archivieren';
+
+  @override
+  String get actionEdit => 'Bearbeiten';
+
+  @override
+  String get actionInspect => 'Ansehen';
+
+  @override
+  String get actionOpen => 'Öffnen';
+
+  @override
+  String get actionDelete => 'Löschen';
+
+  @override
+  String get actionSaving => 'Wird gespeichert…';
+
+  @override
+  String get actionConfirm => 'Bestätigen';
+
+  @override
+  String get actionSelectCustomer => 'Kunde';
+
+  @override
+  String get actionSelectSupplier => 'Lieferant';
+
+  @override
+  String get actionCreateSupplier => 'Lieferant anlegen';
+
+  @override
+  String get actionCreateArticle => 'Artikel anlegen';
+
+  @override
+  String get actionCreateGroup => 'Gruppe anlegen';
+
+  @override
+  String get actionCreateCategory => 'Kategorie anlegen';
+
+  @override
+  String get actionCreateAccount => 'Konto anlegen';
+
+  @override
+  String get actionCreateTaxRate => 'Steuersatz anlegen';
+
+  @override
+  String get actionCreateNumberRange => 'Nummernkreis anlegen';
+
+  @override
+  String get contactTypeSelectionTitle => 'Kontaktart wählen';
+
+  @override
+  String get contactTypeSelectionMessage =>
+      'Wähle, ob ein Kunden- oder Lieferantendatensatz geöffnet werden soll. Ohne Auswahl wird kein Datensatz geladen.';
+
+  @override
+  String get articleTypeSelectionTitle => 'Artikelart wählen';
+
+  @override
+  String get articleTypeSelectionMessage =>
+      'Wähle, ob ein Artikel oder eine Warengruppe geöffnet werden soll. Ohne Auswahl wird kein Datensatz geladen.';
+
+  @override
+  String get archiveConfirmTitle => 'Archivieren bestätigen';
+
+  @override
+  String get archiveConfirmMessage =>
+      'Der Datensatz erhält einen Archivzeitpunkt und bleibt für vorhandene Belege und Auswertungen erhalten.';
+
+  @override
+  String get restoreConfirmTitle => 'Wiederherstellen bestätigen';
+
+  @override
+  String get restoreConfirmMessage =>
+      'Der Archivzeitpunkt wird entfernt und der Datensatz erscheint wieder in der Standardauswahl.';
+
+  @override
+  String get workspaceUnavailable => 'Daten nicht verfügbar';
+
+  @override
+  String get workspaceUnavailableMessage => 'Die Daten konnten nicht geladen werden. Versuche es erneut.';
+
+  @override
+  String get saveFailed => 'Speichern fehlgeschlagen';
+
+  @override
+  String get formRequiredField => 'Pflichtfeld';
+
+  @override
+  String get formName => 'Name';
+
+  @override
+  String get formCompany => 'Firma';
+
+  @override
+  String get formStreet => 'Straße und Hausnummer';
+
+  @override
+  String get formPostalCode => 'PLZ';
+
+  @override
+  String get formCity => 'Ort';
+
+  @override
+  String get formEmail => 'E-Mail';
+
+  @override
+  String get formPhone => 'Telefon';
+
+  @override
+  String get formVatId => 'USt-IdNr.';
+
+  @override
+  String get formIban => 'IBAN';
+
+  @override
+  String get formDescription => 'Beschreibung';
+
+  @override
+  String get formSectionBasic => 'Grunddaten';
+
+  @override
+  String get formSectionContact => 'Kontakt';
+
+  @override
+  String get formSectionTax => 'Steuer und Zahlung';
+
+  @override
+  String get customerEditTitle => 'Kunde bearbeiten';
+
+  @override
+  String get supplierEditTitle => 'Lieferant bearbeiten';
+
+  @override
+  String get contactArchived => 'Archiviert';
+
+  @override
+  String get routeArticles => 'Artikel';
+
+  @override
+  String get articlesViewItems => 'Artikel';
+
+  @override
+  String get articlesViewGroups => 'Warengruppen';
+
+  @override
+  String get settingsMasterData => 'Stammdaten';
+
+  @override
+  String get settingsCompany => 'Firmendaten';
+
+  @override
+  String get settingsCategories => 'Kategorien';
+
+  @override
+  String get settingsAccounts => 'Bankkonten';
+
+  @override
+  String get settingsTaxRates => 'Steuersätze';
+
+  @override
+  String get settingsNumberRanges => 'Nummernkreise';
+
+  @override
+  String get countCustomers => 'Kunden';
+
+  @override
+  String get countSuppliers => 'Lieferanten';
+
+  @override
+  String get countArticles => 'Artikel';
+
+  @override
+  String get countGroups => 'Gruppen';
+
+  @override
+  String get companySetupNeeded => 'Noch keine Firmendaten. Lege sie jetzt an.';
+
+  @override
+  String get numberRangeNextLabel => 'Nächste Nummer';
 }
