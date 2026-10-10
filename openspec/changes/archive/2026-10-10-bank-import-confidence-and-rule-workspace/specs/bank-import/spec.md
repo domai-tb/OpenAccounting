@@ -150,6 +150,8 @@ Each staged import SHALL begin with the active profile's persisted mode. The use
 - **WHEN** that import succeeds, fails, or is cancelled and another import begins
 - **THEN** the next import uses the saved profile mode unless the user selects another override
 
+## ADDED Requirements
+
 ### Requirement: Banking workspace follows the design system
 
 The production Banking page SHALL resolve its workspace use case through `AppScope`/`AppServices`; rule, mode, history, retry, and review reads/writes SHALL pass through typed repository and data-source boundaries. The page MUST NOT construct repositories, access query executors, or issue raw SQL. Review, Rules, and history SHALL use implemented design-system components (`AppPage`, `AppPageHeader`, `AppStatusChip`) with Flutter's existing table, form, focus, and layout widgets. The feature SHALL NOT depend on undocumented implementations of `AppDataTable`, `FilterBar`, or `DetailInspector`.
@@ -185,6 +187,8 @@ New labels, errors, validation, empty/loading/unavailable states, tooltips, and 
 - **GIVEN** Banking is rendered at 1280 by 800 logical pixels in English
 - **WHEN** the user opens Review, Rules, and history
 - **THEN** visible strings and semantic descriptions are generated English resources and all actions remain keyboard reachable with visible focus
+
+## MODIFIED Requirements
 
 ### Requirement: Bank Transactions Table
 

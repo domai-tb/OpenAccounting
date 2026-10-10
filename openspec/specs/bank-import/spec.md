@@ -3,7 +3,6 @@
 ## Purpose
 Bank statement import with 3-step workflow, duplicate detection, and booking reconciliation.
 
-
 ## Requirements
 
 ### Requirement: 3-Step Import Workflow
@@ -120,19 +119,37 @@ THEN it is imported with a new hash suffix and stored as a distinct entry.
 
 ### Requirement: Bank Transactions Table
 
-The system SHALL store imported transactions in `bank_transaktionen` with fields: id, konto_id, datum, betrag, partner, verwendungszweck, kategorie_id, journal_id, dedupe_hash.
+The system SHALL store imported transactions in `bank_transaktionen` with fields `id`, `konto_id`, `import_id`, `datum`, `betrag`, `verwendungszweck`, `gegenkonto`, `gegenkonto_name`, `kategorie_id`, `journal_id`, `dedupe_hash`, and `status`. `journal_id` SHALL reference only an existing journal entry. The existing `status` text column SHALL use exactly `neu`, `geprueft`, and `gebucht`. `neu` means awaiting explicit post-import review; `geprueft` means the user explicitly categorized/reviewed the transaction without associating a journal entry; `gebucht` means it is associated with an existing journal entry. A rule-assigned category without an explicit user decision remains `neu`. A category selected by the user during import is `geprueft` unless an existing journal entry is selected, in which case it is `gebucht`. No schema column is added for this state. Post-import review SHALL query only `neu` rows; confirming a category changes the row to `geprueft`, and associating an existing journal entry changes it to `gebucht`. A row cannot leave `neu` without a category or an existing journal link.
 
 #### Scenario: Transaction linked to journal entry
 
-GIVEN a transaction has been matched to a journal entry
-WHEN the import completes
-THEN `journal_id` is set and "Gebucht" badge displays.
+- **GIVEN** a confirmed imported transaction is explicitly associated with an existing journal entry
+- **WHEN** the import completes
+- **THEN** `journal_id` references that entry, status is `gebucht`, and no journal entry or payment is created
 
 #### Scenario: Transaction stored without journal link
 
-GIVEN a transaction has no matching journal entry
-WHEN the import completes
-THEN `journal_id` is NULL and the transaction is stored with all other fields populated.
+- **GIVEN** a confirmed imported transaction has no selected existing journal entry
+- **WHEN** the import completes
+- **THEN** it is stored with its imported fields and `journal_id` is null
+
+#### Scenario: Import assigns row review status from its decisions
+
+- **GIVEN** a row has a rule-assigned category, a user-selected category, no category, or an existing journal link
+- **WHEN** the confirmed import stores the row
+- **THEN** the respective status is `neu`, `geprueft`, `neu`, or `gebucht`, with `gebucht` taking precedence when linked
+
+#### Scenario: Automatic mode does not link a low-confidence candidate
+
+- **GIVEN** the profile mode is automatic and a unique top candidate scores below 90
+- **WHEN** the user confirms the import
+- **THEN** the row remains without a journal link and no journal entry or payment is created
+
+#### Scenario: Explicit review closes a new row
+
+- **GIVEN** an imported row has status `neu`
+- **WHEN** the user confirms a category or selects an existing journal entry in post-import review
+- **THEN** its status becomes `geprueft` or `gebucht`, respectively, and it is absent from later unresolved-review queries
 
 ### Requirement: Manual vs Automatic Mode
 
@@ -299,3 +316,39 @@ THEN the failure is visible with row/error context, history is partial/failed ac
 GIVEN a partial import is retried after correction
 WHEN the user retries the failed rows
 THEN already persisted rows remain deduplicated and only corrected failures are added.
+
+### Requirement: Banking workspace follows the design system
+
+The production Banking page SHALL resolve its workspace use case through `AppScope`/`AppServices`; rule, mode, history, retry, and review reads/writes SHALL pass through typed repository and data-source boundaries. The page MUST NOT construct repositories, access query executors, or issue raw SQL. Review, Rules, and history SHALL use implemented design-system components (`AppPage`, `AppPageHeader`, `AppStatusChip`) with Flutter's existing table, form, focus, and layout widgets. The feature SHALL NOT depend on undocumented implementations of `AppDataTable`, `FilterBar`, or `DetailInspector`.
+
+New labels, errors, validation, empty/loading/unavailable states, tooltips, and semantic descriptions SHALL use generated localization resources. Confidence/status SHALL have textual or semantic meaning beyond color. Every control SHALL be keyboard accessible with logical focus order and visible focus. Focus SHALL return to the invoking row/control when a detail surface closes. Layout SHALL adapt to documented breakpoints without hiding actions or causing page-level horizontal overflow; a wide table MAY scroll in a bounded content area. German text expansion and text scaling SHALL remain readable at the specified widths.
+
+#### Scenario: Banking resolves the typed use case
+
+- **GIVEN** the production application graph is ready
+- **WHEN** the user opens Banking and loads rules, history, and Review
+- **THEN** each operation calls the registered Banking use case and no page-level SQL or repository construction occurs
+
+#### Scenario: Rule controls work from the keyboard
+
+- **GIVEN** Banking Rules is open with visible keyboard focus
+- **WHEN** the user creates, edits, changes priority, toggles, or deletes a rule using the keyboard
+- **THEN** each action is available in logical order, has an accessible localized name, and focus returns to the invoking row after the edit surface closes
+
+#### Scenario: History and review controls work from the keyboard
+
+- **GIVEN** history detail or an unresolved transaction is open
+- **WHEN** the user opens/closes detail, retries failed rows, changes a category, associates an existing journal entry, searches, or changes page using the keyboard
+- **THEN** each action is reachable, has an accessible localized name, and focus returns to the invoking row/control after navigation
+
+#### Scenario: Narrow banking window keeps actions reachable
+
+- **GIVEN** Banking is rendered at 800 by 700 logical pixels in German with increased text scale
+- **WHEN** the user opens Review, Rules, history, detail, retry, and manual review
+- **THEN** translated labels remain readable, actions remain reachable, focus is visible, and there is no page-level horizontal overflow
+
+#### Scenario: Desktop banking views expose localized accessible controls
+
+- **GIVEN** Banking is rendered at 1280 by 800 logical pixels in English
+- **WHEN** the user opens Review, Rules, and history
+- **THEN** visible strings and semantic descriptions are generated English resources and all actions remain keyboard reachable with visible focus
