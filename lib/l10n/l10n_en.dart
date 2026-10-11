@@ -2025,4 +2025,156 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get numberRangeNextLabel => 'Next number';
+
+  @override
+  String get csvImportTitle => 'CSV import';
+
+  @override
+  String get csvImportStepSource => '1. Source';
+
+  @override
+  String get csvImportStepMapping => '2. Mapping';
+
+  @override
+  String get csvImportStepReview => '3. Review';
+
+  @override
+  String get csvImportStepResult => '4. Result';
+
+  @override
+  String get csvImportSourceHint => 'Paste CSV text or enter a local file path. Preview writes nothing.';
+
+  @override
+  String get csvImportCsvLabel => 'CSV text';
+
+  @override
+  String get csvImportPathLabel => 'Local file path (optional)';
+
+  @override
+  String get csvImportDelimiter => 'Delimiter';
+
+  @override
+  String get csvImportHeaderOption => 'First row is header';
+
+  @override
+  String get csvImportDecimalConvention => 'Numeric format';
+
+  @override
+  String get csvImportDecimalPoint => 'Decimal point (123.50)';
+
+  @override
+  String get csvImportDecimalComma => 'Decimal comma (123,50)';
+
+  @override
+  String get csvImportDuplicatePolicy => 'Duplicate policy';
+
+  @override
+  String get csvImportPolicySkip => 'Skip';
+
+  @override
+  String get csvImportPolicyUpdate => 'Update';
+
+  @override
+  String get csvImportPolicyCreateNew => 'Create new';
+
+  @override
+  String get csvImportMatchField => 'Match field';
+
+  @override
+  String get csvImportPriceBasis => 'Price basis';
+
+  @override
+  String get csvImportPriceNet => 'Net';
+
+  @override
+  String get csvImportPriceGross => 'Gross';
+
+  @override
+  String get csvImportParseAndMap => 'Parse and map';
+
+  @override
+  String get csvImportValidatePreview => 'Validate preview';
+
+  @override
+  String get csvImportConfirm => 'Confirm import';
+
+  @override
+  String get csvImportTemplate => 'Mapping template';
+
+  @override
+  String get csvImportTemplateNone => 'No template';
+
+  @override
+  String get csvImportSaveMapping => 'Save mapping';
+
+  @override
+  String get csvImportTemplateName => 'Template name';
+
+  @override
+  String get csvImportStatusValid => 'Valid';
+
+  @override
+  String get csvImportStatusInvalid => 'Invalid';
+
+  @override
+  String get csvImportStatusSkip => 'Skipped';
+
+  @override
+  String get csvImportStatusUpdate => 'Update';
+
+  @override
+  String get csvImportStatusCreate => 'Create';
+
+  @override
+  String get csvImportStatusAmbiguous => 'Ambiguous';
+
+  @override
+  String get csvImportStatusDuplicate => 'Duplicate';
+
+  @override
+  String get csvImportSelectUpdate => 'Select update';
+
+  @override
+  String get csvImportCounts => 'Counts';
+
+  @override
+  String get csvImportFileTooLarge => 'File exceeds 20 MiB; no record was written.';
+
+  @override
+  String get csvImportRowLimit => 'File exceeds 50,000 rows; no record was written.';
+
+  @override
+  String get csvImportMalformed => 'Malformed quoting; no record was written.';
+
+  @override
+  String get csvImportUnsupportedEncoding => 'Unsupported encoding; only UTF-8 is supported.';
+
+  @override
+  String get csvImportColumnMismatch => 'Inconsistent column count; no record was written.';
+
+  @override
+  String get csvImportEmptyFile => 'File is empty; no record was written.';
+
+  @override
+  String get csvImportMappingConflict => 'Column mapping is ambiguous; preview was not opened.';
+
+  @override
+  String get csvImportEntityMismatch => 'Template does not match this entity.';
+
+  @override
+  String get csvImportMatchFieldRequired => 'Skip/Update requires a match field.';
+
+  @override
+  String get csvImportPriceBasisRequired => 'Articles require a price basis (net/gross).';
+
+  @override
+  String csvImportUnsupportedFieldForUpdate(String field) {
+    return '$field is not supported for article update.';
+  }
+
+  @override
+  String get csvImportBatchFailure => 'Import failed; no row was committed.';
+
+  @override
+  String get csvImportUnavailable => 'Import data is currently unavailable. Mapping is preserved.';
 }

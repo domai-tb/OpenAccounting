@@ -21,6 +21,7 @@ import 'package:openaccounting/pages/stammdaten/artikel_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_csv_import_service.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 import 'package:path/path.dart' as p;
@@ -67,6 +68,10 @@ class AppServices {
   late final ArticleGroupWorkspaceUseCase articleGroupWorkspace = ArticleGroupWorkspaceUseCase(artikel);
 
   late final ArticleDetailUseCase articleDetail = ArticleDetailUseCase(artikel);
+
+  late final MasterDataCsvImportService _masterDataCsvImportService = MasterDataCsvImportService(_db.executor);
+
+  late final MasterDataCsvImportUseCase masterDataCsvImport = MasterDataCsvImportUseCase(_masterDataCsvImportService);
 
   late final CompanySettingsUseCase companySettings = CompanySettingsUseCase(unternehmen);
 

@@ -16,6 +16,8 @@ import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_csv_import_models.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_csv_import_page.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
 
 /// Typed master-data workspaces per design.md: customer/supplier lists with
@@ -355,6 +357,14 @@ class _ContactsWorkspaceViewState extends ConsumerState<ContactsWorkspaceView> {
               tooltip: l10n.actionBulkArchive,
               onPressed: _bulkArchive,
             ),
+          IconButton(
+            icon: const Icon(Icons.upload_outlined),
+            tooltip: l10n.actionImport,
+            onPressed: () => openMasterDataCsvImport(
+              context,
+              suppliers ? MasterDataImportEntity.supplier : MasterDataImportEntity.customer,
+            ),
+          ),
           ..._primaryAction(
             context,
             l10n,

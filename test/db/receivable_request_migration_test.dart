@@ -94,7 +94,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
@@ -109,7 +109,7 @@ void main() {
       // No fabricated historical payment rows.
       expect(await _rowCount(native, 'forderung_zahlungen'), 0);
       expect(await _userVersion(native), MigrationRunner.currentVersion);
-      expect(await _allTableCount(native), 44);
+      expect(await _allTableCount(native), 45);
     });
 
     test('test_present_v7_relation_table_repairs_missing_constraints', () async {
@@ -152,8 +152,8 @@ void main() {
       expect(row['requested_betrag_cents'], isNull);
       expect(await _userVersion(native), MigrationRunner.currentVersion);
       // Base schema stays exactly 39 tables plus the feature table.
-      expect(await _baseTableCount(native), 43);
-      expect(await _allTableCount(native), 44);
+      expect(await _baseTableCount(native), 44);
+      expect(await _allTableCount(native), 45);
     });
 
     test('test_duplicate_legacy_key_rolls_migration_back', () async {
@@ -195,7 +195,7 @@ void main() {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
-      expect(await _allTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
 
       final AppDatabase db = AppDatabase.forTesting(
         native,
@@ -204,7 +204,7 @@ void main() {
       addTearDown(db.close);
       await _expectSchemaMigrationFailed(db);
 
-      expect(await _allTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _userVersion(native), 7);
       expect(db.isOpen, isFalse);
@@ -261,7 +261,7 @@ void main() {
       expect(() => failing.kategorienRepository, throwsStateError);
       // Rolled back to the v7 fixture: version, base tables, and seed/trigger state unchanged.
       expect(await _userVersion(native), 7);
-      expect(await _allTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _triggerCount(native), triggerCountBefore);
       expect(await _seedRowCount(native), seedRowsBefore);
@@ -270,7 +270,7 @@ void main() {
     test('test_current_v13_missing_payment_table_fails_closed', () async {
       final AppDatabase seed = await _seedV8(native);
       await _dropFeatureTable(seed.executor);
-      expect(await _allTableCount(native), 43);
+      expect(await _allTableCount(native), 44);
 
       final AppDatabase db = AppDatabase.forTesting(native);
       addTearDown(db.close);
@@ -279,8 +279,8 @@ void main() {
       expect(error.cause, isA<StateError>());
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _userVersion(native), MigrationRunner.currentVersion);
-      expect(await _baseTableCount(native), 43);
-      expect(await _allTableCount(native), 43);
+      expect(await _baseTableCount(native), 44);
+      expect(await _allTableCount(native), 44);
       expect(db.isOpen, isFalse);
     });
 
@@ -578,8 +578,8 @@ CREATE TABLE forderung_zahlungen (
       await _dropFeatureTable(seed.executor);
       await seed.executor.runCustom('PRAGMA user_version = 7');
       // Adaptation: '39 base tables' predates v9/v13/v14 feature tables; baseline is 43 without the feature table.
-      expect(await _baseTableCount(native), 43);
-      expect(await _allTableCount(native), 43);
+      expect(await _baseTableCount(native), 44);
+      expect(await _allTableCount(native), 44);
 
       final AppDatabase db = AppDatabase.forTesting(
         native,
@@ -588,8 +588,8 @@ CREATE TABLE forderung_zahlungen (
       addTearDown(db.close);
       await _expectSchemaMigrationFailed(db);
 
-      expect(await _baseTableCount(native), 43);
-      expect(await _allTableCount(native), 43);
+      expect(await _baseTableCount(native), 44);
+      expect(await _allTableCount(native), 44);
       expect(await _tableExists(native, 'forderung_zahlungen'), isFalse);
       expect(await _userVersion(native), 7);
       expect(db.isOpen, isFalse);

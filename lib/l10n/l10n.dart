@@ -3889,6 +3889,302 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Nächste Nummer'**
   String get numberRangeNextLabel;
+
+String get csvImportTitle;
+
+  /// No description provided for @csvImportStepSource.
+  ///
+  /// In de, this message translates to:
+  /// **'1. Datei'**
+  String get csvImportStepSource;
+
+  /// No description provided for @csvImportStepMapping.
+  ///
+  /// In de, this message translates to:
+  /// **'2. Zuordnung'**
+  String get csvImportStepMapping;
+
+  /// No description provided for @csvImportStepReview.
+  ///
+  /// In de, this message translates to:
+  /// **'3. Prüfung'**
+  String get csvImportStepReview;
+
+  /// No description provided for @csvImportStepResult.
+  ///
+  /// In de, this message translates to:
+  /// **'4. Ergebnis'**
+  String get csvImportStepResult;
+
+  /// No description provided for @csvImportSourceHint.
+  ///
+  /// In de, this message translates to:
+  /// **'CSV-Text einfügen oder lokalen Dateipfad angeben. Die Vorschau schreibt nichts.'**
+  String get csvImportSourceHint;
+
+  /// No description provided for @csvImportCsvLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'CSV-Text'**
+  String get csvImportCsvLabel;
+
+  /// No description provided for @csvImportPathLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Lokaler Dateipfad (optional)'**
+  String get csvImportPathLabel;
+
+  /// No description provided for @csvImportDelimiter.
+  ///
+  /// In de, this message translates to:
+  /// **'Trennzeichen'**
+  String get csvImportDelimiter;
+
+  /// No description provided for @csvImportHeaderOption.
+  ///
+  /// In de, this message translates to:
+  /// **'Erste Zeile ist Kopfzeile'**
+  String get csvImportHeaderOption;
+
+  /// No description provided for @csvImportDecimalConvention.
+  ///
+  /// In de, this message translates to:
+  /// **'Zahlenformat'**
+  String get csvImportDecimalConvention;
+
+  /// No description provided for @csvImportDecimalPoint.
+  ///
+  /// In de, this message translates to:
+  /// **'Dezimalpunkt (123.50)'**
+  String get csvImportDecimalPoint;
+
+  /// No description provided for @csvImportDecimalComma.
+  ///
+  /// In de, this message translates to:
+  /// **'Dezimalkomma (123,50)'**
+  String get csvImportDecimalComma;
+
+  /// No description provided for @csvImportDuplicatePolicy.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplikatregel'**
+  String get csvImportDuplicatePolicy;
+
+  /// No description provided for @csvImportPolicySkip.
+  ///
+  /// In de, this message translates to:
+  /// **'Überspringen'**
+  String get csvImportPolicySkip;
+
+  /// No description provided for @csvImportPolicyUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktualisieren'**
+  String get csvImportPolicyUpdate;
+
+  /// No description provided for @csvImportPolicyCreateNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neu anlegen'**
+  String get csvImportPolicyCreateNew;
+
+  /// No description provided for @csvImportMatchField.
+  ///
+  /// In de, this message translates to:
+  /// **'Vergleichsfeld'**
+  String get csvImportMatchField;
+
+  /// No description provided for @csvImportPriceBasis.
+  ///
+  /// In de, this message translates to:
+  /// **'Preisbasis'**
+  String get csvImportPriceBasis;
+
+  /// No description provided for @csvImportPriceNet.
+  ///
+  /// In de, this message translates to:
+  /// **'Netto'**
+  String get csvImportPriceNet;
+
+  /// No description provided for @csvImportPriceGross.
+  ///
+  /// In de, this message translates to:
+  /// **'Brutto'**
+  String get csvImportPriceGross;
+
+  /// No description provided for @csvImportParseAndMap.
+  ///
+  /// In de, this message translates to:
+  /// **'Parsen und zuordnen'**
+  String get csvImportParseAndMap;
+
+  /// No description provided for @csvImportValidatePreview.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschau prüfen'**
+  String get csvImportValidatePreview;
+
+  /// No description provided for @csvImportConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Import bestätigen'**
+  String get csvImportConfirm;
+
+  /// No description provided for @csvImportTemplate.
+  ///
+  /// In de, this message translates to:
+  /// **'Zuordnungsvorlage'**
+  String get csvImportTemplate;
+
+  /// No description provided for @csvImportTemplateNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Vorlage'**
+  String get csvImportTemplateNone;
+
+  /// No description provided for @csvImportSaveMapping.
+  ///
+  /// In de, this message translates to:
+  /// **'Zuordnung speichern'**
+  String get csvImportSaveMapping;
+
+  /// No description provided for @csvImportTemplateName.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlagenname'**
+  String get csvImportTemplateName;
+
+  /// No description provided for @csvImportStatusValid.
+  ///
+  /// In de, this message translates to:
+  /// **'Gültig'**
+  String get csvImportStatusValid;
+
+  /// No description provided for @csvImportStatusInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültig'**
+  String get csvImportStatusInvalid;
+
+  /// No description provided for @csvImportStatusSkip.
+  ///
+  /// In de, this message translates to:
+  /// **'Übersprungen'**
+  String get csvImportStatusSkip;
+
+  /// No description provided for @csvImportStatusUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktualisierung'**
+  String get csvImportStatusUpdate;
+
+  /// No description provided for @csvImportStatusCreate.
+  ///
+  /// In de, this message translates to:
+  /// **'Neu'**
+  String get csvImportStatusCreate;
+
+  /// No description provided for @csvImportStatusAmbiguous.
+  ///
+  /// In de, this message translates to:
+  /// **'Mehrdeutig'**
+  String get csvImportStatusAmbiguous;
+
+  /// No description provided for @csvImportStatusDuplicate.
+  ///
+  /// In de, this message translates to:
+  /// **'Duplikat'**
+  String get csvImportStatusDuplicate;
+
+  /// No description provided for @csvImportSelectUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktualisierung wählen'**
+  String get csvImportSelectUpdate;
+
+  /// No description provided for @csvImportCounts.
+  ///
+  /// In de, this message translates to:
+  /// **'Anzahlen'**
+  String get csvImportCounts;
+
+  /// No description provided for @csvImportFileTooLarge.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei überschreitet 20 MiB; kein Datensatz wurde geschrieben.'**
+  String get csvImportFileTooLarge;
+
+  /// No description provided for @csvImportRowLimit.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei überschreitet 50.000 Zeilen; kein Datensatz wurde geschrieben.'**
+  String get csvImportRowLimit;
+
+  /// No description provided for @csvImportMalformed.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehlerhafte Anführungszeichen; kein Datensatz wurde geschrieben.'**
+  String get csvImportMalformed;
+
+  /// No description provided for @csvImportUnsupportedEncoding.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht unterstützte Kodierung; nur UTF-8 wird unterstützt.'**
+  String get csvImportUnsupportedEncoding;
+
+  /// No description provided for @csvImportColumnMismatch.
+  ///
+  /// In de, this message translates to:
+  /// **'Uneinheitliche Spaltenzahl; kein Datensatz wurde geschrieben.'**
+  String get csvImportColumnMismatch;
+
+  /// No description provided for @csvImportEmptyFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Datei ist leer; kein Datensatz wurde geschrieben.'**
+  String get csvImportEmptyFile;
+
+  /// No description provided for @csvImportMappingConflict.
+  ///
+  /// In de, this message translates to:
+  /// **'Spaltenzuordnung ist mehrdeutig; die Vorschau wurde nicht geöffnet.'**
+  String get csvImportMappingConflict;
+
+  /// No description provided for @csvImportEntityMismatch.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlage passt nicht zu dieser Datenart.'**
+  String get csvImportEntityMismatch;
+
+  /// No description provided for @csvImportMatchFieldRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Für Überspringen/Aktualisieren ist ein Vergleichsfeld erforderlich.'**
+  String get csvImportMatchFieldRequired;
+
+  /// No description provided for @csvImportPriceBasisRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Für Artikel ist eine Preisbasis (netto/brutto) erforderlich.'**
+  String get csvImportPriceBasisRequired;
+
+  /// No description provided for @csvImportUnsupportedFieldForUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'{field} wird für Artikel-Aktualisierung nicht unterstützt.'**
+  String csvImportUnsupportedFieldForUpdate(String field);
+
+  /// No description provided for @csvImportBatchFailure.
+  ///
+  /// In de, this message translates to:
+  /// **'Import fehlgeschlagen; keine Zeile wurde übernommen.'**
+  String get csvImportBatchFailure;
+
+  /// No description provided for @csvImportUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.'**
+  String get csvImportUnavailable;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

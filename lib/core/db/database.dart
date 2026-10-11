@@ -972,4 +972,19 @@ const List<String> _indexSql = <String>[
       'ON lieferanten(lieferantennummer) WHERE lieferantennummer IS NOT NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_transaktionen_dedupe '
       'ON bank_transaktionen(konto_id, dedupe_hash) WHERE dedupe_hash IS NOT NULL',
+  // 40 master_data_import_templates (v16, profile-local CSV mapping templates).
+  '''
+CREATE TABLE IF NOT EXISTS master_data_import_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  entity TEXT NOT NULL CHECK (entity IN ('customer', 'supplier', 'article')),
+  mapping_json TEXT NOT NULL,
+  has_header INTEGER NOT NULL DEFAULT 1 CHECK (has_header IN (0, 1)),
+  delimiter TEXT NOT NULL,
+  decimal_convention TEXT NOT NULL,
+  duplicate_policy TEXT NOT NULL,
+  match_field TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)''',
 ];

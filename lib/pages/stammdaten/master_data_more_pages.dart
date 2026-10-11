@@ -13,6 +13,8 @@ import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/pages/stammdaten/artikel_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_csv_import_models.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_csv_import_page.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
@@ -99,12 +101,20 @@ class _ArticlesWorkspaceViewState extends ConsumerState<ArticlesWorkspaceView> {
         ],
         initialTabIndex: groups ? 1 : 0,
         onTabChanged: (int index) => context.go(index == 1 ? '/articles?view=groups' : '/articles'),
-        actions: _morePrimaryAction(
-          context,
-          groups ? l10n.actionCreateGroup : l10n.actionCreateArticle,
-          Icons.add,
-          () => context.go(groups ? '/articles/new?kind=group' : '/articles/new?kind=item'),
-        ),
+        actions: <Widget>[
+          if (!groups)
+            IconButton(
+              icon: const Icon(Icons.upload_outlined),
+              tooltip: l10n.actionImport,
+              onPressed: () => openMasterDataCsvImport(context, MasterDataImportEntity.article),
+            ),
+          ..._morePrimaryAction(
+            context,
+            groups ? l10n.actionCreateGroup : l10n.actionCreateArticle,
+            Icons.add,
+            () => context.go(groups ? '/articles/new?kind=group' : '/articles/new?kind=item'),
+          ),
+        ],
       ),
       child: groups
           ? _ArticleGroupListBody(

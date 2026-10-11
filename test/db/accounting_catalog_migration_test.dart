@@ -258,7 +258,7 @@ CREATE TABLE kategorien (
         const [],
       );
       final names = rows.map((row) => row['name'].toString()).toSet();
-      expect(names.length, 44);
+      expect(names.length, 45);
       for (final table in AppDatabase.allTableNames) {
         expect(names, contains(table));
       }
@@ -438,7 +438,7 @@ CREATE TABLE forderung_zahlungen (
         const [],
       );
       final names = rows.map((r) => r['name'].toString()).toSet();
-      expect(names.length, 44);
+      expect(names.length, 45);
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t));
       }

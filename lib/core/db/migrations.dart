@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 15;
+  static const int currentVersion = 16;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -240,6 +240,7 @@ class MigrationRunner {
       await _migrateFeatureModules();
       await _migrateProfilePortabilityTables(freshProfile: true);
       await _migrateContactArchive();
+      await _migrateMasterDataImportTemplates();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -354,6 +355,10 @@ class MigrationRunner {
     if (version == 15) {
       await _migrateTo(14, createSchema);
       await _migrateContactArchive();
+    }
+    if (version == 16) {
+      await _migrateTo(15, createSchema);
+      await _migrateMasterDataImportTemplates();
     }
   }
 
@@ -1021,6 +1026,42 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     }
   }
 
+  Future<void> _migrateMasterDataImportTemplates() async {
+    await executor.runCustom(_masterDataImportTemplatesTableSql);
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_master_data_import_templates_entity '
+      'ON master_data_import_templates(entity)',
+    );
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'master_data_import_templates'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Importvorlagen-Tabelle konnte nicht erstellt werden');
+    }
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(master_data_import_templates)',
+      const <Object?>[],
+    );
+    const Set<String> required = <String>{
+      'id',
+      'name',
+      'entity',
+      'mapping_json',
+      'has_header',
+      'delimiter',
+      'decimal_convention',
+      'duplicate_policy',
+      'match_field',
+      'created_at',
+      'updated_at',
+    };
+    final Set<String> names = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!required.every(names.contains)) {
+      throw StateError('Importvorlagen-Schema konnte nicht verifiziert werden');
+    }
+  }
+
   Future<void> _verifyRequiredTables() async {
     if (requiredTables.isEmpty) return;
     final rows = await executor.runSelect(
@@ -1079,6 +1120,7 @@ const Set<String> _featureOwnedTables = <String>{
   'mileage_trip_corrections',
   'category_mapping_history',
   'feature_table_state',
+  'master_data_import_templates',
 };
 
 const Map<String, int> _featureTableVersions = <String, int>{
@@ -1087,6 +1129,7 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'feature_table_state': 13,
   'mileage_trips': 13,
   'mileage_trip_corrections': 13,
+  'master_data_import_templates': 16,
 };
 
 // shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
@@ -1116,6 +1159,19 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
   },
   'mileage_trip_corrections': <String>{'id', 'trip_id', 'kind', 'reason', 'state', 'created_at'},
   'feature_table_state': <String>{'table_name', 'state'},
+  'master_data_import_templates': <String>{
+    'id',
+    'name',
+    'entity',
+    'mapping_json',
+    'has_header',
+    'delimiter',
+    'decimal_convention',
+    'duplicate_policy',
+    'match_field',
+    'created_at',
+    'updated_at',
+  },
 };
 
 const String _rechnungenTableSql = '''
@@ -1234,4 +1290,19 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       OR (state = 'applied' AND accounting_correction_id IS NOT NULL
         AND trim(accounting_correction_id) <> '' AND applied_at IS NOT NULL)
       OR (state = 'cancelled' AND accounting_correction_id IS NULL AND applied_at IS NULL))
+)''';
+
+const String _masterDataImportTemplatesTableSql = '''
+CREATE TABLE IF NOT EXISTS master_data_import_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  entity TEXT NOT NULL CHECK (entity IN ('customer', 'supplier', 'article')),
+  mapping_json TEXT NOT NULL,
+  has_header INTEGER NOT NULL DEFAULT 1 CHECK (has_header IN (0, 1)),
+  delimiter TEXT NOT NULL,
+  decimal_convention TEXT NOT NULL,
+  duplicate_policy TEXT NOT NULL,
+  match_field TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 )''';

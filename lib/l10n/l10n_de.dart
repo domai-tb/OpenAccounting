@@ -2034,4 +2034,156 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get numberRangeNextLabel => 'Nächste Nummer';
+
+  @override
+  String get csvImportTitle => 'CSV-Import';
+
+  @override
+  String get csvImportStepSource => '1. Datei';
+
+  @override
+  String get csvImportStepMapping => '2. Zuordnung';
+
+  @override
+  String get csvImportStepReview => '3. Prüfung';
+
+  @override
+  String get csvImportStepResult => '4. Ergebnis';
+
+  @override
+  String get csvImportSourceHint => 'CSV-Text einfügen oder lokalen Dateipfad angeben. Die Vorschau schreibt nichts.';
+
+  @override
+  String get csvImportCsvLabel => 'CSV-Text';
+
+  @override
+  String get csvImportPathLabel => 'Lokaler Dateipfad (optional)';
+
+  @override
+  String get csvImportDelimiter => 'Trennzeichen';
+
+  @override
+  String get csvImportHeaderOption => 'Erste Zeile ist Kopfzeile';
+
+  @override
+  String get csvImportDecimalConvention => 'Zahlenformat';
+
+  @override
+  String get csvImportDecimalPoint => 'Dezimalpunkt (123.50)';
+
+  @override
+  String get csvImportDecimalComma => 'Dezimalkomma (123,50)';
+
+  @override
+  String get csvImportDuplicatePolicy => 'Duplikatregel';
+
+  @override
+  String get csvImportPolicySkip => 'Überspringen';
+
+  @override
+  String get csvImportPolicyUpdate => 'Aktualisieren';
+
+  @override
+  String get csvImportPolicyCreateNew => 'Neu anlegen';
+
+  @override
+  String get csvImportMatchField => 'Vergleichsfeld';
+
+  @override
+  String get csvImportPriceBasis => 'Preisbasis';
+
+  @override
+  String get csvImportPriceNet => 'Netto';
+
+  @override
+  String get csvImportPriceGross => 'Brutto';
+
+  @override
+  String get csvImportParseAndMap => 'Parsen und zuordnen';
+
+  @override
+  String get csvImportValidatePreview => 'Vorschau prüfen';
+
+  @override
+  String get csvImportConfirm => 'Import bestätigen';
+
+  @override
+  String get csvImportTemplate => 'Zuordnungsvorlage';
+
+  @override
+  String get csvImportTemplateNone => 'Keine Vorlage';
+
+  @override
+  String get csvImportSaveMapping => 'Zuordnung speichern';
+
+  @override
+  String get csvImportTemplateName => 'Vorlagenname';
+
+  @override
+  String get csvImportStatusValid => 'Gültig';
+
+  @override
+  String get csvImportStatusInvalid => 'Ungültig';
+
+  @override
+  String get csvImportStatusSkip => 'Übersprungen';
+
+  @override
+  String get csvImportStatusUpdate => 'Aktualisierung';
+
+  @override
+  String get csvImportStatusCreate => 'Neu';
+
+  @override
+  String get csvImportStatusAmbiguous => 'Mehrdeutig';
+
+  @override
+  String get csvImportStatusDuplicate => 'Duplikat';
+
+  @override
+  String get csvImportSelectUpdate => 'Aktualisierung wählen';
+
+  @override
+  String get csvImportCounts => 'Anzahlen';
+
+  @override
+  String get csvImportFileTooLarge => 'Datei überschreitet 20 MiB; kein Datensatz wurde geschrieben.';
+
+  @override
+  String get csvImportRowLimit => 'Datei überschreitet 50.000 Zeilen; kein Datensatz wurde geschrieben.';
+
+  @override
+  String get csvImportMalformed => 'Fehlerhafte Anführungszeichen; kein Datensatz wurde geschrieben.';
+
+  @override
+  String get csvImportUnsupportedEncoding => 'Nicht unterstützte Kodierung; nur UTF-8 wird unterstützt.';
+
+  @override
+  String get csvImportColumnMismatch => 'Uneinheitliche Spaltenzahl; kein Datensatz wurde geschrieben.';
+
+  @override
+  String get csvImportEmptyFile => 'Datei ist leer; kein Datensatz wurde geschrieben.';
+
+  @override
+  String get csvImportMappingConflict => 'Spaltenzuordnung ist mehrdeutig; die Vorschau wurde nicht geöffnet.';
+
+  @override
+  String get csvImportEntityMismatch => 'Vorlage passt nicht zu dieser Datenart.';
+
+  @override
+  String get csvImportMatchFieldRequired => 'Für Überspringen/Aktualisieren ist ein Vergleichsfeld erforderlich.';
+
+  @override
+  String get csvImportPriceBasisRequired => 'Für Artikel ist eine Preisbasis (netto/brutto) erforderlich.';
+
+  @override
+  String csvImportUnsupportedFieldForUpdate(String field) {
+    return '$field wird für Artikel-Aktualisierung nicht unterstützt.';
+  }
+
+  @override
+  String get csvImportBatchFailure => 'Import fehlgeschlagen; keine Zeile wurde übernommen.';
+
+  @override
+  String get csvImportUnavailable => 'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.';
 }
