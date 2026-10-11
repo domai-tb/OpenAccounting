@@ -25,7 +25,8 @@
 - [x] Review findings addressed; no rebuttals recorded
 
 ### Change Delivery
-- Delivery state: scoped implementation ready for a partial checkpoint commit; full repository gates remain blocked by unrelated feature work.
+- Commit range: `512155c..512155c` (CSV implementation, tests, and task updates)
+- This verification record is delivered in a follow-up commit so it can cite the implementation commit.
 
 ## Overall Decision
 
