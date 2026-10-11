@@ -26,7 +26,7 @@
 - [ ] All findings are fixed or rebutted and accepted
 
 ### Change Delivery
-- Delivery state: uncommitted; a scoped partial checkpoint commit will follow fresh review. No commit range yet.
+- Delivery state: scoped partial local commit is prepared; the full-suite failure keeps the change unarchived. Publishing remains local per user instruction.
 
 ## Overall Decision
 

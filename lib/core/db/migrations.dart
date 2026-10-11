@@ -1420,3 +1420,18 @@ CREATE TABLE IF NOT EXISTS master_data_import_templates (
 )''';
 
 const String _assetScheduleTableSql = '''
+CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  anlage_id INTEGER NOT NULL REFERENCES anlageverzeichnis(id) ON DELETE RESTRICT,
+  jahr INTEGER NOT NULL,
+  quell_snapshot TEXT NOT NULL,
+  quell_hash TEXT NOT NULL,
+  regel_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('verfuegbar', 'nicht_verfuegbar')),
+  formel TEXT,
+  betrag NUMERIC(12,2),
+  blockierungsgrund TEXT,
+  berechnet_am TEXT NOT NULL,
+  CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
+  UNIQUE (anlage_id, jahr, quell_hash, regel_version)
+)''';
