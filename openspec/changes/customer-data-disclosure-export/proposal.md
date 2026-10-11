@@ -1,15 +1,15 @@
 ## Why
 
-Feature-map item 72 asks customer information to support data disclosure/export as a privacy workflow. The active `profile-data-portability` proposal separately proposes a whole-profile owner export, but that capability is not yet an accepted or wired user feature. The current customer detail workflow has no scoped export. Reusing a whole-profile archive for one customer's request would expose unrelated customers' and suppliers' records.
+Feature-map item 72 asks customer information to support data disclosure/export as a privacy workflow. The accepted `profile-data-portability` capability covers whole-profile owner export. The current customer detail workflow has no scoped export. Reusing a whole-profile archive for one customer's request would expose unrelated customers' and suppliers' records.
 
 ## What Changes
 
 - Add a user-initiated data disclosure export from one customer detail view, limited to that customer and records reached through explicit typed relationships.
-- Package a versioned ZIP containing `manifest.json`, typed UTF-8 JSON Lines record projections, and profile-local files explicitly linked to the selected customer, including reviewed dynamic occurrence, receivable-payment, mileage, and category-history tables in the schema-health inventory; mileage and category-history rows have no approved customer relationship and are not included in the customer payload.
+- Package a versioned ZIP containing `manifest.json`, typed UTF-8 JSON Lines record projections, and profile-local files explicitly linked to the selected customer, including migration-owned tables through v19 in the schema-health inventory; only records reached through approved customer relationships enter the payload.
 - Use versioned per-table field allowlists; omit third-party references and mark any non-empty unclassified field as unsupported and the archive incomplete.
 - Follow invoice correction/conversion lineage, recurring-template source-invoice links, and saved delivery-address links while rejecting conflicting customer identities.
 - Identify included record types, relationship paths, excluded or ambiguous data, and missing files; never call an incomplete package complete.
-- Keep the operation read-only and separate from the proposed whole-profile portability capability, customer deletion, anonymization, or retention controls; do not imply whole-profile portability is currently available.
+- Keep this operation read-only and separate from whole-profile export, customer deletion, anonymization, and retention controls.
 - Follow `DESIGN.md` accessibility, localization, form, status, and responsive workspace requirements.
 
 ## Capabilities

@@ -39,7 +39,10 @@ class MigrationRunner {
     final Set<String> actualTables = <String>{for (final row in rows) row['name'].toString()};
     final Set<String> knownTables = <String>{...requiredTables, ..._featureOwnedTables};
     final Set<String> requiredForVersion = <String>{
-      ...requiredTables,
+      for (final String table in requiredTables)
+        if (!_optionalSchemaTables.contains(table) &&
+            (!_featureTableVersions.containsKey(table) || version >= _featureTableVersions[table]!))
+          table,
       for (final entry in _featureTableVersions.entries)
         if (version >= entry.value) entry.key,
     };
@@ -54,6 +57,11 @@ class MigrationRunner {
     ]..sort();
     final List<String> malformedTables = <String>[];
     for (final String table in requiredForVersion) {
+      if (actualTables.contains(table) && !await _hasDeclaredSchema(table)) {
+        malformedTables.add(table);
+      }
+    }
+    for (final String table in _optionalSchemaTables) {
       if (actualTables.contains(table) && !await _hasDeclaredSchema(table)) {
         malformedTables.add(table);
       }
@@ -116,12 +124,71 @@ class MigrationRunner {
         const <Object?>[],
       );
       final Set<String> names = <String>{for (final row in columns) row['name'].toString()};
-      if (!requiredColumns.every(names.contains)) return false;
+      if (_optionalSchemaTables.contains(table)) {
+        final bool uniqueAttemptKey =
+            table == 'dokument_email_versuche' && await _hasUniqueColumnIndex(table, 'idempotenz_schluessel');
+        if (!hasDeclaredOptionalSchema(table, columns, hasUniqueAttemptKey: uniqueAttemptKey)) return false;
+      } else if (!hasDeclaredSchemaColumns(table, names) || !hasDeclaredRelationshipIdTypes(table, columns)) {
+        return false;
+      }
     }
     if (table == 'forderung_zahlungen') {
       return _receivableFeatureHasRequiredConstraints();
     }
     return true;
+  }
+
+  static bool hasDeclaredSchemaColumns(String table, Iterable<String> columns) {
+    final Set<String>? requiredColumns = _declaredSchemaColumns[table];
+    if (requiredColumns == null) return true;
+    final Set<String> availableColumns = columns.toSet();
+    if (_optionalSchemaTables.contains(table)) {
+      return availableColumns.length == requiredColumns.length && requiredColumns.containsAll(availableColumns);
+    }
+    return requiredColumns.every(availableColumns.contains);
+  }
+
+  static bool hasDeclaredRelationshipIdTypes(String table, List<Map<String, Object?>> columns) {
+    final Set<String> relationshipColumns = _declaredRelationshipIdColumns[table] ?? const <String>{};
+    for (final Map<String, Object?> column in columns) {
+      if (!relationshipColumns.contains(column['name'])) continue;
+      if (!(column['type']?.toString().toUpperCase().contains('INT') ?? false)) return false;
+    }
+    return true;
+  }
+
+  static bool hasDeclaredOptionalSchema(
+    String table,
+    Iterable<Map<String, Object?>> columns, {
+    bool hasUniqueAttemptKey = false,
+  }) {
+    final Map<String, String>? expectedTypes = _optionalSchemaColumnTypes[table];
+    if (expectedTypes == null) return false;
+    final List<Map<String, Object?>> actual = columns.toList(growable: false);
+    if (actual.length != expectedTypes.length) return false;
+    for (final Map<String, Object?> column in actual) {
+      final String name = column['name']?.toString() ?? '';
+      if (expectedTypes[name] != column['type']?.toString().toUpperCase()) return false;
+      if (_asInt(column['notnull']) != (_optionalSchemaNotNull[table]!.contains(name) ? 1 : 0)) return false;
+      if (_asInt(column['pk']) != (_optionalSchemaPrimaryKey[table] == name ? 1 : 0)) return false;
+    }
+    return table != 'dokument_email_versuche' || hasUniqueAttemptKey;
+  }
+
+  Future<bool> _hasUniqueColumnIndex(String table, String column) async {
+    final List<Map<String, Object?>> indexes = await executor.runSelect('PRAGMA index_list($table)', const <Object?>[]);
+    for (final Map<String, Object?> index in indexes) {
+      if (_asInt(index['unique']) != 1) continue;
+      final String name = index['name']?.toString() ?? '';
+      if (name.isEmpty) continue;
+      final String quotedName = name.replaceAll('"', '""');
+      final List<Map<String, Object?>> fields = await executor.runSelect(
+        'PRAGMA index_info("$quotedName")',
+        const <Object?>[],
+      );
+      if (fields.length == 1 && fields.single['name'] == column) return true;
+    }
+    return false;
   }
 
   Future<bool> hasAnyTables() async {
@@ -1308,6 +1375,11 @@ const Set<String> _featureOwnedTables = <String>{
   'anlage_afa_jahreswerte',
   'inventuren',
   'inventur_positionen',
+  'settlement_groups',
+  'settlement_allocations',
+  'statutory_timing_rules',
+  'dokument_email_templates',
+  'dokument_email_versuche',
 };
 
 const Map<String, int> _featureTableVersions = <String, int>{
@@ -1320,31 +1392,94 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'anlage_afa_jahreswerte': 17,
   'inventuren': 18,
   'inventur_positionen': 18,
+  'settlement_groups': 19,
+  'settlement_allocations': 19,
+  'statutory_timing_rules': 19,
 };
 
 // shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
+const Set<String> _optionalSchemaTables = <String>{'dokument_email_templates', 'dokument_email_versuche'};
+
+const Map<String, Map<String, String>> _optionalSchemaColumnTypes = <String, Map<String, String>>{
+  'dokument_email_templates': <String, String>{
+    'typ': 'TEXT',
+    'betreff': 'TEXT',
+    'text': 'TEXT',
+    'aktualisiert_am': 'TEXT',
+  },
+  'dokument_email_versuche': <String, String>{
+    'id': 'INTEGER',
+    'dokument_id': 'INTEGER',
+    'dokument_typ': 'TEXT',
+    'empfaenger': 'TEXT',
+    'ergebnis': 'TEXT',
+    'mahnung_id': 'INTEGER',
+    'idempotenz_schluessel': 'TEXT',
+    'artefakt_ids': 'TEXT',
+    'erstellt_am': 'TEXT',
+    'abgeschlossen_am': 'TEXT',
+    'fehler_kategorie': 'TEXT',
+  },
+};
+
+const Map<String, Set<String>> _optionalSchemaNotNull = <String, Set<String>>{
+  'dokument_email_templates': <String>{'betreff', 'text', 'aktualisiert_am'},
+  'dokument_email_versuche': <String>{
+    'dokument_id',
+    'dokument_typ',
+    'empfaenger',
+    'ergebnis',
+    'idempotenz_schluessel',
+    'artefakt_ids',
+    'erstellt_am',
+  },
+};
+
+const Map<String, String> _optionalSchemaPrimaryKey = <String, String>{
+  'dokument_email_templates': 'typ',
+  'dokument_email_versuche': 'id',
+};
+
+const Map<String, Set<String>> _declaredRelationshipIdColumns = <String, Set<String>>{
+  'kunden_lieferadressen': <String>{'kunde_id'},
+  'rechnungen': <String>{
+    'kunde_id',
+    'lieferadresse_id',
+    'storno_von',
+    'gutschrift_von',
+    'ersatz_fuer',
+    'ersatzrechnung_id',
+    'konvertiert_von',
+    'konvertiert_zu',
+    'vorlage_id',
+  },
+  'rechnungspositionen': <String>{'rechnung_id'},
+  'mahnungen': <String>{'kunde_id', 'rechnung_id'},
+  'forderungen': <String>{'kunde_id', 'partner_id', 'rechnung_id', 'journal_id', 'ausgleich_journal_id'},
+  'forderung_zahlungen': <String>{'forderung_id', 'journal_id'},
+  'journal': <String>{'rechnung_id', 'beleg_id'},
+  'vorsteuer_ansprueche': <String>{'rechnung_id'},
+  'rechnungsvorlagen': <String>{'kunde_id', 'auftrag_id'},
+  'rechnungsvorlagen_occurrences': <String>{'vorlage_id', 'rechnung_id'},
+  'kunden_belege': <String>{'kunde_id', 'beleg_id'},
+  'buchungsvorlagen_occurrences': <String>{'rechnung_id', 'journal_id'},
+  'settlement_allocations': <String>{'forderung_id'},
+  'dokument_email_versuche': <String>{'dokument_id', 'mahnung_id'},
+};
+
 const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
-  'anlage_afa_jahreswerte': <String>{
-    'id',
-    'anlage_id',
-    'jahr',
-    'quell_snapshot',
-    'quell_hash',
-    'regel_version',
-    'status',
-    'betrag',
-    'blockierungsgrund',
-    'berechnet_am',
-  },
-  'inventuren': <String>{'id', 'stichtag', 'status', 'erstellt_am'},
-  'inventur_positionen': <String>{
-    'id',
-    'inventur_id',
-    'artikel_id',
-    'bezeichnung_snapshot',
-    'einheit_snapshot',
-    'menge_gezaehlt',
-  },
+  // These keys are stable across profile versions; the exporter validates every projected field separately.
+  'kunden': <String>{'id'},
+  'kunden_lieferadressen': <String>{'id', 'kunde_id'},
+  'rechnungen': <String>{'id', 'kunde_id'},
+  'rechnungspositionen': <String>{'id', 'rechnung_id'},
+  'mahnungen': <String>{'id', 'rechnung_id', 'kunde_id'},
+  'forderungen': <String>{'id', 'kunde_id', 'rechnung_id', 'journal_id', 'ausgleich_journal_id'},
+  'journal': <String>{'id', 'rechnung_id'},
+  'vorsteuer_ansprueche': <String>{'id', 'rechnung_id'},
+  'rechnungsvorlagen': <String>{'id', 'kunde_id'},
+  'kunden_belege': <String>{'id', 'kunde_id', 'beleg_id'},
+  'belege': <String>{'id', 'dateipfad'},
   'forderung_zahlungen': <String>{
     'id',
     'forderung_id',
@@ -1382,6 +1517,70 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
     'match_field',
     'created_at',
     'updated_at',
+  },
+  'anlage_afa_jahreswerte': <String>{
+    'id',
+    'anlage_id',
+    'jahr',
+    'quell_snapshot',
+    'quell_hash',
+    'regel_version',
+    'status',
+    'betrag',
+    'blockierungsgrund',
+    'berechnet_am',
+  },
+  'inventuren': <String>{'id', 'stichtag', 'status', 'erstellt_am'},
+  'inventur_positionen': <String>{
+    'id',
+    'inventur_id',
+    'artikel_id',
+    'bezeichnung_snapshot',
+    'einheit_snapshot',
+    'menge_gezaehlt',
+  },
+  'settlement_groups': <String>{
+    'id',
+    'source_kind',
+    'source_id',
+    'signed_amount_cents',
+    'settlement_date',
+    'unapplied_cents',
+    'group_root_journal_id',
+  },
+  'settlement_allocations': <String>{
+    'id',
+    'group_id',
+    'forderung_id',
+    'applied_cents',
+    'settlement_date',
+    'euer_zeile',
+    'direction',
+  },
+  'statutory_timing_rules': <String>{
+    'id',
+    'rule_id',
+    'rule_version',
+    'legal_basis',
+    'affected_year',
+    'approver',
+    'source_trace',
+    'settlement_group_id',
+    'attributed_year',
+  },
+  'dokument_email_templates': <String>{'typ', 'betreff', 'text', 'aktualisiert_am'},
+  'dokument_email_versuche': <String>{
+    'id',
+    'dokument_id',
+    'dokument_typ',
+    'empfaenger',
+    'ergebnis',
+    'mahnung_id',
+    'idempotenz_schluessel',
+    'artefakt_ids',
+    'erstellt_am',
+    'abgeschlossen_am',
+    'fehler_kategorie',
   },
 };
 

@@ -30,6 +30,8 @@ import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_csv_import_service.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
+import 'package:openaccounting/pages/stammdaten/customer_data_disclosure_export.dart';
+import 'package:openaccounting/pages/stammdaten/customer_disclosure_export_action.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 import 'package:path/path.dart' as p;
 
@@ -113,6 +115,23 @@ class AppServices {
   );
 
   late final ProfileExportService profileExport = _createProfileExport();
+
+  late final CustomerDataDisclosureExportService customerDisclosureExport = _createCustomerDisclosureExport();
+
+  late final CustomerDisclosureExportAction customerDisclosure = CustomerDisclosureExportAction(
+    customers: kunden,
+    exportService: customerDisclosureExport,
+  );
+
+  CustomerDataDisclosureExportService _createCustomerDisclosureExport() {
+    final String? directory = _db.profileDir;
+    final String label = directory == null || directory.isEmpty ? 'Profil' : p.basename(directory);
+    return CustomerDataDisclosureExportService(
+      executor: _db.executor,
+      profileDir: directory ?? '',
+      profileLabel: label,
+    );
+  }
 
   ProfileExportService _createProfileExport() {
     final String? directory = _db.profileDir;

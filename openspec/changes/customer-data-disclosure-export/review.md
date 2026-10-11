@@ -99,6 +99,8 @@ The round-one changes are confirmed applied. Round-two findings remain unresolve
 
 CHANGES_APPLIED: n/a
 
+---
+
 ## Rebuttals — Round 2
 
 None.
@@ -259,5 +261,86 @@ None. This approval covers the proposal/design/spec artifacts only; no implement
 CHANGES_APPLIED: n/a
 
 ## Rebuttals — Round 5
+
+None.
+
+## Review Metadata — Round 6
+
+- **Review round**: 6
+- **Prior round**: Round 5 approved only proposal/design/spec artifacts; it excluded the test plan and task ledger.
+- **Reviewer context**: fresh independent read-only review of the current working tree.
+- **Revision reviewed**: current `dev` working tree after the v19 inventory and scenario reconciliation.
+- **Artifacts reviewed**: proposal, design, delta specs, test plan, task ledger, maintained database spec, and relevant schema/export source.
+- **Validation evidence**: `openspec validate customer-data-disclosure-export --type change --strict --json` passed 1/1. No tests were run during this artifact review.
+
+### Findings
+
+None. All 47 delta scenarios have matching test-plan rows. The accepted v19 table inventory, optional document-email schemas, version boundaries, and open settlement/email/route implementation tasks are represented consistently.
+
+### Verdict — Round 6
+
+VERDICT: APPROVE
+
+## Required Changes — Round 6
+
+None before implementation.
+
+CHANGES_APPLIED: n/a
+
+---
+
+## Review Metadata — Round 7
+
+- **Review round**: 7
+- **Prior round**: Round 6 approved artifacts before implementation and did not review runtime behavior.
+- **Reviewer context**: fresh independent read-only review of the disclosure implementation after the initialized occurrence-schema regression was added.
+- **Revision reviewed**: current `dev` working tree.
+- **Artifacts reviewed**: disclosure exporter, database schema declarations, scoped export tests, and updated test plan.
+- **Validation evidence**: focused disclosure checks and static analysis were run separately by the implementation agent; this review did not run tests.
+
+### Findings
+
+None blocking. Initialized occurrence tables validate required payload columns and declared relationship ID types. The new regression proves a text-typed invoice ID makes the export incomplete. Other reviewed fixes keep snapshots inside the profile, omit foreign invoice-template references, and report dangling receipt and journal links.
+
+### Verdict — Round 7
+
+VERDICT: APPROVE
+
+## Required Changes — Round 7
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 7
+
+None.
+
+---
+
+## Review Metadata — Round 8
+
+- **Review round**: 8
+- **Prior round**: Round 7 approved the exporter before the clean-HEAD v18 isolation fixes and did not cover the exact staged patch.
+- **Reviewer context**: fresh, independent, read-only review of the staged patch; a second scoped review checked the generated localization diff.
+- **Revision reviewed**: final customer-only index on `dev`, based on `e454048`.
+- **Artifacts reviewed**: exporter and focused fixtures, v18/v19 schema gates, customer-only `migrations.dart`, AppServices and customer-detail wiring, direct `ffi` dependency, ARBs/generated localization output, and archive/privacy handling.
+- **Validation evidence**: implementation checks recorded separately; reviewers did not run tests.
+
+### Findings
+
+None blocking. The review confirmed `currentVersion` remains 18, v19 settlement names are version-gated and add no v19 DDL to this patch, and test fixtures do not import unfinished email or settlement implementations. The `ffi` import has a direct dependency. The full generated localization output is retained because it restores the stale/malformed API for existing ARB keys while adding the customer strings; trimming it would leave generated code out of sync.
+
+### Verdict — Round 8
+
+VERDICT: APPROVE
+
+## Required Changes — Round 8
+
+None for this partial local commit. Keep the change unarchived while the repository-wide suite is failing.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 8
 
 None.

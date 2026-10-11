@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
 import 'package:openaccounting/l10n/l10n.dart';
+import 'package:openaccounting/pages/stammdaten/customer_disclosure_export_action.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_csv_import_models.dart';
@@ -818,6 +820,37 @@ class _CustomerRecordBody extends ConsumerStatefulWidget {
 
 class _CustomerRecordBodyState extends ConsumerState<_CustomerRecordBody> {
   int _reloadToken = 0;
+  int? _customerFutureId;
+  int _customerFutureReloadToken = -1;
+  Future<Kunde?>? _customerFuture;
+  CustomerDisclosureExportController? _disclosureController;
+
+  Future<Kunde?> _customerFor(AppServices services) {
+    if (_customerFuture == null || _customerFutureId != widget.id || _customerFutureReloadToken != _reloadToken) {
+      _customerFutureId = widget.id;
+      _customerFutureReloadToken = _reloadToken;
+      _customerFuture = services.contactDetail.customerById(widget.id);
+    }
+    return _customerFuture!;
+  }
+
+  CustomerDisclosureExportController _disclosureControllerFor(AppServices services, int customerId) {
+    final CustomerDisclosureExportController? current = _disclosureController;
+    if (current != null && current.customerId == customerId && identical(current.action, services.customerDisclosure)) {
+      return current;
+    }
+    current?.dispose();
+    return _disclosureController = CustomerDisclosureExportController(
+      action: services.customerDisclosure,
+      customerId: customerId,
+    );
+  }
+
+  @override
+  void dispose() {
+    _disclosureController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -825,7 +858,7 @@ class _CustomerRecordBodyState extends ConsumerState<_CustomerRecordBody> {
     final AppServices services = _servicesOf(context, ref);
     return FutureBuilder<Kunde?>(
       key: ValueKey<String>('customer_${widget.id}_$_reloadToken'),
-      future: services.contactDetail.customerById(widget.id),
+      future: _customerFor(services),
       builder: (BuildContext context, AsyncSnapshot<Kunde?> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return AppPage(
@@ -918,11 +951,33 @@ class _CustomerRecordBodyState extends ConsumerState<_CustomerRecordBody> {
                   ],
                 ),
               ),
+              const SizedBox(height: AppSpacing.lg),
+              AppCard(
+                child: CustomerDisclosureExportButton(
+                  controller: _disclosureControllerFor(services, customer.id),
+                  selectDestination: () => _selectDisclosureDestination(customer.id),
+                  actionLabel: l10n.customerDisclosureExportAction,
+                  confirmLabel: l10n.customerDisclosureExportConfirm,
+                  cancelLabel: l10n.actionCancel,
+                  scopeTitle: l10n.customerDisclosureExportScopeTitle,
+                  scopeDescription: l10n.customerDisclosureExportScopeDescription,
+                ),
+              ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<String?> _selectDisclosureDestination(int customerId) async {
+    final FileSaveLocation? location = await getSaveLocation(
+      acceptedTypeGroups: const <XTypeGroup>[
+        XTypeGroup(label: 'ZIP', extensions: <String>['zip']),
+      ],
+      suggestedName: 'kundendaten_export_$customerId.zip',
+    );
+    return location?.path;
   }
 
   Future<void> _toggleArchive(BuildContext context, AppServices services, Kunde customer) async {

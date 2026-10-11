@@ -62,7 +62,8 @@ import 'l10n_en.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,15 +84,19 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[Locale('de'), Locale('en')];
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('de'),
+    Locale('en'),
+  ];
 
   /// No description provided for @appTitle.
   ///
@@ -4034,7 +4040,11 @@ abstract class AppLocalizations {
   /// **'Nächste Nummer'**
   String get numberRangeNextLabel;
 
-String get csvImportTitle;
+  /// No description provided for @csvImportTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'CSV-Import'**
+  String get csvImportTitle;
 
   /// No description provided for @csvImportStepSource.
   ///
@@ -4329,9 +4339,220 @@ String get csvImportTitle;
   /// In de, this message translates to:
   /// **'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.'**
   String get csvImportUnavailable;
+
+  /// No description provided for @customerDisclosureExportAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Kundendaten exportieren'**
+  String get customerDisclosureExportAction;
+
+  /// No description provided for @customerDisclosureExportScopeTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Auskunfts-Export: Umfang'**
+  String get customerDisclosureExportScopeTitle;
+
+  /// No description provided for @customerDisclosureExportScopeDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Export enthält ausschließlich diesen Kunden und Datensätze mit verifizierten Verknüpfungen (Rechnungen, Positionen, Mahnungen, Forderungen, Zahlungen, Vorlagen, Belege). Freitext-Treffer werden nicht gesucht oder exportiert. Nicht unterstützte oder ausgeschlossene Inhalte werden im Manifest genannt; das Archiv kann unvollständig sein. Dies ist kein Profil-Archiv und kein Backup. Kundendaten werden weder gelöscht noch anonymisiert.'**
+  String get customerDisclosureExportScopeDescription;
+
+  /// No description provided for @customerDisclosureExportConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Exportieren'**
+  String get customerDisclosureExportConfirm;
+
+  /// No description provided for @customerDisclosureExportProgress.
+  ///
+  /// In de, this message translates to:
+  /// **'Export läuft…'**
+  String get customerDisclosureExportProgress;
+
+  /// No description provided for @customerDisclosureExportComplete.
+  ///
+  /// In de, this message translates to:
+  /// **'Export abgeschlossen und geprüft.'**
+  String get customerDisclosureExportComplete;
+
+  /// No description provided for @customerDisclosureExportIncomplete.
+  ///
+  /// In de, this message translates to:
+  /// **'Export unvollständig gespeichert. Bitte Hinweise prüfen.'**
+  String get customerDisclosureExportIncomplete;
+
+  /// No description provided for @customerDisclosureExportFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Export fehlgeschlagen. Bitte Ziel prüfen und erneut versuchen.'**
+  String get customerDisclosureExportFailed;
+
+  /// No description provided for @customerDisclosureExportCancelled.
+  ///
+  /// In de, this message translates to:
+  /// **'Export abgebrochen. Es wurde kein Archiv erstellt.'**
+  String get customerDisclosureExportCancelled;
+
+  /// No description provided for @customerDisclosureExportUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Auskunfts-Export ist nicht verfügbar.'**
+  String get customerDisclosureExportUnavailable;
+
+  /// No description provided for @customerDisclosureExportNotFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Kunde nicht gefunden. Es wurde kein Archiv erstellt.'**
+  String get customerDisclosureExportNotFound;
+
+  /// No description provided for @customerDisclosureExportDestinationExists.
+  ///
+  /// In de, this message translates to:
+  /// **'Zieldatei existiert bereits. Bitte anderen Namen wählen.'**
+  String get customerDisclosureExportDestinationExists;
+
+  /// No description provided for @routeAssets.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen'**
+  String get routeAssets;
+
+  /// No description provided for @assetRegisterTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagenverzeichnis'**
+  String get assetRegisterTitle;
+
+  /// No description provided for @assetRegisterSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen verwalten und lineare AfA prüfen'**
+  String get assetRegisterSubtitle;
+
+  /// No description provided for @assetAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage hinzufügen'**
+  String get assetAdd;
+
+  /// No description provided for @assetEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage bearbeiten'**
+  String get assetEdit;
+
+  /// No description provided for @assetDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Bezeichnung'**
+  String get assetDescription;
+
+  /// No description provided for @assetType.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagetyp'**
+  String get assetType;
+
+  /// No description provided for @assetAcquisitionDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Anschaffungsdatum'**
+  String get assetAcquisitionDate;
+
+  /// No description provided for @assetNetPrice.
+  ///
+  /// In de, this message translates to:
+  /// **'Nettokaufpreis'**
+  String get assetNetPrice;
+
+  /// No description provided for @assetUsefulLife.
+  ///
+  /// In de, this message translates to:
+  /// **'Nutzungsdauer (Jahre)'**
+  String get assetUsefulLife;
+
+  /// No description provided for @assetMethod.
+  ///
+  /// In de, this message translates to:
+  /// **'AfA-Methode'**
+  String get assetMethod;
+
+  /// No description provided for @assetPrivateShare.
+  ///
+  /// In de, this message translates to:
+  /// **'Privatanteil (%)'**
+  String get assetPrivateShare;
+
+  /// No description provided for @assetCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get assetCategory;
+
+  /// No description provided for @assetDisposalDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Verkauft am'**
+  String get assetDisposalDate;
+
+  /// No description provided for @assetInvalidField.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültige Eingabe: {field}'**
+  String assetInvalidField(Object field);
+
+  /// No description provided for @assetEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Anlagen. Lege die erste Anlage an.'**
+  String get assetEmpty;
+
+  /// No description provided for @assetDeleteRefused.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.'**
+  String get assetDeleteRefused;
+
+  /// No description provided for @assetArchived.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage archiviert'**
+  String get assetArchived;
+
+  /// No description provided for @assetScheduleTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'AfA-Jahreswerte'**
+  String get assetScheduleTitle;
+
+  /// No description provided for @assetScheduleUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get assetScheduleUnavailable;
+
+  /// No description provided for @assetFinancialBlocked.
+  ///
+  /// In de, this message translates to:
+  /// **'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.'**
+  String get assetFinancialBlocked;
+
+  /// No description provided for @assetLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen konnten nicht geladen werden.'**
+  String get assetLoadFailed;
+
+  /// No description provided for @assetUnresolved.
+  ///
+  /// In de, this message translates to:
+  /// **'Unaufgelöst: Prüfung erforderlich'**
+  String get assetUnresolved;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -4340,7 +4561,8 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['de', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['de', 'en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -4361,120 +4583,4 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
     'that was used.',
   );
-  /// No description provided for @routeAssets.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlagen'**
-  String get routeAssets;
-  /// No description provided for @assetRegisterTitle.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlagenverzeichnis'**
-  String get assetRegisterTitle;
-  /// No description provided for @assetRegisterSubtitle.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlagen verwalten und lineare AfA prüfen'**
-  String get assetRegisterSubtitle;
-  /// No description provided for @assetAdd.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlage hinzufügen'**
-  String get assetAdd;
-  /// No description provided for @assetEdit.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlage bearbeiten'**
-  String get assetEdit;
-  /// No description provided for @assetDescription.
-  ///
-  /// In de, this message translates to:
-  /// **'Bezeichnung'**
-  String get assetDescription;
-  /// No description provided for @assetType.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlagetyp'**
-  String get assetType;
-  /// No description provided for @assetAcquisitionDate.
-  ///
-  /// In de, this message translates to:
-  /// **'Anschaffungsdatum'**
-  String get assetAcquisitionDate;
-  /// No description provided for @assetNetPrice.
-  ///
-  /// In de, this message translates to:
-  /// **'Nettokaufpreis'**
-  String get assetNetPrice;
-  /// No description provided for @assetUsefulLife.
-  ///
-  /// In de, this message translates to:
-  /// **'Nutzungsdauer (Jahre)'**
-  String get assetUsefulLife;
-  /// No description provided for @assetMethod.
-  ///
-  /// In de, this message translates to:
-  /// **'AfA-Methode'**
-  String get assetMethod;
-  /// No description provided for @assetPrivateShare.
-  ///
-  /// In de, this message translates to:
-  /// **'Privatanteil (%)'**
-  String get assetPrivateShare;
-  /// No description provided for @assetCategory.
-  ///
-  /// In de, this message translates to:
-  /// **'Kategorie'**
-  String get assetCategory;
-  /// No description provided for @assetDisposalDate.
-  ///
-  /// In de, this message translates to:
-  /// **'Verkauft am'**
-  String get assetDisposalDate;
-  /// No description provided for @assetInvalidField.
-  ///
-  /// In de, this message translates to:
-  /// **'Ungültige Eingabe: {field}'**
-  String assetInvalidField(String field);
-  /// No description provided for @assetEmpty.
-  ///
-  /// In de, this message translates to:
-  /// **'Noch keine Anlagen. Lege die erste Anlage an.'**
-  String get assetEmpty;
-  /// No description provided for @assetDeleteRefused.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.'**
-  String get assetDeleteRefused;
-  /// No description provided for @assetArchived.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlage archiviert'**
-  String get assetArchived;
-  /// No description provided for @assetScheduleTitle.
-  ///
-  /// In de, this message translates to:
-  /// **'AfA-Jahreswerte'**
-  String get assetScheduleTitle;
-  /// No description provided for @assetScheduleUnavailable.
-  ///
-  /// In de, this message translates to:
-  /// **'Nicht verfügbar'**
-  String get assetScheduleUnavailable;
-  /// No description provided for @assetFinancialBlocked.
-  ///
-  /// In de, this message translates to:
-  /// **'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.'**
-  String get assetFinancialBlocked;
-  /// No description provided for @assetLoadFailed.
-  ///
-  /// In de, this message translates to:
-  /// **'Anlagen konnten nicht geladen werden.'**
-  String get assetLoadFailed;
-  /// No description provided for @assetUnresolved.
-  ///
-  /// In de, this message translates to:
-  /// **'Unaufgelöst: Prüfung erforderlich'**
-  String get assetUnresolved;
-
 }
