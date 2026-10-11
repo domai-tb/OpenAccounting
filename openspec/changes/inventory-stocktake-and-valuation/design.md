@@ -58,7 +58,7 @@ Use keyboard traversal and activation for table rows and count cells, visible fo
 
 ## Migration Plan
 
-1. Add one ordered, backed-up SQLite migration that creates only `inventuren`, `inventur_positionen`, and their immutability/completeness guards. The migration updates the explicit database table inventory: 38 established tables plus `inventarbewegungen` make the 39-table baseline; adding the two stocktake tables yields 41. Do not rewrite current stock, movement rows, or article prices. A migration failure must leave the schema version and prior data unchanged.
+1. Add one ordered, backed-up SQLite migration at v18 that creates only `inventuren`, `inventur_positionen`, and their immutability/completeness guards. The v18 base registry has 41 tables: the 39-table pre-stocktake baseline plus these two tables. Do not rewrite current stock, movement rows, or article prices. A migration failure must leave the schema version and prior data unchanged.
 2. Add typed inventory service wiring and the `/inventory` count workspace. Create and record count snapshots transactionally; retain records when the route is later disabled.
 3. Add localized German/English labels and accessible keyboard, focus, and semantic behavior; retain unavailable/retry states for disabled inventory or data-service failure.
 4. Keep book-quantity reconciliation and monetary valuation unavailable until the open policy/data questions are separately resolved and specified. Rollback may hide the workspace but must not delete recorded stocktakes or alter live inventory.

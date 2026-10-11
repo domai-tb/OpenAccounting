@@ -528,6 +528,85 @@ class AppLocalizationsDe extends AppLocalizations {
   String get inventoryBack => 'Zur Übersicht';
 
   @override
+  String get stocktakeNewAction => 'Neue Inventur';
+
+  @override
+  String get stocktakeStichtagLabel => 'Stichtag';
+
+  @override
+  String get stocktakeRecordAction => 'Erfassen';
+
+  @override
+  String get stocktakeDraftStatus => 'Entwurf';
+
+  @override
+  String get stocktakeRecordedStatus => 'Erfasst';
+
+  @override
+  String get stocktakeCountLabel => 'Gezählte Menge';
+
+  @override
+  String get stocktakePhysicalCount => 'Gezählte Istmenge';
+
+  @override
+  String get stocktakeMissingCount =>
+      'Für jeden Artikel eine gezählte Menge eingeben.';
+
+  @override
+  String get stocktakeInvalidCount =>
+      'Bitte eine gültige gezählte Menge eingeben.';
+
+  @override
+  String get stocktakeInvalidDate => 'Stichtag im Format JJJJ-MM-TT eingeben';
+
+  @override
+  String get stocktakeNegativeForbidden =>
+      'Gezählte Mengen dürfen nicht negativ sein.';
+
+  @override
+  String get stocktakePrecisionInvalid =>
+      'Gezählte Mengen dürfen höchstens drei Nachkommastellen haben.';
+
+  @override
+  String get stocktakeNoCountable => 'Keine zählbaren Artikel vorhanden.';
+
+  @override
+  String get stocktakeNoCountableDescription =>
+      'Aktiviere die Lagerführung für mindestens einen Artikel.';
+
+  @override
+  String get stocktakeHistoryTitle => 'Erfasste Inventuren';
+
+  @override
+  String get stocktakeBookUnavailable => 'Buchbestand nicht verfügbar';
+
+  @override
+  String get stocktakeVarianceUnavailable => 'Differenz nicht verfügbar';
+
+  @override
+  String get stocktakeValuationUnavailable => 'Bewertung nicht verfügbar';
+
+  @override
+  String get stocktakeValuationDescription =>
+      'Keine geprüfte Bewertungsrichtlinie hinterlegt. Gezählte Mengen bleiben verfügbar.';
+
+  @override
+  String get stocktakeCorrectionHint =>
+      'Korrekturen über eine neue Inventur erfassen.';
+
+  @override
+  String get stocktakeDisabledNew => 'Neue Inventuren sind deaktiviert.';
+
+  @override
+  String get stocktakeEmpty => 'Noch keine Inventuren.';
+
+  @override
+  String get stocktakeCapturedAt => 'Erfasst am';
+
+  @override
+  String get stocktakeArticleColumn => 'Artikel';
+
+  @override
   String get pdfInvoice => 'Rechnung';
 
   @override

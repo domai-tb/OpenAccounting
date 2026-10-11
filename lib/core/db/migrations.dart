@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 17;
+  static const int currentVersion = 18;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -242,6 +242,7 @@ class MigrationRunner {
       await _migrateContactArchive();
       await _migrateMasterDataImportTemplates();
       await _migrateAssetRegister();
+      await _migrateStocktake();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -364,6 +365,10 @@ class MigrationRunner {
     if (version == 17) {
       await _migrateTo(16, createSchema);
       await _migrateAssetRegister();
+    }
+    if (version == 18) {
+      await _migrateTo(17, createSchema);
+      await _migrateStocktake();
     }
   }
 
@@ -1160,6 +1165,87 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     }
   }
 
+  /// Physical stocktake count evidence (v18, next sequential after the v17
+  /// baseline). Creates exactly `inventuren` and `inventur_positionen` plus
+  /// their immutability/completeness guards. Headers are inserted only as
+  /// `entwurf`; the draft-to-recorded transition requires at least one
+  /// position with an explicit count. Recorded headers and their positions
+  /// are immutable at the persistence boundary, including direct SQL.
+  /// Count snapshots never touch `artikel` stock, `inventarbewegungen`, or
+  /// accounting records. Idempotent: existing verified tables are kept as-is
+  /// so reruns and full-schema fixtures emit no DDL; any DDL or verification
+  /// failure rolls back with the version bump.
+  Future<void> _migrateStocktake() async {
+    final List<Map<String, Object?>> existing = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('inventuren', 'inventur_positionen')",
+      const <Object?>[],
+    );
+    final Set<String> names = <String>{for (final Map<String, Object?> row in existing) row['name'].toString()};
+    if (names.length == 2) {
+      await _verifyStocktakeSchema();
+      return;
+    }
+    if (names.isNotEmpty) {
+      throw StateError('Inventur-Schema unvollständig');
+    }
+    await executor.runCustom(_inventurenTableSql);
+    await executor.runCustom(_inventurPositionenTableSql);
+    for (final String trigger in _stocktakeTriggerSql) {
+      await executor.runCustom(trigger);
+    }
+    await _verifyStocktakeSchema();
+  }
+
+  Future<void> _verifyStocktakeSchema() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('inventuren', 'inventur_positionen')",
+      const <Object?>[],
+    );
+    if (tables.length != 2) {
+      throw StateError('Inventur-Tabellen konnten nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> headerColumns = await executor.runSelect(
+      'PRAGMA table_info(inventuren)',
+      const <Object?>[],
+    );
+    final Set<String> headerNames = <String>{
+      for (final Map<String, Object?> row in headerColumns) row['name'].toString(),
+    };
+    const Set<String> headerRequired = <String>{'id', 'stichtag', 'status', 'erstellt_am'};
+    if (!headerRequired.every(headerNames.contains)) {
+      throw StateError('Inventur-Kopf konnte nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> positionColumns = await executor.runSelect(
+      'PRAGMA table_info(inventur_positionen)',
+      const <Object?>[],
+    );
+    final Set<String> positionNames = <String>{
+      for (final Map<String, Object?> row in positionColumns) row['name'].toString(),
+    };
+    const Set<String> positionRequired = <String>{
+      'id',
+      'inventur_id',
+      'artikel_id',
+      'bezeichnung_snapshot',
+      'einheit_snapshot',
+      'menge_gezaehlt',
+    };
+    if (!positionRequired.every(positionNames.contains)) {
+      throw StateError('Inventur-Positionen konnten nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> guards = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN "
+      "('trg_inventuren_insert_only_entwurf', 'trg_inventuren_no_update_recorded', "
+      "'trg_inventuren_record_needs_counts', 'trg_inventuren_no_delete_recorded', "
+      "'trg_inventur_positionen_no_insert_recorded', 'trg_inventur_positionen_no_update_recorded', "
+      "'trg_inventur_positionen_no_delete_recorded')",
+      const <Object?>[],
+    );
+    if (guards.length != 7) {
+      throw StateError('Inventur-Schutz konnte nicht verifiziert werden');
+    }
+  }
+
   Future<void> _verifyRequiredTables() async {
     if (requiredTables.isEmpty) return;
     final rows = await executor.runSelect(
@@ -1220,6 +1306,8 @@ const Set<String> _featureOwnedTables = <String>{
   'feature_table_state',
   'master_data_import_templates',
   'anlage_afa_jahreswerte',
+  'inventuren',
+  'inventur_positionen',
 };
 
 const Map<String, int> _featureTableVersions = <String, int>{
@@ -1230,6 +1318,8 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'mileage_trip_corrections': 13,
   'master_data_import_templates': 16,
   'anlage_afa_jahreswerte': 17,
+  'inventuren': 18,
+  'inventur_positionen': 18,
 };
 
 // shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
@@ -1245,6 +1335,15 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
     'betrag',
     'blockierungsgrund',
     'berechnet_am',
+  },
+  'inventuren': <String>{'id', 'stichtag', 'status', 'erstellt_am'},
+  'inventur_positionen': <String>{
+    'id',
+    'inventur_id',
+    'artikel_id',
+    'bezeichnung_snapshot',
+    'einheit_snapshot',
+    'menge_gezaehlt',
   },
   'forderung_zahlungen': <String>{
     'id',
@@ -1435,3 +1534,70 @@ CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
   CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
   UNIQUE (anlage_id, jahr, quell_hash, regel_version)
 )''';
+
+const String _inventurenTableSql = '''
+CREATE TABLE IF NOT EXISTS inventuren (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stichtag TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'entwurf' CHECK (status IN ('entwurf', 'erfasst')),
+  erstellt_am TEXT NOT NULL
+)''';
+
+const String _inventurPositionenTableSql = '''
+CREATE TABLE IF NOT EXISTS inventur_positionen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  inventur_id INTEGER NOT NULL REFERENCES inventuren(id) ON DELETE RESTRICT,
+  artikel_id INTEGER NOT NULL,
+  bezeichnung_snapshot TEXT NOT NULL CHECK (trim(bezeichnung_snapshot) <> ''),
+  einheit_snapshot TEXT NOT NULL CHECK (trim(einheit_snapshot) <> ''),
+  menge_gezaehlt NUMERIC(10,3) CHECK (menge_gezaehlt IS NULL OR menge_gezaehlt >= 0),
+  UNIQUE (inventur_id, artikel_id)
+)''';
+
+/// Persistence-boundary guards for recorded count evidence. Draft rows stay
+/// editable; anything touching a recorded (`erfasst`) header or its positions
+/// is rejected, including direct SQL. The draft-to-recorded transition is the
+/// only path to `erfasst` and requires at least one counted position.
+const List<String> _stocktakeTriggerSql = <String>[
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_insert_only_entwurf
+BEFORE INSERT ON inventuren
+WHEN NEW.status <> 'entwurf'
+BEGIN SELECT RAISE(ABORT, 'Inventur wird nur als Entwurf angelegt'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_no_update_recorded
+BEFORE UPDATE ON inventuren
+WHEN OLD.status = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Erfasste Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_record_needs_counts
+BEFORE UPDATE ON inventuren
+WHEN NEW.status = 'erfasst' AND OLD.status = 'entwurf'
+BEGIN
+  SELECT RAISE(ABORT, 'Inventur ohne Positionen kann nicht erfasst werden')
+    WHERE (SELECT COUNT(*) FROM inventur_positionen WHERE inventur_id = NEW.id) = 0;
+  SELECT RAISE(ABORT, 'Inventur mit fehlenden Zaehlmengen kann nicht erfasst werden')
+    WHERE (SELECT COUNT(*) FROM inventur_positionen WHERE inventur_id = NEW.id AND menge_gezaehlt IS NULL) > 0;
+END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_no_delete_recorded
+BEFORE DELETE ON inventuren
+WHEN OLD.status = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Erfasste Inventur kann nicht geloescht werden'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_insert_recorded
+BEFORE INSERT ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = NEW.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_update_recorded
+BEFORE UPDATE ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = NEW.inventur_id) = 'erfasst'
+  OR (SELECT status FROM inventuren WHERE id = OLD.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_delete_recorded
+BEFORE DELETE ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = OLD.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+];

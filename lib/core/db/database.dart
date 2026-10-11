@@ -20,7 +20,7 @@ import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 
-/// Drift-backed app database with 39 tables per spec §Table Definitions.
+/// Drift-backed app database with 41 tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
 /// Handles WAL, FK, schema versioning, GoBD triggers, seed, profiles.
 class AppDatabase {
@@ -89,6 +89,8 @@ class AppDatabase {
     'auto_filter_regeln',
     'import_mapping_vorlagen',
     'inventarbewegungen',
+    'inventuren',
+    'inventur_positionen',
   ];
 
   QueryExecutor get executor => _executor;
@@ -356,7 +358,7 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   );
 });
 
-/// Raw DDL for 39 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
+/// Raw DDL for 41 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
 const List<String> _schemaSql = <String>[
   // 1 unternehmen
   '''
@@ -967,6 +969,67 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
   referenz_typ TEXT,
   referenz_id INTEGER
 )''',
+  // 42 inventuren + 43 inventur_positionen (v18, count evidence only).
+  // Recorded rows are immutable via the triggers below; snapshots never
+  // touch artikel stock, inventarbewegungen, or accounting records.
+  '''
+CREATE TABLE IF NOT EXISTS inventuren (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  stichtag TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'entwurf' CHECK (status IN ('entwurf', 'erfasst')),
+  erstellt_am TEXT NOT NULL
+)''',
+  '''
+CREATE TABLE IF NOT EXISTS inventur_positionen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  inventur_id INTEGER NOT NULL REFERENCES inventuren(id) ON DELETE RESTRICT,
+  artikel_id INTEGER NOT NULL,
+  bezeichnung_snapshot TEXT NOT NULL CHECK (trim(bezeichnung_snapshot) <> ''),
+  einheit_snapshot TEXT NOT NULL CHECK (trim(einheit_snapshot) <> ''),
+  menge_gezaehlt NUMERIC(10,3) CHECK (menge_gezaehlt IS NULL OR menge_gezaehlt >= 0),
+  UNIQUE (inventur_id, artikel_id)
+)''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_insert_only_entwurf
+BEFORE INSERT ON inventuren
+WHEN NEW.status <> 'entwurf'
+BEGIN SELECT RAISE(ABORT, 'Inventur wird nur als Entwurf angelegt'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_no_update_recorded
+BEFORE UPDATE ON inventuren
+WHEN OLD.status = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Erfasste Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_record_needs_counts
+BEFORE UPDATE ON inventuren
+WHEN NEW.status = 'erfasst' AND OLD.status = 'entwurf'
+BEGIN
+  SELECT RAISE(ABORT, 'Inventur ohne Positionen kann nicht erfasst werden')
+    WHERE (SELECT COUNT(*) FROM inventur_positionen WHERE inventur_id = NEW.id) = 0;
+  SELECT RAISE(ABORT, 'Inventur mit fehlenden Zaehlmengen kann nicht erfasst werden')
+    WHERE (SELECT COUNT(*) FROM inventur_positionen WHERE inventur_id = NEW.id AND menge_gezaehlt IS NULL) > 0;
+END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventuren_no_delete_recorded
+BEFORE DELETE ON inventuren
+WHEN OLD.status = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Erfasste Inventur kann nicht geloescht werden'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_insert_recorded
+BEFORE INSERT ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = NEW.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_update_recorded
+BEFORE UPDATE ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = NEW.inventur_id) = 'erfasst'
+  OR (SELECT status FROM inventuren WHERE id = OLD.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_delete_recorded
+BEFORE DELETE ON inventur_positionen
+WHEN (SELECT status FROM inventuren WHERE id = OLD.inventur_id) = 'erfasst'
+BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
 ];
 
 const List<String> _indexSql = <String>[

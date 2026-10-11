@@ -527,6 +527,84 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inventoryBack => 'Back to overview';
 
   @override
+  String get stocktakeNewAction => 'New stocktake';
+
+  @override
+  String get stocktakeStichtagLabel => 'Reporting date';
+
+  @override
+  String get stocktakeRecordAction => 'Record';
+
+  @override
+  String get stocktakeDraftStatus => 'Draft';
+
+  @override
+  String get stocktakeRecordedStatus => 'Recorded';
+
+  @override
+  String get stocktakeCountLabel => 'Counted quantity';
+
+  @override
+  String get stocktakePhysicalCount => 'Physical count';
+
+  @override
+  String get stocktakeMissingCount =>
+      'Enter a counted quantity for every article.';
+
+  @override
+  String get stocktakeInvalidCount => 'Enter a valid counted quantity.';
+
+  @override
+  String get stocktakeInvalidDate => 'Enter the reporting date as YYYY-MM-DD';
+
+  @override
+  String get stocktakeNegativeForbidden =>
+      'Counted quantities must not be negative.';
+
+  @override
+  String get stocktakePrecisionInvalid =>
+      'Counted quantities may have at most three decimal places.';
+
+  @override
+  String get stocktakeNoCountable => 'No countable articles available.';
+
+  @override
+  String get stocktakeNoCountableDescription =>
+      'Enable inventory tracking for at least one article.';
+
+  @override
+  String get stocktakeHistoryTitle => 'Recorded stocktakes';
+
+  @override
+  String get stocktakeBookUnavailable => 'Book quantity unavailable';
+
+  @override
+  String get stocktakeVarianceUnavailable => 'Variance unavailable';
+
+  @override
+  String get stocktakeValuationUnavailable => 'Valuation unavailable';
+
+  @override
+  String get stocktakeValuationDescription =>
+      'No reviewed valuation policy is available. Counted quantities remain available.';
+
+  @override
+  String get stocktakeCorrectionHint =>
+      'Record corrections in a new stocktake.';
+
+  @override
+  String get stocktakeDisabledNew => 'New stocktakes are disabled.';
+
+  @override
+  String get stocktakeEmpty => 'No stocktakes yet.';
+
+  @override
+  String get stocktakeCapturedAt => 'Captured at';
+
+  @override
+  String get stocktakeArticleColumn => 'Article';
+
+  @override
   String get pdfInvoice => 'Invoice';
 
   @override

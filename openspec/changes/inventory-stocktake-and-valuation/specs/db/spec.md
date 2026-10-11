@@ -2,21 +2,21 @@
 
 ### Requirement: Table Definitions
 
-Once the inventory movement and physical stocktake migrations are applied, the database SHALL contain exactly 41 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`, `inventarbewegungen`, `inventuren`, `inventur_positionen`. This comprises the 38 existing non-inventory tables, the named `inventarbewegungen` table, and the named `inventuren` and `inventur_positionen` stocktake tables. The schema inventory SHALL match the actual table set after each ordered migration; no migration may silently drop an existing table or create an undeclared table.
+At schema v18, the declared base registry SHALL contain exactly 41 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`, `inventarbewegungen`, `inventuren`, `inventur_positionen`. This is the 39-table pre-stocktake base plus the two named stocktake tables. The schema inventory SHALL match the actual table set after each ordered migration; no migration may silently drop an existing table or create an undeclared table.
 
 #### Scenario: All Tables Created on Fresh Install
 
 GIVEN the app runs for the first time with an empty database and all current feature migrations are enabled
-WHEN schema creation completes
-THEN all 41 declared tables SHALL exist
+WHEN schema creation completes at user_version 18
+THEN all 41 declared base tables SHALL exist
 AND each table SHALL have its expected columns and constraints.
 
 #### Scenario: Table Count Verification
 
-GIVEN all current migrations are applied to a supported database
+GIVEN all migrations through schema v18 are applied to a supported database
 WHEN a migration completes
-THEN the 38 existing non-inventory tables and all three declared inventory tables SHALL remain present
-AND the total table count SHALL be exactly 41
+THEN the 41 declared base tables SHALL remain present
+AND the v18 declared table count SHALL be exactly 41
 AND no table SHALL be silently dropped or created outside the inventory.
 
 #### Scenario: Missing Table Detection

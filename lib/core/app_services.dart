@@ -17,6 +17,10 @@ import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.d
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/features/setup/profile_export_service.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_repository.dart';
+import 'package:openaccounting/features/feature_modules/feature_module_service.dart';
+import 'package:openaccounting/features/inventory/stocktake_repository.dart';
+import 'package:openaccounting/features/inventory/stocktake_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -102,6 +106,11 @@ class AppServices {
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final IncomeTaxScheduleAvailabilityUseCase incomeTax = const IncomeTaxScheduleAvailabilityUseCase();
   late final WizardService setup = WizardService(repository: SetupRepository(_db.executor), profileId: _db.profileDir);
+
+  late final StocktakeUseCases inventur = StocktakeUseCases(
+    StocktakeRepository(_db.executor),
+    FeatureModuleService(repository: FeatureModuleRepository(_db.executor)),
+  );
 
   late final ProfileExportService profileExport = _createProfileExport();
 

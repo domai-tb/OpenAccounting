@@ -1106,6 +1106,150 @@ abstract class AppLocalizations {
   /// **'Zur Übersicht'**
   String get inventoryBack;
 
+  /// No description provided for @stocktakeNewAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Inventur'**
+  String get stocktakeNewAction;
+
+  /// No description provided for @stocktakeStichtagLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Stichtag'**
+  String get stocktakeStichtagLabel;
+
+  /// No description provided for @stocktakeRecordAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfassen'**
+  String get stocktakeRecordAction;
+
+  /// No description provided for @stocktakeDraftStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf'**
+  String get stocktakeDraftStatus;
+
+  /// No description provided for @stocktakeRecordedStatus.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfasst'**
+  String get stocktakeRecordedStatus;
+
+  /// No description provided for @stocktakeCountLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Gezählte Menge'**
+  String get stocktakeCountLabel;
+
+  /// No description provided for @stocktakePhysicalCount.
+  ///
+  /// In de, this message translates to:
+  /// **'Gezählte Istmenge'**
+  String get stocktakePhysicalCount;
+
+  /// No description provided for @stocktakeMissingCount.
+  ///
+  /// In de, this message translates to:
+  /// **'Für jeden Artikel eine gezählte Menge eingeben.'**
+  String get stocktakeMissingCount;
+
+  /// No description provided for @stocktakeInvalidCount.
+  ///
+  /// In de, this message translates to:
+  /// **'Bitte eine gültige gezählte Menge eingeben.'**
+  String get stocktakeInvalidCount;
+
+  /// No description provided for @stocktakeInvalidDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Stichtag im Format JJJJ-MM-TT eingeben'**
+  String get stocktakeInvalidDate;
+
+  /// No description provided for @stocktakeNegativeForbidden.
+  ///
+  /// In de, this message translates to:
+  /// **'Gezählte Mengen dürfen nicht negativ sein.'**
+  String get stocktakeNegativeForbidden;
+
+  /// No description provided for @stocktakePrecisionInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Gezählte Mengen dürfen höchstens drei Nachkommastellen haben.'**
+  String get stocktakePrecisionInvalid;
+
+  /// No description provided for @stocktakeNoCountable.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine zählbaren Artikel vorhanden.'**
+  String get stocktakeNoCountable;
+
+  /// No description provided for @stocktakeNoCountableDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktiviere die Lagerführung für mindestens einen Artikel.'**
+  String get stocktakeNoCountableDescription;
+
+  /// No description provided for @stocktakeHistoryTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfasste Inventuren'**
+  String get stocktakeHistoryTitle;
+
+  /// No description provided for @stocktakeBookUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchbestand nicht verfügbar'**
+  String get stocktakeBookUnavailable;
+
+  /// No description provided for @stocktakeVarianceUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Differenz nicht verfügbar'**
+  String get stocktakeVarianceUnavailable;
+
+  /// No description provided for @stocktakeValuationUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Bewertung nicht verfügbar'**
+  String get stocktakeValuationUnavailable;
+
+  /// No description provided for @stocktakeValuationDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine geprüfte Bewertungsrichtlinie hinterlegt. Gezählte Mengen bleiben verfügbar.'**
+  String get stocktakeValuationDescription;
+
+  /// No description provided for @stocktakeCorrectionHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrekturen über eine neue Inventur erfassen.'**
+  String get stocktakeCorrectionHint;
+
+  /// No description provided for @stocktakeDisabledNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Inventuren sind deaktiviert.'**
+  String get stocktakeDisabledNew;
+
+  /// No description provided for @stocktakeEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Inventuren.'**
+  String get stocktakeEmpty;
+
+  /// No description provided for @stocktakeCapturedAt.
+  ///
+  /// In de, this message translates to:
+  /// **'Erfasst am'**
+  String get stocktakeCapturedAt;
+
+  /// No description provided for @stocktakeArticleColumn.
+  ///
+  /// In de, this message translates to:
+  /// **'Artikel'**
+  String get stocktakeArticleColumn;
+
   /// No description provided for @pdfInvoice.
   ///
   /// In de, this message translates to:

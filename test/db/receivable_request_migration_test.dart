@@ -333,7 +333,8 @@ CREATE TABLE forderung_zahlungen (
       expect(freshVersion, lessThan(freshCommit));
       expect(
         freshStatements.indexWhere(
-          (String s) => s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY'),
+          (String s) =>
+              s.contains('CREATE TRIGGER') && !s.contains('CATEGORY_MAPPING_HISTORY') && !s.contains('INVENTUR'),
         ),
         greaterThan(freshCommit),
       );

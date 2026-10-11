@@ -27,6 +27,7 @@ import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
+import 'package:openaccounting/features/inventory/stocktake_page.dart';
 import 'package:openaccounting/features/assets/assets_page.dart';
 import 'package:openaccounting/features/contextual_accounting_tax_guidance/contextual_guidance_help_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
@@ -232,7 +233,7 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
           GoRoute(path: '/assets', builder: (context, state) => AssetsPage(routeUri: state.uri)),
-          GoRoute(path: '/inventory', builder: (context, state) => const InventoryUnavailablePage()),
+          GoRoute(path: '/inventory', builder: (context, state) => const StocktakeWorkspacePage()),
           // German alias per specs/app/spec.md deep-link scenario — preserve query and id.
           GoRoute(
             path: '/rechnungen',
