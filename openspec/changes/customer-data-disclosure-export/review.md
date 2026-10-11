@@ -344,3 +344,32 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 8
 
 None.
+
+---
+
+## Review Metadata — Round 9
+
+- **Review round**: 9
+- **Prior round**: Round 8 approved the completed disclosure export; this review covers the receipt-schema follow-up.
+- **Reviewer context**: fresh, independent, read-only review of the exact staged follow-up diff.
+- **Revision reviewed**: customer export receipt metadata and evidence-path projection on `dev`.
+- **Artifacts reviewed**: exporter allowlist and evidence projection, receipt export fixtures, metadata assertions, and outside-profile symlink coverage.
+- **Validation evidence**: focused customer disclosure tests passed (39 tests); `git diff --check` passed.
+
+### Findings
+
+None blocking. The seven descriptive receipt metadata fields are retained. Both receipt path fields use the existing profile-root evidence checks, archive names remain digest-based, and tests assert that source and outside-profile paths are not exposed.
+
+### Verdict — Round 9
+
+VERDICT: APPROVE
+
+## Required Changes — Round 9
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 9
+
+None.

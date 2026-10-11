@@ -385,6 +385,13 @@ class CustomerDisclosureInventory {
       'unternehmen_id',
       'status',
       'beschreibung',
+      'dateiname',
+      'original_name',
+      'mime_type',
+      'dateigroesse',
+      'sha256',
+      'hochgeladen_am',
+      'loeschdatum',
     },
     'buchungsvorlagen_occurrences': <String>{'id', 'faelligkeit', 'journal_id', 'rechnung_id'},
   };
@@ -437,6 +444,7 @@ class CustomerDisclosureInventory {
   static const List<(String, String)> evidenceColumns = <(String, String)>[
     ('rechnungen', 'original_pdf_pfad'),
     ('belege', 'dateipfad'),
+    ('belege', 'beleg_pdfa_pfad'),
   ];
 
   /// Verified relationship paths, also published in the manifest.

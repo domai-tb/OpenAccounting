@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/drift.dart'
@@ -197,11 +198,26 @@ Future<Map<String, int>> _seedLinkedRecords(AppDatabase db, Directory profileDir
     'rechnung-a.pdf',
     invoiceA,
   ]);
+  const List<int> receiptBytes = <int>[9, 8, 7];
   final File receipt = File(p.join(profileDir.path, 'beleg.pdf'));
-  await receipt.writeAsBytes(<int>[9, 8, 7], flush: true);
+  await receipt.writeAsBytes(receiptBytes, flush: true);
+  final File receiptPdfa = File(p.join(profileDir.path, 'beleg-pdfa.pdf'));
+  await receiptPdfa.writeAsBytes(<int>[6, 5, 4], flush: true);
   final int beleg = await db.executor.runInsert(
-    'INSERT INTO belege (datum, betrag, dateipfad) VALUES (?, ?, ?)',
-    <Object?>['2026-01-15', '12.34', receipt.path],
+    'INSERT INTO belege (datum, betrag, dateipfad, dateiname, original_name, mime_type, dateigroesse, sha256, hochgeladen_am, beleg_pdfa_pfad, loeschdatum) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    <Object?>[
+      '2026-01-15',
+      '12.34',
+      receipt.path,
+      '123_beleg.pdf',
+      'beleg.pdf',
+      'application/pdf',
+      receiptBytes.length,
+      sha256.convert(receiptBytes).toString(),
+      '2026-01-15T10:30:00.000',
+      receiptPdfa.path,
+      '2027-01-15',
+    ],
   );
   await db.executor.runInsert('INSERT INTO kunden_belege (kunde_id, beleg_id) VALUES (?, ?)', <Object?>[
     customerId,
@@ -282,7 +298,7 @@ void main() {
       expect((counts['kunden_belege']! as num).toInt(), 1);
       expect((counts['belege']! as num).toInt(), 1);
       final List<Object?> evidence = List<Object?>.from(manifest['evidence']! as List);
-      expect(evidence, hasLength(2));
+      expect(evidence, hasLength(3));
       final List<Object?> recordFiles = List<Object?>.from(manifest['record_files']! as List);
       expect(recordFiles, hasLength(14));
       for (final Object? entry in recordFiles) {
@@ -294,7 +310,16 @@ void main() {
       expect(rechnungenJsonl, isNot(contains('RE-B-1')));
       expect(rechnungenJsonl, isNot(contains('lieferant_id')));
       final String belegeJsonl = utf8.decode(await service.readEntry(destination, 'records/belege.jsonl'));
-      expect(belegeJsonl, contains('evidence/'));
+      final Map<String, Object?> beleg = Map<String, Object?>.from(jsonDecode(belegeJsonl.trim()) as Map);
+      expect(beleg['dateiname'], '123_beleg.pdf');
+      expect(beleg['original_name'], 'beleg.pdf');
+      expect(beleg['mime_type'], 'application/pdf');
+      expect(beleg['dateigroesse'], 3);
+      expect(beleg['sha256'], sha256.convert(<int>[9, 8, 7]).toString());
+      expect(beleg['hochgeladen_am'], '2026-01-15T10:30:00.000');
+      expect(beleg['loeschdatum'], '2027-01-15');
+      expect(beleg['dateipfad'], startsWith('evidence/'));
+      expect(beleg['beleg_pdfa_pfad'], startsWith('evidence/'));
       expect(belegeJsonl, isNot(contains(env.profileDir.path)));
 
       // Source records remain unchanged and no partial sibling is left behind.
@@ -478,7 +503,7 @@ void main() {
       expect(result.status, CustomerDisclosureExportStatus.complete);
       final Map<String, Object?> manifest = await service.readManifest(destination);
       final List<Object?> evidence = List<Object?>.from(manifest['evidence']! as List);
-      expect(evidence, hasLength(2));
+      expect(evidence, hasLength(3));
       for (final Object? entry in evidence) {
         final Map<String, Object?> item = Map<String, Object?>.from(entry! as Map);
         final String archivePath = item['archive_path'].toString();
@@ -531,7 +556,7 @@ void main() {
       expect(exclusions.where((Object? e) => (e! as Map)['reason'] == 'missing'), hasLength(1));
       expect(exclusions.where((Object? e) => (e! as Map)['reason'] == 'unsupported'), hasLength(1));
       final List<Object?> evidence = List<Object?>.from(manifest['evidence']! as List);
-      expect(evidence, hasLength(2));
+      expect(evidence, hasLength(3));
     });
 
     test('test_customer_data_disclosure_export_007_profile_local_symlink_targets_evidence_outside_t', () async {
@@ -547,7 +572,7 @@ void main() {
       final String linkPath = p.join(env.profileDir.path, 'verknuepfung.pdf');
       Link(linkPath).createSync(target.path);
       final int beleg = await env.db.executor.runInsert(
-        'INSERT INTO belege (datum, betrag, dateipfad) VALUES (?, ?, ?)',
+        'INSERT INTO belege (datum, betrag, beleg_pdfa_pfad) VALUES (?, ?, ?)',
         <Object?>['2026-01-18', '3.00', linkPath],
       );
       await env.db.executor.runInsert('INSERT INTO kunden_belege (kunde_id, beleg_id) VALUES (?, ?)', <Object?>[
@@ -565,12 +590,17 @@ void main() {
       expect(result.status, CustomerDisclosureExportStatus.incomplete);
       final Map<String, Object?> manifest = await service.readManifest(destination);
       final List<Object?> exclusions = List<Object?>.from(manifest['exclusions']! as List);
-      expect(exclusions.where((Object? e) => (e! as Map)['reason'] == 'outside_profile'), hasLength(1));
+      expect(
+        exclusions.where(
+          (Object? e) => (e! as Map)['field'] == 'beleg_pdfa_pfad' && (e as Map)['reason'] == 'outside_profile',
+        ),
+        hasLength(1),
+      );
       final String encoded = jsonEncode(manifest);
       expect(encoded, isNot(contains(external.path)));
       expect(encoded, isNot(contains(env.profileDir.path)));
       final List<Object?> evidence = List<Object?>.from(manifest['evidence']! as List);
-      expect(evidence, hasLength(2));
+      expect(evidence, hasLength(3));
     });
 
     test('test_customer_data_disclosure_export_008_user_sees_the_export_scope_before_saving', () async {
