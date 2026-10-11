@@ -68,7 +68,7 @@ class MasterDataImportTemplateStore {
           trimmed,
           mapping.entity.name,
           payload,
-          mapping.hasHeader ? 1 : 0,
+          if (mapping.hasHeader) 1 else 0,
           mapping.delimiter.name,
           mapping.decimalConvention.name,
           mapping.duplicatePolicy.name,
@@ -88,7 +88,7 @@ class MasterDataImportTemplateStore {
         trimmed,
         mapping.entity.name,
         payload,
-        mapping.hasHeader ? 1 : 0,
+        if (mapping.hasHeader) 1 else 0,
         mapping.delimiter.name,
         mapping.decimalConvention.name,
         mapping.duplicatePolicy.name,
@@ -220,7 +220,7 @@ class MasterDataImportTemplateStore {
     final Object? mapRaw = json['columnToField'];
     if (mapRaw is! Map) throw const MasterDataCsvMappingException('Vorlage ist nicht verfügbar.');
     final Map<int, String> columnToField = <int, String>{};
-    for (final MapEntry<Object?, Object?> e in (mapRaw as Map).entries) {
+    for (final MapEntry<Object?, Object?> e in mapRaw.entries) {
       final int? col = int.tryParse(e.key.toString());
       if (col == null) throw const MasterDataCsvMappingException('Vorlage ist nicht verfügbar.');
       columnToField[col] = e.value.toString();
