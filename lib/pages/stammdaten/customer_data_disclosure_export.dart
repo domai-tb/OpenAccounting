@@ -139,9 +139,6 @@ class CustomerDisclosureInventory {
     'category_mapping_history',
     'master_data_import_templates',
     'anlage_afa_jahreswerte',
-    'settlement_groups',
-    'settlement_allocations',
-    'statutory_timing_rules',
     'dokument_email_templates',
     'dokument_email_versuche',
   };
