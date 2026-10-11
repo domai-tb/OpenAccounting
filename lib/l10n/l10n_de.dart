@@ -2186,4 +2186,53 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get csvImportUnavailable => 'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.';
+  @override
+  String get routeAssets => 'Anlagen';
+  @override
+  String get assetRegisterTitle => 'Anlagenverzeichnis';
+  @override
+  String get assetRegisterSubtitle => 'Anlagen verwalten und lineare AfA prüfen';
+  @override
+  String get assetAdd => 'Anlage hinzufügen';
+  @override
+  String get assetEdit => 'Anlage bearbeiten';
+  @override
+  String get assetDescription => 'Bezeichnung';
+  @override
+  String get assetType => 'Anlagetyp';
+  @override
+  String get assetAcquisitionDate => 'Anschaffungsdatum';
+  @override
+  String get assetNetPrice => 'Nettokaufpreis';
+  @override
+  String get assetUsefulLife => 'Nutzungsdauer (Jahre)';
+  @override
+  String get assetMethod => 'AfA-Methode';
+  @override
+  String get assetPrivateShare => 'Privatanteil (%)';
+  @override
+  String get assetCategory => 'Kategorie';
+  @override
+  String get assetDisposalDate => 'Verkauft am';
+  @override
+  String assetInvalidField(String field) {
+    return 'Ungültige Eingabe: $field';
+  }
+  @override
+  String get assetEmpty => 'Noch keine Anlagen. Lege die erste Anlage an.';
+  @override
+  String get assetDeleteRefused => 'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.';
+  @override
+  String get assetArchived => 'Anlage archiviert';
+  @override
+  String get assetScheduleTitle => 'AfA-Jahreswerte';
+  @override
+  String get assetScheduleUnavailable => 'Nicht verfügbar';
+  @override
+  String get assetFinancialBlocked => 'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.';
+  @override
+  String get assetLoadFailed => 'Anlagen konnten nicht geladen werden.';
+  @override
+  String get assetUnresolved => 'Unaufgelöst: Prüfung erforderlich';
+
 }

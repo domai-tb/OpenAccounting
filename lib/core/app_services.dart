@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/desktop/desktop_capability.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
+import 'package:openaccounting/features/assets/asset_repository.dart';
+import 'package:openaccounting/features/assets/asset_schedule_service.dart';
+import 'package:openaccounting/features/assets/asset_usecases.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/einkommen/forderungen_usecases.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
@@ -29,6 +32,11 @@ import 'package:path/path.dart' as p;
 /// Aggregated use-cases for the application.
 /// Pages resolve from here instead of constructing repositories directly.
 class AppServices {
+  late final AssetRegisterUseCases assets = AssetRegisterUseCases(
+    AssetRepository(_db.executor),
+    scheduleService: const AssetScheduleService(),
+  );
+
   AppServices(this._db, {DesktopCapabilityRegistry? desktopCapabilities})
     : desktopCapabilities = desktopCapabilities ?? DesktopCapabilityRegistry();
 

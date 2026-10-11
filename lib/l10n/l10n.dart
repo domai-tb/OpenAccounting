@@ -4217,4 +4217,120 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
     'that was used.',
   );
+  /// No description provided for @routeAssets.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen'**
+  String get routeAssets;
+  /// No description provided for @assetRegisterTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagenverzeichnis'**
+  String get assetRegisterTitle;
+  /// No description provided for @assetRegisterSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen verwalten und lineare AfA prüfen'**
+  String get assetRegisterSubtitle;
+  /// No description provided for @assetAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage hinzufügen'**
+  String get assetAdd;
+  /// No description provided for @assetEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage bearbeiten'**
+  String get assetEdit;
+  /// No description provided for @assetDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Bezeichnung'**
+  String get assetDescription;
+  /// No description provided for @assetType.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagetyp'**
+  String get assetType;
+  /// No description provided for @assetAcquisitionDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Anschaffungsdatum'**
+  String get assetAcquisitionDate;
+  /// No description provided for @assetNetPrice.
+  ///
+  /// In de, this message translates to:
+  /// **'Nettokaufpreis'**
+  String get assetNetPrice;
+  /// No description provided for @assetUsefulLife.
+  ///
+  /// In de, this message translates to:
+  /// **'Nutzungsdauer (Jahre)'**
+  String get assetUsefulLife;
+  /// No description provided for @assetMethod.
+  ///
+  /// In de, this message translates to:
+  /// **'AfA-Methode'**
+  String get assetMethod;
+  /// No description provided for @assetPrivateShare.
+  ///
+  /// In de, this message translates to:
+  /// **'Privatanteil (%)'**
+  String get assetPrivateShare;
+  /// No description provided for @assetCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get assetCategory;
+  /// No description provided for @assetDisposalDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Verkauft am'**
+  String get assetDisposalDate;
+  /// No description provided for @assetInvalidField.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültige Eingabe: {field}'**
+  String assetInvalidField(String field);
+  /// No description provided for @assetEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Anlagen. Lege die erste Anlage an.'**
+  String get assetEmpty;
+  /// No description provided for @assetDeleteRefused.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.'**
+  String get assetDeleteRefused;
+  /// No description provided for @assetArchived.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage archiviert'**
+  String get assetArchived;
+  /// No description provided for @assetScheduleTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'AfA-Jahreswerte'**
+  String get assetScheduleTitle;
+  /// No description provided for @assetScheduleUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get assetScheduleUnavailable;
+  /// No description provided for @assetFinancialBlocked.
+  ///
+  /// In de, this message translates to:
+  /// **'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.'**
+  String get assetFinancialBlocked;
+  /// No description provided for @assetLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlagen konnten nicht geladen werden.'**
+  String get assetLoadFailed;
+  /// No description provided for @assetUnresolved.
+  ///
+  /// In de, this message translates to:
+  /// **'Unaufgelöst: Prüfung erforderlich'**
+  String get assetUnresolved;
+
 }

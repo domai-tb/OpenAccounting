@@ -27,6 +27,7 @@ import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
+import 'package:openaccounting/features/assets/assets_page.dart';
 import 'package:openaccounting/features/contextual_accounting_tax_guidance/contextual_guidance_help_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/profile_data_section.dart';
@@ -48,6 +49,7 @@ export 'package:openaccounting/app/app_shell.dart';
 
 /// Sidebar destinations — order per DESIGN §4.
 enum AppRoute {
+  assets('/assets'),
   dashboard('/'),
   invoices('/invoices'),
   receipts('/receipts'),
@@ -192,6 +194,12 @@ GoRouter createRouter(AppDatabase db) {
                   final id = state.pathParameters['id']!;
                   return ArticleDetailRoute(id: id);
                 },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (context, state) => ArticleEditRoute(recordId: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -223,6 +231,7 @@ GoRouter createRouter(AppDatabase db) {
           ),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
+          GoRoute(path: '/assets', builder: (context, state) => AssetsPage(routeUri: state.uri)),
           GoRoute(path: '/inventory', builder: (context, state) => const InventoryUnavailablePage()),
           // German alias per specs/app/spec.md deep-link scenario — preserve query and id.
           GoRoute(
@@ -288,6 +297,13 @@ GoRouter createRouter(AppDatabase db) {
             redirect: (BuildContext context, GoRouterState state) {
               final String q = state.uri.query;
               return q.isEmpty ? '/setup' : '/setup?$q';
+            },
+          ),
+          GoRoute(
+            path: '/anlagen',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/assets' : '/assets?$q';
             },
           ),
         ],
@@ -753,6 +769,19 @@ class ArticleDetailRoute extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ArticleRecordView(id: id);
+  }
+}
+
+class ArticleEditRoute extends ConsumerWidget {
+  const ArticleEditRoute({required this.recordId, super.key});
+
+  final String recordId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int? id = int.tryParse(recordId);
+    if (id == null) return ArticleRecordView(id: recordId);
+    return ArticleFormView(recordId: id);
   }
 }
 

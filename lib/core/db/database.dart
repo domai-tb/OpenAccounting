@@ -759,7 +759,13 @@ CREATE TABLE IF NOT EXISTS anlageverzeichnis (
   kategorie_id INTEGER REFERENCES kategorien(id),
   unternehmen_id INTEGER REFERENCES unternehmen(id),
   status TEXT DEFAULT 'aktiv',
-  privatanteil NUMERIC(12,2) DEFAULT 0
+  privatanteil NUMERIC(12,2) DEFAULT 0,
+  asset_typ TEXT CHECK (asset_typ IN ('KFZ', 'EDV', 'sonstig')),
+  kaufpreis_netto NUMERIC(12,2) CHECK (kaufpreis_netto >= 0),
+  nutzungsdauer_jahre INTEGER CHECK (nutzungsdauer_jahre > 0),
+  afa_methode TEXT CHECK (afa_methode IN ('linear')),
+  privat_anteil_prozent NUMERIC(5,2) CHECK (privat_anteil_prozent BETWEEN 0 AND 100),
+  verkauft_am TEXT
 )''',
   // 23 dokumentenpakete
   '''
@@ -987,4 +993,30 @@ CREATE TABLE IF NOT EXISTS master_data_import_templates (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 )''',
+  // 41 anlage_afa_jahreswerte (v17, owned by fixed-asset-register-workspace).
+  // Append-only annual schedule snapshots; immutable via triggers below.
+  '''
+CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  anlage_id INTEGER NOT NULL REFERENCES anlageverzeichnis(id) ON DELETE RESTRICT,
+  jahr INTEGER NOT NULL,
+  quell_snapshot TEXT NOT NULL,
+  quell_hash TEXT NOT NULL,
+  regel_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('verfuegbar', 'nicht_verfuegbar')),
+  formel TEXT,
+  betrag NUMERIC(12,2),
+  blockierungsgrund TEXT,
+  berechnet_am TEXT NOT NULL,
+  CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
+  UNIQUE (anlage_id, jahr, quell_hash, regel_version)
+)''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_update
+BEFORE UPDATE ON anlage_afa_jahreswerte
+BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_delete
+BEFORE DELETE ON anlage_afa_jahreswerte
+BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
 ];

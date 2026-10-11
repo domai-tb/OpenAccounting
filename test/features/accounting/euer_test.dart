@@ -73,8 +73,10 @@ void main() {
 
       // Anlageverzeichnis: 1200 / 3 = 400.00 linear, no privat.
       await db.executor.runInsert(
-        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status) VALUES (?, ?, ?, ?, ?, ?)',
-        <Object?>['Laptop', '2025-01-01', '1200.00', 3, '0', 'aktiv'],
+        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, '
+        'privatanteil, status, asset_typ, kaufpreis_netto, nutzungsdauer_jahre, afa_methode, '
+        'privat_anteil_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['Laptop', '2022-01-01', '1200.00', 3, '0', 'aktiv', 'EDV', '1200.00', 3, 'linear', '0'],
       );
 
       final result = await service.generate(jahr: 2025);
@@ -180,8 +182,10 @@ void main() {
     test('AfA privatanteil reduces business portion', () async {
       // 1200 / 4 =300, privat 30% => 210.00
       await db.executor.runInsert(
-        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status) VALUES (?, ?, ?, ?, ?, ?)',
-        <Object?>['KFZ', '2025-01-01', '1200.00', 4, '30', 'aktiv'],
+        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, '
+        'privatanteil, status, asset_typ, kaufpreis_netto, nutzungsdauer_jahre, afa_methode, '
+        'privat_anteil_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['KFZ', '2022-01-01', '1200.00', 4, '30', 'aktiv', 'KFZ', '1200.00', 4, 'linear', '30'],
       );
 
       final result = await service.generate(jahr: 2025);

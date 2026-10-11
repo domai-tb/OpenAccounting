@@ -473,6 +473,18 @@ class _ArticleGroupRecordBody extends ConsumerWidget {
               icon: const Icon(Icons.arrow_back),
               tooltip: l10n.actionBack,
             ),
+            actions: <Widget>[
+              IconButton(
+                onPressed: () => context.go('/articles/$id/edit?kind=group'),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: l10n.actionEdit,
+              ),
+              IconButton(
+                onPressed: () => unawaited(_setArticleGroupActive(context, services, id, !group.aktiv)),
+                icon: Icon(group.aktiv ? Icons.archive_outlined : Icons.restore_outlined),
+                tooltip: group.aktiv ? l10n.actionArchive : l10n.actionRestore,
+              ),
+            ],
           ),
           child: AppCard(
             child: Column(
@@ -486,6 +498,18 @@ class _ArticleGroupRecordBody extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+Future<void> _setArticleGroupActive(BuildContext context, AppServices services, int id, bool active) async {
+  final AppLocalizations l10n = appLocalizationsOf(context);
+  try {
+    await services.articleGroupWorkspace.update(id, aktiv: active);
+    if (context.mounted) context.go('/articles?view=groups');
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l10n.saveFailed}: $error')));
+    }
   }
 }
 
@@ -507,7 +531,9 @@ Widget _moreDetailRow(String label, String value) {
 
 /// Article/group create form. Missing/invalid kind offers the item/group choice.
 class ArticleFormView extends ConsumerStatefulWidget {
-  const ArticleFormView({super.key});
+  const ArticleFormView({this.recordId, super.key});
+
+  final int? recordId;
 
   @override
   ConsumerState<ArticleFormView> createState() => _ArticleFormViewState();
@@ -518,6 +544,16 @@ class _ArticleFormViewState extends ConsumerState<ArticleFormView> {
   final TextEditingController _name = TextEditingController();
   final TextEditingController _description = TextEditingController();
   bool _saving = false;
+  int? _loadedGroupId;
+  Future<ArtikelGruppe?>? _groupFuture;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.recordId != null && _groupFuture == null) {
+      _groupFuture = _moreServicesOf(context, ref).articleDetail.groupById(widget.recordId!);
+    }
+  }
 
   String? get _kind {
     try {
@@ -542,10 +578,16 @@ class _ArticleFormViewState extends ConsumerState<ArticleFormView> {
     try {
       final AppServices services = _moreServicesOf(context, ref);
       if (kind == 'group') {
-        final ArtikelGruppe group = await services.articleGroupWorkspace.create(
-          name: _name.text.trim(),
-          beschreibung: _description.text.trim().isEmpty ? null : _description.text.trim(),
-        );
+        final ArtikelGruppe group = widget.recordId == null
+            ? await services.articleGroupWorkspace.create(
+                name: _name.text.trim(),
+                beschreibung: _description.text.trim().isEmpty ? null : _description.text.trim(),
+              )
+            : await services.articleGroupWorkspace.update(
+                widget.recordId!,
+                name: _name.text.trim(),
+                beschreibung: _description.text.trim().isEmpty ? null : _description.text.trim(),
+              );
         if (mounted) context.go('/articles/${group.id}?kind=group');
       } else {
         final ArtikelRepository repository = services.artikel;
@@ -570,25 +612,74 @@ class _ArticleFormViewState extends ConsumerState<ArticleFormView> {
   Widget build(BuildContext context) {
     final AppLocalizations l10n = appLocalizationsOf(context);
     final String? kind = _kind;
-    if (kind != 'item' && kind != 'group') {
+    if ((kind != 'item' && kind != 'group') || (widget.recordId != null && kind != 'group')) {
+      final Uri uri = GoRouterState.of(context).uri;
       return MasterDataTypeSelectionView(
-        requestedId: 'neu',
+        requestedId: widget.recordId?.toString() ?? 'neu',
         title: l10n.articleTypeSelectionTitle,
         message: l10n.articleTypeSelectionMessage,
         firstLabel: l10n.articlesViewItems,
         secondLabel: l10n.articlesViewGroups,
-        onSelectFirst: () => context.go('/articles/new?kind=item'),
-        onSelectSecond: () => context.go('/articles/new?kind=group'),
+        onSelectFirst: () => context.go(widget.recordId == null ? '/articles/new?kind=item' : '${uri.path}?kind=item'),
+        onSelectSecond: () =>
+            context.go(widget.recordId == null ? '/articles/new?kind=group' : '${uri.path}?kind=group'),
       );
     }
+    if (widget.recordId != null) {
+      return FutureBuilder<ArtikelGruppe?>(
+        future: _groupFuture,
+        builder: (BuildContext context, AsyncSnapshot<ArtikelGruppe?> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return MasterDataErrorView(
+              onRetry: () => setState(() {
+                _loadedGroupId = null;
+                _groupFuture = _moreServicesOf(context, ref).articleDetail.groupById(widget.recordId!);
+              }),
+            );
+          }
+          final ArtikelGruppe? articleGroup = snapshot.data;
+          if (articleGroup == null) {
+            return AppPage(
+              header: AppPageHeader(title: l10n.notFound, showFilterToolbar: false),
+              child: AppCard(child: Text(l10n.errorRecordNotFound('${widget.recordId}'))),
+            );
+          }
+          if (_loadedGroupId != articleGroup.id) {
+            _name.text = articleGroup.name;
+            _description.text = articleGroup.beschreibung ?? '';
+            _loadedGroupId = articleGroup.id;
+          }
+          return _buildForm(l10n, kind);
+        },
+      );
+    }
+    return _buildForm(l10n, kind);
+  }
+
+  Widget _buildForm(AppLocalizations l10n, String? kind) {
     final bool group = kind == 'group';
     return AppPage(
       maxWidth: 860,
       header: AppPageHeader(
-        title: group ? l10n.actionCreateGroup : l10n.actionCreateArticle,
+        title: widget.recordId != null
+            ? l10n.actionEdit
+            : group
+            ? l10n.actionCreateGroup
+            : l10n.actionCreateArticle,
         showFilterToolbar: false,
         leading: IconButton(
-          onPressed: _saving ? null : () => context.go(group ? '/articles?view=groups' : '/articles'),
+          onPressed: _saving
+              ? null
+              : () => context.go(
+                  widget.recordId != null
+                      ? '/articles/${widget.recordId}?kind=group'
+                      : group
+                      ? '/articles?view=groups'
+                      : '/articles',
+                ),
           icon: const Icon(Icons.arrow_back),
           tooltip: l10n.actionBack,
         ),
@@ -611,7 +702,15 @@ class _ArticleFormViewState extends ConsumerState<ArticleFormView> {
             Row(
               children: <Widget>[
                 OutlinedButton(
-                  onPressed: _saving ? null : () => context.go(group ? '/articles?view=groups' : '/articles'),
+                  onPressed: _saving
+                      ? null
+                      : () => context.go(
+                          widget.recordId != null
+                              ? '/articles/${widget.recordId}?kind=group'
+                              : group
+                              ? '/articles?view=groups'
+                              : '/articles',
+                        ),
                   child: Text(l10n.actionCancel),
                 ),
                 const Spacer(),

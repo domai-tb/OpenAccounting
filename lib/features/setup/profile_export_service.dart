@@ -163,6 +163,7 @@ class ProfileExportService {
     'rechnungsvorlagen_occurrences',
     'mileage_trips',
     'mileage_trip_corrections',
+    'anlage_afa_jahreswerte',
   ];
 
   /// Columns that are never serialized. Values are reported only as

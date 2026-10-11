@@ -2177,4 +2177,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get csvImportUnavailable => 'Import data is currently unavailable. Mapping is preserved.';
+  @override
+  String get routeAssets => 'Fixed assets';
+  @override
+  String get assetRegisterTitle => 'Fixed asset register';
+  @override
+  String get assetRegisterSubtitle => 'Manage assets and review linear depreciation';
+  @override
+  String get assetAdd => 'Add asset';
+  @override
+  String get assetEdit => 'Edit asset';
+  @override
+  String get assetDescription => 'Description';
+  @override
+  String get assetType => 'Asset type';
+  @override
+  String get assetAcquisitionDate => 'Acquisition date';
+  @override
+  String get assetNetPrice => 'Net purchase price';
+  @override
+  String get assetUsefulLife => 'Useful life (years)';
+  @override
+  String get assetMethod => 'Depreciation method';
+  @override
+  String get assetPrivateShare => 'Private-use share (%)';
+  @override
+  String get assetCategory => 'Category';
+  @override
+  String get assetDisposalDate => 'Disposed on';
+  @override
+  String assetInvalidField(String field) {
+    return 'Invalid input: $field';
+  }
+  @override
+  String get assetEmpty => 'No assets yet. Add the first asset.';
+  @override
+  String get assetDeleteRefused => 'Asset cannot be deleted: schedule history exists. Please archive it.';
+  @override
+  String get assetArchived => 'Asset archived';
+  @override
+  String get assetScheduleTitle => 'Annual depreciation';
+  @override
+  String get assetScheduleUnavailable => 'Unavailable';
+  @override
+  String get assetFinancialBlocked => 'Financial effect unavailable: no posting contract.';
+  @override
+  String get assetLoadFailed => 'Assets could not be loaded.';
+  @override
+  String get assetUnresolved => 'Unresolved: review required';
+
 }

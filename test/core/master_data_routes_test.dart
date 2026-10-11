@@ -52,6 +52,7 @@ void main() {
         '/settings/accounts',
         '/settings/tax-rates',
         '/settings/number-ranges',
+        '/assets',
         '/help',
         '/setup',
         '/inventory',

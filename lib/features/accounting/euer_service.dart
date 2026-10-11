@@ -5,6 +5,8 @@ import 'package:drift/drift.dart';
 import 'package:openaccounting/features/accounting/beleg_typ.dart';
 import 'package:openaccounting/features/accounting/euer_entity.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/assets/asset_entity.dart';
+import 'package:openaccounting/features/assets/asset_schedule_service.dart';
 
 /// EÜR Anlage 2025 — 60+ Zeilen 12–107 per spec.
 /// Journal direction is read from beleg_typ and kept separate from the
@@ -131,11 +133,17 @@ class EuerService {
       );
     }
 
-    // Zeile 33 — AfA from anlageverzeichnis, not journal.
+    // Zeile 33 — AfA from the asset-register schedule owner, not journal.
+    // The canonical schedule is the sole AfA source. Legacy rows fail closed
+    // until their inputs are explicitly mapped to the maintained contract.
     int afaCents = 0;
+    final List<Map<String, Object?>> afaAssetRefs = <Map<String, Object?>>[];
     try {
       final Set<String> anlageColumns = await _tableColumns('anlageverzeichnis');
+      final bool hasCanonical = anlageColumns.contains('kaufpreis_netto');
       final List<String> selectedColumns = <String>[
+        'id',
+        'bezeichnung',
         'anschaffungskosten',
         'nutzungsdauer',
         'privatanteil',
@@ -143,50 +151,55 @@ class EuerService {
         'anschaffungsdatum',
         for (final String optional in <String>['verkauft_am', 'verkaufsdatum', 'abgangsdatum'])
           if (anlageColumns.contains(optional)) optional,
+        if (hasCanonical)
+          for (final String canonical in <String>[
+            'asset_typ',
+            'kaufpreis_netto',
+            'nutzungsdauer_jahre',
+            'afa_methode',
+            'privat_anteil_prozent',
+            'kategorie_id',
+          ])
+            if (anlageColumns.contains(canonical)) canonical,
       ];
       final List<Map<String, Object?>> afaRows = await executor.runSelect(
         'SELECT ${selectedColumns.join(', ')} FROM anlageverzeichnis',
         const <Object?>[],
       );
+      const AssetScheduleService scheduleOwner = AssetScheduleService();
       for (final Map<String, Object?> r in afaRows) {
         final String status = (r['status']?.toString() ?? 'aktiv').trim().toLowerCase();
         // ponytail: only 'aktiv' counts — 'inaktiv'/'verkauft' skipped, null treated as aktiv.
-        if (status == 'inaktiv' || status == 'verkauft' || status == 'disposed') {
+        if (status == 'inaktiv' || status == 'verkauft' || status == 'disposed' || status == 'archiviert') {
           continue;
         }
-        final DateTime? acquisitionDate = _parseDate(r['anschaffungsdatum']);
-        if (acquisitionDate != null && acquisitionDate.year > jahr) {
+        final FixedAsset asset = _toFixedAsset(r);
+        if (!asset.hasCanonicalInputs) {
+          throw EuerException(
+            'EÜR unvollständig: Anlage ${asset.id} hat unaufgelöste AfA-Eingaben '
+            '(kaufpreis_netto/nutzungsdauer_jahre/afa_methode ohne bestätigte Zuordnung)',
+          );
+        }
+        final AssetScheduleRow row = scheduleOwner.computeRow(asset: asset, jahr: jahr);
+        if (row.isAvailable) {
+          afaCents += money.toCents(row.betrag!);
+          afaAssetRefs.add(<String, Object?>{
+            'anlage_id': asset.id,
+            'jahr': jahr,
+            'formel': row.formel,
+            'betrag': row.betrag,
+          });
           continue;
         }
-        final DateTime? disposalDate = _firstDate(r, <String>['verkauft_am', 'verkaufsdatum', 'abgangsdatum']);
-        if (disposalDate != null && disposalDate.year < jahr) {
+        final String reason = row.blockierungsgrund ?? '';
+        if (reason.startsWith('vor-anschaffung') || reason.startsWith('nutzungsdauer-ueberschritten')) {
           continue;
         }
-        final String kostenRaw = r['anschaffungskosten']?.toString() ?? '0.00';
-        final int kostenCents = money.toCents(money.formatBetrag(kostenRaw));
-        final int nutzungsdauer = (r['nutzungsdauer'] as num?)?.toInt() ?? 0;
-        if (nutzungsdauer <= 0) {
-          continue;
-        }
-        // Linear AfA uses half-up cents, then the annual amount is prorated
-        // for the active months when acquisition/disposal occurred this year.
-        final int baseCents = _roundHalfUp(kostenCents, nutzungsdauer);
-        final String privatRaw = r['privatanteil']?.toString() ?? '0';
-        // privatanteil: private-use share 0–100% as decimal string; e.g. '30.00' → 3000.
-        final int privatCents = money.toCents(money.formatBetrag(privatRaw));
-        // factor scales AfA by business share: (10000 - privatCents) / 10000.
-        final int factor = 10000 - privatCents;
-        final int clampedFactor = factor < 0 ? 0 : (factor > 10000 ? 10000 : factor);
-        final int reduced = _roundHalfUp(baseCents * clampedFactor, 10000);
-        final int activeMonths = _activeMonths(
-          jahr: jahr,
-          acquisitionDate: acquisitionDate,
-          disposalDate: disposalDate,
-        );
-        afaCents += _roundHalfUp(reduced * activeMonths, 12);
+        throw EuerException('EÜR unvollständig: Anlage ${asset.id} ($reason)');
       }
       zeilen[33] = money.fromCents(afaCents);
     } catch (error, stackTrace) {
+      if (error is EuerException) rethrow;
       Error.throwWithStackTrace(
         EuerException('Anlageverzeichnis konnte für AfA nicht gelesen werden', error),
         stackTrace,
@@ -289,6 +302,7 @@ class EuerService {
     final Map<String, Object?> snapshot = <String, Object?>{
       'version': 1,
       'jahr': jahr,
+      'afa_assets': afaAssetRefs,
       'resolved': <Object?>[
         for (final _ResolvedMapping m in resolved)
           <String, Object?>{
@@ -429,31 +443,8 @@ DateTime? _parseDate(Object? raw) {
   return DateTime.tryParse(text.length >= 10 ? text.substring(0, 10) : text);
 }
 
-DateTime? _firstDate(Map<String, Object?> row, List<String> keys) {
-  for (final String key in keys) {
-    final DateTime? date = _parseDate(row[key]);
-    if (date != null) {
-      return date;
-    }
-  }
-  return null;
-}
 
-int _activeMonths({required int jahr, DateTime? acquisitionDate, DateTime? disposalDate}) {
-  final int start = acquisitionDate?.year == jahr ? acquisitionDate!.month : 1;
-  final int end = disposalDate?.year == jahr ? disposalDate!.month : 12;
-  return end < start ? 0 : end - start + 1;
-}
 
-int _roundHalfUp(int numerator, int denominator) {
-  if (denominator <= 0) {
-    throw ArgumentError('denominator must be positive');
-  }
-  if (numerator < 0) {
-    return -_roundHalfUp(-numerator, denominator);
-  }
-  return (numerator + denominator ~/ 2) ~/ denominator;
-}
 
 bool _useSoll(int jahr, DateTime? cutoverDatum) {
   if (cutoverDatum == null) {
@@ -480,4 +471,36 @@ class _ResolvedMapping {
   final String status;
   final String? quelle;
   final String? version;
+}
+
+int? _asIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+String? _asTextOrNull(Object? value) {
+  if (value == null) return null;
+  final String text = value.toString();
+  return text.isEmpty ? null : text;
+}
+
+/// Maps a canonical asset row to its typed contract inputs for the owner.
+FixedAsset _toFixedAsset(Map<String, Object?> row) {
+  return FixedAsset(
+    id: (row['id'] as num?)?.toInt() ?? 0,
+    bezeichnung: row['bezeichnung']?.toString() ?? '',
+    assetTyp: AssetTyp.fromDb(row['asset_typ']),
+    anschaffungsdatum: row['anschaffungsdatum']?.toString() ?? '',
+    kaufpreisNetto: _asTextOrNull(row['kaufpreis_netto']),
+    nutzungsdauerJahre: _asIntOrNull(row['nutzungsdauer_jahre']),
+    afaMethode: _asTextOrNull(row['afa_methode']),
+    privatAnteilProzent: _asTextOrNull(row['privat_anteil_prozent']),
+    kategorieId: _asIntOrNull(row['kategorie_id']),
+    verkauftAm: _asTextOrNull(row['verkauft_am']),
+    status: row['status']?.toString() ?? 'aktiv',
+    legacyAnschaffungskosten: _asTextOrNull(row['anschaffungskosten']),
+    legacyNutzungsdauer: _asIntOrNull(row['nutzungsdauer']),
+    legacyPrivatanteil: _asTextOrNull(row['privatanteil']),
+  );
 }

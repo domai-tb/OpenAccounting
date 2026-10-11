@@ -65,17 +65,32 @@ void main() {
       expect(result.gewinn, '120.00');
     });
 
-    test('EÜR prorates depreciation through the disposal month', () async {
-      await db.executor.runInsert(
+    test('EÜR fails closed when disposal-year depreciation has no accepted rule', () async {
+      final int id = await db.executor.runInsert(
         'INSERT INTO anlageverzeichnis '
-        '(bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status, verkauft_am) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>['Disposed laptop', '2026-01-01', '1200.00', 3, '0', 'aktiv', '2026-06-15'],
+        '(bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status, verkauft_am, '
+        'asset_typ, kaufpreis_netto, nutzungsdauer_jahre, afa_methode, privat_anteil_prozent) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'Disposed laptop',
+          '2022-01-01',
+          '1200.00',
+          3,
+          '0',
+          'aktiv',
+          '2026-06-15',
+          'EDV',
+          '1200.00',
+          3,
+          'linear',
+          '0',
+        ],
       );
 
-      final EuerResult result = await EuerService(db.executor).generate(jahr: 2026);
-
-      expect(result.zeile(33), '200.00');
+      await expectLater(
+        EuerService(db.executor).generate(jahr: 2026),
+        throwsA(isA<EuerException>().having((EuerException error) => error.message, 'message', contains('$id'))),
+      );
     });
 
     test('EÜR uses the configured cutover deterministically', () async {

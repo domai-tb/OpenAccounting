@@ -773,12 +773,18 @@ class ContactRecordView extends ConsumerWidget {
     final Uri uri = GoRouterState.of(context).uri;
     final String? kind = uri.queryParameters['kind'];
     if (kind != 'customer' && kind != 'supplier') {
+      String detailLocation(String selectedKind) {
+        final Map<String, dynamic> query = Map<String, dynamic>.from(uri.queryParametersAll);
+        query['kind'] = selectedKind;
+        return uri.replace(queryParameters: query).toString();
+      }
+
       return MasterDataTypeSelectionView(
         requestedId: id,
         firstLabel: l10n.actionSelectCustomer,
         secondLabel: l10n.actionSelectSupplier,
-        onSelectFirst: () => context.go('${uri.path}?kind=customer'),
-        onSelectSecond: () => context.go('${uri.path}?kind=supplier'),
+        onSelectFirst: () => context.go(detailLocation('customer')),
+        onSelectSecond: () => context.go(detailLocation('supplier')),
       );
     }
     final int? recordId = int.tryParse(id);

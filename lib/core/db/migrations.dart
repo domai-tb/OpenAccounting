@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 16;
+  static const int currentVersion = 17;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -241,6 +241,7 @@ class MigrationRunner {
       await _migrateProfilePortabilityTables(freshProfile: true);
       await _migrateContactArchive();
       await _migrateMasterDataImportTemplates();
+      await _migrateAssetRegister();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -359,6 +360,10 @@ class MigrationRunner {
     if (version == 16) {
       await _migrateTo(15, createSchema);
       await _migrateMasterDataImportTemplates();
+    }
+    if (version == 17) {
+      await _migrateTo(16, createSchema);
+      await _migrateAssetRegister();
     }
   }
 
@@ -1062,6 +1067,99 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     }
   }
 
+  /// Fixed-asset register (v17, next sequential after the v16 baseline).
+  /// Adds nullable canonical columns to `anlageverzeichnis` (`asset_typ`,
+  /// `kaufpreis_netto`, `nutzungsdauer_jahre`, `afa_methode`,
+  /// `privat_anteil_prozent`, `verkauft_am`) and the append-only
+  /// `anlage_afa_jahreswerte` schedule-snapshot table owned by
+  /// `fixed-asset-register-workspace`. Legacy columns and values are never
+  /// copied or reinterpreted; existing rows keep NULL canonical fields.
+  /// Schedule rows are immutable via triggers and keyed by
+  /// `(anlage_id, jahr, quell_hash, regel_version)`. Any DDL or verification
+  /// failure rolls back with the version bump.
+  Future<void> _migrateAssetRegister() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'anlageverzeichnis'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Anlagenverzeichnis-Tabelle fehlt');
+    }
+    await _addColumnIfMissing('anlageverzeichnis', 'asset_typ', "TEXT CHECK (asset_typ IN ('KFZ','EDV','sonstig'))");
+    await _addColumnIfMissing('anlageverzeichnis', 'kaufpreis_netto', 'NUMERIC(12,2) CHECK (kaufpreis_netto >= 0)');
+    await _addColumnIfMissing('anlageverzeichnis', 'nutzungsdauer_jahre', 'INTEGER CHECK (nutzungsdauer_jahre > 0)');
+    await _addColumnIfMissing('anlageverzeichnis', 'afa_methode', "TEXT CHECK (afa_methode IN ('linear'))");
+    await _addColumnIfMissing(
+      'anlageverzeichnis',
+      'privat_anteil_prozent',
+      'NUMERIC(5,2) CHECK (privat_anteil_prozent BETWEEN 0 AND 100)',
+    );
+    await _addColumnIfMissing('anlageverzeichnis', 'verkauft_am', 'TEXT');
+    await executor.runCustom(_assetScheduleTableSql);
+    await executor.runCustom(
+      'CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_update '
+      'BEFORE UPDATE ON anlage_afa_jahreswerte '
+      "BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END",
+    );
+    await executor.runCustom(
+      'CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_delete '
+      'BEFORE DELETE ON anlage_afa_jahreswerte '
+      "BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END",
+    );
+    final List<Map<String, Object?>> created = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'anlage_afa_jahreswerte'",
+      const <Object?>[],
+    );
+    if (created.isEmpty) {
+      throw StateError('AfA-Jahreswerte konnten nicht erstellt werden');
+    }
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(anlage_afa_jahreswerte)',
+      const <Object?>[],
+    );
+    const Set<String> required = <String>{
+      'id',
+      'anlage_id',
+      'jahr',
+      'quell_snapshot',
+      'quell_hash',
+      'regel_version',
+      'status',
+      'formel',
+      'betrag',
+      'blockierungsgrund',
+      'berechnet_am',
+    };
+    final Set<String> names = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!required.every(names.contains)) {
+      throw StateError('AfA-Jahreswerte-Schema konnte nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> assetColumns = await executor.runSelect(
+      'PRAGMA table_info(anlageverzeichnis)',
+      const <Object?>[],
+    );
+    final Set<String> assetNames = <String>{
+      for (final Map<String, Object?> row in assetColumns) row['name'].toString(),
+    };
+    const Set<String> assetRequired = <String>{
+      'id',
+      'bezeichnung',
+      'anschaffungsdatum',
+      'anschaffungskosten',
+      'nutzungsdauer',
+      'privatanteil',
+      'asset_typ',
+      'kaufpreis_netto',
+      'nutzungsdauer_jahre',
+      'afa_methode',
+      'privat_anteil_prozent',
+      'verkauft_am',
+    };
+    if (!assetRequired.every(assetNames.contains)) {
+      throw StateError('Anlagen-Schema konnte nicht verifiziert werden');
+    }
+  }
+
   Future<void> _verifyRequiredTables() async {
     if (requiredTables.isEmpty) return;
     final rows = await executor.runSelect(
@@ -1121,6 +1219,7 @@ const Set<String> _featureOwnedTables = <String>{
   'category_mapping_history',
   'feature_table_state',
   'master_data_import_templates',
+  'anlage_afa_jahreswerte',
 };
 
 const Map<String, int> _featureTableVersions = <String, int>{
@@ -1130,10 +1229,23 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'mileage_trips': 13,
   'mileage_trip_corrections': 13,
   'master_data_import_templates': 16,
+  'anlage_afa_jahreswerte': 17,
 };
 
 // shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
 const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
+  'anlage_afa_jahreswerte': <String>{
+    'id',
+    'anlage_id',
+    'jahr',
+    'quell_snapshot',
+    'quell_hash',
+    'regel_version',
+    'status',
+    'betrag',
+    'blockierungsgrund',
+    'berechnet_am',
+  },
   'forderung_zahlungen': <String>{
     'id',
     'forderung_id',
@@ -1306,3 +1418,5 @@ CREATE TABLE IF NOT EXISTS master_data_import_templates (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 )''';
+
+const String _assetScheduleTableSql = '''

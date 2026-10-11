@@ -30,13 +30,20 @@ The application SHALL provide a typed asset register at the canonical `/assets` 
 
 ### Requirement: Traceable annual depreciation schedule
 
-The application SHALL expose an annual per-asset schedule only when the source fields map to the maintained accounting contract. For a full year with no acquisition or disposal during that year, it SHALL calculate linear annual AfA from net purchase price divided by useful life in years. It SHALL apply the private-use reduction only to KFZ assets as defined by the maintained accounting contract. A non-KFZ asset with a non-zero private-use percentage SHALL remain unavailable until that type's treatment is accepted. Each result SHALL identify the asset, schedule year, source inputs, formula, and resulting amount. Opening book value, remaining book value, and disposal effects SHALL be marked unavailable until their formulas and cutoff rules are accepted. Partial acquisition or disposal years, unresolved legacy inputs, unsupported methods, and unresolved account/report mappings MUST fail closed: the schedule SHALL show an unavailable reason, SHALL NOT substitute zero, and SHALL NOT be represented as complete EÜR/AVEÜR output.
+The application SHALL expose an annual per-asset schedule only when the source fields map to the maintained accounting contract. For a full year with no acquisition or disposal during that year, it SHALL calculate linear annual AfA as `kaufpreis_netto / nutzungsdauer_jahre` rounded half-up to the cent for `NUMERIC(12,2)` storage, computed independently per year with no final-year remainder adjustment. The schedule SHALL contain at most `nutzungsdauer_jahre` full-year rows; years beyond the useful life SHALL be unavailable with the useful-life bound identified. It SHALL apply the private-use reduction only to KFZ assets as defined by the maintained accounting contract. A non-KFZ asset with a non-zero private-use percentage SHALL remain unavailable until that type's treatment is accepted. Each result SHALL identify the asset, schedule year, source inputs, formula, and resulting amount. Opening book value, remaining book value, and disposal effects SHALL be marked unavailable until their formulas and cutoff rules are accepted. Partial acquisition or disposal years, unresolved legacy inputs, unsupported methods, and unresolved account/report mappings MUST fail closed: the schedule SHALL show an unavailable reason, SHALL NOT substitute zero, and SHALL NOT be represented as complete EÜR/AVEÜR output. The owning EÜR workflow, under its independently accepted reporting contract, may consume only complete rows; this change defines no report output on its own and waits on no other change for its asset and schedule scope.
 
 #### Scenario: Show a supported full-year linear amount
 
 - **GIVEN** a reconciled KFZ asset has net purchase price `1000.00`, useful life `3` years, linear method, private-use share `30%`, and the selected year is a full year between acquisition and disposal
 - **WHEN** the annual schedule is generated
 - **THEN** the row identifies the asset and inputs, shows the formula `1000.00 / 3 × 70%`, and reports annual AfA `233.33` with opening/remaining book values marked unavailable
+
+#### Scenario: Schedule respects useful life and cent rounding
+
+- **GIVEN** a reconciled asset has net purchase price `1000.00` and useful life `3` years with linear method
+- **WHEN** the full schedule is generated
+- **THEN** each full-year row SHALL hold the independently half-up-rounded cent amount
+- **AND** no more than `3` full-year rows SHALL exist, with later years unavailable under the useful-life bound
 
 #### Scenario: Non-KFZ private-use rule is unresolved
 
