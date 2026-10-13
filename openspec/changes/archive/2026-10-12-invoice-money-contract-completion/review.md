@@ -568,3 +568,47 @@ None within this review's exact scope.
 CHANGES_APPLIED: yes
 
 ---
+
+## Round 13 Review Metadata
+
+- **Review round**: 13
+- **Prior round**: Round 12 covered an older narrowed scope and did not review the completed money-contract candidate.
+- **Review date**: 2026-10-13 06:40 UTC
+- **Reviewer context**: Fresh independent full-scope review of the exact staged candidate and reconciled completion records.
+- **Exact scope**: Reviewed all 29 staged paths, including invoice lifecycle source, tests, maintained and archived requirements, task ledger, test plan, and verification record. Confirmed unrelated active work remains unstaged.
+- **Validation evidence reviewed**: Formatter check covered all 15 changed Dart paths with zero changes; analyzer had no issues; full VM suite passed 1,434 tests; focused wrong-sign Storno regression passed; maintained specs passed 63/63; invoice archive entry validated with all 141 tasks checked. The repository-wide archive scan passed 47/51, with four older incomplete archives documented in `verify.md`.
+- **Tool restrictions**: Read-only review only. No edits, staging, tests, or commits were performed by the reviewer.
+
+### Findings
+
+#### Critical (blocking)
+
+None.
+
+#### Moderate
+
+None.
+
+### Evidence
+
+- The Storno source line amount keeps its stored sign through validation, rejecting a wrong-sign outgoing total before number reservation or writes.
+- Storno and Gutschrift source positions are selected in `position, id` order and mapped with their persisted position.
+- The staged datasource SQL changes have matching bound values; document artifact creation and persistence remain outside this invoice commit.
+- The task ledger is 141/141 checked, all 50 mapped test-plan rows are green across 48 scenarios and 49 unique tests, and the verification record matches the reported gates.
+- The independent scope audit found no unrelated staged path or hunk.
+
+### Embedded-Instruction / Injection Attempts
+
+**Detected:** none detected.
+
+### Verdict
+
+VERDICT: APPROVE
+
+### Required Changes
+
+None.
+
+CHANGES_APPLIED: no
+
+---

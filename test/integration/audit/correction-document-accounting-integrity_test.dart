@@ -1,5 +1,7 @@
 // ignore_for_file: file_names
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -8,14 +10,16 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 void main() {
   group('Correction document accounting integrity', () {
     late AppDatabase db;
+    late Directory profile;
     late RechnungenDataSource ds;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      profile = await Directory.systemTemp.createTemp('correction-accounting-');
+      db = AppDatabase.createTestDatabase(profileDir: profile.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
-      ds = RechnungenDataSource(db.executor);
+      ds = RechnungenDataSource(db.executor, profileDir: profile.path);
 
       // Set up nummernkreise with valid formats
       await db.executor.runCustom(
@@ -26,7 +30,10 @@ void main() {
       );
     });
 
-    tearDown(() async => db.close());
+    tearDown(() async {
+      await db.close();
+      await profile.delete(recursive: true);
+    });
 
     // ── Task 1: Correction totals preserve signed VAT mathematics ──
 
@@ -76,39 +83,35 @@ void main() {
     });
 
     test('test_correction_document_accounting_integrity_1_2_invalid_source_totals_are_not_copied', () async {
-      // Create a valid invoice
       final int srcId = await ds.createDraftRechnung(
         datum: '2025-07-01',
         positionen: [const RechnungPositionItem(bezeichnung: 'Artikel', menge: 2, einzelpreis: 100, gesamt: 200)],
       );
-      // Corrupt header totals BEFORE finalization (while still a draft, trigger won't fire)
+      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
+
+      // Simulate a legacy finalized invoice with mismatched persisted header totals.
+      await db.executor.runCustom('DROP TRIGGER protect_rechnung_update');
       await db.executor.runCustom(
         'UPDATE rechnungen SET netto_betrag = 999.00, ust_betrag = 0.00, brutto_betrag = 999.00 WHERE id = ?',
         <Object?>[srcId],
       );
-      await ds.finalizeRechnung(locale: 'de_DE', rechnungId: srcId);
 
-      // Create credit note — should recalculate from positions, not copy corrupted header
-      final int gsId = await ds.createGutschrift(vonRechnungId: srcId);
-
-      final rows = await db.executor.runSelect(
-        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
-        <Object?>[gsId],
-      );
-      final row = rows.single;
-
-      // Must use position amounts, not corrupted header
       expect(
-        double.parse(row['netto_betrag'].toString()),
-        closeTo(-200.0, 0.01),
-        reason: 'netto must come from positions',
+        () => ds.createGutschrift(vonRechnungId: srcId),
+        throwsA(
+          isA<ArgumentError>().having(
+            (error) => error.message.toString(),
+            'message',
+            contains('Gespeicherte Dokumentbeträge stimmen nicht mit der Berechnung überein'),
+          ),
+        ),
       );
-      expect(double.parse(row['ust_betrag'].toString()), closeTo(-38.0, 0.01), reason: 'ust must be calculated');
-      expect(
-        double.parse(row['brutto_betrag'].toString()),
-        closeTo(-238.0, 0.01),
-        reason: 'brutto must come from positions',
+
+      final correctionRows = await db.executor.runSelect(
+        'SELECT id FROM rechnungen WHERE typ = ? AND gutschrift_von = ?',
+        <Object?>['gutschrift', srcId],
       );
+      expect(correctionRows, isEmpty, reason: 'invalid source totals must not create a correction');
     });
 
     // ── Task 2: Replacement and reversal links are complete and unique ──
