@@ -241,14 +241,8 @@ class MahnungenRepository {
         );
       }
 
-      try {
-        await executor.runUpdate('UPDATE rechnungen SET mahnstufe_aktuell = ? WHERE id = ?', <Object?>[
-          stufeNum,
-          rechnungId,
-        ]);
-      } catch (e) {
-        debugPrint('mahnungen update mahnstufe: $e');
-      }
+      // ponytail: kein Stufen-Update beim Entwurf — die Stufe schaltet erst
+      // nach Transport-Annahme weiter (markTransportAccepted).
 
       await executor.runCustom('COMMIT');
     } catch (e) {
@@ -456,6 +450,199 @@ class MahnungenRepository {
     }
   }
 
+  Future<Mahnung> markTransportAccepted(int id, {required int stufeNummer}) async {
+    await _ensureInitialized();
+    final now = DateTime.now().toIso8601String();
+    final current = await getById(id);
+    if (current == null) throw const MahnungException('Mahnung nicht gefunden');
+    await executor.runCustom('BEGIN');
+    try {
+      try {
+        await executor.runUpdate('UPDATE mahnungen SET status = ?, versendet_am = ? WHERE id = ?', <Object?>[
+          'versendet',
+          now,
+          id,
+        ]);
+      } catch (e) {
+        debugPrint('mahnungen markTransportAccepted: $e');
+        await executor.runUpdate('UPDATE mahnungen SET status = ? WHERE id = ?', <Object?>['versendet', id]);
+      }
+      try {
+        await executor.runUpdate('UPDATE rechnungen SET mahnstufe_aktuell = ? WHERE id = ?', <Object?>[
+          stufeNummer,
+          current.rechnungId,
+        ]);
+      } catch (e) {
+        debugPrint('mahnungen update mahnstufe accepted: $e');
+      }
+      await executor.runCustom('COMMIT');
+    } catch (e) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (e2) {
+        debugPrint('mahnungen rollback accepted: $e2');
+      }
+      rethrow;
+    }
+    final updated = await getById(id);
+    if (updated == null) throw const MahnungException('Mahnung nicht gefunden');
+    return updated;
+  }
+
+  /// Höchste transport-akzeptierte Stufe einer Rechnung (0 = keine).
+  Future<int> currentAcceptedLevel(int rechnungId) async {
+    await _ensureInitialized();
+    try {
+      final rows = await executor.runSelect(
+        'SELECT MAX(ms.stufe) AS max_stufe FROM mahnungen m '
+        'JOIN mahnstufen ms ON ms.id = m.stufe_id '
+        "WHERE m.rechnung_id = ? AND m.status = 'versendet'",
+        <Object?>[rechnungId],
+      );
+      if (rows.isEmpty) return 0;
+      return _asInt(rows.single['max_stufe']) ?? 0;
+    } catch (e) {
+      debugPrint('mahnungen currentAcceptedLevel: $e');
+      return 0;
+    }
+  }
+
+  Future<Mahnung?> findByRechnungAndStufe(int rechnungId, int stufeId) async {
+    await _ensureInitialized();
+    List<Map<String, Object?>> rows;
+    try {
+      rows = await executor.runSelect(
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot, '
+        'COALESCE(gebuehr_bezahlt, 0) AS gebuehr_bezahlt, '
+        'COALESCE(zinsen_bezahlt, 0) AS zinsen_bezahlt, '
+        'COALESCE(uebernommene_gebuehr, 0) AS uebernommene_gebuehr, '
+        'COALESCE(uebernommene_zinsen, 0) AS uebernommene_zinsen, '
+        'versendet_am '
+        'FROM mahnungen WHERE rechnung_id = ? AND stufe_id = ? ORDER BY id ASC LIMIT 1',
+        <Object?>[rechnungId, stufeId],
+      );
+    } catch (e) {
+      debugPrint('mahnungen findByRechnungAndStufe fallback: $e');
+      rows = await executor.runSelect(
+        'SELECT id, rechnung_id, kunde_id, stufe_id, datum, betrag, '
+        'gebuehr, zinsen, status, snapshot '
+        'FROM mahnungen WHERE rechnung_id = ? AND stufe_id = ? ORDER BY id ASC LIMIT 1',
+        <Object?>[rechnungId, stufeId],
+      );
+    }
+    if (rows.isEmpty) return null;
+    return _fromRow(rows.single);
+  }
+
+  /// Setzt die Stufe einer vollständig beglichenen Rechnung zurück.
+  Future<void> clearInvoiceLevel(int rechnungId) async {
+    await _ensureInitialized();
+    try {
+      await executor.runUpdate('UPDATE rechnungen SET mahnstufe_aktuell = 0 WHERE id = ?', <Object?>[rechnungId]);
+    } catch (e) {
+      debugPrint('mahnungen clearInvoiceLevel: $e');
+    }
+  }
+
+  /// Kanonische Erstellung aus dem abgerechneten Saldo (DunningService-Pfad).
+  ///
+  /// Snapshotet Rechnungsnummer, Fälligkeit, Kunde, Stufe, offenen Saldo,
+  /// effektive Gebühr, Zinssegmente, Zinssumme und übernommene Beträge.
+  /// Erstellt keinen Brief ohne positiven Saldo und fasst keine Rechnungen
+  /// zusammen. Ein Entwurf schaltet die Rechnungsstufe NICHT weiter.
+  Future<Mahnung> createSettled({
+    required int rechnungId,
+    required int stufeId,
+    required String rechnungsnummer,
+    required String faelligkeit,
+    required int? kundeId,
+    required int stufeNummer,
+    required String stufenBezeichnung,
+    required String outstandingPrincipal,
+    required String effektiveGebuehr,
+    required String zinssumme,
+    required String zinssegmenteJson,
+    required String uebernommeneGebuehr,
+    required String uebernommeneZinsen,
+  }) async {
+    await _ensureInitialized();
+    if (money.toCents(outstandingPrincipal) <= 0) {
+      throw const MahnungException('Ohne positiven Saldo keine Mahnung');
+    }
+    final datum = DateTime.now().toIso8601String();
+    final snapshotMap = <String, Object?>{
+      'rechnungsnummer': rechnungsnummer,
+      'betrag': outstandingPrincipal,
+      'faelligkeit': faelligkeit,
+      'stufe': stufeNummer,
+      'stufeBezeichnung': stufenBezeichnung,
+      'gebuehr': effektiveGebuehr,
+      'zinsen': zinssumme,
+      'zinssegmente': zinssegmenteJson,
+      'uebernommeneGebuehr': uebernommeneGebuehr,
+      'uebernommeneZinsen': uebernommeneZinsen,
+    };
+    final snapshotJson = jsonEncode(snapshotMap);
+    late final int id;
+    await executor.runCustom('BEGIN');
+    try {
+      try {
+        id = await executor.runInsert(
+          'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, '
+          'betrag, gebuehr, zinsen, status, snapshot, '
+          'gebuehr_bezahlt, zinsen_bezahlt, uebernommene_gebuehr, '
+          'uebernommene_zinsen) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            rechnungId,
+            kundeId,
+            stufeId,
+            datum,
+            outstandingPrincipal,
+            effektiveGebuehr,
+            zinssumme,
+            'offen',
+            snapshotJson,
+            '0.00',
+            '0.00',
+            uebernommeneGebuehr,
+            uebernommeneZinsen,
+          ],
+        );
+      } catch (e) {
+        debugPrint('mahnungen insert settled full: $e');
+        id = await executor.runInsert(
+          'INSERT INTO mahnungen (rechnung_id, kunde_id, stufe_id, datum, '
+          'betrag, gebuehr, zinsen, status, snapshot) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            rechnungId,
+            kundeId,
+            stufeId,
+            datum,
+            outstandingPrincipal,
+            effektiveGebuehr,
+            zinssumme,
+            'offen',
+            snapshotJson,
+          ],
+        );
+      }
+      await executor.runCustom('COMMIT');
+    } catch (e) {
+      try {
+        await executor.runCustom('ROLLBACK');
+      } catch (e2) {
+        debugPrint('mahnungen rollback settled: $e2');
+      }
+      rethrow;
+    }
+    final created = await getById(id);
+    if (created == null) throw const MahnungException('Mahnung konnte nicht erstellt werden');
+    return created;
+  }
+
   Future<Mahnung> markSent(int id) async {
     await _ensureInitialized();
     final now = DateTime.now().toIso8601String();
@@ -474,346 +661,96 @@ class MahnungenRepository {
     return updated;
   }
 
+  /// Fail-closed: kennzeichnet nichts als versendet, ohne dass der Transport
+  /// die Nachricht mit Anhang angenommen hat. Versand läuft ausschließlich
+  /// über den konfigurierten SMTP-Transport (DunningSendService).
   Future<void> sendMail(int mahnungId) async {
-    await markSent(mahnungId);
+    await _ensureInitialized();
+    final existing = await getById(mahnungId);
+    if (existing == null) throw const MahnungException('Mahnung nicht gefunden');
+    throw const MahnungException('Versand erfordert einen konfigurierten SMTP-Transport');
   }
 
+  /// Erzeugt das lesbare Mahn-PDF aus dem unveränderlichen Snapshot.
+  ///
+  /// Profile-lokal, atomar (tmp → prüfen → rename), mit echten
+  /// Snapshot-Feldern statt Platzhalter. Das PDF einer transport-akzeptierten
+  /// Mahnung ist unveränderlich und wird nicht neu erzeugt.
   Future<String> generatePdf(int mahnungId, {String? profileDirOverride}) async {
     await _ensureInitialized();
     final m = await getById(mahnungId);
     if (m == null) throw const MahnungException('Mahnung nicht gefunden');
+    if (m.status == 'versendet') {
+      throw const MahnungException('Transport-akzeptiertes PDF ist unveränderlich');
+    }
     final effectiveDir = profileDirOverride ?? profileDir;
     if (effectiveDir == null) return 'Mahnung-${m.id}.pdf';
     final pdfDir = Directory('$effectiveDir/pdfs')..createSync(recursive: true);
     final pdfFile = File('${pdfDir.path}/Mahnung-${m.id}.pdf');
     final tmpFile = File('${pdfDir.path}/Mahnung-${m.id}.pdf.tmp');
     try {
-      tmpFile.writeAsBytesSync(_minimalPdf());
+      tmpFile.writeAsBytesSync(_renderPdf(m), flush: true);
+      if (tmpFile.readAsBytesSync().isEmpty) {
+        throw const MahnungException('Mahnung-PDF ist nicht lesbar');
+      }
+      if (pdfFile.existsSync()) pdfFile.deleteSync();
       tmpFile.renameSync(pdfFile.path);
     } catch (e) {
       try {
         if (tmpFile.existsSync()) tmpFile.deleteSync();
       } catch (_) {}
-      rethrow;
+      if (e is MahnungException) rethrow;
+      throw const MahnungException('Mahnung-PDF konnte nicht erzeugt werden');
     }
     return pdfFile.path;
   }
 
-  static List<int> _minimalPdf() => [
-    0x25,
-    0x50,
-    0x44,
-    0x46,
-    0x2d,
-    0x31,
-    0x2e,
-    0x34,
-    0x0a,
-    0x25,
-    0xe2,
-    0xe3,
-    0xcf,
-    0xd3,
-    0x0a,
-    0x31,
-    0x20,
-    0x30,
-    0x20,
-    0x6f,
-    0x62,
-    0x6a,
-    0x3c,
-    0x3c,
-    0x2f,
-    0x54,
-    0x79,
-    0x70,
-    0x65,
-    0x2f,
-    0x43,
-    0x61,
-    0x74,
-    0x61,
-    0x6c,
-    0x6f,
-    0x67,
-    0x2f,
-    0x50,
-    0x61,
-    0x67,
-    0x65,
-    0x73,
-    0x20,
-    0x32,
-    0x20,
-    0x30,
-    0x20,
-    0x52,
-    0x3e,
-    0x3e,
-    0x0a,
-    0x65,
-    0x6e,
-    0x64,
-    0x6f,
-    0x62,
-    0x6a,
-    0x0a,
-    0x32,
-    0x20,
-    0x30,
-    0x20,
-    0x6f,
-    0x62,
-    0x6a,
-    0x3c,
-    0x3c,
-    0x2f,
-    0x54,
-    0x79,
-    0x70,
-    0x65,
-    0x2f,
-    0x50,
-    0x61,
-    0x67,
-    0x65,
-    0x73,
-    0x2f,
-    0x4b,
-    0x69,
-    0x64,
-    0x73,
-    0x5b,
-    0x33,
-    0x20,
-    0x30,
-    0x20,
-    0x52,
-    0x5d,
-    0x2f,
-    0x43,
-    0x6f,
-    0x75,
-    0x6e,
-    0x74,
-    0x20,
-    0x31,
-    0x3e,
-    0x3e,
-    0x0a,
-    0x65,
-    0x6e,
-    0x64,
-    0x6f,
-    0x62,
-    0x6a,
-    0x6a,
-    0x0a,
-    0x33,
-    0x20,
-    0x30,
-    0x20,
-    0x6f,
-    0x62,
-    0x6a,
-    0x3c,
-    0x3c,
-    0x2f,
-    0x54,
-    0x79,
-    0x70,
-    0x65,
-    0x2f,
-    0x50,
-    0x61,
-    0x67,
-    0x65,
-    0x2f,
-    0x50,
-    0x61,
-    0x72,
-    0x65,
-    0x6e,
-    0x74,
-    0x20,
-    0x32,
-    0x20,
-    0x30,
-    0x20,
-    0x52,
-    0x2f,
-    0x4d,
-    0x65,
-    0x64,
-    0x69,
-    0x61,
-    0x42,
-    0x6f,
-    0x78,
-    0x5b,
-    0x30,
-    0x20,
-    0x30,
-    0x20,
-    0x36,
-    0x31,
-    0x32,
-    0x20,
-    0x37,
-    0x39,
-    0x32,
-    0x5d,
-    0x3e,
-    0x3e,
-    0x0a,
-    0x65,
-    0x6e,
-    0x64,
-    0x6f,
-    0x62,
-    0x6a,
-    0x6a,
-    0x0a,
-    0x78,
-    0x72,
-    0x65,
-    0x66,
-    0x0a,
-    0x30,
-    0x20,
-    0x34,
-    0x0a,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x36,
-    0x35,
-    0x35,
-    0x33,
-    0x35,
-    0x20,
-    0x66,
-    0x0a,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x66,
-    0x0a,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x66,
-    0x0a,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x30,
-    0x20,
-    0x66,
-    0x0a,
-    0x74,
-    0x72,
-    0x61,
-    0x69,
-    0x6c,
-    0x65,
-    0x72,
-    0x3c,
-    0x3c,
-    0x2f,
-    0x53,
-    0x69,
-    0x7a,
-    0x65,
-    0x20,
-    0x34,
-    0x2f,
-    0x52,
-    0x6f,
-    0x6f,
-    0x74,
-    0x20,
-    0x31,
-    0x20,
-    0x30,
-    0x20,
-    0x52,
-    0x3e,
-    0x3e,
-    0x0a,
-    0x73,
-    0x74,
-    0x61,
-    0x72,
-    0x74,
-    0x78,
-    0x72,
-    0x65,
-    0x66,
-    0x0a,
-    0x31,
-    0x37,
-    0x36,
-    0x0a,
-    0x25,
-    0x25,
-    0x45,
-    0x4f,
-    0x46,
-    0x0a,
-  ];
+  /// Minimaler einseitiger PDF-Text aus Snapshot-Feldern (ASCII-sicher).
+  static List<int> _renderPdf(Mahnung m) {
+    final snap = m.snapshotData;
+    final lines = <String>[
+      'Mahnung Nr. M-${m.id}',
+      'Rechnung: ${snap?['rechnungsnummer'] ?? ''}',
+      'Faellig: ${snap?['faelligkeit'] ?? ''}',
+      'Betrag: ${m.betrag}',
+      'Mahngebuehr: ${m.gebuehr}',
+      'Verzugszinsen: ${m.zinsen}',
+      'Stufe: ${snap?['stufe'] ?? ''}',
+    ];
+    final content = StringBuffer('BT /F1 12 Tf 72 740 Td 14 TL ');
+    for (final line in lines) {
+      content.write('(${_pdfEscape(line)}) Tj T* ');
+    }
+    content.write('ET');
+    final contentBytes = content.toString().codeUnits;
+    const String pageObject =
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+        '/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>';
+    final objects = <String>[
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      pageObject,
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      '<< /Length ${contentBytes.length} >>\nstream\n${content}endstream',
+    ];
+    final out = <int>[];
+    void write(String s) => out.addAll(s.codeUnits);
+    write('%PDF-1.4\n');
+    final offsets = <int>[];
+    for (var i = 0; i < objects.length; i++) {
+      offsets.add(out.length);
+      write('${i + 1} 0 obj\n${objects[i]}\nendobj\n');
+    }
+    final xrefAt = out.length;
+    write('xref\n0 ${objects.length + 1}\n0000000000 65535 f \n');
+    for (final offset in offsets) {
+      write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+    }
+    write('trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n$xrefAt\n%%EOF\n');
+    return out;
+  }
+
+  static String _pdfEscape(String s) => s.replaceAll(r'\', r'\\').replaceAll('(', r'\(').replaceAll(')', r'\)');
 
   Future<int> getInvoiceDunningLevel(int rechnungId) async {
     await _ensureInitialized();

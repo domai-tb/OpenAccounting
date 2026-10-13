@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:openaccounting/core/router/app_router.dart';
+import 'package:openaccounting/core/router/master_data_routes.dart';
 
 /// Canonical route definition with typed data and actions.
 class CanonicalRoute {
@@ -218,6 +220,89 @@ void main() {
 
       // THEN: retry works
       expect(retried, isTrue);
+    });
+  });
+
+  group('Canonical route inventory (dunning-workflow-integrity)', () {
+    const MasterDataRouteMatrix matrix = MasterDataRouteMatrix();
+
+    const List<String> canonical = <String>[
+      '/',
+      '/invoices',
+      '/invoices/new',
+      '/invoices/:id',
+      '/receipts',
+      '/banking',
+      '/contacts',
+      '/mahnwesen',
+      '/taxes',
+      '/reports',
+      '/assets',
+      '/settings',
+      '/help',
+      '/setup',
+      '/inventory',
+    ];
+
+    test('test_typed_route_every_canonical_route_has_a_useful_surface', () {
+      // GIVEN an active profile, WHEN visiting every canonical route, THEN each has title + action/boundary.
+      for (final String path in canonical) {
+        expect(matrix.truthfulBoundary(path), 'ok', reason: '$path has no surface');
+        final MasterDataRouteTarget? target = matrix.ownerOf(path);
+        expect(target, isNotNull, reason: '$path has no owner');
+        expect(target!.title.isNotEmpty, isTrue, reason: '$path has no title');
+        expect(
+          target.primaryActionLabel != null || target.boundary != null,
+          isTrue,
+          reason: '$path has neither action nor boundary',
+        );
+        expect(matrix.fallbackSqlFor(path), isNull, reason: '$path uses a generic fallback');
+      }
+    });
+
+    test('test_typed_route_database_outage_is_not_an_empty_route', () {
+      // GIVEN an unreadable database, WHEN any canonical route is requested, THEN retryable, route kept.
+      for (final String path in canonical) {
+        final MasterDataUnavailable unavailable = matrix.unavailable(path);
+        expect(unavailable.route, path);
+        expect(unavailable.state, 'unavailable');
+        if (path != '/setup') {
+          expect(unavailable.route, isNot('/setup'), reason: '$path must not redirect to setup');
+        }
+      }
+    });
+
+    test('test_typed_route_alias_matrix_preserves_deep_links', () {
+      // GIVEN German aliases with IDs and queries, THEN canonical equivalents keep every parameter.
+      expect(matrix.canonicalize('/rechnungen/123?status=offen&seite=2'), '/invoices/123?status=offen&seite=2');
+      expect(matrix.canonicalize('/belege/456?filter=unbezahlt'), '/receipts/456?filter=unbezahlt');
+      expect(matrix.canonicalize('/mahnungen?status=offen'), '/mahnwesen?status=offen');
+    });
+
+    test('test_typed_route_route_matrix_exposes_a_truthful_boundary', () {
+      // GIVEN an unregistered route, THEN unavailable without a generic SELECT * fallback.
+      expect(matrix.truthfulBoundary('/phantomschmerz'), 'unavailable');
+      expect(matrix.truthfulBoundary('/mahnwesen'), 'ok');
+      expect(matrix.fallbackSqlFor('/phantomschmerz'), isNull);
+      expect(matrix.fallbackSqlFor('/mahnwesen'), isNull);
+    });
+
+    test('test_typed_route_dunning_route_exposes_its_typed_workspace', () {
+      // GIVEN an active profile, WHEN opening /mahnwesen, THEN the typed workspace with query params.
+      expect(AppRoute.mahnwesen.path, '/mahnwesen');
+      final MasterDataRouteTarget? target = matrix.ownerOf('/mahnwesen');
+      expect(target, isNotNull);
+      expect(target!.owner, MasterDataOwner.dunning);
+      expect(target.title, 'Mahnwesen');
+      expect(target.primaryActionLabel, 'Lauf prüfen');
+      expect(matrix.canonicalize('/mahnwesen?status=offen&stufe=2'), '/mahnwesen?status=offen&stufe=2');
+    });
+
+    test('test_typed_route_dunning_route_database_outage_remains_actionable', () {
+      // GIVEN an unreadable database at /mahnwesen?status=offen, THEN retryable, path and query kept.
+      final MasterDataUnavailable unavailable = matrix.unavailable('/mahnwesen?status=offen');
+      expect(unavailable.route, '/mahnwesen?status=offen');
+      expect(unavailable.state, 'unavailable');
     });
   });
 }

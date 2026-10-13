@@ -207,7 +207,9 @@ class _AppSidebarState extends State<AppSidebar> {
         item(Icons.receipt_long, l10n?.sidebarInvoices ?? 'Rechnungen', '/invoices'),
         item(Icons.receipt, l10n?.sidebarReceipts ?? 'Belege', '/receipts'),
         item(Icons.account_balance, l10n?.sidebarBanking ?? 'Bank & Zahlungen', '/banking'),
+        item(Icons.markunread_mailbox_outlined, l10n?.sidebarDunning ?? 'Mahnwesen', '/mahnwesen'),
         item(Icons.contacts, l10n?.sidebarContacts ?? 'Kontakte', '/contacts'),
+        item(Icons.repeat_outlined, l10n?.sidebarRecurring ?? 'Wiederkehrend', '/recurring'),
         item(Icons.inventory_2_outlined, l10n?.routeInventory ?? 'Inventory', '/inventory'),
         if (!widget.isCompact)
           Padding(

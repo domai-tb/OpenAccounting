@@ -12,6 +12,7 @@ enum MasterDataOwner {
   invoiceDetail,
   receipts,
   banking,
+  dunning,
   customers,
   suppliers,
   contactForm,
@@ -34,6 +35,7 @@ enum MasterDataOwner {
   help,
   setup,
   inventory,
+  recurring,
 }
 
 @immutable
@@ -110,6 +112,7 @@ class MasterDataRouteMatrix {
     MasterDataRouteTarget(owner: MasterDataOwner.invoiceDetail, title: 'Rechnung', primaryActionLabel: 'Ansehen'),
     MasterDataRouteTarget(owner: MasterDataOwner.receipts, title: 'Belege', primaryActionLabel: 'Beleg erfassen'),
     MasterDataRouteTarget(owner: MasterDataOwner.banking, title: 'Banking', primaryActionLabel: 'Import starten'),
+    MasterDataRouteTarget(owner: MasterDataOwner.dunning, title: 'Mahnwesen', primaryActionLabel: 'Lauf prüfen'),
     MasterDataRouteTarget(owner: MasterDataOwner.customers, title: 'Kunden', primaryActionLabel: 'Kunde anlegen'),
     MasterDataRouteTarget(
       owner: MasterDataOwner.contactForm,
@@ -148,6 +151,7 @@ class MasterDataRouteMatrix {
     MasterDataRouteTarget(owner: MasterDataOwner.help, title: 'Hilfe', boundary: 'read-only'),
     MasterDataRouteTarget(owner: MasterDataOwner.setup, title: 'Einrichtung', primaryActionLabel: 'Profil anlegen'),
     MasterDataRouteTarget(owner: MasterDataOwner.inventory, title: 'Lager', boundary: 'unavailable'),
+    MasterDataRouteTarget(owner: MasterDataOwner.recurring, title: 'Wiederkehrend', primaryActionLabel: 'Neue Vorlage'),
   ];
 
   static const List<String> _paths = <String>[
@@ -157,6 +161,7 @@ class MasterDataRouteMatrix {
     '/invoices/:id',
     '/receipts',
     '/banking',
+    '/mahnwesen',
     '/contacts',
     '/contacts/new',
     '/contacts/:id',
@@ -175,6 +180,7 @@ class MasterDataRouteMatrix {
     '/help',
     '/setup',
     '/inventory',
+    '/recurring',
   ];
 
   List<MasterDataRouteTarget> get canonicalRoutes => List<MasterDataRouteTarget>.unmodifiable(_inventory);
@@ -236,11 +242,13 @@ class MasterDataRouteMatrix {
       '/rechnungen' => '/invoices',
       '/belege' => '/receipts',
       '/bank' => '/banking',
+      '/mahnungen' => '/mahnwesen',
       '/kontakte' => '/contacts',
       '/steuern' => '/taxes',
       '/auswertungen' => '/reports',
       '/einrichtung' => '/setup',
       '/anlagen' => '/assets',
+      '/wiederkehrend' => '/recurring',
       _ when uri.path.startsWith('/rechnungen/') => uri.path.replaceFirst('/rechnungen/', '/invoices/'),
       _ when uri.path.startsWith('/belege/') => uri.path.replaceFirst('/belege/', '/receipts/'),
       _ => uri.path,

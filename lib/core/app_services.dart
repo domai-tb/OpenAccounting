@@ -16,11 +16,18 @@ import 'package:openaccounting/features/assets/asset_usecases.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/einkommen/forderungen_usecases.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
+import 'package:openaccounting/features/mahnwesen/collection_package_service.dart';
+import 'package:openaccounting/features/mahnwesen/dunning_balance_source.dart';
+import 'package:openaccounting/features/mahnwesen/dunning_exclusions_repository.dart';
+import 'package:openaccounting/features/mahnwesen/dunning_send_service.dart';
+import 'package:openaccounting/features/mahnwesen/dunning_service.dart';
 import 'package:openaccounting/features/mahnwesen/mahnungen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/mahnstufen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/mahnwesen_einstellungen_repository.dart';
 import 'package:openaccounting/features/mahnwesen/sperrung_service.dart';
 import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
+import 'package:openaccounting/features/recurring/recurring_booking_wiring.dart';
+import 'package:openaccounting/features/recurring/recurring_booking_workspace_usecases.dart';
 import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/features/setup/profile_export_service.dart';
@@ -64,6 +71,11 @@ class AppServices {
   late final ForderungenUseCases forderungen = ForderungenUseCases(ForderungenRepository(_db.executor));
 
   late final BuchungsVorlagenRepository buchungsVorlagen = BuchungsVorlagenRepository(_db.executor);
+
+  late final RecurringBookingWorkspaceUseCases recurringBooking = buildRecurringBookingUseCases(
+    _db.executor,
+    rechnungen,
+  );
 
   late final RechnungsVorlagenRepository rechnungsVorlagen = RechnungsVorlagenRepository(_db.executor);
 
@@ -113,6 +125,38 @@ class AppServices {
   late final MahnstufenRepository mahnstufen = MahnstufenRepository(_db.executor);
   late final MahnwesenEinstellungenRepository mahnwesenEinstellungen = MahnwesenEinstellungenRepository(_db.executor);
   late final SperrungService sperrung = SperrungService(_db.executor);
+  late final SettledBalanceSource dunningBalances = SettledBalanceSource(_db.executor);
+  late final DunningExclusionsRepository dunningAusschluesse = DunningExclusionsRepository(_db.executor);
+  late final DunningService dunning = DunningService(
+    executor: _db.executor,
+    mahnungen: mahnungen,
+    stufen: mahnstufen,
+    balances: dunningBalances,
+    exclusions: dunningAusschluesse,
+    sperrung: sperrung,
+  );
+  late final DunningSendService dunningVersand = DunningSendService(
+    executor: _db.executor,
+    mahnungen: mahnungen,
+    configuration: SmtpConfigurationService(
+      executor: _db.executor,
+      transport: const DartIoSmtpTransport(),
+      migration: SmtpCredentialMigration(
+        vault: const UnavailableVault(),
+        legacyFile: LegacySecretFile(_db.profileDir),
+        identity: ProfileIdentityStore(_db.profileDir),
+      ),
+    ),
+    attempts: EmailAttemptRepository(_db.executor),
+    profileDir: _db.profileDir,
+  );
+  late final CollectionPackageService inkassoPaket = CollectionPackageService(
+    executor: _db.executor,
+    mahnungen: mahnungen,
+    balances: dunningBalances,
+    forderungen: ForderungenRepository(_db.executor),
+    profileDir: _db.profileDir,
+  );
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final AssetRegisterUseCases assets = AssetRegisterUseCases(
     AssetRepository(_db.executor),
