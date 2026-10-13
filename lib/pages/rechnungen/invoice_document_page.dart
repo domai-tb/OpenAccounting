@@ -350,8 +350,10 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
             ? EInvoiceReadiness.valid
             : EInvoiceReadiness.notValidated;
       case EInvoiceOutputFormat.zugferd:
+        if (!const EInvoiceService().validatorAvailable) return EInvoiceReadiness.unavailable;
         return _zugferdXmlExists(invoice.id) ? EInvoiceReadiness.valid : EInvoiceReadiness.invalid;
       case EInvoiceOutputFormat.xrechnung:
+        if (!const EInvoiceService().validatorAvailable) return EInvoiceReadiness.unavailable;
         return (_exportedForId == invoice.id && _xrechnungExported)
             ? EInvoiceReadiness.valid
             : EInvoiceReadiness.notValidated;

@@ -12,16 +12,21 @@ void main() {
   group('Invoice document posting boundaries', () {
     late AppDatabase db;
     late RechnungenDataSource ds;
+    late Directory fixtureProfile;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      fixtureProfile = await Directory.systemTemp.createTemp('invoice-posting-boundaries-test-');
+      db = AppDatabase.createTestDatabase(profileDir: fixtureProfile.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
-      ds = RechnungenDataSource(db.executor);
+      ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
     });
 
-    tearDown(() async => db.close());
+    tearDown(() async {
+      await db.close();
+      if (fixtureProfile.existsSync()) await fixtureProfile.delete(recursive: true);
+    });
 
     Future<int> addCustomer() => db.executor.runInsert(
       'INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)',

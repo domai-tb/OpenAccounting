@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,11 +22,13 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 void main() {
   group('stocktake workspace', () {
     late AppDatabase db;
+    late Directory fixtureProfile;
     late StocktakeRepository repository;
     late StocktakeUseCases useCases;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      fixtureProfile = await Directory.systemTemp.createTemp('stocktake-invoice-test-');
+      db = AppDatabase.createTestDatabase(profileDir: fixtureProfile.path);
       await db.ensureOpen();
       await db.executor.runInsert('INSERT INTO unternehmen (name) VALUES (?)', <Object?>['Inventur GmbH']);
       await db.executor.runInsert('INSERT INTO kategorien (bezeichnung, aktiv) VALUES (?, 1)', <Object?>[
@@ -36,6 +40,7 @@ void main() {
 
     tearDown(() async {
       await db.close();
+      if (fixtureProfile.existsSync()) await fixtureProfile.delete(recursive: true);
     });
 
     Future<void> enableInventory() async {
@@ -73,7 +78,7 @@ void main() {
 
     test('test_automatic_movement_recorded', () async {
       final id = await createArtikel(bezeichnung: 'Abverkauf', bestand: 50);
-      final rechnungen = RechnungenDataSource(db.executor);
+      final rechnungen = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       final rechnungId = await rechnungen.createDraftRechnung(
         datum: '2026-03-01',
         positionen: <RechnungPositionItem>[
@@ -90,7 +95,7 @@ void main() {
 
     test('test_storno_movement_recorded', () async {
       final id = await createArtikel(bezeichnung: 'Storno', bestand: 50);
-      final rechnungen = RechnungenDataSource(db.executor);
+      final rechnungen = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       final rechnungId = await rechnungen.createDraftRechnung(
         datum: '2026-03-01',
         positionen: <RechnungPositionItem>[
@@ -109,7 +114,7 @@ void main() {
 
     test('test_incoming_and_document_only_finalization_has_no_automatic_movement', () async {
       final incomingId = await createArtikel(bezeichnung: 'Eingang', bestand: 20);
-      final rechnungen = RechnungenDataSource(db.executor);
+      final rechnungen = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       final incomingRechnung = await rechnungen.createDraftRechnung(
         datum: '2026-03-01',
         typ: 'rechnung_eingang',

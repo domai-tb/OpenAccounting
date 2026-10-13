@@ -1,5 +1,7 @@
 // ignore_for_file: file_names
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -9,16 +11,21 @@ void main() {
   group('Invoice accounting posting lifecycle', () {
     late AppDatabase db;
     late RechnungenDataSource ds;
+    late Directory fixtureProfile;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      fixtureProfile = await Directory.systemTemp.createTemp('invoice-accounting-lifecycle-test-');
+      db = AppDatabase.createTestDatabase(profileDir: fixtureProfile.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
-      ds = RechnungenDataSource(db.executor);
+      ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
     });
 
-    tearDown(() async => db.close());
+    tearDown(() async {
+      await db.close();
+      if (fixtureProfile.existsSync()) await fixtureProfile.delete(recursive: true);
+    });
 
     Future<int> insertKunde() async {
       return db.executor.runInsert('INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)', const <Object?>[

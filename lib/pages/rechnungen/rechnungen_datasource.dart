@@ -21,11 +21,13 @@ class RechnungenDataSource {
     this.executor, {
     this.profileDir,
     this.correctionArtifactWriter = const CorrectionArtifactWriter(),
+    this.eInvoiceService = const EInvoiceService(),
   });
 
   final QueryExecutor executor;
   final String? profileDir;
   final CorrectionArtifactWriter correctionArtifactWriter;
+  final EInvoiceService eInvoiceService;
 
   bool get correctionArtifactTransactionAvailable => profileDir?.trim().isNotEmpty ?? false;
 
@@ -838,8 +840,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         // Validated hybrid: CII XML from the same snapshot is generated and
         // validated before anything commits; any failure rolls back numbering,
         // status, stock, and database writes and removes temp artifacts.
-        const eService = EInvoiceService();
-        final EInvoiceValidationResult validation = eService.validate(eSnapshot, selectedFormat);
+        final EInvoiceValidationResult validation = eInvoiceService.validate(eSnapshot, selectedFormat);
         if (!validation.valid) {
           throw EInvoiceExportValidationException(validation);
         }

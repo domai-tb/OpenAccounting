@@ -3,11 +3,11 @@ import 'dart:typed_data';
 
 import 'package:openaccounting/features/documents/artifact_transaction.dart';
 
-/// Finalized correction/conversion artifact writer.
+/// Finalized document artifact writer.
 ///
-/// Every operation that transitions a document to finalized — including
-/// Storno, Gutschrift, replacement, and conversion results — SHALL persist a
-/// readable profile-local artifact rendered from its own finalized snapshot.
+/// Every operation that transitions a document to finalized SHALL persist a
+/// readable profile-local artifact rendered from its own finalized snapshot. This
+/// includes invoices, document-only types, corrections, replacements, and conversions.
 /// A draft result remains editable and never claims a finalized artifact
 /// path. Bytes come from the caller (rendered via the existing PDF service
 /// from an immutable snapshot); this writer owns temp → verify → rename and

@@ -399,7 +399,7 @@ class MasterDataCsvImportService {
     if (isUpdate) {
       // Forbidden price/derivation fields reject the whole row.
       for (final String field in MasterDataImportFields.articleUpdateForbidden) {
-        if (((mapped[field] ?? '').trim()).isNotEmpty) {
+        if ((mapped[field] ?? '').trim().isNotEmpty) {
           errors.add(
             MasterDataFieldError(
               field: field,
@@ -884,7 +884,7 @@ class MasterDataCsvImportService {
         bezeichnung,
         typ,
         _nullIfEmpty(mapped['beschreibung']),
-        (mapped['einheit'] ?? '').trim().isEmpty ? 'Stk' : mapped['einheit']!.trim(),
+        if ((mapped['einheit'] ?? '').trim().isEmpty) 'Stk' else mapped['einheit']!.trim(),
         finalNetto,
         finalBrutto,
         vkEingabe,
@@ -904,7 +904,7 @@ class MasterDataCsvImportService {
     );
     if (rows.isEmpty) throw const MasterDataCsvImportException('Nummernkreis fehlt.');
     final Map<String, Object?> row = rows.single;
-    int? configured = _asIntOrNull(row['naechste_nummer']);
+    final int? configured = _asIntOrNull(row['naechste_nummer']);
     final List<int> lasts = <int>[
       if (_asIntOrNull(row['letzte_nummer']) != null) _asIntOrNull(row['letzte_nummer'])!,
       if (_asIntOrNull(row['letze_nummer']) != null) _asIntOrNull(row['letze_nummer'])!,
@@ -982,7 +982,7 @@ class _NoopImportUser extends QueryExecutorUser {
 }
 
 /// Thin application-service facade over the import service. Pages resolve
-/// through [AppServices.masterDataCsvImport], never via raw SQL.
+/// through `AppServices.masterDataCsvImport`, never via raw SQL.
 class MasterDataCsvImportUseCase {
   const MasterDataCsvImportUseCase(this._service);
 

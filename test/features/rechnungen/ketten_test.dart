@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -5,18 +7,27 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
+Future<AppDatabase> _openProfileDb() async {
+  final Directory profile = await Directory.systemTemp.createTemp('invoice-chain-');
+  final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profile.path);
+  addTearDown(() async {
+    await db.close();
+    await profile.delete(recursive: true);
+  });
+  await db.ensureOpen();
+  return db;
+}
+
 void main() {
   test('Angebot -> Auftrag propagates positions preserves eingabemodus', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'AN-YY####', naechste_nummer = 1 WHERE typ = 'angebot'",
     );
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'AU-YY####', naechste_nummer = 1 WHERE typ = 'auftrag'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final angebot = await uc.createDokument(
       typ: 'angebot',
       datum: '2026-08-30',
@@ -44,9 +55,7 @@ void main() {
   });
 
   test('Lieferschein -> Rechnung propagates lieferadresse', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.executor.runCustom(
       "INSERT INTO kunden (name, strasse, plz, ort) VALUES ('Muster', 'Str 1', '10115', 'Berlin')",
     );
@@ -64,7 +73,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final ls = await uc.createDokument(
       typ: 'lieferschein',
       datum: '2026-08-30',
@@ -80,14 +89,12 @@ void main() {
   });
 
   test('Auftrag -> LS -> Rechnung chain', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     for (final t in ['angebot', 'auftrag', 'lieferschein', 'rechnung_ausgang']) {
       final fmt = t == 'rechnung_ausgang' ? 'RE-YY####' : '${t.substring(0, 2).toUpperCase()}-YY####';
       await db.executor.runCustom('UPDATE nummernkreise SET format = ?, naechste_nummer = 1 WHERE typ = ?', [fmt, t]);
     }
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final ang = await uc.createDokument(
       typ: 'angebot',
       datum: '2026-08-30',
@@ -103,13 +110,11 @@ void main() {
   });
 
   test('unsupported conversion blocked', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'LS-YY####', naechste_nummer = 1 WHERE typ = 'lieferschein'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final ls = await uc.createDokument(
       typ: 'lieferschein',
       datum: '2026-08-30',
@@ -122,13 +127,11 @@ void main() {
   });
 
   test('position fields preserved including rabatt and ust', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'AN-YY####', naechste_nummer = 1 WHERE typ = 'angebot'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final ang = await uc.createDokument(
       typ: 'angebot',
       datum: '2026-08-30',

@@ -1,0 +1,125 @@
+// ignore_for_file: file_names
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
+
+import 'e_invoice_test_fixtures.dart'
+    show
+        eInvoiceTestService,
+        fakePdfBytes,
+        standardPositions,
+        standardTotals,
+        validCompany,
+        validCustomer,
+        validSnapshot;
+
+void main() {
+  group('ZUGFeRD and XRechnung e-invoicing', () {
+    test('generates_hybrid_pdf_with_validated_zugferd_metadata', () {
+      const EInvoiceService service = eInvoiceTestService;
+      final FinalizationSnapshot snapshot = validSnapshot(format: EInvoiceOutputFormat.zugferd);
+
+      final EInvoiceValidationResult validation = service.validate(snapshot, EInvoiceOutputFormat.zugferd);
+      expect(validation.valid, isTrue);
+      final ZugferdHybridArtifact hybrid = service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes);
+
+      expect(hybrid.pdfBytes, fakePdfBytes);
+      expect(hybrid.documentNumber, 'RE-2026-0001');
+      expect(hybrid.ciiXml.contains('CrossIndustryInvoice'), isTrue);
+      expect(hybrid.ciiXml.contains('urn:factur-x.eu:1p0:en16931'), isTrue);
+      expect(hybrid.ciiXml.contains('<ram:GrandTotalAmount>238.00</ram:GrandTotalAmount>'), isTrue);
+      expect(service.readiness(validation), EInvoiceReadiness.valid);
+    });
+
+    test('generates_standalone_xrechnung_ubl_without_mutating_invoice', () {
+      const EInvoiceService service = eInvoiceTestService;
+      final FinalizationSnapshot snapshot = validSnapshot(
+        buyerReference: 'LEITWEG-123',
+        format: EInvoiceOutputFormat.xrechnung,
+      );
+      final int netBefore = snapshot.netCents;
+
+      final String xml = service.xrechnungXml(snapshot);
+
+      expect(xml.contains('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"'), isTrue);
+      expect(xml.contains('xrechnung_3.0'), isTrue);
+      expect(xml.contains('PDF'), isFalse);
+      expect(xml.contains('<cbc:BuyerReference>LEITWEG-123</cbc:BuyerReference>'), isTrue);
+      expect(xml.contains('<cbc:PayableAmount currencyID="EUR">238.00</cbc:PayableAmount>'), isTrue);
+      // Serialization never mutates the snapshot.
+      expect(snapshot.netCents, netBefore);
+      expect(snapshot.lines.single.netCents, 20000);
+    });
+
+    test('rejects_invalid_invoice_with_localized_rule_diagnostic_and_no_output', () {
+      const EInvoiceService service = eInvoiceTestService;
+      final Map<String, Object?> customer = validCustomer()..remove('strasse');
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.zugferd,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: customer,
+        posRows: standardPositions(),
+        preview: standardTotals(),
+        eingabemodus: 'netto',
+      );
+
+      final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.zugferd);
+
+      expect(result.valid, isFalse);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('buyer.street'));
+      final EInvoiceDiagnostic diagnostic = result.diagnostics.firstWhere((entry) => entry.ruleId == 'buyer.street');
+      expect(diagnostic.messageFor('de'), contains('buyer.street'));
+      expect(diagnostic.messageFor('en_US'), isNotEmpty);
+      expect(diagnostic.route, 'rechnungen');
+      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+    });
+
+    test('serializes_approved_typed_tax_category_and_exemption_reason', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
+
+      expect(snapshot.lines.single.classification.category.code, 'S');
+
+      final String cii = serializer.zugferdCii(snapshot);
+      expect(cii.contains('<ram:CategoryCode>S</ram:CategoryCode>'), isTrue);
+      expect(cii.contains('<ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>'), isTrue);
+      final String ubl = serializer.xrechnungUbl(snapshot);
+      expect(ubl.contains('<cbc:ID>S</cbc:ID>'), isTrue);
+      expect(ubl.contains('<cbc:Percent>19.00</cbc:Percent>'), isTrue);
+    });
+
+    test('unresolved_tax_mapping_fails_without_inference_or_output', () {
+      final List<Map<String, Object?>> positions = <Map<String, Object?>>[
+        <String, Object?>{
+          'bezeichnung': 'Auslandsleistung',
+          'menge': 1,
+          'einzelpreis': 100,
+          'gesamt': 100,
+          'ust_satz': 0,
+          'rabatt_prozent': 0,
+          'position': 0,
+        },
+      ];
+
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.zugferd,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: positions,
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        ),
+        throwsA(predicate((error) => error is EInvoiceSourceException && error.code == 'unresolvedTaxClassification')),
+      );
+    });
+  });
+}

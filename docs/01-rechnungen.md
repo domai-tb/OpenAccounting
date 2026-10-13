@@ -177,12 +177,13 @@ Supports Markdown formatting: `**fett**` and `*kursiv*`.
 
 ## ZUGFeRD / XRechnung
 
-E-invoicing integration for B2B mandates:
+The OpenSpec target for ordinary outgoing invoices (`typ = rechnung`) is below. The implementation is not release-ready until the accepted invoice-money and tax-map contracts, customer preference UI and finalized customer snapshots, and packaged offline validator/PDF-A-3 checks are complete and verified on Linux, Windows, and macOS.
 
-- ZUGFeRD 2.1.1 (EN 16931 compliant) embedded as PDF/A-3 attachment
-- XRechnung as standalone XML output
-- Mandatory fields: USt-IdNr, Leistungsdatum, Zahlungsbedingungen
-- Automatic generation on Rechnung finalization
+- **Explicit per-invoice choice** of ZUGFeRD, XRechnung, or PDF at finalization. The customer `zugferd_aktiv` value only preselects the draft default (ZUGFeRD when true, PDF when false); it never forces or hides the choice. The selection persists as `rechnungen.ausgabeformat`; legacy finalized rows without a saved choice resolve to PDF.
+- **Target: ZUGFeRD 2.5.2** (`EN16931` profile, UN/CEFACT CII D22B) as a hybrid PDF with embedded validated XML. Generation must roll back finalization on validation or output failure.
+- **Target: XRechnung 3.0** (UBL 2.1 syntax) as a standalone XML export validated with the pinned XRechnung Bundle 3.0.2 Summer 2026 technical artifacts. “3.0.2” identifies the validator bundle, not the format version. XRechnung is never embedded in PDF. Export validates the committed snapshot before opening the save dialog, writes atomically, and never mutates the invoice. Cancelling writes nothing.
+- **One canonical snapshot**: finalization materializes a single immutable snapshot (number, format, dates, sender/customer state, lines, typed tax classifications, canonical totals) that both the visual PDF and the structured XML consume. Standalone exports read the committed snapshot, including the customer state captured at finalization.
+- **Required data follows the pinned format rules**, not a blanket list: the issuer needs a Steuernummer *or* USt-IdNr (§14 Abs. 4 UStG), and the selected profile's business rules decide which buyer, reference (e.g. buyer reference for XRechnung), and payment fields apply. Missing or inconsistent data fails with a field-level diagnostic naming the corrective route. Technical validation never decides tax treatment and never claims legal/GoBD compliance by itself.
 
 ---
 

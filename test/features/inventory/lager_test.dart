@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -7,17 +9,20 @@ void main() {
   group('Lagerführung', () {
     late AppDatabase db;
     late RechnungenDataSource rechnungen;
+    late Directory fixtureProfile;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      fixtureProfile = await Directory.systemTemp.createTemp('inventory-invoice-test-');
+      db = AppDatabase.createTestDatabase(profileDir: fixtureProfile.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
-      rechnungen = RechnungenDataSource(db.executor);
+      rechnungen = RechnungenDataSource(db.executor, profileDir: db.profileDir);
     });
 
     tearDown(() async {
       await db.close();
+      if (fixtureProfile.existsSync()) await fixtureProfile.delete(recursive: true);
     });
 
     Future<int> createArtikel({
