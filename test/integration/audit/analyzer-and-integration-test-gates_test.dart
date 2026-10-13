@@ -13,7 +13,17 @@ import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
+import 'package:openaccounting/features/inventory/stocktake_page.dart';
+import 'package:openaccounting/features/mahnwesen/mahnwesen_workspace_page.dart';
+import 'package:openaccounting/features/recurring/recurring_booking_page.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
+
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+  for (int frame = 0; frame < 20; frame++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (finder.evaluate().isNotEmpty) return;
+  }
+}
 
 void main() {
   test('test_analyzer_and_integration_test_gates_1_1_analyzer_gate_passes', () async {
@@ -74,26 +84,27 @@ void main() {
     final List<AppRoute> primaryRoutes = AppRoute.values.where((AppRoute route) => route != AppRoute.setup).toList();
     for (final AppRoute route in primaryRoutes) {
       router.go(route.path);
-      await tester.pumpAndSettle();
-
+      final Finder surface = switch (route) {
+        AppRoute.dashboard => find.text('Offene Rechnungen'),
+        AppRoute.banking => find.byKey(const ValueKey<String>('bank-import-workflow')),
+        AppRoute.settings || AppRoute.help => find.byType(AppPage),
+        AppRoute.assets => find.byType(AppPage),
+        AppRoute.mahnwesen => find.byType(MahnwesenWorkspacePage),
+        AppRoute.inventory => find.byType(StocktakeWorkspacePage),
+        AppRoute.recurring => find.byType(RecurringBookingPage),
+        AppRoute.invoices || AppRoute.receipts => find.byType(TypedWorkspaceSurface),
+        AppRoute.contacts => find.byType(ContactsWorkspaceView),
+        _ => find.byType(FinanceListSurface),
+      };
+      await _pumpUntilFound(tester, surface);
       expect(router.state.matchedLocation, route.path, reason: 'Route ${route.path} must be reachable');
-      if (route == AppRoute.dashboard) {
-        expect(find.text('Offene Rechnungen'), findsOneWidget);
-      } else if (route == AppRoute.banking) {
+      expect(surface, findsOneWidget, reason: 'Route ${route.path} must expose its reviewable workspace surface');
+      if (route == AppRoute.banking) {
         expect(
           find.text('Dateiimport mit Prüfung vor dem Speichern'),
           findsOneWidget,
           reason: 'Route ${route.path} must expose the reviewable bank-import workflow',
         );
-        expect(find.byKey(const ValueKey<String>('bank-import-workflow')), findsOneWidget);
-      } else {
-        final Finder surface = switch (route) {
-          AppRoute.settings || AppRoute.help => find.byType(AppPage),
-          AppRoute.invoices || AppRoute.receipts => find.byType(TypedWorkspaceSurface),
-          AppRoute.contacts => find.byType(ContactsWorkspaceView),
-          _ => find.byType(FinanceListSurface),
-        };
-        expect(surface, findsOneWidget, reason: 'Route ${route.path} must expose its reviewable workspace surface');
       }
     }
   });

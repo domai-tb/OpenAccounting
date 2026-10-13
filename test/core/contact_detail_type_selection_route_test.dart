@@ -282,8 +282,10 @@ class _ContactDetailLookupSpy extends ContactDetailUseCase {
 }
 
 class _ContactDetailSpyServices extends AppServices {
-  _ContactDetailSpyServices(super.db, this.contactDetail);
+  _ContactDetailSpyServices(super.db, this._contactDetail);
+
+  final ContactDetailUseCase _contactDetail;
 
   @override
-  final ContactDetailUseCase contactDetail;
+  ContactDetailUseCase get contactDetail => _contactDetail;
 }
