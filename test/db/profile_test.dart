@@ -41,7 +41,7 @@ void main() {
         final tables = database.select(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         );
-        expect(tables, hasLength(AppDatabase.allTableNames.length + 5));
+        expect(tables, hasLength(AppDatabase.allTableNames.length + 6));
         expect(tables.map((row) => row['name']), contains('category_mapping_history'));
 
         final rates = database.select('SELECT satz FROM ust_saetze ORDER BY id');
@@ -87,10 +87,16 @@ void main() {
       await manager.createProfile('Geschäft');
       await manager.createProfile('Privat');
 
-      expect(await manager.setActiveProfile('Geschäft'), isTrue);
+      expect(await manager.setActiveProfile('Geschäft'), isFalse);
       expect(await manager.setActiveProfile('Privat'), isTrue);
       expect(await manager.getActiveProfile(), 'Privat');
-      expect(await File(manager.profileJsonPath).readAsString(), jsonEncode(<String, String>{'active': 'Privat'}));
+      expect(
+        await File(manager.profileJsonPath).readAsString(),
+        jsonEncode(<String, Object?>{
+          'active': 'Privat',
+          'registered': <String>['Geschäft', 'Privat'],
+        }),
+      );
       expect(await manager.setActiveProfile('Privat'), isFalse);
     });
 

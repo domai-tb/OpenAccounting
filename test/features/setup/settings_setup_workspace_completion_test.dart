@@ -57,7 +57,7 @@ void main() {
     test('test_invalid_required_setup_value_blocks_progression', () {
       expect(service().validateStammdaten(name: '  ', locale: 'de'), isNotNull);
       expect(service().validateKonten(accounts: const <BankAccount>[], kassenbestand: '0.00', locale: 'de'), isNotNull);
-      expect(service().validateKategorien(selectedIds: const <int>[], locale: 'de', catalogVerified: true), isNotNull);
+      expect(service().validateKategorien(selectedIds: const <int>[], locale: 'de'), isNotNull);
     });
 
     test('test_back_navigation_preserves_entered_values', () {
@@ -155,7 +155,7 @@ void main() {
     });
 
     test('test_step_3_validation_failure', () {
-      expect(service().validateKategorien(selectedIds: const <int>[], locale: 'de', catalogVerified: true), isNotNull);
+      expect(service().validateKategorien(selectedIds: const <int>[], locale: 'de'), isNotNull);
     });
 
     test('test_step_3_permits_deferred_categories_when_no_verified_catalog_exists', () {

@@ -41,7 +41,7 @@ void main() {
       expect(File(m.databasePath('Geschäft')).existsSync(), isTrue);
       final Map<String, dynamic> raw = jsonDecode(await File(m.profileJsonPath).readAsString());
       expect(raw['active'], 'Geschäft');
-      expect((raw['registered'] as List), contains('Geschäft'));
+      expect(raw['registered'] as List, contains('Geschäft'));
     });
 
     test('test_additional_profile_is_registered_without_changing_the_active_profile', () async {
@@ -198,10 +198,10 @@ void main() {
       final ProfileManager m = manager();
       await m.createProfile('Privat');
       final File file = File(m.profileJsonPath);
-      final DateTime modified = await file.lastModified();
+      final DateTime modified = file.lastModifiedSync();
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(await m.setActiveProfile('Privat'), isFalse);
-      expect(await file.lastModified(), modified);
+      expect(file.lastModifiedSync(), modified);
     });
 
     test('test_switch_to_non_existent_profile_does_not_fall_back_to_first_available', () async {
@@ -217,7 +217,9 @@ void main() {
       await m.createProfile('Geschäft');
       await m.createProfile('Privat');
       expect(await m.setActiveProfile('Privat'), isTrue);
-      expect(jsonDecode(await File(m.profileJsonPath).readAsString())['active'], 'Privat');
+      final Map<String, dynamic> profileData =
+          jsonDecode(await File(m.profileJsonPath).readAsString()) as Map<String, dynamic>;
+      expect(profileData['active'], 'Privat');
     });
 
     test('test_switch_to_nonexistent_profile_no_fallback', () async {

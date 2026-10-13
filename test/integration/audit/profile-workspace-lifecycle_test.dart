@@ -12,7 +12,7 @@ void main() {
 
     setUp(() async {
       tmpDir = await Directory.systemTemp.createTemp('profile-lifecycle-');
-      pm = ProfileManager(baseDir: tmpDir.path, databaseInitializer: (_) async {});
+      pm = ProfileManager(baseDir: tmpDir.path);
     });
 
     tearDown(() async {
@@ -24,7 +24,7 @@ void main() {
     // ── Task 1: Profile CRUD changes real profile state ──
 
     test('test_profile_workspace_lifecycle_1_1_inactive_profile_can_be_deleted', () async {
-      // An inactive profile must be fully removable (directory + files).
+      // Removing an inactive profile unregisters it without erasing its data.
       await pm.createProfile('ProfileA');
       await pm.createProfile('ProfileB');
 
@@ -34,9 +34,10 @@ void main() {
       // Delete ProfileB (inactive).
       await pm.deleteProfile('ProfileB');
 
-      // ProfileB directory must no longer exist.
+      // ProfileB is no longer registered, but its data remains recoverable.
       final profileBDir = Directory(pm.profileDir('ProfileB'));
-      expect(profileBDir.existsSync(), isFalse, reason: 'Deleted profile directory must be removed');
+      expect(profileBDir.existsSync(), isTrue, reason: 'Unregistered profile data must be preserved');
+      expect(await pm.listProfiles(), isNot(contains('ProfileB')));
 
       // ProfileA must still exist.
       final profileADir = Directory(pm.profileDir('ProfileA'));
@@ -73,8 +74,8 @@ void main() {
       await pm.createProfile('ProfileA');
       await pm.createProfile('ProfileB');
 
-      // Multiple profiles without a durable pointer require an explicit choice.
-      await expectLater(pm.getActiveProfile(), throwsA(isA<ProfileSelectionRequiredException>()));
+      // Creating the second profile preserves the first profile as active.
+      expect(await pm.getActiveProfile(), 'ProfileA');
 
       // Switch to ProfileB.
       final restartRequired = await pm.setActiveProfile('ProfileB');

@@ -100,7 +100,7 @@ When the user selects a different registered profile, the application SHALL pers
 
 - **GIVEN** the active profile is `Geschäft` and `Privat` is registered
 - **WHEN** the user selects `Privat` in the Profile Manager
-- **THEN** `profile.json` SHALL be updated to `{"active": "Privat"}`, Settings SHALL show a restart-required state, the current session SHALL continue to show only `Geschäft` until restart, and after restart only the `Privat` database SHALL be loaded
+- **THEN** `profile.json` SHALL contain `active: Privat` and the unchanged registered-name list, Settings SHALL show a restart-required state, the current session SHALL continue to show only `Geschäft` until restart, and after restart only the `Privat` database SHALL be loaded
 
 #### Scenario: Switch to same profile is a no-op
 

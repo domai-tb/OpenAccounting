@@ -3,7 +3,6 @@
 ## Purpose
 WAL-safe local backup with rotation, profile-scoped paths, and restore validation.
 
-
 ## Requirements
 
 ### Requirement: Local WAL-safe backup with rotation
@@ -24,6 +23,7 @@ GIVEN the backup directory exists on a filesystem with insufficient space
 WHEN a local backup is triggered
 THEN the system SHALL NOT corrupt the existing database
 AND SHALL display an error message indicating insufficient disk space.
+
 ### Requirement: Backup before schema migration
 
 The system SHALL automatically create a local backup before executing any migration statements when a schema version mismatch is detected. The backup SHALL complete before the first `PRAGMA user_version` write.
@@ -64,21 +64,25 @@ AND SHALL NOT replace the active database.
 
 ### Requirement: Restore from encrypted backup
 
-The system SHALL support restoring an encrypted backup as the active database. Restore SHALL replace the current database file atomically (write to temp, then rename). The system SHALL prompt for application restart after restore.
+The system SHALL support restoring an encrypted backup through the staged restore workflow. It SHALL decrypt and validate the backup into a staged database without replacing the live database, then apply the staged file only after the application has restarted and before any database handle is opened. The passphrase SHALL NOT be persisted as a preference. Wrong-passphrase or integrity failures SHALL leave the active database and pending-restore state unchanged.
 
 #### Scenario: Restore from encrypted backup
 
-GIVEN the user has an encrypted backup file and knows the correct passphrase
-WHEN the user selects the encrypted backup and provides the correct passphrase
-THEN the system SHALL decrypt the file, verify integrity, and atomically replace the active database
-AND prompt for application restart.
+- **GIVEN** the user has an encrypted backup file and knows the correct passphrase
+- **WHEN** the user selects it, enters the passphrase, and confirms restore
+- **THEN** the system SHALL validate and stage the decrypted database, block writes, and require application restart before replacing the active database
 
 #### Scenario: Restore with corrupted encrypted backup
 
-GIVEN the user has a corrupted encrypted backup file
-WHEN the user attempts to restore from the corrupted backup
-THEN the system SHALL display an integrity verification error
-AND SHALL NOT replace the active database.
+- **GIVEN** the user has a corrupted encrypted backup file
+- **WHEN** the user attempts to stage it for restore
+- **THEN** the system SHALL display an integrity verification error and SHALL NOT replace or schedule replacement of the active database
+
+#### Scenario: Encrypted backup with wrong passphrase on restore
+
+- **GIVEN** the user has an encrypted backup file
+- **WHEN** the user provides an incorrect passphrase during restore
+- **THEN** the system SHALL display a decryption error and SHALL NOT replace or schedule replacement of the active database
 
 ### Requirement: SMB network share backup
 
@@ -117,22 +121,19 @@ THEN the system SHALL accept the path and proceed with backup.
 
 ### Requirement: Restore from backup
 
-The system SHALL support restoring a local backup as the active database. Restore SHALL replace the current database file atomically (write to temp, then rename). The system SHALL prompt for application restart after restore.
+The system SHALL support restoring a local backup through the staged restore workflow. It SHALL validate and stage the selected backup without replacing the live database, then apply the staged file only after application restart and before any database handle is opened. Replacement failure SHALL restore the prior database before the application opens it.
 
 #### Scenario: Restore from local backup
 
-GIVEN the user has a valid local backup file
-WHEN the user selects a local backup file to restore
-THEN the system SHALL copy the backup to a temporary file
-AND atomically replace the active database
-AND prompt for application restart.
+- **GIVEN** the user has selected a valid local backup file
+- **WHEN** the user confirms restore in Settings
+- **THEN** the system SHALL stage and validate the snapshot, block writes, and require restart before replacing the active database
 
 #### Scenario: Restore with missing backup file
 
-GIVEN the user has selected a backup file that no longer exists on disk
-WHEN the user attempts to restore
-THEN the system SHALL display a file-not-found error
-AND SHALL NOT modify the active database.
+- **GIVEN** the selected backup file no longer exists on disk
+- **WHEN** the user attempts to stage it for restore
+- **THEN** the system SHALL display a file-not-found error and SHALL NOT modify the active database or create pending restore state
 
 ### Requirement: Backup scheduling
 
@@ -198,3 +199,49 @@ THEN the system SHALL reject the path with a clear error message.
 GIVEN the user has set `backup_extern_pfad_lokal_ok` to true for the external local path
 WHEN the user configures a backup path on a system drive
 THEN the system SHALL accept the path and proceed with backup.
+
+### Requirement: Restore is staged and applied before database open
+
+The active database SHALL never be replaced while any executor or database connection to it remains open. Before opening any writable database handle, each application process SHALL acquire and retain an exclusive OS-level lock on a lock file inside the active profile; inability to acquire that lock SHALL stop startup with a localized profile-in-use state. All database mutations SHALL pass through one profile-scoped `ProfileWriteGate` at the shared database write boundary. A restore requested in Settings SHALL validate its source and stage a restorable database under the active profile, close the gate to new writes, wait for in-flight mutations to finish, record the pending operation, keep the gate closed, and require the application to exit and restart. If staging or pending-state persistence fails, the gate SHALL reopen and the live database SHALL remain unchanged. The next process SHALL acquire the profile lock and apply the staged restore before constructing or opening any database executor. It SHALL remove stale SQLite WAL/SHM sidecars only after no handle can be open, and SHALL use an atomic replacement with rollback to the prior database if replacement fails. Successful replacement SHALL be reported only after the restored database opens and passes validation. Failed validation or replacement SHALL retain the prior database, clean up or mark the staged artifact for safe retry/removal, and report failure.
+
+#### Scenario: Live Settings restore waits for restart
+
+- **GIVEN** the active profile database is open in the current application session
+- **WHEN** the user confirms a valid local or encrypted backup for restore
+- **THEN** the system SHALL validate and stage the restore, block further writes, leave the open database file untouched, and show that application exit and restart are required
+
+#### Scenario: Startup restore applies before opening the database
+
+- **GIVEN** a valid staged restore is pending for the active profile
+- **WHEN** the restarted application owns the profile exclusively and begins startup
+- **THEN** it SHALL replace the active database before creating or opening its executor, validate the restored database, clear the pending state, and report success
+
+#### Scenario: Invalid restore does not replace the database
+
+- **GIVEN** a selected local or encrypted backup is missing, corrupt, or has a wrong passphrase
+- **WHEN** restore validation runs
+- **THEN** the active database and its files SHALL remain unchanged and Settings SHALL show a localized failure without scheduling a replacement
+
+#### Scenario: Startup replacement failure restores the prior database
+
+- **GIVEN** a validated restore is staged and atomic replacement fails during startup
+- **WHEN** the restore coordinator handles the failure
+- **THEN** the prior active database SHALL be restored before the application opens it, the failure SHALL be retained for Settings to display, and the failed staged artifact SHALL NOT be reported as applied
+
+#### Scenario: A second process cannot open the same profile
+
+- **GIVEN** one application process owns the active profile's exclusive OS-level lock
+- **WHEN** another process starts with that same profile selected
+- **THEN** it SHALL fail before opening a writable database handle and SHALL show a localized profile-in-use state
+
+#### Scenario: Restore blocks every profile mutation
+
+- **GIVEN** restore has been confirmed and the profile write gate is closed
+- **WHEN** any repository or service attempts a database mutation
+- **THEN** the shared write boundary SHALL reject it without issuing SQL, and the restore coordinator SHALL wait for already-running mutations before persisting pending restore state
+
+#### Scenario: Restore staging failure reopens writes
+
+- **GIVEN** restore confirmation begins while the active database is open
+- **WHEN** staging or pending-state persistence fails
+- **THEN** the live database SHALL remain unchanged and the profile write gate SHALL return to its open state

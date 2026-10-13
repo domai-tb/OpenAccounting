@@ -190,7 +190,7 @@ void main() {
       final String snapshot = await backup.createLocalBackup();
       final RestoreCoordinator coordinator = RestoreCoordinator(profileDir: profileDir);
       await coordinator.stageLocalRestore(snapshot);
-      expect(() => coordinator.gate.requireOpen(), throwsA(isA<ProfileWriteGateBlocked>()));
+      expect(coordinator.gate.requireOpen, throwsA(isA<ProfileWriteGateBlocked>()));
     });
 
     test('test_restore_staging_failure_reopens_writes', () async {
@@ -258,20 +258,20 @@ void main() {
 
     test('backup history status distinguishes never current stale and failed', () async {
       final String profileDir = makeProfile('Verlauf');
-      BackupHistoryView never = backupHistoryView(
+      final BackupHistoryView never = backupHistoryView(
         const BackupScheduleState(schedule: BackupSchedule.manualOnly),
         DateTime.now().toUtc(),
       );
       expect(never.status, BackupHistoryStatus.never);
       final BackupScheduleStore store = BackupScheduleStore(profileDir: profileDir);
       await store.recordSuccess(DateTime.now().toUtc());
-      BackupHistoryView current = backupHistoryView(await store.load(), DateTime.now().toUtc());
+      final BackupHistoryView current = backupHistoryView(await store.load(), DateTime.now().toUtc());
       expect(current.status, BackupHistoryStatus.current);
       await store.recordSuccess(DateTime.now().toUtc().subtract(const Duration(days: 30)));
-      BackupHistoryView stale = backupHistoryView(await store.load(), DateTime.now().toUtc());
+      final BackupHistoryView stale = backupHistoryView(await store.load(), DateTime.now().toUtc());
       expect(stale.status, BackupHistoryStatus.stale);
       await store.recordFailure('boom');
-      BackupHistoryView failed = backupHistoryView(await store.load(), DateTime.now().toUtc());
+      final BackupHistoryView failed = backupHistoryView(await store.load(), DateTime.now().toUtc());
       expect(failed.status, BackupHistoryStatus.failed);
     });
   });

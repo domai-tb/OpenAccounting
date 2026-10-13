@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -632,11 +631,7 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       final RestoreCoordinator coordinator = await ref.read(restoreCoordinatorProvider.future);
       if (encrypted) {
         final BackupService service = await ref.read(backupServiceProvider.future);
-        await coordinator.stageEncryptedRestore(
-          result.first.trim(),
-          result.last,
-          (Uint8List data, String passphrase) => service.decryptForRestore(data, passphrase), // ignore: unnecessary_lambdas
-        );
+        await coordinator.stageEncryptedRestore(result.first.trim(), result.last, service.decryptForRestore);
       } else {
         await coordinator.stageLocalRestore(result.first.trim());
       }

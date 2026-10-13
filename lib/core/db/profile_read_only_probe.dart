@@ -43,7 +43,10 @@ class ProfileReadOnlyProbe {
       return ProfileProbeResult(name: trimmed, compatible: false, reason: 'missing');
     }
     final File db = File(p.join(target, 'openinvoices.db'));
-    final FileSystemEntityType dbType = FileSystemEntity.typeSync(db.path, followLinks: false); // ignore: avoid_redundant_argument_values
+    final FileSystemEntityType dbType = FileSystemEntity.typeSync(
+      db.path,
+      followLinks: false,
+    ); // ignore: avoid_redundant_argument_values
     if (dbType != FileSystemEntityType.file) {
       return ProfileProbeResult(name: trimmed, compatible: false, reason: 'no-database');
     }
