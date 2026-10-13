@@ -36,7 +36,7 @@ The system SHALL generate a Stornorechnung PDF with negative amounts and mandato
 
 - GIVEN a finalized Storno linked to an original Rechnung, with storno_datum, storno_grund, and storno_rechnungsnummer set
 - WHEN the Storno PDF is requested
-- THEN the system SHALL produce a PDF titled "Stornorechnung" with negative amounts, the storno_rechnungsnummer, storno_datum, storno_grund, and without a Zahlungsblock
+- THEN the system SHALL produce a PDF titled "Stornorechnung" with negative amounts, the original Rechnung date, the storno_rechnungsnummer, storno_datum, storno_grund, and no Zahlungsblock
 
 #### Scenario: Missing storno_grund
 

@@ -312,6 +312,7 @@ final class PdfDocumentSnapshot {
     this.texts = const PdfDocumentTextsSnapshot(),
     this.copyState = PdfCopyState.original,
     this.documentDate,
+    this.originalDocumentDate,
     this.serviceFrom,
     this.serviceTo,
     this.validUntil,
@@ -332,6 +333,7 @@ final class PdfDocumentSnapshot {
     PdfDocumentTextsSnapshot texts = const PdfDocumentTextsSnapshot(),
     PdfCopyState copyState = PdfCopyState.original,
     DateTime? documentDate,
+    DateTime? originalDocumentDate,
     DateTime? serviceFrom,
     DateTime? serviceTo,
     DateTime? validUntil,
@@ -353,6 +355,7 @@ final class PdfDocumentSnapshot {
       texts: texts,
       copyState: copyState,
       documentDate: documentDate,
+      originalDocumentDate: originalDocumentDate,
       serviceFrom: serviceFrom,
       serviceTo: serviceTo,
       validUntil: validUntil,
@@ -372,6 +375,7 @@ final class PdfDocumentSnapshot {
   final PdfDocumentTextsSnapshot texts;
   final PdfCopyState copyState;
   final DateTime? documentDate;
+  final DateTime? originalDocumentDate;
   final DateTime? serviceFrom;
   final DateTime? serviceTo;
   final DateTime? validUntil;

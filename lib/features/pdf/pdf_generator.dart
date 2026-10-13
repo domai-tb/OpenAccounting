@@ -41,6 +41,10 @@ List<pw.Widget> _buildPage(PdfDocumentSnapshot snapshot, AppLocalizations l10n, 
       pw.SizedBox(height: 12),
       pw.Text('${l10n.pdfDate}: ${_formatDate(snapshot.documentDate!, locale)}'),
     ],
+    if (snapshot.documentType == PdfDocumentType.storno && snapshot.originalDocumentDate != null) ...[
+      pw.SizedBox(height: 6),
+      pw.Text('${l10n.pdfInvoiceDate}: ${_formatDate(snapshot.originalDocumentDate!, locale)}'),
+    ],
     if (isMahnung && snapshot.mahnung != null) ...[
       pw.SizedBox(height: 6),
       pw.Text('${l10n.pdfOriginalInvoice}: ${snapshot.mahnung!.originalInvoiceNumber}'),
