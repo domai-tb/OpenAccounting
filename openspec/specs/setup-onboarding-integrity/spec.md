@@ -43,18 +43,16 @@ Implementation evidence: Completion awaits separate writes with no rollback, and
 
 ### Requirement: First-run concepts are explicit and non-deceptive
 
-The onboarding flow MUST either collect or clearly defer invoice numbering/payment terms, privacy/local-storage, and backup choices described by the design, and MUST never create demo credentials or synthetic financial identity as a hidden fallback.
-
-Implementation evidence: The current wizard has four steps and no visible controls for those concepts; empty IBAN fields receive fake fallback values.
+The onboarding flow MUST either collect or clearly defer invoice numbering/payment terms, privacy/local-storage, and backup choices. A deferred choice MUST identify its later destination in Settings and SHALL NOT be represented as configured. The flow MUST NOT create demo credentials, synthetic financial identity, fabricated bank data, or a completion state that hides unfinished choices. This requirement follows the canonical four-step setup sequence and does not adopt the feature-map's alternate number-sequence step.
 
 #### Scenario: Required first-run decisions are visible
 
-- Given a new profile opens the wizard
-- When the user reviews its steps
-- Then the documented concepts are represented by controls or an explicit deferred-state explanation with a path to complete them later
+- **GIVEN** a new profile opens setup and one or more first-run choices are deferred
+- **WHEN** the user reviews the completion step and then opens Settings
+- **THEN** the completion summary SHALL identify each deferred choice and provide a working destination to its owning Settings section or workspace
 
 #### Scenario: Blank identity is handled honestly
 
-- Given the user leaves optional bank identity blank
-- When setup saves
-- Then the state records absence or asks for correction and never stores a plausible-looking fake IBAN/BIC
+- **GIVEN** the company, account, category, or settings source needed for a choice is unavailable
+- **WHEN** setup renders that choice
+- **THEN** the wizard SHALL show an explicit unavailable/deferred state and SHALL NOT claim a default was stored or synthesize a plausible value

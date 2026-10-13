@@ -12,6 +12,10 @@ import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
+import 'package:openaccounting/core/db/profile_lock.dart';
+import 'package:openaccounting/core/db/backup_service.dart';
+import 'package:openaccounting/core/db/backup_startup.dart';
+import 'package:openaccounting/core/db/restore_coordinator.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/features/desktop/desktop_capability.dart';
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
@@ -76,6 +80,34 @@ Future<void> main() async {
   }
   final profileDirectory = profileManager.profileDir(activeProfile);
   await Directory(profileDirectory).create(recursive: true);
+  try {
+    ProfileFileLock.acquire(profileDirectory);
+  } on ProfileInUseException {
+    runApp(
+      MaterialApp(
+        title: 'OpenAccounting',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: initialTheme,
+        home: const Scaffold(body: Center(child: Text('Profil wird bereits verwendet'))),
+      ),
+    );
+    return;
+  }
+  try {
+    await RestoreCoordinator(profileDir: profileDirectory).applyPendingBeforeOpen();
+  } catch (error) {
+    runApp(
+      MaterialApp(
+        title: 'OpenAccounting',
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: initialTheme,
+        home: Scaffold(body: Center(child: Text('Wiederherstellung fehlgeschlagen: $error'))),
+      ),
+    );
+    return;
+  }
   final db = AppDatabase.forProfile(profileDirectory);
   await db.ensureOpen();
   final DesktopCapabilityRegistry desktopCapabilities = DesktopCapabilityRegistry();
@@ -98,6 +130,12 @@ Future<void> main() async {
     ),
   );
   final AppServices services = AppServices(db, desktopCapabilities: desktopCapabilities);
+  try {
+    await BackupStartupCheck.runOnceAfterReady(
+      profileDir: profileDirectory,
+      backup: BackupService(profileDir: profileDirectory, executor: db.executor),
+    );
+  } catch (_) {}
   final bool initialPrivacyMode = prefs.getBool('openaccounting.privacy_mode') ?? false;
   final Locale initialLocale = parseAppLocale(prefs.getString(appLocalePreferenceKey));
   runApp(

@@ -9,6 +9,7 @@ import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
+import 'package:openaccounting/features/setup/catalog_provenance.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/l10n/l10n.dart';
@@ -36,13 +37,40 @@ class _WizardPageState extends State<WizardPage> {
   final TextEditingController _ortCtrl = TextEditingController();
   final TextEditingController _ibanCtrl = TextEditingController();
   final TextEditingController _bicCtrl = TextEditingController();
+  final TextEditingController _inhaberCtrl = TextEditingController();
+  final TextEditingController _steuerNrCtrl = TextEditingController();
+  final TextEditingController _ustIdCtrl = TextEditingController();
+  final TextEditingController _rechtsformCtrl = TextEditingController();
   final TextEditingController _kasseCtrl = TextEditingController(text: '0.00');
   String? _nameError;
   String? _ibanError;
   String? _kategorieError;
   String? _kasseError;
-  final Set<int> _selectedKategorien = <int>{1};
+  final Set<int> _selectedKategorien = <int>{};
   bool _busy = false;
+  bool _catalogVerified = false;
+  List<({int id, String name})> _verifiedKategorien = const <({int id, String name})>[];
+  bool _catalogLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCatalog());
+  }
+
+  Future<void> _loadCatalog() async {
+    try {
+      final CatalogProvenanceState state = await _service.loadProvenance();
+      if (!mounted) return;
+      setState(() {
+        _catalogVerified = state.verified;
+        _verifiedKategorien = state.verifiedNames;
+        _catalogLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _catalogLoaded = true);
+    }
+  }
 
   @override
   void dispose() {
@@ -52,6 +80,10 @@ class _WizardPageState extends State<WizardPage> {
     _ortCtrl.dispose();
     _ibanCtrl.dispose();
     _bicCtrl.dispose();
+    _inhaberCtrl.dispose();
+    _steuerNrCtrl.dispose();
+    _ustIdCtrl.dispose();
+    _rechtsformCtrl.dispose();
     _kasseCtrl.dispose();
     super.dispose();
   }
@@ -93,7 +125,14 @@ class _WizardPageState extends State<WizardPage> {
       final String iban = _ibanCtrl.text.trim();
       final List<BankAccount> accounts = iban.isEmpty
           ? const <BankAccount>[]
-          : <BankAccount>[BankAccount(name: 'Giro', iban: iban, bic: _bicCtrl.text.trim())];
+          : <BankAccount>[
+              BankAccount(
+                name: 'Giro',
+                iban: iban,
+                bic: _bicCtrl.text.trim(),
+                inhaber: _inhaberCtrl.text.trim().isEmpty ? null : _inhaberCtrl.text.trim(),
+              ),
+            ];
       // Cash-balance feedback owns its field, so validate it before the
       // account rules instead of routing by message content.
       final String? kErr = _service.validateKassenbestand(_kasseCtrl.text, locale: _activeLocale);
@@ -114,7 +153,11 @@ class _WizardPageState extends State<WizardPage> {
       return;
     }
     if (_step == WizardStep.kategorien) {
-      final String? err = _service.validateKategorien(selectedIds: _selectedKategorien.toList(), locale: _activeLocale);
+      final String? err = _service.validateKategorien(
+        selectedIds: _selectedKategorien.toList(),
+        locale: _activeLocale,
+        catalogVerified: _catalogVerified,
+      );
       if (err != null) {
         setState(() => _kategorieError = err);
         return;
@@ -134,15 +177,27 @@ class _WizardPageState extends State<WizardPage> {
       final String iban = _ibanCtrl.text.trim();
       final List<BankAccount> accounts = iban.isEmpty
           ? const <BankAccount>[]
-          : <BankAccount>[BankAccount(name: 'Giro', iban: iban, bic: _bicCtrl.text.trim())];
+          : <BankAccount>[
+              BankAccount(
+                name: 'Giro',
+                iban: iban,
+                bic: _bicCtrl.text.trim(),
+                inhaber: _inhaberCtrl.text.trim().isEmpty ? null : _inhaberCtrl.text.trim(),
+              ),
+            ];
+      final bool deferred = !_catalogVerified;
       await _service.completeWizard(
         companyName: _nameCtrl.text.trim().isEmpty ? 'Meine Firma' : _nameCtrl.text.trim(),
         strasse: _strasseCtrl.text,
         plz: _plzCtrl.text,
         ort: _ortCtrl.text,
+        steuernummer: _steuerNrCtrl.text.trim().isEmpty ? null : _steuerNrCtrl.text.trim(),
+        ustIdnr: _ustIdCtrl.text.trim().isEmpty ? null : _ustIdCtrl.text.trim(),
+        rechtsform: _rechtsformCtrl.text.trim().isEmpty ? null : _rechtsformCtrl.text.trim(),
         accounts: accounts,
         kassenbestand: _kasseCtrl.text.trim().isEmpty ? '0.00' : _kasseCtrl.text.trim(),
         kategorieIds: _selectedKategorien.toList(),
+        categoriesDeferred: deferred,
         locale: _activeLocale,
       );
       if (mounted) {
@@ -307,6 +362,21 @@ class _WizardPageState extends State<WizardPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _steuerNrCtrl,
+              decoration: InputDecoration(labelText: l10n.pdfTaxNumber, border: const OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _ustIdCtrl,
+              decoration: InputDecoration(labelText: l10n.pdfVatId, border: const OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _rechtsformCtrl,
+              decoration: const InputDecoration(labelText: 'Rechtsform', border: OutlineInputBorder()),
+            ),
           ],
         );
       case WizardStep.konten:
@@ -331,6 +401,11 @@ class _WizardPageState extends State<WizardPage> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _inhaberCtrl,
+              decoration: const InputDecoration(labelText: 'Kontoinhaber', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _kasseCtrl,
               decoration: InputDecoration(
                 labelText: l10n.setupCashBalance,
@@ -343,6 +418,21 @@ class _WizardPageState extends State<WizardPage> {
           ],
         );
       case WizardStep.kategorien:
+        if (!_catalogLoaded) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!_catalogVerified) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(l10n.setupCategories, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Text(l10n.setupCategoriesHint),
+              const SizedBox(height: 8),
+              Text(l10n.setupRequired),
+            ],
+          );
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -352,20 +442,21 @@ class _WizardPageState extends State<WizardPage> {
               spacing: 8,
               runSpacing: 8,
               children: <Widget>[
-                for (int i = 1; i <= 6; i++)
-                  FilterChip(
-                    label: Text('${l10n.setupCategories} $i'),
-                    selected: _selectedKategorien.contains(i),
-                    onSelected: (bool v) {
-                      setState(() {
-                        if (v) {
-                          _selectedKategorien.add(i);
-                        } else {
-                          _selectedKategorien.remove(i);
-                        }
-                      });
-                    },
-                  ),
+                for (final entry in _verifiedKategorien)
+                  if (!isSyntheticCategoryLabel(entry.name))
+                    FilterChip(
+                      label: Text(entry.name),
+                      selected: _selectedKategorien.contains(entry.id),
+                      onSelected: (bool v) {
+                        setState(() {
+                          if (v) {
+                            _selectedKategorien.add(entry.id);
+                          } else {
+                            _selectedKategorien.remove(entry.id);
+                          }
+                        });
+                      },
+                    ),
               ],
             ),
             if (_kategorieError != null)
@@ -379,6 +470,13 @@ class _WizardPageState extends State<WizardPage> {
           ],
         );
       case WizardStep.abschluss:
+        final String holder = _inhaberCtrl.text.trim().isEmpty ? '—' : _inhaberCtrl.text.trim();
+        final String categorySummary = _catalogVerified
+            ? _verifiedKategorien
+                  .where((entry) => _selectedKategorien.contains(entry.id))
+                  .map((entry) => entry.name)
+                  .join(', ')
+            : l10n.setupRequired;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -393,9 +491,10 @@ class _WizardPageState extends State<WizardPage> {
                     Text(
                       '${l10n.setupCompanyName}: ${_nameCtrl.text.isEmpty ? l10n.setupCompanyName : _nameCtrl.text}',
                     ),
-                    Text('${l10n.setupIban}: ${_maskedIban(_ibanCtrl.text)}'),
+                    Text('${l10n.setupIban}: ${_ibanCtrl.text.trim().isEmpty ? '—' : _ibanCtrl.text.trim()}'),
+                    Text('Kontoinhaber: $holder'),
                     Text('${l10n.setupCashBalance}: ${_kasseCtrl.text} €'),
-                    Text('${l10n.setupCategories}: ${_selectedKategorien.join(", ")}'),
+                    Text('${l10n.setupCategories}: ${categorySummary.isEmpty ? l10n.setupRequired : categorySummary}'),
                   ],
                 ),
               ),
@@ -405,14 +504,6 @@ class _WizardPageState extends State<WizardPage> {
           ],
         );
     }
-  }
-
-  String _maskedIban(String raw) {
-    final String value = raw.trim();
-    if (value.isEmpty) return '—';
-    final String compact = value.replaceAll(RegExp(r'\s+'), '');
-    if (compact.length <= 4) return '••••';
-    return '•••• •••• •••• •••• ${compact.substring(compact.length - 4)}';
   }
 
   String _localizedStepLabel(AppLocalizations l10n, WizardStep step) {

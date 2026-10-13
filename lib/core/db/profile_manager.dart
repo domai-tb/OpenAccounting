@@ -1,14 +1,18 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
 import 'package:openaccounting/core/db/data_paths.dart';
+import 'package:openaccounting/core/db/profile_catalog.dart';
 import 'package:openaccounting/core/db/profile_database.dart';
+import 'package:openaccounting/core/db/profile_read_only_probe.dart';
 
-/// Profile management per spec §Profile Management.
+/// Profile management per specs `profiles` and `profile-workspace-lifecycle`.
 /// Each profile = isolated DB file under `<base>/profiles/<name>/openinvoices.db`.
-/// Active profile tracked via `<base>/profile.json` `{"active": "Name"}`.
+/// Active profile and registered names tracked via `<base>/profile.json`
+/// `{"active": "Name", "registered": ["Name", ...]}`. Registered names are the
+/// only source for startup, recovery, Settings, and explicit selection.
+/// Removal is non-destructive registry unregister; files stay on disk.
 typedef ProfileDatabaseInitializer = Future<void> Function(String databasePath);
 
 class ProfileManager {
@@ -25,13 +29,26 @@ class ProfileManager {
 
   String _validateProfileName(String name) {
     _assertSafeRoots();
-    final trimmed = name.trim();
-    if (trimmed.isEmpty || trimmed == '.' || trimmed == '..' || trimmed.contains(RegExp(r'[/\\]'))) {
+    final String trimmed = name.trim();
+    if (trimmed.isEmpty ||
+        trimmed == '.' ||
+        trimmed == '..' ||
+        trimmed.contains('/') ||
+        trimmed.contains(r'\') ||
+        trimmed.contains('\x00')) {
       throw ArgumentError('Ungültiger Profilname');
     }
-    final root = p.absolute(p.join(baseDir, 'profiles'));
-    final target = p.absolute(p.join(root, trimmed));
+    for (final int unit in trimmed.codeUnits) {
+      if (unit < 32 || unit == 127) {
+        throw ArgumentError('Ungültiger Profilname');
+      }
+    }
+    final String root = p.absolute(p.join(baseDir, 'profiles'));
+    final String target = p.absolute(p.join(root, trimmed));
     if (target == root || !p.isWithin(root, target)) {
+      throw ArgumentError('Ungültiger Profilname');
+    }
+    if (p.basename(target) != trimmed) {
       throw ArgumentError('Ungültiger Profilname');
     }
     return trimmed;
@@ -46,128 +63,174 @@ class ProfileManager {
     return resolveDefaultBaseDir();
   }
 
-  /// Get active profile name. Requires explicit recovery when several profiles
-  /// exist but the durable pointer is absent or invalid.
+  ProfileCatalogStore get _catalog => ProfileCatalogStore(baseDir: baseDir);
+
+  ProfileReadOnlyProbe get _probe => ProfileReadOnlyProbe(baseDir: baseDir);
+
+  /// Get active profile name via the registered catalog. Never falls back to
+  /// the first available profile by filesystem order. Missing/corrupt catalogs
+  /// recover a sole validated candidate with a warning; multiple candidates
+  /// require explicit selection.
   Future<String> getActiveProfile() async {
     _assertSafeRoots();
-    final f = File(profileJsonPath);
-    final profiles = await listProfiles();
-    if (!f.existsSync()) {
-      return _recoverableProfile(profiles);
+    final CatalogRecoveryResult loaded = await _catalog.load();
+    final ProfileCatalog catalog = loaded.catalog;
+    if (loaded.outcome == CatalogRecovery.needsChoice) {
+      throw const ProfileSelectionRequiredException('Mehrere Profile gefunden; bitte ein Profil auswählen');
     }
-    try {
-      final raw = await f.readAsString();
-      final m = jsonDecode(raw) as Map<String, dynamic>;
-      final active = m['active'] as String?;
-      if (active != null && active.isNotEmpty) {
-        // Verify the pointer before opening a database. An invalid pointer is
-        // recovered through explicit selection below.
-        final String activePath = profileDir(active);
-        if (FileSystemEntity.typeSync(activePath, followLinks: false) == FileSystemEntityType.directory) {
-          return active;
-        }
-      }
-      return _recoverableProfile(profiles);
-    } on ProfileSelectionRequiredException {
-      rethrow;
-    } catch (error, stackTrace) {
-      if (profiles.length <= 1) return _recoverableProfile(profiles);
-      Error.throwWithStackTrace(
-        ProfileSelectionRequiredException('Aktives Profil ist beschädigt; bitte ein Profil auswählen', cause: error),
-        stackTrace,
+    if (loaded.outcome == CatalogRecovery.noCandidates) {
+      return 'Default';
+    }
+    final String? active = catalog.active;
+    if (active == null || active.isEmpty) {
+      if (catalog.registered.length == 1) return catalog.registered.single;
+      throw const ProfileSelectionRequiredException('Aktives Profil fehlt; bitte ein Profil auswählen');
+    }
+    if (!catalog.registered.any((e) => e.toLowerCase() == active.toLowerCase())) {
+      throw const ProfileSelectionRequiredException('Aktives Profil ist nicht registriert; bitte ein Profil auswählen');
+    }
+    final String canonical = catalog.registered.firstWhere((e) => e.toLowerCase() == active.toLowerCase());
+    final String dir = p.join(baseDir, 'profiles', canonical);
+    if (FileSystemEntity.typeSync(dir, followLinks: false) != FileSystemEntityType.directory) {
+      throw const ProfileSelectionRequiredException('Aktives Profil ist nicht verfügbar; bitte ein Profil auswählen');
+    }
+    if (!_probe.probe(canonical).compatible) {
+      throw const ProfileSelectionRequiredException(
+        'Aktives Profil kann nicht validiert werden; bitte ein Profil auswählen',
       );
     }
+    return canonical;
   }
 
-  /// Switch active profile — writes profile.json, requires restart to take effect.
-  /// Returns true if restart required.
+  /// Switch active profile — persists pointer, requires restart to take effect.
+  /// Same-profile selection is a no-op without pointer rewrite. Never switches
+  /// the database, providers, or session identity before restart. Unknown or
+  /// unregistered targets fail without fallback. Returns true if restart required.
   Future<bool> setActiveProfile(String name) async {
     final String profileName = _validateProfileName(name);
     String? current;
     try {
       current = await getActiveProfile();
     } on ProfileSelectionRequiredException {
-      // An explicit user selection is also the recovery action for a torn
-      // pointer, so continue with the requested profile.
+      current = null;
     }
-    if (current?.toLowerCase() == profileName.toLowerCase()) return false;
-    final dir = Directory(profileDir(profileName));
-    final FileSystemEntityType type = FileSystemEntity.typeSync(dir.path, followLinks: false);
+    if (current != null && current.toLowerCase() == profileName.toLowerCase()) return false;
+    final CatalogRecoveryResult loaded = await _catalog.load();
+    final List<String> registered = loaded.catalog.registered;
+    final List<String> match = registered.where((e) => e.toLowerCase() == profileName.toLowerCase()).toList();
+    if (match.isEmpty) {
+      throw StateError('Profil ist nicht registriert: $profileName');
+    }
+    final String canonical = match.single;
+    final String dir = p.join(baseDir, 'profiles', canonical);
+    final FileSystemEntityType type = FileSystemEntity.typeSync(dir, followLinks: false);
     if (type == FileSystemEntityType.link) {
       throw StateError('Profilpfad darf kein symbolischer Link sein');
     }
     if (type != FileSystemEntityType.directory) {
-      await dir.create(recursive: true);
+      throw StateError('Profil nicht gefunden: $canonical');
     }
-    final File f = File(profileJsonPath);
-    await f.parent.create(recursive: true);
-    final String staged = '${f.path}.tmp-${DateTime.now().microsecondsSinceEpoch}';
-    await File(staged).writeAsString(jsonEncode(<String, String>{'active': profileName}), flush: true);
-    await File(staged).rename(f.path);
+    if (!_probe.probe(canonical).compatible) {
+      throw StateError('Profil kann nicht validiert werden: $canonical');
+    }
+    await _catalog.save(ProfileCatalog(active: canonical, registered: registered));
     // ponytail: restart required — caller must restart process to load new DB.
     return true;
   }
 
+  /// Registered profiles only. Unregistered directories are never listed.
   Future<List<String>> listProfiles() async {
     _assertSafeRoots();
-    final root = Directory(p.join(baseDir, 'profiles'));
-    if (!root.existsSync()) return <String>[];
-    final ents = await root.list().toList();
-    final names = <String>[];
-    for (final e in ents) {
-      if (e is Directory && FileSystemEntity.typeSync(e.path, followLinks: false) == FileSystemEntityType.directory) {
-        names.add(p.basename(e.path));
-      }
-    }
-    names.sort();
-    return names;
+    final CatalogRecoveryResult loaded = await _catalog.load();
+    if (loaded.outcome == CatalogRecovery.noCandidates) return <String>[];
+    if (loaded.outcome == CatalogRecovery.needsChoice) return List<String>.from(loaded.catalog.registered)..sort();
+    final List<String> registered = List<String>.from(loaded.catalog.registered)..sort();
+    return registered;
+  }
+
+  /// Explicit recovery candidates for the picker. No preselected choice.
+  Future<List<String>> recoveryCandidates() async {
+    final CatalogRecoveryResult loaded = await _catalog.load();
+    return List<String>.from(loaded.candidates)..sort();
   }
 
   Future<void> createProfile(String name) async {
-    final profileName = name.trim();
+    final String profileName = name.trim();
     if (profileName.isEmpty) {
       throw ArgumentError('Profilname darf nicht leer sein');
     }
-    final existing = await listProfiles();
-    if (existing.any((e) => e.toLowerCase() == profileName.toLowerCase())) {
+    final String validated = _validateProfileName(profileName);
+    final List<String> existing = await listProfiles();
+    if (existing.any((e) => e.toLowerCase() == validated.toLowerCase())) {
       throw StateError('Profilname existiert bereits');
     }
-    final dir = Directory(profileDir(profileName));
+    final Directory dir = Directory(p.join(baseDir, 'profiles', validated));
     if (FileSystemEntity.typeSync(dir.path, followLinks: false) == FileSystemEntityType.link) {
       throw StateError('Profilpfad darf kein symbolischer Link sein');
     }
     await dir.create(recursive: true);
-
-    await databaseInitializer(databasePath(profileName));
+    await databaseInitializer(databasePath(validated));
+    final CatalogRecoveryResult loaded = await _catalog.load();
+    final List<String> registered = List<String>.from(loaded.catalog.registered);
+    if (!registered.any((e) => e.toLowerCase() == validated.toLowerCase())) {
+      registered.add(validated);
+    }
+    final String? active = loaded.catalog.active ?? (registered.length == 1 ? validated : null);
+    if (loaded.outcome == CatalogRecovery.noCandidates) {
+      await _catalog.save(ProfileCatalog(active: validated, registered: <String>[validated]));
+    } else {
+      await _catalog.save(ProfileCatalog(active: active, registered: registered));
+    }
   }
 
-  /// Delete profile — removes directory and all data.
-  /// Cannot delete the active profile or the last remaining profile.
-  Future<void> deleteProfile(String name) async {
-    final active = await getActiveProfile();
-    if (active.toLowerCase() == name.toLowerCase()) {
-      throw StateError('Aktives Profil kann nicht gelöscht werden');
+  /// Non-destructive removal from the registered-name list. Retains the
+  /// profile directory, database, uploads, and backups. Cannot remove the
+  /// active profile or the last registered profile. No automatic purge.
+  Future<void> deleteProfile(String name) => unregisterProfile(name);
+
+  Future<void> unregisterProfile(String name) async {
+    final String validated = _validateProfileName(name);
+    final String active = await getActiveProfile();
+    if (active.toLowerCase() == validated.toLowerCase()) {
+      throw StateError('Aktives Profil kann nicht entfernt werden');
     }
-    final profiles = await listProfiles();
-    if (profiles.length <= 1) {
-      throw StateError('Mindestens ein Profil muss existieren');
+    final List<String> registered = await listProfiles();
+    if (registered.length <= 1) {
+      throw StateError('Mindestens ein Profil muss registriert bleiben');
     }
-    final dir = Directory(profileDir(name));
-    if (dir.existsSync()) {
-      await dir.delete(recursive: true);
+    if (!registered.any((e) => e.toLowerCase() == validated.toLowerCase())) {
+      throw StateError('Profil ist nicht registriert: $validated');
     }
+    final String canonical = registered.firstWhere((e) => e.toLowerCase() == validated.toLowerCase());
+    final List<String> next = registered.where((e) => e.toLowerCase() != validated.toLowerCase()).toList();
+    await _catalog.save(ProfileCatalog(active: active, registered: next));
+    // Files intentionally retained: directory, database, uploads, backups.
+    canonical.isNotEmpty;
   }
 
   Future<void> renameProfile(String oldName, String newName) async {
-    if (newName.trim().isEmpty) {
+    final String validatedNew = _validateProfileName(newName.trim());
+    if (validatedNew.isEmpty) {
       throw ArgumentError('Neuer Name darf nicht leer sein');
     }
-    final profiles = await listProfiles();
-    if (profiles.any((e) => e.toLowerCase() == newName.toLowerCase())) {
+    final List<String> profiles = await listProfiles();
+    if (profiles.any((e) => e.toLowerCase() == validatedNew.toLowerCase())) {
       throw StateError('Profilname existiert bereits');
     }
-    final oldDir = Directory(profileDir(oldName));
-    final newDir = Directory(profileDir(newName));
+    final String validatedOld = _validateProfileName(oldName.trim());
+    String? canonicalOld;
+    for (final String entry in profiles) {
+      if (entry.toLowerCase() == validatedOld.toLowerCase()) {
+        canonicalOld = entry;
+        break;
+      }
+    }
+    if (canonicalOld == null) {
+      throw StateError('Profil nicht gefunden: $oldName');
+    }
+    final String oldCanonical = canonicalOld;
+    final Directory oldDir = Directory(p.join(baseDir, 'profiles', oldCanonical));
+    final Directory newDir = Directory(p.join(baseDir, 'profiles', validatedNew));
     if (FileSystemEntity.typeSync(oldDir.path, followLinks: false) != FileSystemEntityType.directory) {
       throw StateError('Profil nicht gefunden: $oldName');
     }
@@ -181,15 +244,18 @@ class ProfileManager {
       // Keep an invalid multi-profile pointer invalid until the user repairs it.
     }
     await oldDir.rename(newDir.path);
-    if (activeBefore?.toLowerCase() == oldName.toLowerCase()) {
-      await setActiveProfile(newName);
-    }
+    final List<String> next = <String>[
+      for (final String entry in profiles)
+        if (entry.toLowerCase() != oldCanonical.toLowerCase()) entry else validatedNew,
+    ];
+    final String? nextActive = activeBefore?.toLowerCase() == oldCanonical.toLowerCase() ? validatedNew : activeBefore;
+    await _catalog.save(ProfileCatalog(active: nextActive, registered: next));
   }
 
   /// Resolve APP_DATA_DIR for active profile — used for uploads/backups/logos.
   Future<String> resolveAppDataDir() async {
-    final active = await getActiveProfile();
-    return profileDir(active);
+    final String active = await getActiveProfile();
+    return p.join(baseDir, 'profiles', active);
   }
 
   /// Validate path is inside APP_DATA_DIR (prevent traversal).
@@ -219,15 +285,9 @@ class ProfileManager {
     return p.normalize(p.join(resolvedParent, p.relative(path, from: parent.path)));
   }
 
-  String _recoverableProfile(List<String> profiles) {
-    if (profiles.isEmpty) return 'Default';
-    if (profiles.length == 1) return profiles.single;
-    throw const ProfileSelectionRequiredException('Aktives Profil fehlt oder ist ungültig; bitte ein Profil auswählen');
-  }
-
   void _assertSafeRoots() {
-    for (final path in <String>[baseDir, p.join(baseDir, 'profiles')]) {
-      final type = FileSystemEntity.typeSync(path, followLinks: false);
+    for (final String path in <String>[baseDir, p.join(baseDir, 'profiles')]) {
+      final FileSystemEntityType type = FileSystemEntity.typeSync(path, followLinks: false);
       if (type == FileSystemEntityType.link) {
         throw StateError('Profilbasis darf kein symbolischer Link sein');
       }
@@ -239,7 +299,7 @@ class ProfileManager {
 
   /// Whether profile manager should be visible.
   Future<bool> shouldShowManager({bool profilmanagerAktiv = false}) async {
-    final profiles = await listProfiles();
+    final List<String> profiles = await listProfiles();
     if (profiles.length > 1) return true;
     return profilmanagerAktiv;
   }

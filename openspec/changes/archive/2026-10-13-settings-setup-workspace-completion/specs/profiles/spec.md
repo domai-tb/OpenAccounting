@@ -131,3 +131,36 @@ Profile names MUST be non-empty single path components. The system SHALL reject 
 - **GIVEN** `profile.json` is missing or invalid and multiple valid profile candidates exist
 - **WHEN** recovery probes available profile directories
 - **THEN** it SHALL show a picker with no preselected candidate and SHALL NOT persist an active profile until the user chooses one
+
+### Requirement: Profile switching requires restart
+
+When the user selects a different registered profile, the application SHALL persist the selection to `profile.json` and show a localized restart-required state; it SHALL NOT switch the database, providers, or session identity before restart. Selecting the active profile SHALL be a no-op without restart or pointer rewrite. A `profile.json` active pointer that references a missing, unregistered, or invalid profile SHALL NOT fall back to the first available profile by filesystem order; the application SHALL enter the profile recovery flow without opening or altering any database or files, and with multiple valid candidates SHALL require explicit user selection before persisting an active profile.
+
+#### Scenario: Switch profile persists selection and requires restart
+
+- **GIVEN** the active profile is `Geschäft` and `Privat` is registered
+- **WHEN** the user selects `Privat` in the Profile Manager
+- **THEN** `profile.json` SHALL be updated to `{"active": "Privat"}`, Settings SHALL show a restart-required state, the current session SHALL continue to show only `Geschäft` until restart, and after restart only the `Privat` database SHALL be loaded
+
+#### Scenario: Switch to same profile is a no-op
+
+- **GIVEN** the active profile is `Privat`
+- **WHEN** the user selects `Privat` in the Profile Manager
+- **THEN** the application SHALL NOT restart, SHALL NOT rewrite the active pointer, and the current database SHALL remain loaded
+
+#### Scenario: Switch to non-existent profile does not fall back to first available
+
+- **GIVEN** `profile.json` references a profile that does not exist on disk or is not in the registered-name list
+- **WHEN** the application starts
+- **THEN** it SHALL NOT open the first available profile by filesystem order, SHALL enter the profile recovery flow without changing any database or files, SHALL display a warning, and with multiple valid candidates SHALL require explicit user selection before persisting an active profile
+#### Scenario: Switch profile
+
+- **GIVEN** the active profile is "Geschäft"
+- **WHEN** the user selects "Privat" in the Profile Manager
+- **THEN** the outcome SHALL follow "Switch profile persists selection and requires restart" above; no pre-restart database switch SHALL occur
+
+#### Scenario: Switch to non-existent profile
+
+- **GIVEN** `profile.json` references a profile that does not exist on disk
+- **WHEN** the application starts
+- **THEN** the outcome SHALL follow "Switch to non-existent profile does not fall back to first available" above; the legacy first-available fallback SHALL NOT apply

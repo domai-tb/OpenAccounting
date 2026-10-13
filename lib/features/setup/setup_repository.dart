@@ -66,9 +66,11 @@ class SetupRepository {
     String? inhaber,
     String kontoart = 'Bank',
   }) async {
+    await _ensureInhaberColumn();
     if (iban != null && iban.trim().isNotEmpty && !isValidIban(iban)) {
       throw const SetupException('IBAN ungültig');
     }
+    final String? normalizedHolder = inhaber == null || inhaber.trim().isEmpty ? null : inhaber.trim();
     final normalizedIban = iban == null ? null : _normalizeIban(iban);
     if (normalizedIban != null && normalizedIban.isNotEmpty) {
       final existing = await executor.runSelect('SELECT id, iban FROM konten WHERE iban IS NOT NULL', const []);
@@ -80,15 +82,15 @@ class SetupRepository {
         final id = (row['id'] as num?)?.toInt();
         if (id == null) continue;
         await executor.runUpdate(
-          'UPDATE konten SET name = ?, bic = ?, kontoart = ?, waehrung = ? WHERE id = ?',
-          <Object?>[name.trim(), bic, kontoart, 'EUR', id],
+          'UPDATE konten SET name = ?, bic = ?, inhaber = COALESCE(?, inhaber), kontoart = ?, waehrung = ? WHERE id = ?',
+          <Object?>[name.trim(), bic, normalizedHolder, kontoart, 'EUR', id],
         );
         return id;
       }
     }
     final int id = await executor.runInsert(
-      'INSERT INTO konten (name, iban, bic, kontoart, waehrung) VALUES (?, ?, ?, ?, ?)',
-      <Object?>[name, normalizedIban, bic, kontoart, 'EUR'],
+      'INSERT INTO konten (name, iban, bic, inhaber, kontoart, waehrung) VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>[name, normalizedIban, bic, normalizedHolder, kontoart, 'EUR'],
     );
     return id;
   }
@@ -254,6 +256,21 @@ class SetupRepository {
     if (!verified.any((column) => column['name'] == name)) {
       throw StateError('Setup konnte Spalte $table.$name nicht verifizieren');
     }
+  }
+
+  Future<void> _ensureInhaberColumn() => _addColumnIfMissing('konten', 'inhaber', 'TEXT');
+
+  /// Reads the stored holder back from the same account record for summaries.
+  Future<String?> readInhaber(int kontoId) async {
+    await _ensureInhaberColumn();
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT inhaber FROM konten WHERE id = ?',
+      <Object?>[kontoId],
+    );
+    if (rows.isEmpty) return null;
+    final Object? value = rows.single['inhaber'];
+    if (value is String && value.trim().isNotEmpty) return value;
+    return null;
   }
 
   static String _normalizeIban(String raw) => raw.replaceAll(RegExp(r'[\s-]'), '').toUpperCase();

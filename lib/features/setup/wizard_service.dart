@@ -1,13 +1,11 @@
 // ignore_for_file: prefer_initializing_formals
 
-import 'dart:io';
-
 import 'package:flutter/widgets.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
+import 'package:openaccounting/features/setup/catalog_provenance.dart';
 import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/l10n/l10n.dart';
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String profileSelectionTitle = 'Profil wählen';
@@ -127,9 +125,20 @@ class WizardService {
     return null;
   }
 
-  String? validateKategorien({required List<int> selectedIds, required String locale}) {
+  String? validateKategorien({required List<int> selectedIds, required String locale, bool catalogVerified = true}) {
+    if (!catalogVerified) return null;
     if (selectedIds.isEmpty) return _l10nFor(locale).setupErrorCategoryRequired;
     return null;
+  }
+
+  /// Loads the accepted catalog provenance for the Kategorien step. Version
+  /// markers or populated tables alone never establish trust.
+  Future<CatalogProvenanceState> loadProvenance() async {
+    final SetupRepository? repository = _repository;
+    if (repository == null) {
+      return const CatalogProvenanceState(verified: false, verifiedNames: <({int id, String name})>[]);
+    }
+    return loadCatalogProvenance(repository.executor);
   }
 
   // ---------------------------------------------------------------------------
@@ -189,14 +198,18 @@ class WizardService {
     List<BankAccount> accounts = const <BankAccount>[],
     String kassenbestand = '0.00',
     List<int> kategorieIds = const <int>[1],
+    bool categoriesDeferred = false,
     required String locale,
   }) async {
     final String? err1 = validateStammdaten(name: companyName, locale: locale);
     if (err1 != null) throw SetupException(err1);
     final String? err2 = validateKonten(accounts: accounts, kassenbestand: kassenbestand, locale: locale);
     if (err2 != null) throw SetupException(err2);
-    final String? err3 = validateKategorien(selectedIds: kategorieIds, locale: locale);
-    if (err3 != null) throw SetupException(err3);
+    final List<int> effectiveKategorien = categoriesDeferred ? const <int>[] : kategorieIds;
+    if (!categoriesDeferred) {
+      final String? err3 = validateKategorien(selectedIds: effectiveKategorien, locale: locale);
+      if (err3 != null) throw SetupException(err3);
+    }
 
     if (_repository != null) {
       await _repository.runInTransaction<void>((SetupRepository repository) async {
@@ -210,11 +223,13 @@ class WizardService {
           rechtsform: rechtsform,
         );
         for (final BankAccount a in accounts) {
-          await repository.createKonto(name: a.name, iban: a.iban, bic: a.bic);
+          await repository.createKonto(name: a.name, iban: a.iban, bic: a.bic, inhaber: a.inhaber);
         }
         final String kb = kassenbestand.trim().isEmpty ? '0.00' : kassenbestand;
         await repository.ensureKassenKonto(betrag: kb);
-        await repository.ensureKategorienSelected(kategorieIds);
+        if (!categoriesDeferred) {
+          await repository.ensureKategorienSelected(effectiveKategorien);
+        }
       });
     } else {
       // fallback when no repo injected (pure validation test) — still mark completed
@@ -231,11 +246,15 @@ class WizardService {
 }
 
 /// Profilauswahl-Service — steuert Startup-Entscheidung.
+/// Startup selection and recovery lists use the validated registered catalog,
+/// never every directory by default.
 class ProfileSelectionService {
   ProfileSelectionService({String? baseDir, SharedPreferences? prefs}) : _baseDir = baseDir, _prefsOverride = prefs;
 
   final String? _baseDir;
   final SharedPreferences? _prefsOverride;
+
+  ProfileManager get _manager => ProfileManager(baseDir: _baseDir);
 
   Future<SharedPreferences> _prefs() async {
     if (_prefsOverride != null) return _prefsOverride;
@@ -252,18 +271,8 @@ class ProfileSelectionService {
     await p.setString(_lastUsedProfileKey, name);
   }
 
-  /// Ob Auswahl nötig: mehr als ein tatsächlich angelegtes Profil.
+  /// Ob Auswahl nötig: mehr als ein registriertes Profil.
   Future<bool> needsSelection() async => (await listProfiles()).length > 1;
 
-  Future<List<String>> listProfiles() async {
-    final Directory root = Directory(p.join(_baseDir ?? ProfileManager.getDefaultBaseDir(), 'profiles'));
-    if (!root.existsSync()) return <String>[];
-    final List<FileSystemEntity> entries = await root.list().toList();
-    final List<String> profiles = <String>[];
-    for (final FileSystemEntity entry in entries) {
-      if (entry is Directory) profiles.add(p.basename(entry.path));
-    }
-    profiles.sort();
-    return profiles;
-  }
+  Future<List<String>> listProfiles() => _manager.listProfiles();
 }

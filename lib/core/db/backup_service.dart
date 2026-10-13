@@ -53,6 +53,33 @@ class BackupService {
 
   String get _statePath => p.join(profileDir, 'backup_state.json');
 
+  /// Canonical profile-local backup directory. Platform base resolves to
+  /// `~/.local/share/OpenInvoices` (Linux), `~/Library/Application Support/OpenInvoices`
+  /// (macOS), `%LOCALAPPDATA%/OpenInvoices` (Windows); local backups live only
+  /// under `<base>/profiles/<profile>/backups/`. A global sibling `backups/`
+  /// directory is never used for profile backups.
+  static String canonicalBackupDir(String profileDir) => p.join(profileDir, 'backups');
+
+  /// Validated local backup files, oldest first. Used for truthful history.
+  Future<List<File>> listLocalBackups() => _backupFiles();
+
+  /// Decrypts an encrypted backup for staged restore. Wrong-passphrase and
+  /// integrity failures throw; the passphrase is never persisted.
+  Uint8List decryptForRestore(Uint8List data, String passphrase) => _decrypt(data, passphrase);
+
+  /// Last successful backup time from `backup_state.json`, if any.
+  Future<DateTime?> lastSuccess() async {
+    final File state = File(_statePath);
+    if (!state.existsSync()) return null;
+    try {
+      final Object? decoded = jsonDecode(await state.readAsString());
+      if (decoded is Map<String, dynamic> && decoded['lastBackup'] is String) {
+        return DateTime.tryParse(decoded['lastBackup'] as String);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<String> createLocalBackup() async {
     if (!File(databasePath).existsSync() && executor == null) {
       throw StateError('Datenbank nicht gefunden');

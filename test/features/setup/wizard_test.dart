@@ -241,6 +241,7 @@ void main() {
       await tester.pumpWidget(const MaterialApp(home: WizardPage()));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Weiter'));
       await tester.tap(find.text('Weiter'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Name ist Pflicht'), findsOneWidget);

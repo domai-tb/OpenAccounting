@@ -3,7 +3,6 @@
 ## Purpose
 First-run setup wizard with empty database detection, company creation, and initial configuration.
 
-
 ## Requirements
 
 ### Requirement: Empty database detection triggers wizard
@@ -61,28 +60,31 @@ AND close the wizard.
 
 ### Requirement: Required field validation per step
 
-Each wizard step SHALL validate required fields before allowing progression. Step 1 requires company name. Step 2 requires at least one bank account with IBAN. Step 3 requires at least one category selected. Validation errors SHALL be displayed inline below the relevant field.
+Each wizard step SHALL validate required fields before allowing progression. Step 1 requires company name. Step 2 requires at least one bank account with a valid IBAN. Step 3 requires at least one selected category only when a verified category catalog is available; with a missing or unverified catalog it SHALL permit continuation with an explicit deferred state and no category IDs. Validation and load errors SHALL be localized and displayed inline below the relevant field or step.
 
 #### Scenario: Step 1 validation failure
 
-GIVEN the user is on step 1 (Stammdaten)
-WHEN the user leaves the company name field empty and clicks "Weiter"
-THEN an inline error message SHALL appear below the name field
-AND the wizard SHALL NOT advance to step 2.
+- **GIVEN** the user is on step 1 (Stammdaten)
+- **WHEN** the user leaves the company name field empty and selects Weiter
+- **THEN** an inline error SHALL appear below the name field and the wizard SHALL NOT advance
 
 #### Scenario: Step 2 validation failure
 
-GIVEN the user is on step 2 (Konten)
-WHEN the user enters an invalid IBAN format and clicks "Weiter"
-THEN an inline error message SHALL appear below the IBAN field
-AND the wizard SHALL NOT advance to step 3.
+- **GIVEN** the user is on step 2 (Konten)
+- **WHEN** the user enters an invalid IBAN and selects Weiter
+- **THEN** an inline error SHALL appear below the IBAN field and the wizard SHALL NOT advance
 
 #### Scenario: Step 3 validation failure
 
-GIVEN the user is on step 3 (Kategorien)
-WHEN the user deselects all categories and clicks "Weiter"
-THEN an inline error message SHALL appear indicating at least one category is required
-AND the wizard SHALL NOT advance to step 4.
+- **GIVEN** a verified category catalog is available and the user selected no category
+- **WHEN** the user selects Weiter
+- **THEN** an inline error SHALL indicate that at least one category is required and the wizard SHALL NOT advance
+
+#### Scenario: Step 3 permits deferred categories when no verified catalog exists
+
+- **GIVEN** no verified category catalog is available
+- **WHEN** the user selects Weiter without a category ID
+- **THEN** the wizard SHALL advance with a localized deferred notice and SHALL NOT invent or persist a category selection
 
 ### Requirement: Kassenbestand initialization
 
@@ -108,35 +110,43 @@ THEN an inline error message SHALL appear indicating the balance must be non-neg
 
 ### Requirement: Profile selection on startup
 
-When multiple profiles exist, the system SHALL display a profile selection screen on startup before loading the main application. The selected profile SHALL determine the active database path. The system SHALL persist the last-used profile for quick selection.
+When multiple registered profiles exist, the system SHALL display a profile selection screen on startup before loading the main application. The selected profile SHALL determine the active database path. Startup selection and recovery lists SHALL use the validated registered profile catalog, never every directory by default. An absent or corrupt catalog with one validated profile SHALL recover that profile with a warning; when multiple valid recovery candidates exist the user SHALL choose explicitly before an active profile is persisted.
 
 #### Scenario: Multiple profiles exist
 
-GIVEN more than one profile directory exists under `profiles/`
-WHEN the application starts
-THEN a profile selection screen SHALL be displayed listing all profiles
-AND the last-used profile SHALL be highlighted/pre-selected.
+- **GIVEN** more than one validated profile is registered
+- **WHEN** the application starts
+- **THEN** a profile selection screen SHALL list only those registered profiles and SHALL highlight the last-used registered profile when it is available
+
+#### Scenario: Unregistered directory exists
+
+- **GIVEN** an unregistered profile directory exists beside registered profiles
+- **WHEN** the application starts normally
+- **THEN** the directory SHALL not appear in profile selection and SHALL not be loaded
+
+#### Scenario: Multiple profiles need catalog recovery
+
+- **GIVEN** the profile catalog is missing or corrupt and multiple valid profile directories exist
+- **WHEN** the application starts
+- **THEN** a recovery selection screen SHALL appear without preselecting or persisting an active profile until the user chooses one
 
 #### Scenario: Single profile exists
 
-GIVEN exactly one profile directory exists
-WHEN the application starts
-THEN the profile selection screen SHALL be skipped
-AND that profile SHALL be loaded automatically.
+- **GIVEN** exactly one validated registered profile exists
+- **WHEN** the application starts with a valid catalog
+- **THEN** that profile SHALL be loaded automatically without showing the selection screen
 
 #### Scenario: Profile switching requires restart
 
-GIVEN the user has selected a different profile from the settings or profile manager
-WHEN the profile switch is confirmed
-THEN the application SHALL restart to load the new profile's database
-AND the new profile SHALL be persisted as the last-used profile.
+- **GIVEN** the user has selected a different registered profile from Settings or profile manager
+- **WHEN** the profile switch is confirmed
+- **THEN** the application SHALL persist the selection and clearly require restart before loading the new profile database
 
 #### Scenario: No profiles exist
 
-GIVEN no profile directories exist under `profiles/`
-WHEN the application starts
-THEN the system SHALL create a default profile
-AND load it automatically without showing the selection screen.
+- **GIVEN** no valid or recoverable profile exists
+- **WHEN** the application starts
+- **THEN** the system SHALL create and register a default profile and load it automatically
 
 ### Requirement: Profile manager UI
 
@@ -209,3 +219,19 @@ AND its opening journal entry SHALL record betrag=150.00 on the current date.
 GIVEN the user is on step 2 (Konten)
 WHEN the user enters a negative cash balance
 THEN an inline error message SHALL appear indicating the balance must be non-negative.
+
+### Requirement: Bank-account holder survives setup persistence
+
+The setup persistence boundary SHALL store the account holder entered in the wizard. Existing profile databases SHALL receive a nullable `konten.inhaber` column through the ordered schema migration path. Create and duplicate-IBAN update paths SHALL persist the normalized holder value, and setup summaries SHALL read that value back from the same account record.
+
+#### Scenario: Holder value is persisted and reviewed
+
+- **GIVEN** the user enters `Max Mustermann` as the holder for a bank account
+- **WHEN** setup saves and reloads the account summary
+- **THEN** the existing account row SHALL contain `inhaber = Max Mustermann` and the summary SHALL display that stored value
+
+#### Scenario: Existing database receives the holder field safely
+
+- **GIVEN** an existing profile database has a `konten` table without `inhaber`
+- **WHEN** the ordered schema migration runs
+- **THEN** it SHALL add the nullable column without rewriting existing account values or changing their IDs
