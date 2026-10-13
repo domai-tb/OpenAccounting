@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/beleg_typ.dart';
 import 'package:openaccounting/features/accounting/euer_entity.dart';
+import 'package:openaccounting/features/accounting/eur_settlement_reader.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/assets/asset_entity.dart';
 import 'package:openaccounting/features/assets/asset_schedule_service.dart';
@@ -43,8 +44,8 @@ class EuerService {
   /// only `catalog_verified` and explicitly `user_confirmed` mappings may
   /// contribute. A missing category, missing report line, or ineligible
   /// provenance blocks output with the affected journal/category IDs instead
-  /// of silently excluding rows. AfA line 33 stays computed from
-  /// anlageverzeichnis (journal rows pointing at it are skipped, not failed).
+  /// of silently excluding rows. AfA line 33 consumes only complete canonical
+  /// asset schedule inputs; legacy values are preserved but never guessed.
   Future<EuerResult> generate({required int jahr, DateTime? cutoverDatum}) async {
     final String jahrStr = jahr.toString().padLeft(4, '0');
 
@@ -52,86 +53,114 @@ class EuerService {
     final Map<int, String> zeilen = <int, String>{for (int i = 12; i <= 107; i++) i: '0.00'};
     final Map<int, String> hinweise = <int, String>{106: '0.00', 107: '0.00'};
 
-    // LEFT JOIN: unresolved mappings must fail closed, never vanish.
-    // beleg_typ is deliberately selected so Gewinn never infers direction
-    // from arbitrary EÜR line-number ranges.
-    final List<Map<String, Object?>> rows;
-    try {
-      rows = await executor.runSelect(
-        'SELECT j.id AS journal_id, j.kategorie_id AS kategorie_id, k.euer_zeile as zeile, '
-        'j.betrag as betrag, j.beleg_typ as art, k.mapping_status AS mapping_status, '
-        'k.catalog_source_reference AS quelle, k.catalog_source_version AS version '
-        'FROM journal j LEFT JOIN kategorien k ON j.kategorie_id = k.id '
-        "WHERE strftime('%Y', j.datum) = ?",
-        <Object?>[jahrStr],
-      );
-    } catch (error, stackTrace) {
-      Error.throwWithStackTrace(EuerException('Buchungen konnten für EÜR nicht gelesen werden', error), stackTrace);
-    }
+    // Cash-basis settlement recognition: when settlement groups attribute
+    // amounts to this year, ordinary income/expenses come from settled
+    // allocations by settlement date — never from invoice-issue journal
+    // dates. Legacy `legacy_unverified` rows fail closed when mixed with
+    // settlement data in an in-scope period.
+    final EurSettlementTotals? settlementTotals = await _settlementTotalsOrNull(jahr);
     var einnahmen = 0;
     var ausgaben = 0;
     final List<int> blockedJournals = <int>[];
     final List<int> blockedCategories = <int>[];
     final List<_ResolvedMapping> resolved = <_ResolvedMapping>[];
-    for (final Map<String, Object?> r in rows) {
-      // Explicit beleg_typ predicate — not string contains. Cash categories
-      // Zahlung/Ueberzahlung/Ausbuchung/Eroeffnung never count as revenue.
-      // ponytail: whitelist Einnahme/Ausgabe only, explicit exclusion list in BelegTyp.nonRevenue.
-      // Non-revenue rows are outside the accepted posting rules and stay skipped.
-      final String art = r['art']?.toString().trim().toLowerCase() ?? '';
-      final bool isRevenue = art == BelegTyp.einnahme.toLowerCase();
-      final bool isExpense = art == BelegTyp.ausgabe.toLowerCase();
-      if (!isRevenue && !isExpense) {
-        continue;
+    if (settlementTotals != null) {
+      final List<int> legacyIds = await EurSettlementReader.legacyUnverifiedIds(executor, jahr);
+      if (legacyIds.isNotEmpty) {
+        throw EuerException(
+          'EÜR blockiert: ${legacyIds.length} Buchungen ohne geprüfte Doppik '
+          '(Journal-IDs: ${legacyIds.join(', ')}) — Abrechnung erst nach Klärung der Altbuchungen möglich',
+          null,
+          legacyIds,
+        );
       }
-      final int journalId = (r['journal_id'] as num?)?.toInt() ?? 0;
-      final int? kategorieId = (r['kategorie_id'] as num?)?.toInt();
-      final String? status = r['mapping_status']?.toString();
-      final int? zeile = (r['zeile'] as num?)?.toInt();
-      final bool eligible = status == 'catalog_verified' || status == 'user_confirmed';
-      if (kategorieId == null || status == null || !eligible || zeile == null || zeile < 12 || zeile > 107) {
-        blockedJournals.add(journalId);
-        if (kategorieId != null && !blockedCategories.contains(kategorieId)) {
-          blockedCategories.add(kategorieId);
+      for (final MapEntry<int, int> entry in settlementTotals.centsByZeile.entries) {
+        zeilen[entry.key] = money.fromCents(entry.value);
+      }
+      einnahmen = settlementTotals.einnahmenCents;
+      ausgaben = settlementTotals.ausgabenCents;
+    } else {
+      // LEFT JOIN: unresolved mappings must fail closed, never vanish.
+      // beleg_typ is deliberately selected so Gewinn never infers direction
+      // from arbitrary EÜR line-number ranges.
+      // Boundary rows (source_kind set) carry their own settlement-based
+      // recognition and stay excluded from legacy invoice-date totals, so an
+      // unpaid invoice never counts as received cash here.
+      final bool excludeBoundaryRows = await _journalHasSourceColumn();
+      final String sourceFilter = excludeBoundaryRows ? ' AND j.source_kind IS NULL' : '';
+      final List<Map<String, Object?>> rows;
+      try {
+        rows = await executor.runSelect(
+          'SELECT j.id AS journal_id, j.kategorie_id AS kategorie_id, k.euer_zeile as zeile, '
+          'j.betrag as betrag, j.beleg_typ as art, k.mapping_status AS mapping_status, '
+          'k.catalog_source_reference AS quelle, k.catalog_source_version AS version '
+          'FROM journal j LEFT JOIN kategorien k ON j.kategorie_id = k.id '
+          "WHERE strftime('%Y', j.datum) = ?$sourceFilter",
+          <Object?>[jahrStr],
+        );
+      } catch (error, stackTrace) {
+        Error.throwWithStackTrace(EuerException('Buchungen konnten für EÜR nicht gelesen werden', error), stackTrace);
+      }
+      for (final Map<String, Object?> r in rows) {
+        // Explicit beleg_typ predicate — not string contains. Cash categories
+        // Zahlung/Ueberzahlung/Ausbuchung/Eroeffnung never count as revenue.
+        // ponytail: whitelist Einnahme/Ausgabe only, explicit exclusion list in BelegTyp.nonRevenue.
+        // Non-revenue rows are outside the accepted posting rules and stay skipped.
+        final String art = r['art']?.toString().trim().toLowerCase() ?? '';
+        final bool isRevenue = art == BelegTyp.einnahme.toLowerCase();
+        final bool isExpense = art == BelegTyp.ausgabe.toLowerCase();
+        if (!isRevenue && !isExpense) {
+          continue;
         }
-        continue;
-      }
-      if (zeile == 33) {
-        continue; // AfA overridden via anlageverzeichnis.
-      }
-      resolved.add(
-        _ResolvedMapping(
-          journalId: journalId,
-          kategorieId: kategorieId,
-          zeile: zeile,
-          status: status,
-          quelle: r['quelle']?.toString(),
-          version: r['version']?.toString(),
-        ),
-      );
-      final String raw = r['betrag']?.toString() ?? '0.00';
-      final String formatted = money.formatBetrag(raw);
-      final String current = zeilen[zeile] ?? '0.00';
-      zeilen[zeile] = money.add(current, formatted);
+        final int journalId = (r['journal_id'] as num?)?.toInt() ?? 0;
+        final int? kategorieId = (r['kategorie_id'] as num?)?.toInt();
+        final String? status = r['mapping_status']?.toString();
+        final int? zeile = (r['zeile'] as num?)?.toInt();
+        final bool eligible = status == 'catalog_verified' || status == 'user_confirmed';
+        if (kategorieId == null || status == null || !eligible || zeile == null || zeile < 12 || zeile > 107) {
+          blockedJournals.add(journalId);
+          if (kategorieId != null && !blockedCategories.contains(kategorieId)) {
+            blockedCategories.add(kategorieId);
+          }
+          continue;
+        }
+        if (zeile == 33) {
+          continue; // AfA overridden via anlageverzeichnis.
+        }
+        resolved.add(
+          _ResolvedMapping(
+            journalId: journalId,
+            kategorieId: kategorieId,
+            zeile: zeile,
+            status: status,
+            quelle: r['quelle']?.toString(),
+            version: r['version']?.toString(),
+          ),
+        );
+        final String raw = r['betrag']?.toString() ?? '0.00';
+        final String formatted = money.formatBetrag(raw);
+        final String current = zeilen[zeile] ?? '0.00';
+        zeilen[zeile] = money.add(current, formatted);
 
-      if (zeile != 106 && zeile != 107) {
-        final int cents = money.toCents(formatted);
-        if (isRevenue) {
-          einnahmen += cents;
-        } else if (isExpense) {
-          ausgaben += cents;
+        if (zeile != 106 && zeile != 107) {
+          final int cents = money.toCents(formatted);
+          if (isRevenue) {
+            einnahmen += cents;
+          } else if (isExpense) {
+            ausgaben += cents;
+          }
         }
       }
-    }
-    if (blockedJournals.isNotEmpty) {
-      throw EuerException(
-        'EÜR blockiert: ${blockedJournals.length} Buchungen mit ungeklärtem Kategorie-Mapping '
-        '(Journal-IDs: ${blockedJournals.join(', ')}; Kategorie-IDs: ${blockedCategories.join(', ')})',
-        null,
-        blockedJournals,
-        blockedCategories,
-      );
-    }
+      if (blockedJournals.isNotEmpty) {
+        throw EuerException(
+          'EÜR blockiert: ${blockedJournals.length} Buchungen mit ungeklärtem Kategorie-Mapping '
+          '(Journal-IDs: ${blockedJournals.join(', ')}; Kategorie-IDs: ${blockedCategories.join(', ')})',
+          null,
+          blockedJournals,
+          blockedCategories,
+        );
+      }
+    } // settlementTotals == null → legacy invoice-date totals above.
 
     // Zeile 33 — AfA from the asset-register schedule owner, not journal.
     // The canonical schedule is the sole AfA source. Legacy rows fail closed
@@ -299,10 +328,15 @@ class EuerService {
       }
     }
     final Map<int, int> historyIds = await _latestHistoryIds(resolved.map((m) => m.kategorieId).toSet());
+    // Statutory timing trace: approved year-boundary rules attributing
+    // settlements to this year stay visible on the report.
+    final List<Map<String, Object?>> statutoryRules = await EurSettlementReader.timingRulesForYear(executor, jahr);
     final Map<String, Object?> snapshot = <String, Object?>{
       'version': 1,
       'jahr': jahr,
       'afa_assets': afaAssetRefs,
+      'settlement_basis': settlementTotals != null,
+      'statutory_rules': statutoryRules,
       'resolved': <Object?>[
         for (final _ResolvedMapping m in resolved)
           <String, Object?>{
@@ -340,6 +374,27 @@ class EuerService {
       'INSERT INTO euer_exporte (jahr, summen, status, unternehmen_id, mapping_provenance_json) VALUES (?, ?, ?, ?, ?)',
       <Object?>[jahr, _summenJson(result), 'erstellt', companyId, _snapshotJson(result)],
     );
+  }
+
+  /// Settlement totals when settlement groups attribute amounts to [jahr];
+  /// null keeps the legacy invoice-date path (no settlement data yet).
+  Future<EurSettlementTotals?> _settlementTotalsOrNull(int jahr) async {
+    if (!await EurSettlementReader.hasSettlementData(executor, jahr)) {
+      return null;
+    }
+    return EurSettlementReader.totalsForYear(executor, jahr);
+  }
+
+  Future<bool> _journalHasSourceColumn() async {
+    try {
+      final List<Map<String, Object?>> columns = await executor.runSelect(
+        'PRAGMA table_info(journal)',
+        const <Object?>[],
+      );
+      return columns.any((Map<String, Object?> column) => column['name'] == 'source_kind');
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<Map<int, int>> _latestHistoryIds(Set<int> categoryIds) async {
@@ -443,9 +498,6 @@ DateTime? _parseDate(Object? raw) {
   return DateTime.tryParse(text.length >= 10 ? text.substring(0, 10) : text);
 }
 
-
-
-
 bool _useSoll(int jahr, DateTime? cutoverDatum) {
   if (cutoverDatum == null) {
     return false;
@@ -453,24 +505,6 @@ bool _useSoll(int jahr, DateTime? cutoverDatum) {
   final DateTime periodStart = DateTime(jahr);
   final DateTime cut = DateTime(cutoverDatum.year, cutoverDatum.month, cutoverDatum.day);
   return !periodStart.isBefore(cut);
-}
-
-/// One journal row resolved to an eligible category mapping for EÜR output.
-class _ResolvedMapping {
-  const _ResolvedMapping({
-    required this.journalId,
-    required this.kategorieId,
-    required this.zeile,
-    required this.status,
-    this.quelle,
-    this.version,
-  });
-  final int journalId;
-  final int kategorieId;
-  final int zeile;
-  final String status;
-  final String? quelle;
-  final String? version;
 }
 
 int? _asIntOrNull(Object? value) {
@@ -503,4 +537,22 @@ FixedAsset _toFixedAsset(Map<String, Object?> row) {
     legacyNutzungsdauer: _asIntOrNull(row['nutzungsdauer']),
     legacyPrivatanteil: _asTextOrNull(row['privatanteil']),
   );
+}
+
+/// One journal row resolved to an eligible category mapping for EÜR output.
+class _ResolvedMapping {
+  const _ResolvedMapping({
+    required this.journalId,
+    required this.kategorieId,
+    required this.zeile,
+    required this.status,
+    this.quelle,
+    this.version,
+  });
+  final int journalId;
+  final int kategorieId;
+  final int zeile;
+  final String status;
+  final String? quelle;
+  final String? version;
 }

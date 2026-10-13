@@ -342,6 +342,39 @@ Three sub-categories:
 
 ---
 
+## Ausgeglichene Buchungsgruppen und Ausgleich (Settlement)
+
+In-scope Rechnungs- und Zahlungsereignisse buchen ausschließlich über die
+Posting-Grenze (`PostingGroupService`): mindestens zwei kontengebundene
+Zeilen mit genau einer belegten Seite in ganzen Cent (Soll XOR Haben),
+gleiche Soll-/Haben-Summen, atomare Transaktion und `(source_kind,
+source_id)`-Eindeutigkeit (`invoice_event`, `bank_transaction`,
+`cash_payment`). Wiederholungen liefern die gebuchte Gruppe zurück;
+Stornos sind neue gegenläufige Gruppen (Duplikat-Storno abgelehnt).
+Rechnungsgruppen mit angewandten Ausgleichen sind bis zum Storno der
+Ausgleiche gesperrt. Vorsteuer-Storni folgen dem Vorsteuer-Vertrag.
+
+- **Forderung vs. Ertrag:** Die Rechnungsbuchung begründet die offene
+  Forderung/Verbindlichkeit; erst der bestätigte Zahlungseingang/-ausgang
+  (Bankbuchungs-/Valutadatum, bei Bargeld Zahldatum) erkennt EÜR-Einnahmen
+  und -Ausgaben — je Periode nur der beglichene Anteil.
+- **Eine Bankbuchung, eine Gruppe:** Positive Zeilen tilgen
+  Kundenforderungen, negative Lieferantenverbindlichkeiten; Teilbeträge
+  (`offen` → `teilbezahlt` → `bezahlt`), Splits über mehrere Posten und
+  Überzahlungen als separater Kredit bleiben in einer Gruppe mit
+  `angewandt + offen = Bankbetrag` nachvollziehbar. Unbestätigte Importe
+  buchen nie. Vollzahlung löscht die Mahnstufe.
+- **Altbuchungen:** Zeilen ohne Doppik-Beine tragen dauerhaft
+  `legacy_unverified`, bleiben lesbar und zählen nicht in
+  ausgleichsbasierte EÜR-Summen; gemischte Perioden scheitern geschlossen.
+- **Ausnahmen:** §11-EStG-Jahresgrenzen nur über geprüfte Regel-Ergebnisse
+  (Regel-ID/Version, Rechtsgrundlage, Jahr, Genehmiger, Quellennachweis).
+- **Außerhalb:** Buchungsvorlagen, Eröffnungssalden und direkte
+  `journal`-Zeilen behalten ihr Ein-Zeilen-Verhalten bis ein eigener Vertrag
+  sie überführt. Rollback heißt Backup-Wiederherstellung (forward-only).
+
+---
+
 ## Technical Notes
 
 - **Immutable entries**: DB triggers on `journal` prevent mutation of `immutable=1` rows

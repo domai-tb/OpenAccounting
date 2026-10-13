@@ -56,8 +56,10 @@ void main() {
       await insertJournal(kategorieId: 921, betrag: '1000.00', datum: '2025-02-02', art: 'Ausgabe');
       await insertJournal(kategorieId: 922, betrag: '9999.99', datum: '2025-02-03');
       await db.executor.runInsert(
-        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status) VALUES (?, ?, ?, ?, ?, ?)',
-        <Object?>['Laptop', '2025-01-01', '1200.00', 3, '0', 'aktiv'],
+        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, '
+        'privatanteil, status, asset_typ, kaufpreis_netto, nutzungsdauer_jahre, afa_methode, '
+        'privat_anteil_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['Laptop', '2022-01-01', '1200.00', 3, '0', 'aktiv', 'EDV', '1200.00', 3, 'linear', '0'],
       );
 
       final result = await euer.generate(jahr: 2025);
@@ -79,8 +81,10 @@ void main() {
       await insertJournal(kategorieId: 933, betrag: '300.00', datum: '2025-03-04');
       // KFZ 1200/4=300 *30% privat => 210
       await db.executor.runInsert(
-        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, privatanteil, status) VALUES (?, ?, ?, ?, ?, ?)',
-        <Object?>['KFZ', '2025-01-01', '1200.00', 4, '30', 'aktiv'],
+        'INSERT INTO anlageverzeichnis (bezeichnung, anschaffungsdatum, anschaffungskosten, nutzungsdauer, '
+        'privatanteil, status, asset_typ, kaufpreis_netto, nutzungsdauer_jahre, afa_methode, '
+        'privat_anteil_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['KFZ', '2022-01-01', '1200.00', 4, '30', 'aktiv', 'KFZ', '1200.00', 4, 'linear', '30'],
       );
 
       final result = await euer.generate(jahr: 2025);
@@ -712,15 +716,19 @@ CREATE TABLE forderungen (
     });
 
     test('Forderungen occurrence check/insert atomic for concurrent createForRechnung', () async {
-      final AppDatabase db = AppDatabase.createTestDatabase();
+      final Directory profile = await Directory.systemTemp.createTemp('forderungen-race-');
+      final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profile.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Finalisierung');
-      addTearDown(() async => db.close());
+      addTearDown(() async {
+        await db.close();
+        await profile.delete(recursive: true);
+      });
       final int kundeId = await db.executor.runInsert(
         'INSERT INTO kunden (name, strasse, plz, ort) VALUES (?, ?, ?, ?)',
         const <Object?>['Kunde Race', 'Strasse 1', '10115', 'Berlin'],
       );
-      final RechnungenDataSource ds = RechnungenDataSource(db.executor);
+      final RechnungenDataSource ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       final int rechnungId = await ds.createDraftRechnung(
         datum: '2025-01-15',
         positionen: const <RechnungPositionItem>[
