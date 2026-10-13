@@ -85,24 +85,14 @@ SQLite column declarations such as `NUMERIC(12,2)` select numeric affinity but d
 
 ### Requirement: Table Definitions
 
-The application database SHALL maintain one auditable inventory of 46 known application-table names, partitioned as 39 pre-existing base tables, one shared database-health table, and six feature-owned tables. The 39 pre-existing base tables SHALL remain the current AppDatabase.allTableNames entries: unternehmen, kunden, lieferanten, artikel, journal, rechnungen, rechnungspositionen, kategorien, konten, nummernkreise, ust_saetze, tagesabschluesse, belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen, and inventarbewegungen. The shared database-health table SHALL be feature_table_state. At schema version 13 it is required in addition to the existing 39 base tables; it remains separate from the legacy 39-name AppDatabase.allTableNames count. The six feature-owned table names SHALL be forderung_zahlungen, buchungsvorlagen_occurrences, rechnungsvorlagen_occurrences, mileage_trips, mileage_trip_corrections, and category_mapping_history. SQLite internal objects whose names begin with sqlite_ are excluded from this application-table inventory.
-
-The inventory SHALL record each table owner, its required migration version or lazy-state rule, its declared schema, creation path, and presence rule. The feature-owned presence rules SHALL be: forderung_zahlungen is introduced by the accepted v7-to-v8 migration and required at user_version 8 or later; mileage_trips and mileage_trip_corrections are created together and required at user_version 13 or later; category_mapping_history is owned by accounting-catalog-provenance, created by its v9 migration, and required at user_version 9 or later; the two occurrence tables are owned by recurring features and follow the v13 feature_table_state markers.
-
-At versions before a table's required migration version, that table is not yet required and its absence SHALL NOT make that older schema unhealthy. At a version at or beyond its required migration version, a migration-required table SHALL exist with its declared schema. Before v8, forderung_zahlungen MAY be absent or may exist in its accepted legacy v7 shape; the normal v7-to-v8 migration SHALL create it when absent. At v8 or later, absence of forderung_zahlungen is an integrity failure: startup SHALL detect it before current-version repair or any migration that could recreate it, stop profile initialization, preserve the original database, and leave the profile unavailable for complete export until verified recovery. It SHALL NOT create an empty replacement. The missing table remains the durable completeness signal. A present forderung_zahlungen table with a repairable schema or constraint defect MAY use the accepted transactional, row-preserving repair path; a repair that cannot preserve and verify its rows SHALL fail without changing the database.
-
-The shared feature_table_state table SHALL be introduced at schema version 13 and SHALL contain exactly one durable row for each lazy occurrence table. Its table_name SHALL be constrained to buchungsvorlagen_occurrences or rechnungsvorlagen_occurrences, and state SHALL be constrained to never_initialized, initialized, or unknown. Fresh creation at version 13 or later SHALL seed both rows as never_initialized. The v12-to-v13 migration SHALL classify an existing lazy table with its declared schema as initialized and an absent lazy table as unknown; absence alone SHALL NOT imply never_initialized. Feature initialization SHALL create a lazy table and transition its marker from never_initialized to initialized in the same transaction. It SHALL NOT create a table while its marker is unknown. State/table mismatches SHALL fail schema health. Unknown may become never_initialized only after explicit integrity reconciliation verifies that the feature was never initialized; it may become initialized only after a verified table is restored or its prior data is otherwise verified. Before schema version 13, the marker table is not yet required and legacy lazy-table presence is not judged against marker rows.
-
-A complete version-13 inventory SHALL be valid only when all 39 existing base tables and feature_table_state exist with declared schemas, forderung_zahlungen exists at or after v8, both mileage tables exist at or after v13, category_mapping_history exists at or after v9, and each lazy occurrence table is present with state initialized or absent with state never_initialized. An absent lazy table with state unknown, a missing required marker row, any state/table mismatch, an unknown application table, or a missing or malformed required table SHALL prevent a complete inventory. Before v13, older profiles may remain valid for their own schema version but SHALL NOT be reported as complete version-13 exports. Every feature specification that adds a table SHALL update this inventory before migration or lazy creation is implemented.
+At schema v18, the declared base registry SHALL contain exactly 41 tables: `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`, `inventarbewegungen`, `inventuren`, `inventur_positionen`. This is the 39-table pre-stocktake base plus the two named stocktake tables. A fresh schema SHALL also include the seven required migration-owned tables `forderung_zahlungen`, `category_mapping_history`, `feature_table_state`, `mileage_trips`, `mileage_trip_corrections`, `master_data_import_templates`, and `anlage_afa_jahreswerte`, for exactly 48 application tables. Optional lazy tables SHALL exist only when their feature marker is initialized. The schema inventory SHALL match the version-specific table set after each ordered migration; no migration may silently drop an existing table or create an undeclared table.
 
 #### Scenario: All Tables Created on Fresh Install
 
-- **GIVEN** the application creates a fresh profile at supported schema version 13
-- **WHEN** schema creation completes
-- **THEN** all 39 existing base tables and feature_table_state SHALL exist with declared schemas
-- **AND** feature_table_state SHALL contain never_initialized rows for both lazy occurrence tables
-- **AND** forderung_zahlungen, mileage_trips, mileage_trip_corrections, and category_mapping_history SHALL exist
-- **AND** neither lazy occurrence table SHALL exist until its owning feature is initialized
+GIVEN the app runs for the first time with an empty database through schema v18
+WHEN schema creation completes at user_version 18
+THEN the 41 base tables and seven required migration-owned tables SHALL exist, for exactly 48 application tables
+AND each table SHALL have its expected columns and constraints.
 
 #### Scenario: Pre-v13 profile is valid before the coordinated feature migration
 
@@ -176,7 +166,7 @@ A complete version-13 inventory SHALL be valid only when all 39 existing base ta
 
 - **GIVEN** a migration runs against an existing profile
 - **WHEN** the migration completes
-- **THEN** its application-table set SHALL equal the 39 existing base tables, the shared marker and migration-required feature tables for that version, and only those lazy tables whose marker is initialized
+- **THEN** its application-table set SHALL equal the declared base tables and migration-required feature tables for that version, and only those lazy tables whose marker is initialized
 - **AND** no existing table SHALL be silently dropped or recreated
 - **AND** all table-state pairs SHALL satisfy their declared presence rules
 
@@ -187,12 +177,19 @@ A complete version-13 inventory SHALL be valid only when all 39 existing base ta
 - **THEN** the database SHALL be marked unhealthy before an exporter can claim completeness
 - **AND** no migration or feature initializer SHALL silently replace data-bearing tables
 
+#### Scenario: Version-aware table count verification
+
+GIVEN a supported database is upgraded through schema v18
+WHEN its declared table set is checked
+THEN the v18 base registry SHALL contain exactly 41 tables
+AND no table SHALL be silently dropped or created outside the version-specific inventory.
+
 #### Scenario: Missing Table Detection
 
-- **GIVEN** a sequential migration is creating a required application table and its `CREATE TABLE` step fails
-- **WHEN** the migration transaction rolls back
-- **THEN** the migration SHALL leave no partial table or schema change
-- **AND** `PRAGMA user_version` SHALL remain at the pre-migration version
+GIVEN a migration should create one of the declared stocktake tables
+WHEN the CREATE TABLE statement fails
+THEN the migration SHALL roll back
+AND the schema version SHALL NOT be incremented.
 
 ### Requirement: Schema Versioning
 
@@ -452,14 +449,44 @@ AND the partial index SHALL not apply to null hashes
 
 ### Requirement: Explicit feature-table migrations
 
-Feature migrations SHALL declare every table they add, including its columns, constraints, and schema-version change. The inventory feature SHALL add the named `inventarbewegungen` table defined in the inventory specification; no unspecified movement or log table SHALL be created.
+Feature migrations SHALL declare every table they add, including its columns, constraints, and schema-version change. The existing inventory movement migration SHALL add the named `inventarbewegungen` table defined in the inventory specification. A separate physical stocktake migration SHALL add exactly `inventuren` and `inventur_positionen` with the columns, constraints, and foreign key defined in the inventory specification. These stocktake tables SHALL store count evidence only; this change SHALL NOT add an inventory valuation or journal table. No other unspecified movement or log table SHALL be created.
 
 #### Scenario: Named inventory table migration
 
-GIVEN the inventory feature migration is enabled
-WHEN the migration completes
-THEN the `inventarbewegungen` table SHALL exist with the columns and constraints specified by the inventory feature
-AND the 38 base tables SHALL remain present.
+GIVEN the existing inventory movement migration is enabled
+WHEN that migration completes
+THEN `inventarbewegungen` SHALL exist with the columns and constraints specified by the inventory capability
+AND the pre-inventory base tables SHALL remain present
+AND the v18 base registry SHALL contain 41 tables after the stocktake migration.
+
+#### Scenario: Named stocktake table migration
+
+GIVEN the physical stocktake migration is enabled
+WHEN that migration completes
+THEN `inventuren` and `inventur_positionen` SHALL exist with the columns and constraints specified by the inventory capability
+AND existing article and movement rows SHALL retain their values
+AND the v18 base registry SHALL increase from 39 to 41.
+
+#### Scenario: Empty recorded header insert is rejected by the database
+
+GIVEN the stocktake tables are installed and no positions exist for a new header
+WHEN direct SQL inserts an `inventuren` row with status `erfasst`
+THEN the database guard SHALL reject the insert
+AND no empty recorded stocktake SHALL persist.
+
+#### Scenario: Recorded count immutability is enforced by the database
+
+GIVEN the stocktake tables are installed and a header has status `erfasst`
+WHEN direct SQL attempts to update or delete that header or mutate one of its positions
+THEN the database guard SHALL reject the mutation
+AND the recorded count evidence SHALL remain unchanged.
+
+#### Scenario: Failed stocktake migration leaves prior schema intact
+
+GIVEN the physical stocktake migration fails while creating a declared constraint
+WHEN migration error handling completes
+THEN neither stocktake table SHALL remain
+AND the schema version and pre-existing article and movement rows SHALL retain their pre-migration values.
 
 ### Requirement: Company fiscal-year start month migration
 
