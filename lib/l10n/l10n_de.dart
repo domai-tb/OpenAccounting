@@ -2506,4 +2506,404 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get belegUnsupportedType => 'Dateityp nicht unterstützt';
+
+  @override
+  String get invoiceWorkspaceTitle => 'Rechnungsarbeitsbereich';
+
+  @override
+  String get invoiceWorkspaceEditorTab => 'Bearbeiten';
+
+  @override
+  String get invoiceWorkspacePreviewTab => 'Vorschau';
+
+  @override
+  String get invoiceWorkspaceAddPosition => 'Position hinzufügen';
+
+  @override
+  String get invoiceWorkspaceRemovePosition => 'Position entfernen';
+
+  @override
+  String get invoiceWorkspaceMoveUp => 'Nach oben verschieben';
+
+  @override
+  String get invoiceWorkspaceMoveDown => 'Nach unten verschieben';
+
+  @override
+  String get invoiceWorkspacePreviewStale => 'Vorschau ist veraltet oder ungültig';
+
+  @override
+  String get invoiceWorkspaceInvalid => 'Eingaben prüfen';
+
+  @override
+  String get invoiceWorkspaceEditDraft => 'Entwurf bearbeiten';
+
+  @override
+  String get invoiceWorkspaceSaved => 'Entwurf gespeichert';
+
+  @override
+  String get invoiceActionFinalize => 'Finalisieren';
+
+  @override
+  String get invoiceFinalizeConfirmTitle => 'Rechnung finalisieren?';
+
+  @override
+  String get invoiceFinalizeConfirmMessage => 'Zusammenfassung prüfen und Finalisierung bestätigen.';
+
+  @override
+  String get invoiceFinalizeConfirm => 'Finalisieren';
+
+  @override
+  String get invoiceActionStorno => 'Stornieren';
+
+  @override
+  String get invoiceStornoReasonLabel => 'Stornogrund';
+
+  @override
+  String get invoiceStornoReasonRequired => 'Stornogrund ist erforderlich';
+
+  @override
+  String get invoiceActionCreditNote => 'Gutschrift erstellen';
+
+  @override
+  String get invoiceCreditNoteConfirmMessage => 'Aus dieser Rechnung wird eine verknüpfte Gutschrift erstellt.';
+
+  @override
+  String get invoiceActionReplacement => 'Ersatzrechnung erstellen';
+
+  @override
+  String get invoiceReplacementConfirmMessage =>
+      'Aus dieser stornierten Rechnung wird ein verknüpfter Ersatzentwurf erstellt.';
+
+  @override
+  String get invoiceActionConvert => 'Konvertieren';
+
+  @override
+  String get invoiceConvertConfirmTitle => 'Konvertierung bestätigen';
+
+  @override
+  String get invoiceLifecycleTitle => 'Belegaktionen';
+
+  @override
+  String get invoiceLifecycleUnavailable => 'Keine weiteren Aktionen verfügbar';
+
+  @override
+  String get invoiceLifecycleDone => 'Aktion abgeschlossen';
+
+  @override
+  String get invoiceActionFailed => 'Aktion fehlgeschlagen. Prüfen Sie das Dokument und versuchen Sie es erneut.';
+
+  @override
+  String get invoiceRelationshipsTitle => 'Verknüpfungen';
+
+  @override
+  String get invoiceRelationshipsEmpty => 'Keine Verknüpfungen';
+
+  @override
+  String get invoiceRelationshipMissing => 'Verknüpfung nicht verfügbar';
+
+  @override
+  String get eInvoiceOutputTitle => 'Ausgabeformat';
+
+  @override
+  String get eInvoiceFormatPdf => 'PDF';
+
+  @override
+  String get eInvoiceFormatPdfDescription => 'Visuelles PDF ohne strukturierte Daten';
+
+  @override
+  String get eInvoiceFormatZugferd => 'ZUGFeRD';
+
+  @override
+  String get eInvoiceFormatZugferdDescription => 'PDF mit eingebetteter ZUGFeRD-XML (2.5.2 EN 16931)';
+
+  @override
+  String get eInvoiceFormatXrechnung => 'XRechnung';
+
+  @override
+  String get eInvoiceFormatXrechnungDescription => 'XRechnung 3.0 XML-Export nach Finalisierung';
+
+  @override
+  String get eInvoiceReadinessValid => 'E-Rechnung geprüft und gültig';
+
+  @override
+  String get eInvoiceReadinessInvalid => 'E-Rechnung fehlerhaft – Details prüfen';
+
+  @override
+  String get eInvoiceReadinessNotValidated => 'Noch nicht geprüft';
+
+  @override
+  String get eInvoiceReadinessUnavailable => 'Prüfung nicht verfügbar';
+
+  @override
+  String get eInvoiceExportXrechnung => 'XRechnung exportieren';
+
+  @override
+  String get eInvoiceExportSaved => 'XRechnung gespeichert';
+
+  @override
+  String get eInvoiceExportCancelled => 'Export abgebrochen';
+
+  @override
+  String get eInvoiceValidationTitle => 'Prüfergebnis';
+
+  @override
+  String get eInvoiceDraftNoExport => 'Export erst nach Finalisierung verfügbar';
+
+  @override
+  String get eInvoiceBuyerReferenceLabel => 'Käuferreferenz (z. B. Leitweg-ID)';
+
+  @override
+  String get eInvoiceBuyerReferenceHint => 'Für XRechnung erforderlich';
+
+  @override
+  String get routeRecurring => 'Wiederkehrend';
+
+  @override
+  String get sidebarRecurring => 'Wiederkehrend';
+
+  @override
+  String get recurringTitle => 'Wiederkehrende Buchungen';
+
+  @override
+  String get recurringSubtitle => 'Vorlagen und fällige Buchungen prüfen';
+
+  @override
+  String get recurringNewTemplate => 'Neue Vorlage';
+
+  @override
+  String get recurringEmpty => 'Noch keine Vorlagen. Lege deine erste Vorlage an.';
+
+  @override
+  String get recurringLoadFailed => 'Wiederkehrende Buchungen konnten nicht geladen werden';
+
+  @override
+  String get recurringDueTitle => 'Fällige Buchungen';
+
+  @override
+  String get recurringDueEmpty => 'Keine fälligen Buchungen.';
+
+  @override
+  String recurringBlockedReason(String reason) {
+    return 'Blockiert: $reason';
+  }
+
+  @override
+  String recurringHandoffError(String error) {
+    return 'Übergabe fehlgeschlagen: $error';
+  }
+
+  @override
+  String recurringInvalidField(String field) {
+    return 'Ungültiges Feld: $field';
+  }
+
+  @override
+  String get recurringConfirmExecute => 'Ausführen';
+
+  @override
+  String get recurringCreateDraft => 'Entwurf erstellen';
+
+  @override
+  String get settingsSectionBackup => 'Sicherung';
+
+  @override
+  String get settingsBackupNow => 'Jetzt sichern';
+
+  @override
+  String get settingsBackupSchedule => 'Automatische Sicherung';
+
+  @override
+  String get settingsBackupManual => 'Manuell';
+
+  @override
+  String get settingsBackupDaily => 'Täglich';
+
+  @override
+  String get settingsBackupWeekly => 'Wöchentlich';
+
+  @override
+  String get settingsBackupNever => 'Noch nie gesichert';
+
+  @override
+  String get settingsBackupCurrent => 'Aktuell';
+
+  @override
+  String get settingsBackupStale => 'Veraltet';
+
+  @override
+  String get settingsBackupFailed => 'Fehlgeschlagen';
+
+  @override
+  String get settingsRestoreRestartRequired => 'Wiederherstellung vorbereitet. Bitte App beenden und neu starten.';
+
+  @override
+  String get settingsProfileUnregister => 'Profil entfernen (Dateien bleiben erhalten)';
+
+  @override
+  String get settingsProfileRename => 'Umbenennen';
+
+  @override
+  String get settingsProfileRestartRequired => 'Neustart erforderlich';
+
+  @override
+  String get settingsProfileInUse => 'Profil wird bereits verwendet';
+
+  @override
+  String get settingsRegion => 'Region';
+
+  @override
+  String get settingsHolder => 'Kontoinhaber';
+
+  @override
+  String get setupDeferredCategories => 'Kategorien sind zurückgestellt (kein geprüfter Katalog).';
+
+  @override
+  String get setupLegalForm => 'Rechtsform';
+
+  @override
+  String get smtpConnectivityOnly => 'Verbindung geprüft (keine Anmeldung, kein Versand).';
+
+  @override
+  String get settingsNoErasure => 'Kein dauerhaftes Löschen verfügbar.';
+
+  @override
+  String get settingsExportScope => 'Exporte stammen aus dem zuständigen Bereich.';
+
+  @override
+  String get routeDunning => 'Mahnwesen';
+
+  @override
+  String get sidebarDunning => 'Mahnwesen';
+
+  @override
+  String get dunningTitle => 'Mahnwesen';
+
+  @override
+  String get dunningSubtitle => 'Offene Forderungen prüfen, Mahnungen vorbereiten';
+
+  @override
+  String get dunningPreviewAction => 'Lauf prüfen';
+
+  @override
+  String get dunningConfirmAction => 'Bestätigen & erstellen';
+
+  @override
+  String get dunningHistoryTitle => 'Mahnhistorie';
+
+  @override
+  String get dunningExclusionsTitle => 'Ausschlüsse';
+
+  @override
+  String get dunningEmpty => 'Keine fälligen Forderungen.';
+
+  @override
+  String get dunningLoadFailed => 'Mahnwesen konnte nicht geladen werden';
+
+  @override
+  String get dunningUnavailable => 'Mahnwesen ist nicht verfügbar';
+
+  @override
+  String get dunningExcludedState => 'Ausgeschlossen';
+
+  @override
+  String get dunningDraftState => 'Entwurf';
+
+  @override
+  String get dunningTransportAccepted => 'Transport akzeptiert';
+
+  @override
+  String get dunningOutstandingLabel => 'Offen';
+
+  @override
+  String get dunningFeeLabel => 'Gebühr';
+
+  @override
+  String get dunningRateLabel => 'Zinssatz';
+
+  @override
+  String get dunningInterestLabel => 'Zinsen';
+
+  @override
+  String get dunningStageLabel => 'Stufe';
+
+  @override
+  String get dunningExclusionReasonHint => 'Grund';
+
+  @override
+  String get dunningAddExclusion => 'Ausschluss hinzufügen';
+
+  @override
+  String get dunningRemoveExclusion => 'Ausschluss entfernen';
+
+  @override
+  String get dunningGraceDeprecated => 'Karenz (veraltet, ohne Wirkung)';
+
+  @override
+  String get dunningSendAction => 'Mahnung senden';
+
+  @override
+  String get dunningCollectionAction => 'Inkassopaket';
+
+  @override
+  String get dunningNoBalance => 'Saldo nicht verfügbar';
+
+  @override
+  String dunningDetailTitle(String number) {
+    return 'Forderung $number';
+  }
+
+  @override
+  String get incomingInvoiceCaptureTitle => 'Lieferantenrechnung erfassen';
+
+  @override
+  String get incomingInvoiceCaptureAction => 'Eingangsrechnung erstellen';
+
+  @override
+  String get incomingInvoiceSupplierLabel => 'Lieferant';
+
+  @override
+  String get incomingInvoiceSourceNumberLabel => 'Rechnungsnummer des Lieferanten';
+
+  @override
+  String get incomingInvoiceDueDateLabel => 'Fällig am';
+
+  @override
+  String get incomingInvoiceVatRateLabel => 'USt %';
+
+  @override
+  String get incomingInvoiceSupplierRequired => 'Wählen Sie vor dem Speichern einen Lieferanten aus.';
+
+  @override
+  String get incomingInvoiceSaveFailed => 'Der Entwurf der Eingangsrechnung konnte nicht gespeichert werden.';
+
+  @override
+  String get incomingInvoiceCaptureSaved => 'Entwurf der Eingangsrechnung gespeichert.';
+
+  @override
+  String get incomingInvoiceUnsupportedProfile =>
+      'Dieses strukturierte Rechnungsprofil wird nicht unterstützt. Erfassen Sie die Werte manuell.';
+
+  @override
+  String get incomingInvoiceUnreadable =>
+      'Strukturierte Rechnungsdaten konnten nicht gelesen werden. Erfassen Sie die Werte manuell.';
+
+  @override
+  String incomingInvoiceUnsupportedValue(String value) {
+    return 'Nicht unterstützter Quellenwert: $value';
+  }
+
+  @override
+  String incomingInvoiceSuggestedValue(String value) {
+    return 'Quellenwert: $value';
+  }
+
+  @override
+  String get incomingInvoiceSourcePreviewUnavailable => 'Die Vorschau der Originalquelle ist nicht verfügbar.';
+
+  @override
+  String get incomingInvoiceTotalsDisplayOnly => 'Quellensummen dienen nur zum Vergleich.';
+
+  @override
+  String get incomingInvoiceConfirmUnsupportedValues =>
+      'Ich habe die nicht unterstützten Quellenwerte geprüft und die Rechnung manuell erfasst.';
 }

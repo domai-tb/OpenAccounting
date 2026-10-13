@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
@@ -26,10 +29,14 @@ class _ReceiptInboxPageState extends ConsumerState<ReceiptInboxPage> {
   bool _loading = true;
   String? _error;
 
+  bool _loaded = false;
+
   @override
-  void initState() {
-    super.initState();
-    _reload();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loaded) return;
+    _loaded = true;
+    unawaited(_reload());
   }
 
   Future<void> _reload() async {
@@ -105,6 +112,7 @@ class _ReceiptInboxPageState extends ConsumerState<ReceiptInboxPage> {
             previewUnavailable: _previewUnavailable,
             onPreview: _preview,
             onReviewed: _markReviewed,
+            onCreateIncomingInvoice: (int id) => context.go('/receipts/$id/capture'),
           );
           if (wide) {
             return Row(
@@ -182,12 +190,14 @@ class _InboxDetail extends StatelessWidget {
     required this.previewUnavailable,
     required this.onPreview,
     required this.onReviewed,
+    required this.onCreateIncomingInvoice,
   });
 
   final Map<String, Object?>? selected;
   final String? previewUnavailable;
   final ValueChanged<int> onPreview;
   final ValueChanged<int> onReviewed;
+  final ValueChanged<int> onCreateIncomingInvoice;
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +224,14 @@ class _InboxDetail extends StatelessWidget {
             children: <Widget>[
               FilledButton.tonal(onPressed: () => onPreview(id), child: Text(l10n.receiptPreviewAction)),
               OutlinedButton(onPressed: () => onReviewed(id), child: Text(l10n.receiptReviewAction)),
+              if ((row['status']?.toString().startsWith('geprueft') ?? false) &&
+                  ((row['original_name'] ?? row['dateiname'])?.toString().toLowerCase().endsWith('.pdf') == true ||
+                      (row['original_name'] ?? row['dateiname'])?.toString().toLowerCase().endsWith('.xml') == true))
+                FilledButton(
+                  key: const ValueKey<String>('receipt_create_incoming_invoice'),
+                  onPressed: () => onCreateIncomingInvoice(id),
+                  child: Text(l10n.incomingInvoiceCaptureAction),
+                ),
             ],
           ),
         ],

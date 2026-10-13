@@ -2497,4 +2497,403 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get belegUnsupportedType => 'File type not supported';
+
+  @override
+  String get invoiceWorkspaceTitle => 'Invoice workspace';
+
+  @override
+  String get invoiceWorkspaceEditorTab => 'Edit';
+
+  @override
+  String get invoiceWorkspacePreviewTab => 'Preview';
+
+  @override
+  String get invoiceWorkspaceAddPosition => 'Add line item';
+
+  @override
+  String get invoiceWorkspaceRemovePosition => 'Remove line item';
+
+  @override
+  String get invoiceWorkspaceMoveUp => 'Move up';
+
+  @override
+  String get invoiceWorkspaceMoveDown => 'Move down';
+
+  @override
+  String get invoiceWorkspacePreviewStale => 'Preview unavailable or outdated';
+
+  @override
+  String get invoiceWorkspaceInvalid => 'Check the highlighted inputs';
+
+  @override
+  String get invoiceWorkspaceEditDraft => 'Edit draft';
+
+  @override
+  String get invoiceWorkspaceSaved => 'Draft saved';
+
+  @override
+  String get invoiceActionFinalize => 'Finalize';
+
+  @override
+  String get invoiceFinalizeConfirmTitle => 'Finalize invoice?';
+
+  @override
+  String get invoiceFinalizeConfirmMessage => 'Review the summary and confirm finalization.';
+
+  @override
+  String get invoiceFinalizeConfirm => 'Finalize';
+
+  @override
+  String get invoiceActionStorno => 'Cancel';
+
+  @override
+  String get invoiceStornoReasonLabel => 'Reason';
+
+  @override
+  String get invoiceStornoReasonRequired => 'A reason is required';
+
+  @override
+  String get invoiceActionCreditNote => 'Create credit note';
+
+  @override
+  String get invoiceCreditNoteConfirmMessage => 'A linked credit note will be created from this invoice.';
+
+  @override
+  String get invoiceActionReplacement => 'Create replacement invoice';
+
+  @override
+  String get invoiceReplacementConfirmMessage =>
+      'A linked replacement draft will be created from this cancelled invoice.';
+
+  @override
+  String get invoiceActionConvert => 'Convert';
+
+  @override
+  String get invoiceConvertConfirmTitle => 'Confirm conversion';
+
+  @override
+  String get invoiceLifecycleTitle => 'Document actions';
+
+  @override
+  String get invoiceLifecycleUnavailable => 'No further actions available';
+
+  @override
+  String get invoiceLifecycleDone => 'Action completed';
+
+  @override
+  String get invoiceActionFailed => 'The action could not be completed. Check the document and try again.';
+
+  @override
+  String get invoiceRelationshipsTitle => 'Relationships';
+
+  @override
+  String get invoiceRelationshipsEmpty => 'No linked documents';
+
+  @override
+  String get invoiceRelationshipMissing => 'Linked document unavailable';
+
+  @override
+  String get eInvoiceOutputTitle => 'Output format';
+
+  @override
+  String get eInvoiceFormatPdf => 'PDF';
+
+  @override
+  String get eInvoiceFormatPdfDescription => 'Visual PDF without structured data';
+
+  @override
+  String get eInvoiceFormatZugferd => 'ZUGFeRD';
+
+  @override
+  String get eInvoiceFormatZugferdDescription => 'PDF with embedded ZUGFeRD XML (2.5.2 EN 16931)';
+
+  @override
+  String get eInvoiceFormatXrechnung => 'XRechnung';
+
+  @override
+  String get eInvoiceFormatXrechnungDescription => 'XRechnung 3.0 XML export after finalization';
+
+  @override
+  String get eInvoiceReadinessValid => 'E-invoice validated';
+
+  @override
+  String get eInvoiceReadinessInvalid => 'E-invoice invalid – check details';
+
+  @override
+  String get eInvoiceReadinessNotValidated => 'Not yet validated';
+
+  @override
+  String get eInvoiceReadinessUnavailable => 'Validation unavailable';
+
+  @override
+  String get eInvoiceExportXrechnung => 'Export XRechnung';
+
+  @override
+  String get eInvoiceExportSaved => 'XRechnung saved';
+
+  @override
+  String get eInvoiceExportCancelled => 'Export cancelled';
+
+  @override
+  String get eInvoiceValidationTitle => 'Validation result';
+
+  @override
+  String get eInvoiceDraftNoExport => 'Export available after finalization';
+
+  @override
+  String get eInvoiceBuyerReferenceLabel => 'Buyer reference (e.g. Leitweg ID)';
+
+  @override
+  String get eInvoiceBuyerReferenceHint => 'Required for XRechnung';
+
+  @override
+  String get routeRecurring => 'Recurring';
+
+  @override
+  String get sidebarRecurring => 'Recurring';
+
+  @override
+  String get recurringTitle => 'Recurring bookings';
+
+  @override
+  String get recurringSubtitle => 'Review templates and due bookings';
+
+  @override
+  String get recurringNewTemplate => 'New template';
+
+  @override
+  String get recurringEmpty => 'No templates yet. Create your first template.';
+
+  @override
+  String get recurringLoadFailed => 'Recurring bookings could not be loaded';
+
+  @override
+  String get recurringDueTitle => 'Due bookings';
+
+  @override
+  String get recurringDueEmpty => 'No due bookings.';
+
+  @override
+  String recurringBlockedReason(String reason) {
+    return 'Blocked: $reason';
+  }
+
+  @override
+  String recurringHandoffError(String error) {
+    return 'Handoff failed: $error';
+  }
+
+  @override
+  String recurringInvalidField(String field) {
+    return 'Invalid field: $field';
+  }
+
+  @override
+  String get recurringConfirmExecute => 'Execute';
+
+  @override
+  String get recurringCreateDraft => 'Create draft';
+
+  @override
+  String get settingsSectionBackup => 'Backup';
+
+  @override
+  String get settingsBackupNow => 'Back up now';
+
+  @override
+  String get settingsBackupSchedule => 'Automatic backup';
+
+  @override
+  String get settingsBackupManual => 'Manual';
+
+  @override
+  String get settingsBackupDaily => 'Daily';
+
+  @override
+  String get settingsBackupWeekly => 'Weekly';
+
+  @override
+  String get settingsBackupNever => 'Never backed up';
+
+  @override
+  String get settingsBackupCurrent => 'Current';
+
+  @override
+  String get settingsBackupStale => 'Stale';
+
+  @override
+  String get settingsBackupFailed => 'Failed';
+
+  @override
+  String get settingsRestoreRestartRequired => 'Restore staged. Please exit and restart the app.';
+
+  @override
+  String get settingsProfileUnregister => 'Remove profile (files are retained)';
+
+  @override
+  String get settingsProfileRename => 'Rename';
+
+  @override
+  String get settingsProfileRestartRequired => 'Restart required';
+
+  @override
+  String get settingsProfileInUse => 'Profile is already in use';
+
+  @override
+  String get settingsRegion => 'Region';
+
+  @override
+  String get settingsHolder => 'Account holder';
+
+  @override
+  String get setupDeferredCategories => 'Categories are deferred (no verified catalog).';
+
+  @override
+  String get setupLegalForm => 'Legal form';
+
+  @override
+  String get smtpConnectivityOnly => 'Connectivity checked (no sign-in, no delivery).';
+
+  @override
+  String get settingsNoErasure => 'No permanent deletion available.';
+
+  @override
+  String get settingsExportScope => 'Exports come from their owning section.';
+
+  @override
+  String get routeDunning => 'Dunning';
+
+  @override
+  String get sidebarDunning => 'Dunning';
+
+  @override
+  String get dunningTitle => 'Dunning';
+
+  @override
+  String get dunningSubtitle => 'Review open receivables, prepare reminders';
+
+  @override
+  String get dunningPreviewAction => 'Preview run';
+
+  @override
+  String get dunningConfirmAction => 'Confirm & create';
+
+  @override
+  String get dunningHistoryTitle => 'Dunning history';
+
+  @override
+  String get dunningExclusionsTitle => 'Exclusions';
+
+  @override
+  String get dunningEmpty => 'No due receivables.';
+
+  @override
+  String get dunningLoadFailed => 'Dunning could not be loaded';
+
+  @override
+  String get dunningUnavailable => 'Dunning is unavailable';
+
+  @override
+  String get dunningExcludedState => 'Excluded';
+
+  @override
+  String get dunningDraftState => 'Draft';
+
+  @override
+  String get dunningTransportAccepted => 'Transport accepted';
+
+  @override
+  String get dunningOutstandingLabel => 'Open';
+
+  @override
+  String get dunningFeeLabel => 'Fee';
+
+  @override
+  String get dunningRateLabel => 'Rate';
+
+  @override
+  String get dunningInterestLabel => 'Interest';
+
+  @override
+  String get dunningStageLabel => 'Stage';
+
+  @override
+  String get dunningExclusionReasonHint => 'Reason';
+
+  @override
+  String get dunningAddExclusion => 'Add exclusion';
+
+  @override
+  String get dunningRemoveExclusion => 'Remove exclusion';
+
+  @override
+  String get dunningGraceDeprecated => 'Grace (deprecated, no effect)';
+
+  @override
+  String get dunningSendAction => 'Send reminder';
+
+  @override
+  String get dunningCollectionAction => 'Collection package';
+
+  @override
+  String get dunningNoBalance => 'Balance unavailable';
+
+  @override
+  String dunningDetailTitle(String number) {
+    return 'Receivable $number';
+  }
+
+  @override
+  String get incomingInvoiceCaptureTitle => 'Capture supplier invoice';
+
+  @override
+  String get incomingInvoiceCaptureAction => 'Create incoming invoice';
+
+  @override
+  String get incomingInvoiceSupplierLabel => 'Supplier';
+
+  @override
+  String get incomingInvoiceSourceNumberLabel => 'Supplier invoice number';
+
+  @override
+  String get incomingInvoiceDueDateLabel => 'Due date';
+
+  @override
+  String get incomingInvoiceVatRateLabel => 'VAT %';
+
+  @override
+  String get incomingInvoiceSupplierRequired => 'Select a supplier before saving.';
+
+  @override
+  String get incomingInvoiceSaveFailed => 'The incoming invoice draft could not be saved.';
+
+  @override
+  String get incomingInvoiceCaptureSaved => 'Incoming invoice draft saved.';
+
+  @override
+  String get incomingInvoiceUnsupportedProfile =>
+      'This structured invoice profile is not supported. Enter the values manually.';
+
+  @override
+  String get incomingInvoiceUnreadable => 'Structured invoice data could not be read. Enter the values manually.';
+
+  @override
+  String incomingInvoiceUnsupportedValue(String value) {
+    return 'Unsupported source value: $value';
+  }
+
+  @override
+  String incomingInvoiceSuggestedValue(String value) {
+    return 'Source value: $value';
+  }
+
+  @override
+  String get incomingInvoiceSourcePreviewUnavailable => 'The original source preview is unavailable.';
+
+  @override
+  String get incomingInvoiceTotalsDisplayOnly => 'Source totals are shown for comparison only.';
+
+  @override
+  String get incomingInvoiceConfirmUnsupportedValues =>
+      'I reviewed the unsupported source values and entered the invoice manually.';
 }

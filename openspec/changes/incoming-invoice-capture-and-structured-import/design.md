@@ -38,9 +38,9 @@ Creating a journal row directly was considered and rejected because it bypasses 
 
 ### Treat structured fields as suggestions
 
-Read supported XRechnung XML and the structured invoice payload embedded in a supported ZUGFeRD/Factur-X PDF from the Beleg. Map only fields the incoming draft model already represents. Show which values came from the source and let the user correct them before explicitly creating the draft. Preserve the source unchanged. Do not OCR PDFs or images, infer unsupported values, or parse by making network requests. Reuse the receipt-intake source validation and safe XML parsing contract.
+Read supported XRechnung XML and the structured invoice payload embedded in a supported ZUGFeRD/Factur-X PDF from the Beleg. Parse with the `xml` package directly with no second validation or artifact pipeline. Extract embedded ZUGFeRD XML by byte-scanning the PDF bytes for the XML payload. Reject inputs over 2 MiB and any XML with DTD or external entities. Map only fields the incoming draft model already represents. Show which values came from the source and let the user correct them before explicitly creating the draft. Preserve the source unchanged. Do not OCR PDFs or images, infer unsupported values, or parse by making network requests. Reuse the receipt-intake source validation and safe XML parsing contract.
 
-If a field cannot be represented, surface that field and keep the manual path available; do not silently coerce it. The source-invoice formats and profile versions supported for import must be named before implementation. The maintained PDF capability describes generation and is not evidence that an imported source is legally certified.
+If a field cannot be represented, surface that field and keep the manual path available; do not silently coerce it. The supported source-invoice formats and profile versions are named in `incoming-invoice-capture`. The maintained PDF capability describes generation and is not evidence that an imported source is legally certified.
 
 Automatic draft creation and OCR were considered and rejected because neither gives the user a review point for supplier identity and imported values.
 
@@ -61,12 +61,10 @@ Saving capture creates only an editable incoming draft using the modified `docum
 ## Migration Plan
 
 1. Complete and accept the Beleg source/preview/association contract and resolve the invoice money-contract prerequisite.
-2. Add a nullable supplier-source-number column through the repository's additive schema migration; existing documents retain their current number and values.
+2. Add nullable `fremd_rechnungsnummer TEXT NULL` through the repository's additive schema migration; existing documents retain their current number and values. Do not use `notiz` as a substitute.
 3. Wire manual and structured review to the existing invoice use-case path. Capture creates only drafts; finalization effects remain in their current owner.
 4. If the capture route is disabled or rolled back, retain imported Belege and existing invoice rows. The new nullable source-number field can remain unused without rewriting old data.
 
 ## Open Questions
 
-- Which exact XRechnung versions and ZUGFeRD/Factur-X profiles and embedded XML variants will the importer support?
-- Which source fields beyond supplier identity, source number, dates, and representable invoice positions belong in the first mapping?
-- Which library or existing parser can read those formats locally without adding a second validation or artifact pipeline?
+- None for structured import: versions/profiles, field mapping, and parser are fixed above and in `incoming-invoice-capture`.

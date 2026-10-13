@@ -4,22 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/app/app_shell.dart';
-import 'package:openaccounting/core/app_locale.dart';
 import 'package:openaccounting/core/app_scope.dart';
-import 'package:openaccounting/features/fiscal_year/fiscal_year_repository.dart';
-import 'package:openaccounting/features/fiscal_year/fiscal_year_settings_section.dart';
-import 'package:openaccounting/features/feature_modules/feature_module_repository.dart';
-import 'package:openaccounting/features/feature_modules/feature_module_service.dart';
-import 'package:openaccounting/features/feature_modules/feature_module_settings_section.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_availability.dart';
 import 'package:openaccounting/features/income_tax_supporting_reports/income_tax_schedules_view.dart';
+import 'package:openaccounting/features/mahnwesen/mahnwesen_workspace_page.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/router/typed_workspace_search.dart';
-import 'package:openaccounting/core/theme/app_theme.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
@@ -28,20 +22,19 @@ import 'package:openaccounting/design_system/components/finance_list_surface.dar
 import 'package:openaccounting/design_system/components/typed_workspace_surface.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/features/inventory/stocktake_page.dart';
+import 'package:openaccounting/features/recurring/recurring_booking_page.dart';
 import 'package:openaccounting/features/assets/assets_page.dart';
 import 'package:openaccounting/features/contextual_accounting_tax_guidance/contextual_guidance_help_page.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
-import 'package:openaccounting/features/setup/profile_data_section.dart';
-import 'package:openaccounting/features/setup/profile_export_service.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/features/settings/settings_workspace.dart';
 import 'package:openaccounting/features/accounting/gobd_export_page.dart';
 import 'package:openaccounting/features/documents/dokumentenpaket_page.dart';
 import 'package:openaccounting/features/receipts/receipt_inbox_page.dart';
+import 'package:openaccounting/features/incoming_invoices/incoming_invoice_capture_page.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
-import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
-import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
-import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
+import 'package:openaccounting/pages/rechnungen/invoice_workspace.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_more_pages.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
 
@@ -58,6 +51,7 @@ enum AppRoute {
   invoices('/invoices'),
   receipts('/receipts'),
   banking('/banking'),
+  mahnwesen('/mahnwesen'),
   contacts('/contacts'),
   taxes('/taxes'),
   reports('/reports'),
@@ -65,7 +59,8 @@ enum AppRoute {
   settings('/settings'),
   setup('/setup'),
   help('/help'),
-  inventory('/inventory');
+  inventory('/inventory'),
+  recurring('/recurring');
 
   const AppRoute(this.path);
   final String path;
@@ -141,6 +136,12 @@ GoRouter createRouter(AppDatabase db) {
                   final id = state.pathParameters['id']!;
                   return InvoiceDetailPage(id: id);
                 },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (context, state) => InvoiceEditPage(id: state.pathParameters['id']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -162,6 +163,13 @@ GoRouter createRouter(AppDatabase db) {
                   title: appLocalizationsOf(context).receiptDetailTitle(state.pathParameters['id']!),
                   id: state.pathParameters['id']!,
                 ),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'capture',
+                    builder: (context, state) =>
+                        IncomingInvoiceCapturePage(belegId: int.parse(state.pathParameters['id']!)),
+                  ),
+                ],
               ),
             ],
           ),
@@ -170,6 +178,17 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(
             path: '/banking',
             builder: (context, state) => BankImportPage(routeUri: state.uri),
+          ),
+          GoRoute(
+            path: '/mahnwesen',
+            builder: (context, state) => MahnwesenWorkspacePage(routeUri: state.uri),
+          ),
+          GoRoute(
+            path: '/mahnungen',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/mahnwesen' : '/mahnwesen?$q';
+            },
           ),
           GoRoute(
             path: '/contacts',
@@ -244,6 +263,17 @@ GoRouter createRouter(AppDatabase db) {
           ),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
           GoRoute(path: '/inventory', builder: (context, state) => const StocktakeWorkspacePage()),
+          GoRoute(
+            path: '/recurring',
+            builder: (context, state) => RecurringBookingPage(routeUri: state.uri),
+          ),
+          GoRoute(
+            path: '/wiederkehrend',
+            redirect: (BuildContext context, GoRouterState state) {
+              final String q = state.uri.query;
+              return q.isEmpty ? '/recurring' : '/recurring?$q';
+            },
+          ),
           // German alias per specs/app/spec.md deep-link scenario — preserve query and id.
           GoRoute(
             path: '/rechnungen',
@@ -384,284 +414,28 @@ class InvoicesPage extends ConsumerWidget {
       TypedWorkspaceSearchCriteria(domain: TypedWorkspaceDomain.invoices, status: filterStatus, invoiceType: filterTyp);
 }
 
-class InvoiceDraftPage extends ConsumerStatefulWidget {
+/// Create route for outgoing-invoice drafts. Uses the shared workspace editor.
+class InvoiceDraftPage extends StatelessWidget {
   const InvoiceDraftPage({super.key});
 
   @override
-  ConsumerState<InvoiceDraftPage> createState() => _InvoiceDraftPageState();
+  Widget build(BuildContext context) => const InvoiceWorkspace();
 }
 
-class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _dateController = TextEditingController(text: _todayIsoDate());
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController(text: '1');
-  final TextEditingController _priceController = TextEditingController();
-  List<Kunde> _customers = const <Kunde>[];
-  int? _selectedCustomerId;
-  String? _customerError;
-  bool _customersLoading = true;
-  bool _saving = false;
+/// Edit route for saved outgoing-invoice drafts. Same editor model and
+/// presentation components as the create route.
+class InvoiceEditPage extends StatelessWidget {
+  const InvoiceEditPage({required this.id, super.key});
 
-  bool get _isDirty =>
-      _dateController.text.trim() != _todayIsoDate() ||
-      _descriptionController.text.trim().isNotEmpty ||
-      _quantityController.text.trim() != '1' ||
-      _priceController.text.trim().isNotEmpty ||
-      _selectedCustomerId != null;
-
-  Future<bool> _confirmDiscard() async {
-    if (!_isDirty) return true;
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    final bool? discard = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(l10n.draftDiscardTitle),
-        content: Text(l10n.draftDiscardMessage),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.actionKeepEditing)),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.actionDiscard)),
-        ],
-      ),
-    );
-    return discard ?? false;
-  }
-
-  Future<void> _cancelDraft() async {
-    if (_saving || !await _confirmDiscard() || !mounted) return;
-    context.go('/invoices');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadCustomers());
-  }
-
-  Future<void> _loadCustomers() async {
-    try {
-      final List<Kunde> customers = await ref.read(appServicesProvider).kunden.list();
-      if (!mounted) return;
-      setState(() {
-        _customers = customers;
-        _customersLoading = false;
-        _customerError = null;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _customersLoading = false;
-        _customerError = error.toString();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _dateController.dispose();
-    _descriptionController.dispose();
-    _quantityController.dispose();
-    _priceController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _saveDraft() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    final num quantity = _parseAmount(_quantityController.text)!;
-    final num price = _parseAmount(_priceController.text)!;
-    setState(() => _saving = true);
-    try {
-      final RechnungItem invoice = await ref
-          .read(appServicesProvider)
-          .rechnungen
-          .createDraftRechnung(
-            datum: _dateController.text.trim(),
-            kundeId: _selectedCustomerId,
-            positionen: <RechnungPositionItem>[
-              RechnungPositionItem(
-                bezeichnung: _descriptionController.text.trim(),
-                menge: quantity,
-                einzelpreis: price,
-                gesamt: VorschauService.lineTotal(quantity: quantity, unitPrice: price),
-                // The domain default is 19%.
-                position: 0,
-              ),
-            ],
-          );
-      ref.invalidate(routeRecordsProvider('rechnungen'));
-      if (mounted) context.go('/invoices/${invoice.id}');
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).draftSaveFailed('$error'))));
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  String? _validateDate(String? value) {
-    final String date = value?.trim() ?? '';
-    final DateTime? parsed = DateTime.tryParse(date);
-    if (parsed == null || date.length != 10 || parsed.toIso8601String().substring(0, 10) != date) {
-      return appLocalizationsOf(context).errorDateFormat;
-    }
-    return null;
-  }
-
-  String? _validatePositiveAmount(String? value, String label) {
-    final num? parsed = _parseAmount(value ?? '');
-    if (parsed == null || parsed <= 0) return appLocalizationsOf(context).errorPositiveAmount(label);
-    return null;
-  }
-
-  String _customerLabel(Kunde customer) {
-    final String company = customer.firma?.trim() ?? '';
-    final String name = customer.name.trim();
-    final String displayName = company.isEmpty ? name : '$company · $name';
-    return '${customer.debitorNr} · $displayName';
-  }
-
-  Widget _buildCustomerSelector(BuildContext context) {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    if (_customersLoading) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[Text(l10n.customersLoading), const SizedBox(height: 8), const LinearProgressIndicator()],
-      );
-    }
-    if (_customerError != null) {
-      return Card(
-        child: ListTile(
-          leading: const Icon(Icons.error_outline),
-          title: Text(l10n.customersLoadFailed),
-          subtitle: Text(_customerError!),
-          trailing: TextButton(onPressed: _loadCustomers, child: Text(l10n.actionReload)),
-        ),
-      );
-    }
-    if (_customers.isEmpty) {
-      return Card(
-        child: ListTile(
-          leading: const Icon(Icons.people_outline),
-          title: Text(l10n.invoiceDraftNoCustomerTitle),
-          subtitle: Text(l10n.invoiceDraftNoCustomerMessage),
-          trailing: TextButton(onPressed: () => context.go('/contacts/new'), child: Text(l10n.actionCreateCustomer)),
-        ),
-      );
-    }
-    return DropdownButtonFormField<int>(
-      key: const ValueKey<String>('invoice_draft_customer'),
-      isExpanded: true,
-      initialValue: _customers.any((Kunde customer) => customer.id == _selectedCustomerId) ? _selectedCustomerId : null,
-      decoration: InputDecoration(labelText: l10n.invoiceDraftCustomerLabel),
-      hint: Text(l10n.invoiceDraftCustomerHint),
-      items: _customers
-          .map(
-            (Kunde customer) => DropdownMenuItem<int>(
-              value: customer.id,
-              child: Text(_customerLabel(customer), overflow: TextOverflow.ellipsis),
-            ),
-          )
-          .toList(),
-      onChanged: _saving
-          ? null
-          : (int? value) => setState(() {
-              _selectedCustomerId = value;
-            }),
-      validator: (int? value) => value == null ? l10n.errorCustomerRequired : null,
-    );
-  }
+  final String id;
 
   @override
   Widget build(BuildContext context) {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    return PopScope(
-      canPop: !_isDirty,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (!didPop) unawaited(_cancelDraft());
-      },
-      child: AppPage(
-        header: AppPageHeader(
-          title: l10n.actionNewInvoice,
-          leading: IconButton(
-            onPressed: _saving ? null : () => unawaited(_cancelDraft()),
-            icon: const Icon(Icons.arrow_back),
-            tooltip: l10n.actionBack,
-          ),
-          showFilterToolbar: false,
-        ),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: <Widget>[
-              Text(l10n.invoiceDraftTitle, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(l10n.invoiceDraftDescription),
-              const SizedBox(height: 24),
-              _buildCustomerSelector(context),
-              const SizedBox(height: 16),
-              TextFormField(
-                key: const ValueKey<String>('invoice_draft_date'),
-                controller: _dateController,
-                decoration: InputDecoration(labelText: l10n.dateLabel, hintText: '2026-01-31'),
-                validator: _validateDate,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                key: const ValueKey<String>('invoice_draft_description'),
-                controller: _descriptionController,
-                decoration: InputDecoration(labelText: l10n.invoiceDraftPositionLabel),
-                validator: (String? value) => value == null || value.trim().isEmpty ? l10n.errorPositionRequired : null,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextFormField(
-                      key: const ValueKey<String>('invoice_draft_quantity'),
-                      controller: _quantityController,
-                      decoration: InputDecoration(labelText: l10n.pdfQuantity),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (String? value) => _validatePositiveAmount(value, l10n.pdfQuantity),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      key: const ValueKey<String>('invoice_draft_price'),
-                      controller: _priceController,
-                      decoration: InputDecoration(labelText: l10n.invoiceDraftUnitPriceLabel),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (String? value) => _validatePositiveAmount(value, l10n.pdfUnitPrice),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: <Widget>[
-                  OutlinedButton(
-                    onPressed: _saving ? null : () => unawaited(_cancelDraft()),
-                    child: Text(l10n.actionCancel),
-                  ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    key: const ValueKey<String>('save_invoice_draft'),
-                    onPressed: _saving || _customersLoading || _customerError != null || _customers.isEmpty
-                        ? null
-                        : _saveDraft,
-                    icon: _saving
-                        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.save_outlined),
-                    label: Text(l10n.actionSaveDraft),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    final int? recordId = int.tryParse(id);
+    if (recordId == null) {
+      return NotFoundPage(message: appLocalizationsOf(context).errorInvoiceIdInvalid);
+    }
+    return InvoiceWorkspace(draftId: recordId);
   }
 }
 
@@ -916,234 +690,11 @@ class _SettingsContent extends ConsumerStatefulWidget {
   ConsumerState<_SettingsContent> createState() => _SettingsContentState();
 }
 
-const Duration _profileLoadTimeout = Duration(seconds: 2);
-
 class _SettingsContentState extends ConsumerState<_SettingsContent> {
-  late ProfileManager _profileManager;
-  late Future<_ProfileSnapshot> _profiles;
-
-  @override
-  void initState() {
-    super.initState();
-    _profileManager = ref.read(profileManagerProvider);
-    _profiles = _loadProfiles();
-  }
-
-  Future<_ProfileSnapshot> _loadProfiles() async {
-    final List<dynamic> results = await Future.wait<dynamic>(<Future<dynamic>>[
-      _profileManager.getActiveProfile(),
-      _profileManager.listProfiles(),
-    ]).timeout(_profileLoadTimeout);
-    final String active = results[0] as String;
-    final List<String> profiles = (results[1] as List).cast<String>();
-    if (profiles.contains(active)) {
-      return _ProfileSnapshot(active: active, profiles: profiles);
-    }
-    return _ProfileSnapshot(active: active, profiles: <String>[active, ...profiles]);
-  }
-
-  void _reloadProfiles() {
-    setState(() {
-      _profiles = _loadProfiles();
-    });
-  }
-
-  Future<void> _selectProfile(String name) async {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    try {
-      final bool restartRequired = await _profileManager.setActiveProfile(name);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(restartRequired ? l10n.profileSavedRestartHint : l10n.profileAlreadyActive)),
-      );
-      _reloadProfiles();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileSelectFailed('$error'))));
-      }
-    }
-  }
-
-  ProfileExportService? _resolveProfileExportService() {
-    try {
-      final AppScope? scope = AppScope.maybeOf(context);
-      if (scope != null) {
-        return scope.services.profileExport;
-      }
-      return ref.read(appServicesProvider).profileExport;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _createProfile() async {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    final TextEditingController controller = TextEditingController();
-    final String? name = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(l10n.profileCreateTitle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(labelText: l10n.profileNameLabel),
-          onSubmitted: (String value) => Navigator.of(context).pop(value.trim()),
-        ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.actionCancel)),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: Text(l10n.actionCreate),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
-    try {
-      await _profileManager.createProfile(name);
-      if (!mounted) return;
-      _reloadProfiles();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileCreated)));
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.profileCreateFailed('$error'))));
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final AppLocalizations l10n = appLocalizationsOf(context);
-    final Locale selectedLocale = ref.watch(appLocaleProvider);
-    final ThemeMode selectedTheme = ref.watch(themeModeProvider);
-    return AppPage(
-      header: AppPageHeader(title: l10n.settingsTitle, showFilterToolbar: false),
-      child: ListView(
-        children: <Widget>[
-          Text(l10n.settingsAppearance, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<Locale>(
-            key: ValueKey<String>('locale_${selectedLocale.languageCode}'),
-            initialValue: selectedLocale,
-            decoration: InputDecoration(labelText: l10n.settingsLanguage),
-            items: <DropdownMenuItem<Locale>>[
-              DropdownMenuItem<Locale>(value: const Locale('de'), child: Text(l10n.languageGerman)),
-              DropdownMenuItem<Locale>(value: const Locale('en'), child: Text(l10n.languageEnglish)),
-            ],
-            onChanged: (Locale? locale) {
-              if (locale != null) {
-                unawaited(ref.read(appLocaleProvider.notifier).setLocale(locale));
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<ThemeMode>(
-            key: ValueKey<String>('theme_${selectedTheme.name}'),
-            initialValue: selectedTheme,
-            decoration: InputDecoration(labelText: l10n.settingsTheme),
-            items: <DropdownMenuItem<ThemeMode>>[
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.system, child: Text(l10n.themeSystem)),
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.light, child: Text(l10n.themeLight)),
-              DropdownMenuItem<ThemeMode>(value: ThemeMode.dark, child: Text(l10n.themeDark)),
-            ],
-            onChanged: (ThemeMode? mode) {
-              if (mode != null) {
-                unawaited(ref.read(themeModeProvider.notifier).setMode(mode));
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: Text(l10n.amountHidden),
-            subtitle: Text(l10n.settingsPrivacyDescription),
-            value: ref.watch(privacyModeProvider),
-            onChanged: (bool value) => unawaited(ref.read(privacyModeProvider.notifier).setEnabled(enabled: value)),
-          ),
-          const SizedBox(height: 16),
-          const SizedBox(height: 32),
-          Row(
-            children: <Widget>[
-              Expanded(child: Text(l10n.settingsProfiles, style: Theme.of(context).textTheme.titleMedium)),
-              FilledButton.icon(onPressed: _createProfile, icon: const Icon(Icons.add), label: Text(l10n.actionSave)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FutureBuilder<_ProfileSnapshot>(
-            future: _profiles,
-            builder: (BuildContext context, AsyncSnapshot<_ProfileSnapshot> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const LinearProgressIndicator();
-              }
-              if (snapshot.hasError) {
-                final AppLocalizations? localizations = AppLocalizations.of(context);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(localizations?.settingsProfileLoadError ?? l10n.settingsProfileLoadError),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: _reloadProfiles,
-                      child: Text(localizations?.settingsProfileRetry ?? l10n.actionRetry),
-                    ),
-                  ],
-                );
-              }
-              final _ProfileSnapshot value = snapshot.data!;
-              return RadioGroup<String>(
-                groupValue: value.active,
-                onChanged: (String? selected) {
-                  if (selected != null) {
-                    unawaited(_selectProfile(selected));
-                  }
-                },
-                child: Column(
-                  children: <Widget>[
-                    for (final String profile in value.profiles)
-                      RadioListTile<String>(
-                        value: profile,
-                        selected: profile == value.active,
-                        title: Text(profile),
-                        subtitle: profile == value.active ? Text(l10n.setupSaved) : Text(l10n.setupRetry),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-          FiscalYearSettingsSection(repository: FiscalYearRepository(ref.read(appDatabaseProvider).executor)),
-          const SizedBox(height: 16),
-          FeatureModuleSettingsSection(
-            service: FeatureModuleService(repository: FeatureModuleRepository(ref.read(appDatabaseProvider).executor)),
-          ),
-          const SizedBox(height: 16),
-          const MasterDataSettingsSection(),
-          const SizedBox(height: 16),
-          ProfileDataSection(exportService: _resolveProfileExportService()),
-          const SizedBox(height: 16),
-          Text(l10n.settingsPrivacyDescription),
-          const SizedBox(height: 16),
-          AppCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.storage_outlined),
-              title: Text(l10n.localTitle),
-              subtitle: Text(l10n.localDescription),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SettingsWorkspace();
   }
-}
-
-class _ProfileSnapshot {
-  const _ProfileSnapshot({required this.active, required this.profiles});
-
-  final String active;
-  final List<String> profiles;
 }
 
 class HelpPage extends ConsumerWidget {
@@ -1421,10 +972,6 @@ String _displayValue(Object? value) {
   if (value == null || value.toString().trim().isEmpty) return '—';
   return value.toString();
 }
-
-num? _parseAmount(String value) => num.tryParse(value.trim().replaceAll(',', '.'));
-
-String _todayIsoDate() => DateTime.now().toIso8601String().substring(0, 10);
 
 Widget _routeError(BuildContext context, String source, Object error, StackTrace stackTrace, {VoidCallback? onRetry}) {
   FlutterError.reportError(

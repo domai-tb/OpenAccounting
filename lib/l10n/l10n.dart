@@ -4819,6 +4819,774 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Dateityp nicht unterstützt'**
   String get belegUnsupportedType;
+
+  /// No description provided for @invoiceWorkspaceTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnungsarbeitsbereich'**
+  String get invoiceWorkspaceTitle;
+
+  /// No description provided for @invoiceWorkspaceEditorTab.
+  ///
+  /// In de, this message translates to:
+  /// **'Bearbeiten'**
+  String get invoiceWorkspaceEditorTab;
+
+  /// No description provided for @invoiceWorkspacePreviewTab.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschau'**
+  String get invoiceWorkspacePreviewTab;
+
+  /// No description provided for @invoiceWorkspaceAddPosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Position hinzufügen'**
+  String get invoiceWorkspaceAddPosition;
+
+  /// No description provided for @invoiceWorkspaceRemovePosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Position entfernen'**
+  String get invoiceWorkspaceRemovePosition;
+
+  /// No description provided for @invoiceWorkspaceMoveUp.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach oben verschieben'**
+  String get invoiceWorkspaceMoveUp;
+
+  /// No description provided for @invoiceWorkspaceMoveDown.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach unten verschieben'**
+  String get invoiceWorkspaceMoveDown;
+
+  /// No description provided for @invoiceWorkspacePreviewStale.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorschau ist veraltet oder ungültig'**
+  String get invoiceWorkspacePreviewStale;
+
+  /// No description provided for @invoiceWorkspaceInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Eingaben prüfen'**
+  String get invoiceWorkspaceInvalid;
+
+  /// No description provided for @invoiceWorkspaceEditDraft.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf bearbeiten'**
+  String get invoiceWorkspaceEditDraft;
+
+  /// No description provided for @invoiceWorkspaceSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf gespeichert'**
+  String get invoiceWorkspaceSaved;
+
+  /// No description provided for @invoiceActionFinalize.
+  ///
+  /// In de, this message translates to:
+  /// **'Finalisieren'**
+  String get invoiceActionFinalize;
+
+  /// No description provided for @invoiceFinalizeConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnung finalisieren?'**
+  String get invoiceFinalizeConfirmTitle;
+
+  /// No description provided for @invoiceFinalizeConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Zusammenfassung prüfen und Finalisierung bestätigen.'**
+  String get invoiceFinalizeConfirmMessage;
+
+  /// No description provided for @invoiceFinalizeConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Finalisieren'**
+  String get invoiceFinalizeConfirm;
+
+  /// No description provided for @invoiceActionStorno.
+  ///
+  /// In de, this message translates to:
+  /// **'Stornieren'**
+  String get invoiceActionStorno;
+
+  /// No description provided for @invoiceStornoReasonLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Stornogrund'**
+  String get invoiceStornoReasonLabel;
+
+  /// No description provided for @invoiceStornoReasonRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Stornogrund ist erforderlich'**
+  String get invoiceStornoReasonRequired;
+
+  /// No description provided for @invoiceActionCreditNote.
+  ///
+  /// In de, this message translates to:
+  /// **'Gutschrift erstellen'**
+  String get invoiceActionCreditNote;
+
+  /// No description provided for @invoiceCreditNoteConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus dieser Rechnung wird eine verknüpfte Gutschrift erstellt.'**
+  String get invoiceCreditNoteConfirmMessage;
+
+  /// No description provided for @invoiceActionReplacement.
+  ///
+  /// In de, this message translates to:
+  /// **'Ersatzrechnung erstellen'**
+  String get invoiceActionReplacement;
+
+  /// No description provided for @invoiceReplacementConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus dieser stornierten Rechnung wird ein verknüpfter Ersatzentwurf erstellt.'**
+  String get invoiceReplacementConfirmMessage;
+
+  /// No description provided for @invoiceActionConvert.
+  ///
+  /// In de, this message translates to:
+  /// **'Konvertieren'**
+  String get invoiceActionConvert;
+
+  /// No description provided for @invoiceConvertConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Konvertierung bestätigen'**
+  String get invoiceConvertConfirmTitle;
+
+  /// No description provided for @invoiceLifecycleTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Belegaktionen'**
+  String get invoiceLifecycleTitle;
+
+  /// No description provided for @invoiceLifecycleUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine weiteren Aktionen verfügbar'**
+  String get invoiceLifecycleUnavailable;
+
+  /// No description provided for @invoiceLifecycleDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktion abgeschlossen'**
+  String get invoiceLifecycleDone;
+
+  /// No description provided for @invoiceActionFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktion fehlgeschlagen. Prüfen Sie das Dokument und versuchen Sie es erneut.'**
+  String get invoiceActionFailed;
+
+  /// No description provided for @invoiceRelationshipsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Verknüpfungen'**
+  String get invoiceRelationshipsTitle;
+
+  /// No description provided for @invoiceRelationshipsEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Verknüpfungen'**
+  String get invoiceRelationshipsEmpty;
+
+  /// No description provided for @invoiceRelationshipMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Verknüpfung nicht verfügbar'**
+  String get invoiceRelationshipMissing;
+
+  /// No description provided for @eInvoiceOutputTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgabeformat'**
+  String get eInvoiceOutputTitle;
+
+  /// No description provided for @eInvoiceFormatPdf.
+  ///
+  /// In de, this message translates to:
+  /// **'PDF'**
+  String get eInvoiceFormatPdf;
+
+  /// No description provided for @eInvoiceFormatPdfDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Visuelles PDF ohne strukturierte Daten'**
+  String get eInvoiceFormatPdfDescription;
+
+  /// No description provided for @eInvoiceFormatZugferd.
+  ///
+  /// In de, this message translates to:
+  /// **'ZUGFeRD'**
+  String get eInvoiceFormatZugferd;
+
+  /// No description provided for @eInvoiceFormatZugferdDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'PDF mit eingebetteter ZUGFeRD-XML (2.5.2 EN 16931)'**
+  String get eInvoiceFormatZugferdDescription;
+
+  /// No description provided for @eInvoiceFormatXrechnung.
+  ///
+  /// In de, this message translates to:
+  /// **'XRechnung'**
+  String get eInvoiceFormatXrechnung;
+
+  /// No description provided for @eInvoiceFormatXrechnungDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'XRechnung 3.0 XML-Export nach Finalisierung'**
+  String get eInvoiceFormatXrechnungDescription;
+
+  /// No description provided for @eInvoiceReadinessValid.
+  ///
+  /// In de, this message translates to:
+  /// **'E-Rechnung geprüft und gültig'**
+  String get eInvoiceReadinessValid;
+
+  /// No description provided for @eInvoiceReadinessInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'E-Rechnung fehlerhaft – Details prüfen'**
+  String get eInvoiceReadinessInvalid;
+
+  /// No description provided for @eInvoiceReadinessNotValidated.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch nicht geprüft'**
+  String get eInvoiceReadinessNotValidated;
+
+  /// No description provided for @eInvoiceReadinessUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfung nicht verfügbar'**
+  String get eInvoiceReadinessUnavailable;
+
+  /// No description provided for @eInvoiceExportXrechnung.
+  ///
+  /// In de, this message translates to:
+  /// **'XRechnung exportieren'**
+  String get eInvoiceExportXrechnung;
+
+  /// No description provided for @eInvoiceExportSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'XRechnung gespeichert'**
+  String get eInvoiceExportSaved;
+
+  /// No description provided for @eInvoiceExportCancelled.
+  ///
+  /// In de, this message translates to:
+  /// **'Export abgebrochen'**
+  String get eInvoiceExportCancelled;
+
+  /// No description provided for @eInvoiceValidationTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfergebnis'**
+  String get eInvoiceValidationTitle;
+
+  /// No description provided for @eInvoiceDraftNoExport.
+  ///
+  /// In de, this message translates to:
+  /// **'Export erst nach Finalisierung verfügbar'**
+  String get eInvoiceDraftNoExport;
+
+  /// No description provided for @eInvoiceBuyerReferenceLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Käuferreferenz (z. B. Leitweg-ID)'**
+  String get eInvoiceBuyerReferenceLabel;
+
+  /// No description provided for @eInvoiceBuyerReferenceHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Für XRechnung erforderlich'**
+  String get eInvoiceBuyerReferenceHint;
+
+  /// No description provided for @routeRecurring.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederkehrend'**
+  String get routeRecurring;
+
+  /// No description provided for @sidebarRecurring.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederkehrend'**
+  String get sidebarRecurring;
+
+  /// No description provided for @recurringTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederkehrende Buchungen'**
+  String get recurringTitle;
+
+  /// No description provided for @recurringSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Vorlagen und fällige Buchungen prüfen'**
+  String get recurringSubtitle;
+
+  /// No description provided for @recurringNewTemplate.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Vorlage'**
+  String get recurringNewTemplate;
+
+  /// No description provided for @recurringEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Vorlagen. Lege deine erste Vorlage an.'**
+  String get recurringEmpty;
+
+  /// No description provided for @recurringLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederkehrende Buchungen konnten nicht geladen werden'**
+  String get recurringLoadFailed;
+
+  /// No description provided for @recurringDueTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Fällige Buchungen'**
+  String get recurringDueTitle;
+
+  /// No description provided for @recurringDueEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine fälligen Buchungen.'**
+  String get recurringDueEmpty;
+
+  /// No description provided for @recurringBlockedReason.
+  ///
+  /// In de, this message translates to:
+  /// **'Blockiert: {reason}'**
+  String recurringBlockedReason(String reason);
+
+  /// No description provided for @recurringHandoffError.
+  ///
+  /// In de, this message translates to:
+  /// **'Übergabe fehlgeschlagen: {error}'**
+  String recurringHandoffError(String error);
+
+  /// No description provided for @recurringInvalidField.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiges Feld: {field}'**
+  String recurringInvalidField(String field);
+
+  /// No description provided for @recurringConfirmExecute.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausführen'**
+  String get recurringConfirmExecute;
+
+  /// No description provided for @recurringCreateDraft.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf erstellen'**
+  String get recurringCreateDraft;
+
+  /// No description provided for @settingsSectionBackup.
+  ///
+  /// In de, this message translates to:
+  /// **'Sicherung'**
+  String get settingsSectionBackup;
+
+  /// No description provided for @settingsBackupNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Jetzt sichern'**
+  String get settingsBackupNow;
+
+  /// No description provided for @settingsBackupSchedule.
+  ///
+  /// In de, this message translates to:
+  /// **'Automatische Sicherung'**
+  String get settingsBackupSchedule;
+
+  /// No description provided for @settingsBackupManual.
+  ///
+  /// In de, this message translates to:
+  /// **'Manuell'**
+  String get settingsBackupManual;
+
+  /// No description provided for @settingsBackupDaily.
+  ///
+  /// In de, this message translates to:
+  /// **'Täglich'**
+  String get settingsBackupDaily;
+
+  /// No description provided for @settingsBackupWeekly.
+  ///
+  /// In de, this message translates to:
+  /// **'Wöchentlich'**
+  String get settingsBackupWeekly;
+
+  /// No description provided for @settingsBackupNever.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch nie gesichert'**
+  String get settingsBackupNever;
+
+  /// No description provided for @settingsBackupCurrent.
+  ///
+  /// In de, this message translates to:
+  /// **'Aktuell'**
+  String get settingsBackupCurrent;
+
+  /// No description provided for @settingsBackupStale.
+  ///
+  /// In de, this message translates to:
+  /// **'Veraltet'**
+  String get settingsBackupStale;
+
+  /// No description provided for @settingsBackupFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehlgeschlagen'**
+  String get settingsBackupFailed;
+
+  /// No description provided for @settingsRestoreRestartRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellung vorbereitet. Bitte App beenden und neu starten.'**
+  String get settingsRestoreRestartRequired;
+
+  /// No description provided for @settingsProfileUnregister.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil entfernen (Dateien bleiben erhalten)'**
+  String get settingsProfileUnregister;
+
+  /// No description provided for @settingsProfileRename.
+  ///
+  /// In de, this message translates to:
+  /// **'Umbenennen'**
+  String get settingsProfileRename;
+
+  /// No description provided for @settingsProfileRestartRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Neustart erforderlich'**
+  String get settingsProfileRestartRequired;
+
+  /// No description provided for @settingsProfileInUse.
+  ///
+  /// In de, this message translates to:
+  /// **'Profil wird bereits verwendet'**
+  String get settingsProfileInUse;
+
+  /// No description provided for @settingsRegion.
+  ///
+  /// In de, this message translates to:
+  /// **'Region'**
+  String get settingsRegion;
+
+  /// No description provided for @settingsHolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontoinhaber'**
+  String get settingsHolder;
+
+  /// No description provided for @setupDeferredCategories.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorien sind zurückgestellt (kein geprüfter Katalog).'**
+  String get setupDeferredCategories;
+
+  /// No description provided for @setupLegalForm.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechtsform'**
+  String get setupLegalForm;
+
+  /// No description provided for @smtpConnectivityOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbindung geprüft (keine Anmeldung, kein Versand).'**
+  String get smtpConnectivityOnly;
+
+  /// No description provided for @settingsNoErasure.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein dauerhaftes Löschen verfügbar.'**
+  String get settingsNoErasure;
+
+  /// No description provided for @settingsExportScope.
+  ///
+  /// In de, this message translates to:
+  /// **'Exporte stammen aus dem zuständigen Bereich.'**
+  String get settingsExportScope;
+
+  /// No description provided for @routeDunning.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnwesen'**
+  String get routeDunning;
+
+  /// No description provided for @sidebarDunning.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnwesen'**
+  String get sidebarDunning;
+
+  /// No description provided for @dunningTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnwesen'**
+  String get dunningTitle;
+
+  /// No description provided for @dunningSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Offene Forderungen prüfen, Mahnungen vorbereiten'**
+  String get dunningSubtitle;
+
+  /// No description provided for @dunningPreviewAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Lauf prüfen'**
+  String get dunningPreviewAction;
+
+  /// No description provided for @dunningConfirmAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Bestätigen & erstellen'**
+  String get dunningConfirmAction;
+
+  /// No description provided for @dunningHistoryTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnhistorie'**
+  String get dunningHistoryTitle;
+
+  /// No description provided for @dunningExclusionsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausschlüsse'**
+  String get dunningExclusionsTitle;
+
+  /// No description provided for @dunningEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine fälligen Forderungen.'**
+  String get dunningEmpty;
+
+  /// No description provided for @dunningLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnwesen konnte nicht geladen werden'**
+  String get dunningLoadFailed;
+
+  /// No description provided for @dunningUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnwesen ist nicht verfügbar'**
+  String get dunningUnavailable;
+
+  /// No description provided for @dunningExcludedState.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgeschlossen'**
+  String get dunningExcludedState;
+
+  /// No description provided for @dunningDraftState.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf'**
+  String get dunningDraftState;
+
+  /// No description provided for @dunningTransportAccepted.
+  ///
+  /// In de, this message translates to:
+  /// **'Transport akzeptiert'**
+  String get dunningTransportAccepted;
+
+  /// No description provided for @dunningOutstandingLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Offen'**
+  String get dunningOutstandingLabel;
+
+  /// No description provided for @dunningFeeLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Gebühr'**
+  String get dunningFeeLabel;
+
+  /// No description provided for @dunningRateLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Zinssatz'**
+  String get dunningRateLabel;
+
+  /// No description provided for @dunningInterestLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Zinsen'**
+  String get dunningInterestLabel;
+
+  /// No description provided for @dunningStageLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Stufe'**
+  String get dunningStageLabel;
+
+  /// No description provided for @dunningExclusionReasonHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Grund'**
+  String get dunningExclusionReasonHint;
+
+  /// No description provided for @dunningAddExclusion.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausschluss hinzufügen'**
+  String get dunningAddExclusion;
+
+  /// No description provided for @dunningRemoveExclusion.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausschluss entfernen'**
+  String get dunningRemoveExclusion;
+
+  /// No description provided for @dunningGraceDeprecated.
+  ///
+  /// In de, this message translates to:
+  /// **'Karenz (veraltet, ohne Wirkung)'**
+  String get dunningGraceDeprecated;
+
+  /// No description provided for @dunningSendAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Mahnung senden'**
+  String get dunningSendAction;
+
+  /// No description provided for @dunningCollectionAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Inkassopaket'**
+  String get dunningCollectionAction;
+
+  /// No description provided for @dunningNoBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Saldo nicht verfügbar'**
+  String get dunningNoBalance;
+
+  /// No description provided for @dunningDetailTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Forderung {number}'**
+  String dunningDetailTitle(String number);
+
+  /// No description provided for @incomingInvoiceCaptureTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferantenrechnung erfassen'**
+  String get incomingInvoiceCaptureTitle;
+
+  /// No description provided for @incomingInvoiceCaptureAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Eingangsrechnung erstellen'**
+  String get incomingInvoiceCaptureAction;
+
+  /// No description provided for @incomingInvoiceSupplierLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Lieferant'**
+  String get incomingInvoiceSupplierLabel;
+
+  /// No description provided for @incomingInvoiceSourceNumberLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Rechnungsnummer des Lieferanten'**
+  String get incomingInvoiceSourceNumberLabel;
+
+  /// No description provided for @incomingInvoiceDueDateLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Fällig am'**
+  String get incomingInvoiceDueDateLabel;
+
+  /// No description provided for @incomingInvoiceVatRateLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'USt %'**
+  String get incomingInvoiceVatRateLabel;
+
+  /// No description provided for @incomingInvoiceSupplierRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Wählen Sie vor dem Speichern einen Lieferanten aus.'**
+  String get incomingInvoiceSupplierRequired;
+
+  /// No description provided for @incomingInvoiceSaveFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Entwurf der Eingangsrechnung konnte nicht gespeichert werden.'**
+  String get incomingInvoiceSaveFailed;
+
+  /// No description provided for @incomingInvoiceCaptureSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwurf der Eingangsrechnung gespeichert.'**
+  String get incomingInvoiceCaptureSaved;
+
+  /// No description provided for @incomingInvoiceUnsupportedProfile.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses strukturierte Rechnungsprofil wird nicht unterstützt. Erfassen Sie die Werte manuell.'**
+  String get incomingInvoiceUnsupportedProfile;
+
+  /// No description provided for @incomingInvoiceUnreadable.
+  ///
+  /// In de, this message translates to:
+  /// **'Strukturierte Rechnungsdaten konnten nicht gelesen werden. Erfassen Sie die Werte manuell.'**
+  String get incomingInvoiceUnreadable;
+
+  /// No description provided for @incomingInvoiceUnsupportedValue.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht unterstützter Quellenwert: {value}'**
+  String incomingInvoiceUnsupportedValue(String value);
+
+  /// No description provided for @incomingInvoiceSuggestedValue.
+  ///
+  /// In de, this message translates to:
+  /// **'Quellenwert: {value}'**
+  String incomingInvoiceSuggestedValue(String value);
+
+  /// No description provided for @incomingInvoiceSourcePreviewUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Vorschau der Originalquelle ist nicht verfügbar.'**
+  String get incomingInvoiceSourcePreviewUnavailable;
+
+  /// No description provided for @incomingInvoiceTotalsDisplayOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Quellensummen dienen nur zum Vergleich.'**
+  String get incomingInvoiceTotalsDisplayOnly;
+
+  /// No description provided for @incomingInvoiceConfirmUnsupportedValues.
+  ///
+  /// In de, this message translates to:
+  /// **'Ich habe die nicht unterstützten Quellenwerte geprüft und die Rechnung manuell erfasst.'**
+  String get incomingInvoiceConfirmUnsupportedValues;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
