@@ -7,6 +7,16 @@ class RechnungenUseCases {
 
   final RechnungenRepository repository;
 
+  void _rejectGenericCorrectionDraft(String typ) {
+    if (typ == 'gutschrift' || typ == 'storno') {
+      throw InvoiceMoneyValidationException(
+        code: 'unsupportedDocumentType',
+        message: 'Korrekturdokumente müssen über ihren eigenen Erstellungsweg angelegt werden',
+        fields: const ['typ'],
+      );
+    }
+  }
+
   Future<RechnungItem> createDraftRechnung({
     required String datum,
     required List<RechnungPositionItem> positionen,
@@ -17,6 +27,7 @@ class RechnungenUseCases {
     num? rabattProzent,
     num? rabattBetrag,
   }) async {
+    _rejectGenericCorrectionDraft(typ);
     _validateDraftInput(
       datum: datum,
       positionen: positionen,
@@ -46,6 +57,7 @@ class RechnungenUseCases {
     num? rabattProzent,
     num? rabattBetrag,
   }) async {
+    _rejectGenericCorrectionDraft(typ);
     _validateDraftInput(
       datum: datum,
       positionen: positionen,

@@ -1,0 +1,5 @@
+schema: anvil
+created: 2026-10-11
+goal: Establish deterministic invoice calculation, signed correction,
+  persistence, and validation behavior so blocked accounting and document
+  changes can proceed.

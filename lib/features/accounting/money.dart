@@ -111,3 +111,42 @@ String formatBetrag(String raw) {
 String add(String a, String b) {
   return fromCents(toCents(a) + toCents(b));
 }
+
+/// Allocates non-negative cents proportionally, assigning tied remainders by [compareKeys].
+Map<K, int> allocateProportionally<K>({
+  required int amount,
+  required Map<K, int> weights,
+  required int Function(K, K) compareKeys,
+}) {
+  if (amount < 0 || weights.values.any((int weight) => weight < 0)) {
+    throw const MoneyParseException('Allocation amount and weights must not be negative');
+  }
+  final BigInt total = weights.values.fold(BigInt.zero, (BigInt sum, int weight) => sum + BigInt.from(weight));
+  if (BigInt.from(amount) > total) {
+    throw const MoneyParseException('Allocation amount must not exceed total weight');
+  }
+  if (total == BigInt.zero) {
+    return <K, int>{for (final K key in weights.keys) key: 0};
+  }
+
+  final Map<K, int> allocations = <K, int>{};
+  final List<({K key, BigInt remainder})> remainders = <({K key, BigInt remainder})>[];
+  var allocated = 0;
+  for (final MapEntry<K, int> entry in weights.entries) {
+    final BigInt numerator = BigInt.from(entry.value) * BigInt.from(amount);
+    final int base = (numerator ~/ total).toInt();
+    allocations[entry.key] = base;
+    allocated += base;
+    remainders.add((key: entry.key, remainder: numerator.remainder(total)));
+  }
+  remainders.sort((({K key, BigInt remainder}) a, ({K key, BigInt remainder}) b) {
+    final int remainderOrder = b.remainder.compareTo(a.remainder);
+    return remainderOrder == 0 ? compareKeys(a.key, b.key) : remainderOrder;
+  });
+  final int remaining = amount - allocated;
+  for (var index = 0; index < remaining; index++) {
+    final K key = remainders[index].key;
+    allocations[key] = allocations[key]! + 1;
+  }
+  return allocations;
+}

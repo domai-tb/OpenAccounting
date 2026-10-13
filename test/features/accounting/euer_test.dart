@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/accounting/money.dart';
 import 'package:openaccounting/features/accounting/euer_service.dart';
 
 void main() {
@@ -192,5 +193,38 @@ void main() {
 
       expect(result.zeile(33), '210.00');
     });
+  });
+
+  test('test_proportional_cent_equal_remainders_use_stable_key', () {
+    final Map<String, int> allocations = allocateProportionally<String>(
+      amount: 1,
+      weights: const <String, int>{'b': 1, 'a': 1},
+      compareKeys: (String a, String b) => a.compareTo(b),
+    );
+
+    expect(allocations, <String, int>{'b': 0, 'a': 1});
+    expect(allocations.values.reduce((int a, int b) => a + b), 1);
+  });
+
+  test('test_proportional_cent_largest_remainder_precedes_stable_key', () {
+    final Map<String, int> allocations = allocateProportionally<String>(
+      amount: 2,
+      weights: const <String, int>{'a': 2, 'b': 3, 'c': 5},
+      compareKeys: (String a, String b) => a.compareTo(b),
+    );
+
+    expect(allocations, <String, int>{'a': 0, 'b': 1, 'c': 1});
+    expect(allocations.values.reduce((int a, int b) => a + b), 2);
+  });
+
+  test('test_proportional_cent_allocation_rejects_positive_amount_with_zero_weights', () {
+    expect(
+      () => allocateProportionally<String>(
+        amount: 1,
+        weights: const <String, int>{'a': 0, 'b': 0},
+        compareKeys: (String a, String b) => a.compareTo(b),
+      ),
+      throwsA(isA<MoneyParseException>()),
+    );
   });
 }

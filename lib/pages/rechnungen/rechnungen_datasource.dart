@@ -15,6 +15,25 @@ class RechnungenDataSource {
   final QueryExecutor executor;
   final String? profileDir;
 
+  void _rejectGenericCorrectionDraft(String typ) {
+    final String normalizedType = typ.trim().toLowerCase();
+    if (normalizedType == 'gutschrift' || normalizedType == 'storno') {
+      throw InvoiceMoneyValidationException(
+        code: 'unsupportedDocumentType',
+        message: 'Korrekturdokumente müssen über ihren eigenen Erstellungsweg angelegt werden',
+        fields: const ['typ'],
+      );
+    }
+    if (!RechnungTyp.isInvoice(normalizedType) &&
+        !const {'angebot', 'auftrag', 'proforma', 'lieferschein'}.contains(normalizedType)) {
+      throw InvoiceMoneyValidationException(
+        code: 'unsupportedDocumentType',
+        message: 'Unbekannter Dokumenttyp',
+        fields: const ['typ'],
+      );
+    }
+  }
+
   Future<void> _ensureExtraColumns() async {
     const columns = <({String table, String name, String definition})>[
       (table: 'rechnungen', name: 'storno_grund', definition: 'TEXT'),
@@ -25,6 +44,19 @@ class RechnungenDataSource {
       (table: 'rechnungen', name: 'konvertiert_von', definition: 'INTEGER REFERENCES rechnungen(id)'),
       (table: 'rechnungen', name: 'konvertiert_zu', definition: 'INTEGER REFERENCES rechnungen(id)'),
       (table: 'rechnungen', name: 'original_pdf_pfad', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'dokumentenpaket_id', definition: 'INTEGER REFERENCES dokumentenpakete(id)'),
+      (table: 'rechnungen', name: 'beleg_id', definition: 'INTEGER REFERENCES belege(id)'),
+      (table: 'rechnungen', name: 'einleitungstext', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'schlusstext', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'kunde_einmal_name', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'kunde_einmal_firma', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'kunde_einmal_strasse', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'kunde_einmal_plz', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'kunde_einmal_ort', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'liefer_name', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'liefer_strasse', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'liefer_plz', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'liefer_ort', definition: 'TEXT'),
       (table: 'rechnungen', name: 'rabatt_prozent', definition: 'NUMERIC(12,2) DEFAULT 0'),
       (table: 'rechnungen', name: 'rabatt_betrag', definition: 'NUMERIC(12,2) DEFAULT 0'),
       (table: 'rechnungen', name: 'lieferadresse_id', definition: 'INTEGER REFERENCES kunden_lieferadressen(id)'),
@@ -55,6 +87,7 @@ class RechnungenDataSource {
     num? rabattProzent,
     num? rabattBetrag,
   }) async {
+    _rejectGenericCorrectionDraft(typ);
     await _ensureExtraColumns();
     final preview = VorschauService.calculate(
       eingabemodus: eingabemodus,
@@ -131,6 +164,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     num? rabattProzent,
     num? rabattBetrag,
   }) async {
+    _rejectGenericCorrectionDraft(typ);
     await _ensureExtraColumns();
     const allowed = {'rechnung', 'angebot', 'auftrag', 'proforma', 'lieferschein', 'gutschrift', 'storno'};
     if (!allowed.contains(typ)) {
@@ -228,7 +262,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       await transaction.ensureOpen(_NoopTransactionUser());
       final invoiceRows = await transaction.runSelect(
         '''
-SELECT id, ist_entwurf, datum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id
+SELECT id, ist_entwurf, datum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id, netto_betrag, ust_betrag, brutto_betrag
 FROM rechnungen
 WHERE id = ?
 ''',
@@ -258,7 +292,7 @@ WHERE id = ?
       }
       final eingabemodus = invoice['eingabemodus']?.toString() ?? 'netto';
       final posRows = await transaction.runSelect(
-        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+        '''\nSELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, rabatt_prozent, position\nFROM rechnungspositionen\nWHERE rechnung_id = ?\nORDER BY position, id\n''',
         <Object?>[rechnungId],
       );
       final positionen = posRows
@@ -270,6 +304,7 @@ WHERE id = ?
               gesamt: _asNum(r['gesamt']),
               ustSatz: _asNum(r['ust_satz']),
               rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+              position: _asInt(r['position']),
               artikelId: r['artikel_id'] == null ? null : _asInt(r['artikel_id']),
             ),
           )
@@ -282,6 +317,7 @@ WHERE id = ?
         rabattProzent: rabattProzent == 0 ? null : rabattProzent,
         rabattBetrag: rabattBetrag == 0 ? null : rabattBetrag,
       );
+      _validateStoredHeaders(invoice, preview);
       final kreisTyp = _nummernkreisTypFor(typ, lieferantId: lieferantId);
       final rangeRows = await transaction.runSelect(
         '''
@@ -482,7 +518,9 @@ WHERE id = ? AND ist_entwurf = 1
         throw StateError('Rechnung konnte nicht finalisiert werden');
       }
 
-      if (debugFailAt == 'document') throw StateError('Induced failure after document update');
+      if (debugFailAt == 'document') {
+        throw StateError('Induced failure after document update');
+      }
 
       if (isInvoice) {
         // — Atomic accounting postings: journal + receivable + tax in same tx (via RechnungTyp helper — centralized)
@@ -520,7 +558,9 @@ WHERE id = ? AND ist_entwurf = 1
           journalId,
           journalId,
         ]);
-        if (debugFailAt == 'journal') throw StateError('Induced failure after journal');
+        if (debugFailAt == 'journal') {
+          throw StateError('Induced failure after journal');
+        }
         final Object? partnerIdRaw = isIncomingInvoice ? lieferantId : kundeId;
         final String partnerTyp = isIncomingInvoice ? 'lieferant' : 'kunde';
         int? partnerId;
@@ -571,7 +611,9 @@ WHERE id = ? AND ist_entwurf = 1
             );
           }
         }
-        if (debugFailAt == 'receivable') throw StateError('Induced failure after receivable');
+        if (debugFailAt == 'receivable') {
+          throw StateError('Induced failure after receivable');
+        }
         // Vorsteuer claims belong only to incoming invoices.
         if (isIncomingInvoice && preview.ustCents != 0) {
           await transaction.runInsert(
@@ -613,11 +655,20 @@ WHERE id = ? AND ist_entwurf = 1
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
       final origRows = await transaction.runSelect(
-        'SELECT id, ist_entwurf, typ, status, datum, storno_datum, storno_grund, eingabemodus FROM rechnungen WHERE id = ?',
+        'SELECT id, ist_entwurf, typ, status, datum, storno_datum, storno_grund, eingabemodus, rabatt_prozent, rabatt_betrag, netto_betrag, ust_betrag, brutto_betrag, kunde_id, lieferant_id, lieferadresse_id, einleitungstext, schlusstext FROM rechnungen WHERE id = ?',
         <Object?>[rechnungId],
       );
       if (origRows.isEmpty) throw StateError('Rechnung nicht gefunden');
       final orig = origRows.single;
+      final String origTyp = orig['typ']?.toString().trim().toLowerCase() ?? '';
+      if (!RechnungTyp.isInvoice(origTyp) && origTyp != 'gutschrift') {
+        throw InvoiceMoneyValidationException(
+          code: 'unsupportedCorrectionSource',
+          message: 'Storno ist nur für Rechnung oder Gutschrift zulässig',
+          fields: const ['typ'],
+        );
+      }
+      final bool isGutschrift = origTyp == 'gutschrift';
       if (_asInt(orig['ist_entwurf']) == 1) {
         throw StateError('Dokument ist bereits finalisiert: nur finalisierte Dokumente können storniert werden');
       }
@@ -630,7 +681,9 @@ WHERE id = ? AND ist_entwurf = 1
         'SELECT id, format, naechste_nummer FROM nummernkreise WHERE typ = ? AND aktiv = 1 ORDER BY id LIMIT 1',
         <Object?>[kreisTyp],
       );
-      if (rangeRows.isEmpty) throw StateError('Stornorechnung-Nummernkreis fehlt');
+      if (rangeRows.isEmpty) {
+        throw StateError('Stornorechnung-Nummernkreis fehlt');
+      }
       final range = rangeRows.single;
       final format = range['format'].toString();
       final seq = _sequenceMatchesForFormat(format);
@@ -650,45 +703,51 @@ WHERE id = ? AND ist_entwurf = 1
       }
       final nextNo = (latest != null && latest.year < invDate.year) ? 1 : stored;
       final docNo = _formatNumber(format, invDate.year, nextNo);
-      final updated = await transaction.runUpdate(
-        'UPDATE nummernkreise SET naechste_nummer = ? WHERE id = ? AND naechste_nummer = ?',
-        <Object?>[nextNo + 1, range['id'], stored],
-      );
-      if (updated != 1) throw StateError('Nummernkreis konnte nicht reserviert werden');
       final posRows = await transaction.runSelect(
-        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position, id',
         <Object?>[rechnungId],
       );
-      final origTyp = orig['typ'].toString();
-      final isGutschrift = origTyp == 'gutschrift';
       final eingabemodus = orig['eingabemodus']?.toString() ?? 'netto';
       final List<RechnungPositionItem> sourcePositions = posRows
           .map(
             (r) => RechnungPositionItem(
               bezeichnung: r['bezeichnung']?.toString() ?? '',
-              menge: _asNum(r['menge']).abs(),
-              einzelpreis: _asNum(r['einzelpreis']).abs(),
-              gesamt: _asNum(r['gesamt']).abs(),
+              menge: _asNum(r['menge']),
+              einzelpreis: _asNum(r['einzelpreis']),
+              gesamt: _asNum(r['gesamt']) * (isGutschrift ? -1 : 1),
               ustSatz: _asNum(r['ust_satz']),
               rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+              position: _asInt(r['position']),
               artikelId: r['artikel_id'] == null ? null : _asInt(r['artikel_id']),
             ),
           )
           .toList(growable: false);
+      final num rabattProzent = _asNum(orig['rabatt_prozent']);
+      final num rabattBetrag = _asNum(orig['rabatt_betrag']);
       final VorschauResult sourcePreview = VorschauService.calculate(
         eingabemodus: eingabemodus,
         positionen: sourcePositions,
+        rabattProzent: rabattProzent == 0 ? null : rabattProzent,
+        rabattBetrag: rabattBetrag == 0 ? null : rabattBetrag,
       );
+      _validateStoredHeaders(orig, sourcePreview, sign: isGutschrift ? -1 : 1);
+      final updated = await transaction.runUpdate(
+        'UPDATE nummernkreise SET naechste_nummer = ? WHERE id = ? AND naechste_nummer = ?',
+        <Object?>[nextNo + 1, range['id'], stored],
+      );
+      if (updated != 1) {
+        throw StateError('Nummernkreis konnte nicht reserviert werden');
+      }
       final int correctionSign = isGutschrift ? 1 : -1;
       final stornoId = await transaction.runInsert(
-        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, storno_von, storno_grund, storno_datum, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, storno_von, storno_grund, storno_datum, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad, kunde_id, lieferant_id, lieferadresse_id, einleitungstext, schlusstext) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
           docNo,
           'storno',
           'entwurf',
           datum,
           1,
-          'netto',
+          eingabemodus,
           range['id'],
           rechnungId,
           trimmed,
@@ -697,7 +756,12 @@ WHERE id = ? AND ist_entwurf = 1
           money.fromCents(correctionSign * sourcePreview.bruttoCents),
           money.fromCents(correctionSign * sourcePreview.ustCents),
           DateTime.now().toUtc().toIso8601String(),
-          'pdfs/$docNo.pdf',
+          null,
+          orig['kunde_id'],
+          orig['lieferant_id'],
+          orig['lieferadresse_id'],
+          orig['einleitungstext'],
+          orig['schlusstext'],
         ],
       );
       for (final r in posRows) {
@@ -760,7 +824,9 @@ WHERE id = ? AND ist_entwurf = 1
           <Object?>[aid, datum, menge, 'Storno $docNo', 'storno', stornoId],
         );
       }
-      if (debugFailAt == 'movement') throw StateError('Induced failure after Storno movement');
+      if (debugFailAt == 'movement') {
+        throw StateError('Induced failure after Storno movement');
+      }
       // — Reversal postings negated, linked to original (atomic)
       final origJournals = await transaction.runSelect('SELECT * FROM journal WHERE rechnung_id = ?', <Object?>[
         rechnungId,
@@ -843,6 +909,71 @@ WHERE id = ? AND ist_entwurf = 1
         'UPDATE rechnungen SET status = ?, storno_datum = ?, storno_grund = ? WHERE id = ?',
         <Object?>['storniert', datum, trimmed, rechnungId],
       );
+      // Finalized correction artifact: readable profile-local PDF rendered
+      // from the Storno's own snapshot, committed with its relationships.
+      File? stornoPdfFile;
+      try {
+        final List<Map<String, Object?>> companyRows = await transaction.runSelect(
+          'SELECT * FROM unternehmen ORDER BY id LIMIT 1',
+          const <Object?>[],
+        );
+        final DateTime stornoDate = DateTime.tryParse(datum) ?? DateTime.now();
+        final List<Map<String, Object?>> stornoPosRows = await transaction.runSelect(
+          'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+          <Object?>[stornoId],
+        );
+        final VorschauResult stornoPreview = VorschauResult(
+          nettoCents: correctionSign * sourcePreview.nettoCents,
+          ustCents: correctionSign * sourcePreview.ustCents,
+          bruttoCents: correctionSign * sourcePreview.bruttoCents,
+          rabattCents: sourcePreview.rabattCents == null ? null : correctionSign * sourcePreview.rabattCents!,
+        );
+        final PdfDocumentSnapshot stornoSnapshot = await _buildPdfSnapshot(
+          transaction: transaction,
+          invoice: <String, Object?>{'kunde_id': orig['kunde_id'], 'lieferant_id': orig['lieferant_id']},
+          posRows: stornoPosRows,
+          preview: stornoPreview,
+          documentNumber: docNo,
+          invoiceDate: stornoDate,
+          originalDocumentDate: invDate,
+          typ: 'storno',
+          eingabemodus: eingabemodus,
+          companyRows: companyRows,
+        );
+        final stornoPdfBytes = await const PdfGenerator().generate(stornoSnapshot, locale: 'de_DE');
+        final String? effectiveProfileDir = profileDir;
+        if (effectiveProfileDir != null) {
+          final Directory pdfDir = Directory('$effectiveProfileDir/pdfs/documents');
+          pdfDir.createSync(recursive: true);
+          final File pdfFile = File('${pdfDir.path}/$stornoId.pdf');
+          final File tmpFile = File('${pdfDir.path}/$stornoId.pdf.tmp');
+          if (pdfFile.existsSync()) {
+            throw FileSystemException('PDF artifact already exists', pdfFile.path);
+          }
+          if (tmpFile.existsSync()) {
+            throw FileSystemException('PDF artifact temporary file already exists', tmpFile.path);
+          }
+          tmpFile.writeAsBytesSync(stornoPdfBytes);
+          tmpFile.renameSync(pdfFile.path);
+          stornoPdfFile = pdfFile;
+          await transaction.runUpdate('UPDATE rechnungen SET original_pdf_pfad = ? WHERE id = ?', <Object?>[
+            pdfFile.path,
+            stornoId,
+          ]);
+        } else {
+          await transaction.runUpdate('UPDATE rechnungen SET original_pdf_pfad = ? WHERE id = ?', <Object?>[
+            'pdfs/documents/$stornoId.pdf',
+            stornoId,
+          ]);
+        }
+      } catch (error) {
+        try {
+          if (stornoPdfFile != null && stornoPdfFile.existsSync()) {
+            stornoPdfFile.deleteSync();
+          }
+        } catch (_) {}
+        rethrow;
+      }
       await transaction.send();
       return stornoId;
     } catch (e, st) {
@@ -870,20 +1001,44 @@ WHERE id = ? AND ist_entwurf = 1
       List<RechnungPositionItem> usePos = positionen ?? [];
       int? linkId;
       String useEingabemodus = 'netto';
+      Object? gsKundeId;
+      Object? gsLieferantId;
+      Object? gsLieferadresseId;
+      Object? gsEinleitungstext;
+      Object? gsSchlusstext;
+      Map<String, Object?>? sourceInvoice;
+      num useRabattProzent = 0;
+      num useRabattBetrag = 0;
       if (vonRechnungId != null) {
         final orig = await transaction.runSelect(
-          'SELECT id, ist_entwurf, datum, eingabemodus FROM rechnungen WHERE id = ?',
+          'SELECT id, typ, ist_entwurf, datum, eingabemodus, rabatt_prozent, rabatt_betrag, netto_betrag, ust_betrag, brutto_betrag, kunde_id, lieferant_id, lieferadresse_id, einleitungstext, schlusstext FROM rechnungen WHERE id = ?',
           <Object?>[vonRechnungId],
         );
         if (orig.isEmpty) throw StateError('Rechnung nicht gefunden');
-        if (_asInt(orig.single['ist_entwurf']) == 1) {
+        sourceInvoice = orig.single;
+        final String sourceTyp = sourceInvoice['typ']?.toString().trim().toLowerCase() ?? '';
+        if (sourceTyp != 'rechnung') {
+          throw InvoiceMoneyValidationException(
+            code: 'unsupportedCorrectionSource',
+            message: 'Gutschrift kann nur aus einer Rechnung erstellt werden',
+            fields: const ['typ'],
+          );
+        }
+        if (_asInt(sourceInvoice['ist_entwurf']) == 1) {
           throw StateError('Nur finalisierte Rechnung kann gutgeschrieben werden');
         }
         useDatum = orig.single['datum'].toString();
         useEingabemodus = orig.single['eingabemodus']?.toString() ?? 'netto';
+        useRabattProzent = _asNum(orig.single['rabatt_prozent']);
+        useRabattBetrag = _asNum(orig.single['rabatt_betrag']);
+        gsKundeId = orig.single['kunde_id'];
+        gsLieferantId = orig.single['lieferant_id'];
+        gsLieferadresseId = orig.single['lieferadresse_id'];
+        gsEinleitungstext = orig.single['einleitungstext'];
+        gsSchlusstext = orig.single['schlusstext'];
         linkId = vonRechnungId;
         posRows = await transaction.runSelect(
-          'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+          'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position, id',
           <Object?>[vonRechnungId],
         );
         usePos = posRows
@@ -895,12 +1050,22 @@ WHERE id = ? AND ist_entwurf = 1
                 gesamt: _asNum(r['gesamt']),
                 ustSatz: _asNum(r['ust_satz']),
                 rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+                position: _asInt(r['position']),
                 artikelId: r['artikel_id'] == null ? null : _asInt(r['artikel_id']),
               ),
             )
             .toList();
       } else {
         if (usePos.isEmpty) throw StateError('Positionen erforderlich');
+      }
+      final VorschauResult sourcePreview = VorschauService.calculate(
+        eingabemodus: useEingabemodus,
+        positionen: usePos,
+        rabattProzent: useRabattProzent == 0 ? null : useRabattProzent,
+        rabattBetrag: useRabattBetrag == 0 ? null : useRabattBetrag,
+      );
+      if (sourceInvoice != null) {
+        _validateStoredHeaders(sourceInvoice, sourcePreview);
       }
       const String kreisTyp = 'gutschrift';
       final rangeRows = await transaction.runSelect(
@@ -934,11 +1099,8 @@ WHERE id = ? AND ist_entwurf = 1
       if (reserved != 1) {
         throw StateError('Gutschrift-Nummernkreis konnte nicht atomar reserviert werden');
       }
-      // Validate and calculate the unsigned source once. The correction sign
-      // is applied only when persisting the generated header/lines.
-      final VorschauResult sourcePreview = VorschauService.calculate(eingabemodus: useEingabemodus, positionen: usePos);
       final gsId = await transaction.runInsert(
-        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, gutschrift_von, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, nummernkreis_id, gutschrift_von, rabatt_prozent, rabatt_betrag, netto_betrag, brutto_betrag, ust_betrag, ausgegeben_am, original_pdf_pfad, kunde_id, lieferant_id, lieferadresse_id, einleitungstext, schlusstext) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         <Object?>[
           docNo,
           'gutschrift',
@@ -948,11 +1110,18 @@ WHERE id = ? AND ist_entwurf = 1
           useEingabemodus,
           range['id'],
           linkId,
+          useRabattProzent.toStringAsFixed(2),
+          useRabattBetrag.toStringAsFixed(2),
           money.fromCents(-sourcePreview.nettoCents),
           money.fromCents(-sourcePreview.bruttoCents),
           money.fromCents(-sourcePreview.ustCents),
           DateTime.now().toUtc().toIso8601String(),
-          'pdfs/$docNo.pdf',
+          null,
+          gsKundeId,
+          gsLieferantId,
+          gsLieferadresseId,
+          gsEinleitungstext,
+          gsSchlusstext,
         ],
       );
       if (posRows.isNotEmpty) {
@@ -996,6 +1165,70 @@ WHERE id = ? AND ist_entwurf = 1
         'offen',
         gsId,
       ]);
+      // Finalized correction artifact: readable profile-local PDF rendered
+      // from the Gutschrift's own snapshot, committed with its relationships.
+      File? gsPdfFile;
+      try {
+        final List<Map<String, Object?>> companyRows = await transaction.runSelect(
+          'SELECT * FROM unternehmen ORDER BY id LIMIT 1',
+          const <Object?>[],
+        );
+        final DateTime gsDate = DateTime.tryParse(useDatum) ?? DateTime.now();
+        final List<Map<String, Object?>> gsPosRows = await transaction.runSelect(
+          'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+          <Object?>[gsId],
+        );
+        final VorschauResult gsPreview = VorschauResult(
+          nettoCents: -sourcePreview.nettoCents,
+          ustCents: -sourcePreview.ustCents,
+          bruttoCents: -sourcePreview.bruttoCents,
+          rabattCents: sourcePreview.rabattCents == null ? null : -sourcePreview.rabattCents!,
+        );
+        final PdfDocumentSnapshot gsSnapshot = await _buildPdfSnapshot(
+          transaction: transaction,
+          invoice: <String, Object?>{'kunde_id': gsKundeId, 'lieferant_id': gsLieferantId},
+          posRows: gsPosRows,
+          preview: gsPreview,
+          documentNumber: docNo,
+          invoiceDate: gsDate,
+          typ: 'gutschrift',
+          eingabemodus: useEingabemodus,
+          companyRows: companyRows,
+        );
+        final gsPdfBytes = await const PdfGenerator().generate(gsSnapshot, locale: 'de_DE');
+        final String? gsProfileDir = profileDir;
+        if (gsProfileDir != null) {
+          final Directory pdfDir = Directory('$gsProfileDir/pdfs/documents');
+          pdfDir.createSync(recursive: true);
+          final File pdfFile = File('${pdfDir.path}/$gsId.pdf');
+          final File tmpFile = File('${pdfDir.path}/$gsId.pdf.tmp');
+          if (pdfFile.existsSync()) {
+            throw FileSystemException('PDF artifact already exists', pdfFile.path);
+          }
+          if (tmpFile.existsSync()) {
+            throw FileSystemException('PDF artifact temporary file already exists', tmpFile.path);
+          }
+          tmpFile.writeAsBytesSync(gsPdfBytes);
+          tmpFile.renameSync(pdfFile.path);
+          gsPdfFile = pdfFile;
+          await transaction.runUpdate('UPDATE rechnungen SET original_pdf_pfad = ? WHERE id = ?', <Object?>[
+            pdfFile.path,
+            gsId,
+          ]);
+        } else {
+          await transaction.runUpdate('UPDATE rechnungen SET original_pdf_pfad = ? WHERE id = ?', <Object?>[
+            'pdfs/documents/$gsId.pdf',
+            gsId,
+          ]);
+        }
+      } catch (error) {
+        try {
+          if (gsPdfFile != null && gsPdfFile.existsSync()) {
+            gsPdfFile.deleteSync();
+          }
+        } catch (_) {}
+        rethrow;
+      }
       await transaction.send();
       return gsId;
     } catch (e, st) {
@@ -1014,7 +1247,7 @@ WHERE id = ? AND ist_entwurf = 1
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
       final origRows = await transaction.runSelect(
-        'SELECT id, status, storno_datum, ersatzrechnung_id FROM rechnungen WHERE id = ?',
+        'SELECT id, status, storno_datum, ersatzrechnung_id, kunde_id, lieferant_id, lieferadresse_id, eingabemodus, rabatt_prozent, rabatt_betrag, netto_betrag, ust_betrag, brutto_betrag, einleitungstext, schlusstext FROM rechnungen WHERE id = ?',
         <Object?>[vonRechnungId],
       );
       if (origRows.isEmpty) throw StateError('Rechnung nicht gefunden');
@@ -1029,10 +1262,54 @@ WHERE id = ? AND ist_entwurf = 1
         'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
         <Object?>[vonRechnungId],
       );
+      final String eingabemodus = orig['eingabemodus']?.toString() ?? 'netto';
+      final num rabattProzent = _asNum(orig['rabatt_prozent']);
+      final num rabattBetrag = _asNum(orig['rabatt_betrag']);
+      final List<RechnungPositionItem> sourcePositions = posRows
+          .map(
+            (r) => RechnungPositionItem(
+              bezeichnung: r['bezeichnung']?.toString() ?? '',
+              menge: _asNum(r['menge']),
+              einzelpreis: _asNum(r['einzelpreis']),
+              gesamt: _asNum(r['gesamt']),
+              ustSatz: _asNum(r['ust_satz']),
+              rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+              artikelId: r['artikel_id'] == null ? null : _asInt(r['artikel_id']),
+              position: _asInt(r['position']),
+            ),
+          )
+          .toList(growable: false);
+      final VorschauResult preview = VorschauService.calculate(
+        eingabemodus: eingabemodus,
+        positionen: sourcePositions,
+        rabattProzent: rabattProzent == 0 ? null : rabattProzent,
+        rabattBetrag: rabattBetrag == 0 ? null : rabattBetrag,
+      );
+      _validateStoredHeaders(orig, preview);
       final datum = DateTime.now().toIso8601String().substring(0, 10);
+      // Replacement draft retains source fields, links, and positions; the
+      // draft stays editable and later edits never rewrite the source.
       final ersatzId = await transaction.runInsert(
-        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, ersatz_fuer) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[null, 'rechnung', 'entwurf', datum, 1, 'netto', vonRechnungId],
+        'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, rabatt_prozent, rabatt_betrag, netto_betrag, brutto_betrag, ust_betrag, ersatz_fuer, kunde_id, lieferant_id, lieferadresse_id, einleitungstext, schlusstext) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          null,
+          'rechnung',
+          'entwurf',
+          datum,
+          1,
+          eingabemodus,
+          rabattProzent.toStringAsFixed(2),
+          rabattBetrag.toStringAsFixed(2),
+          preview.nettoBetragString,
+          preview.bruttoBetragString,
+          preview.ustBetragString,
+          vonRechnungId,
+          orig['kunde_id'],
+          orig['lieferant_id'],
+          orig['lieferadresse_id'],
+          orig['einleitungstext'],
+          orig['schlusstext'],
+        ],
       );
       for (final r in posRows) {
         await transaction.runInsert(
@@ -1081,13 +1358,15 @@ WHERE id = ? AND ist_entwurf = 1
     try {
       await transaction.ensureOpen(_NoopTransactionUser());
       final srcRows = await transaction.runSelect(
-        'SELECT id, typ, eingabemodus, lieferadresse_id, ist_entwurf FROM rechnungen WHERE id = ?',
+        'SELECT id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, lieferadresse_id, kunde_id, lieferant_id, einleitungstext, schlusstext, ist_entwurf FROM rechnungen WHERE id = ?',
         <Object?>[quelleId],
       );
       if (srcRows.isEmpty) throw StateError('Quelldokument nicht gefunden');
       final src = srcRows.single;
       final srcTyp = src['typ'].toString();
-      if (!allowed.containsKey(srcTyp)) throw StateError('Unbekannter Dokumenttyp');
+      if (!allowed.containsKey(srcTyp)) {
+        throw StateError('Unbekannter Dokumenttyp');
+      }
       if (!allowed[srcTyp]!.contains(zielTyp)) {
         throw StateError(
           'Lieferschein kann nicht in Angebot konvertiert werden'.contains('Lieferschein') &&
@@ -1103,7 +1382,34 @@ WHERE id = ? AND ist_entwurf = 1
       );
       final eingabemodus = src['eingabemodus'].toString();
       final lieferadresseId = src['lieferadresse_id'];
+      // Supported conversion preserves source context: counterparty,
+      // delivery address, input mode, and texts travel with the draft.
+      final kundeId = src['kunde_id'];
+      final lieferantId = src['lieferant_id'];
+      final einleitungstext = src['einleitungstext'];
+      final schlusstext = src['schlusstext'];
       final datum = DateTime.now().toIso8601String().substring(0, 10);
+      final num rabattProzent = _asNum(src['rabatt_prozent']);
+      final num rabattBetrag = _asNum(src['rabatt_betrag']);
+      final VorschauResult preview = VorschauService.calculate(
+        eingabemodus: eingabemodus,
+        positionen: posRows
+            .map(
+              (r) => RechnungPositionItem(
+                bezeichnung: r['bezeichnung']?.toString() ?? '',
+                menge: _asNum(r['menge']),
+                einzelpreis: _asNum(r['einzelpreis']),
+                gesamt: _asNum(r['gesamt']),
+                ustSatz: _asNum(r['ust_satz']),
+                rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+                position: _asInt(r['position']),
+                artikelId: _asInt(r['artikel_id']),
+              ),
+            )
+            .toList(growable: false),
+        rabattProzent: rabattProzent == 0 ? null : rabattProzent,
+        rabattBetrag: rabattBetrag == 0 ? null : rabattBetrag,
+      );
       int zielId;
       String? nummer;
       int? kreisId;
@@ -1111,22 +1417,8 @@ WHERE id = ? AND ist_entwurf = 1
         final alloc = await _allocateNumberForTyp(transaction, zielTyp, datum);
         nummer = alloc.nummer;
         kreisId = alloc.kreisId;
-        final preview = VorschauService.calculate(
-          eingabemodus: eingabemodus,
-          positionen: posRows
-              .map(
-                (r) => RechnungPositionItem(
-                  bezeichnung: r['bezeichnung']?.toString() ?? '',
-                  menge: _asNum(r['menge']),
-                  einzelpreis: _asNum(r['einzelpreis']),
-                  gesamt: _asNum(r['gesamt']),
-                  ustSatz: _asNum(r['ust_satz']),
-                ),
-              )
-              .toList(),
-        );
         zielId = await transaction.runInsert(
-          'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, lieferadresse_id, nummernkreis_id, ausgegeben_am, original_pdf_pfad, netto_betrag, brutto_betrag, ust_betrag, konvertiert_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, lieferadresse_id, nummernkreis_id, ausgegeben_am, original_pdf_pfad, netto_betrag, brutto_betrag, ust_betrag, rabatt_prozent, rabatt_betrag, konvertiert_von, kunde_id, lieferant_id, einleitungstext, schlusstext) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           <Object?>[
             nummer,
             zielTyp,
@@ -1141,7 +1433,13 @@ WHERE id = ? AND ist_entwurf = 1
             preview.nettoBetragString,
             preview.bruttoBetragString,
             preview.ustBetragString,
+            src['rabatt_prozent']?.toString() ?? '0.00',
+            src['rabatt_betrag']?.toString() ?? '0.00',
             quelleId,
+            kundeId,
+            lieferantId,
+            einleitungstext,
+            schlusstext,
           ],
         );
         for (final r in posRows) {
@@ -1173,8 +1471,26 @@ WHERE id = ? AND ist_entwurf = 1
         return zielId;
       } else {
         zielId = await transaction.runInsert(
-          'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, lieferadresse_id, konvertiert_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          <Object?>[null, zielTyp, 'entwurf', datum, 1, eingabemodus, lieferadresseId, quelleId],
+          'INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, rabatt_prozent, rabatt_betrag, netto_betrag, brutto_betrag, ust_betrag, lieferadresse_id, konvertiert_von, kunde_id, lieferant_id, einleitungstext, schlusstext) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            null,
+            zielTyp,
+            'entwurf',
+            datum,
+            1,
+            eingabemodus,
+            src['rabatt_prozent']?.toString() ?? '0.00',
+            src['rabatt_betrag']?.toString() ?? '0.00',
+            preview.nettoBetragString,
+            preview.bruttoBetragString,
+            preview.ustBetragString,
+            lieferadresseId,
+            quelleId,
+            kundeId,
+            lieferantId,
+            einleitungstext,
+            schlusstext,
+          ],
         );
       }
       for (final r in posRows) {
@@ -1260,7 +1576,9 @@ ORDER BY position, id
     }
     final nextNo = (latest != null && latest.year < invDate.year) ? 1 : stored;
     final width = _sequenceWidth(seq.single);
-    if (width > 9 || nextNo > _maximumForWidth(width)) throw StateError('$kreisTyp-Nummernkreis ist erschöpft');
+    if (width > 9 || nextNo > _maximumForWidth(width)) {
+      throw StateError('$kreisTyp-Nummernkreis ist erschöpft');
+    }
     final nummer = _formatNumber(format, invDate.year, nextNo);
     return _AllocatedNumber(nummer: nummer, kreisId: _asInt(range['id']) ?? 0, nextNo: nextNo, stored: stored);
   }
@@ -1283,7 +1601,9 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       'UPDATE nummernkreise SET naechste_nummer = ? WHERE id = ? AND naechste_nummer = ?',
       <Object?>[alloc.nextNo + 1, alloc.kreisId, alloc.stored],
     );
-    if (upd != 1) throw StateError('Nummernkreis konnte nicht reserviert werden');
+    if (upd != 1) {
+      throw StateError('Nummernkreis konnte nicht reserviert werden');
+    }
   }
 
   String _nummernkreisTypFor(String typ, {int? lieferantId}) {
@@ -1319,6 +1639,33 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     }
     if (end != format.length) return null;
     return _sequenceTokenPattern.allMatches(format).toList(growable: false);
+  }
+
+  void _validateStoredHeaders(Map<String, Object?> stored, VorschauResult expected, {int sign = 1}) {
+    final fields = <String>[];
+
+    void compare(String field, int expectedCents) {
+      final value = stored[field];
+      int? storedCents;
+      try {
+        if (value != null) storedCents = money.parseScaled(value.toString(), scale: 2, field: field);
+      } catch (_) {
+        // Invalid stored values are mismatches and must not bypass the typed error.
+      }
+      if (storedCents != sign * expectedCents) fields.add(field);
+    }
+
+    compare('netto_betrag', expected.nettoCents);
+    compare('ust_betrag', expected.ustCents);
+    compare('brutto_betrag', expected.bruttoCents);
+
+    if (fields.isNotEmpty) {
+      throw InvoiceMoneyValidationException(
+        code: 'headerMismatch',
+        message: 'Gespeicherte Dokumentbeträge stimmen nicht mit der Berechnung überein',
+        fields: fields,
+      );
+    }
   }
 
   static int? _asInt(Object? value) {
@@ -1366,6 +1713,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     required VorschauResult preview,
     required String documentNumber,
     required DateTime invoiceDate,
+    DateTime? originalDocumentDate,
     required String typ,
     required String eingabemodus,
     required List<Map<String, Object?>> companyRows,
@@ -1450,6 +1798,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
         ),
       );
     } catch (_) {}
+    final num? documentDiscount = preview.rabattBetrag;
     return PdfDocumentSnapshot.from(
       documentType: docType,
       template: template,
@@ -1458,12 +1807,15 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       customer: customerSnapshot,
       positions: pdfPositions,
       totals: PdfTotalsSnapshot(
+        subtotal: documentDiscount == null ? null : preview.nettoBetrag + documentDiscount,
+        discountAmount: documentDiscount,
         netAmount: preview.nettoBetrag,
         taxAmount: preview.ustBetrag,
         grossAmount: preview.bruttoBetrag,
       ),
       texts: texts,
       documentDate: invoiceDate,
+      originalDocumentDate: originalDocumentDate,
     );
   }
 
@@ -1471,7 +1823,9 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     final String? strasse = row['strasse']?.toString();
     final String? hausnummer = row['hausnummer']?.toString();
     if (strasse == null || strasse.trim().isEmpty) return null;
-    if (hausnummer != null && hausnummer.trim().isNotEmpty) return '$strasse $hausnummer';
+    if (hausnummer != null && hausnummer.trim().isNotEmpty) {
+      return '$strasse $hausnummer';
+    }
     return strasse;
   }
 
@@ -1514,21 +1868,18 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       final num unitPrice = _asNum(r['einzelpreis']);
       final num taxRate = _asNum(r['ust_satz']);
       final num grossRaw = _asNum(r['gesamt']);
+      final int lineSign = grossRaw < 0 ? -1 : 1;
       final int rateScaled = _percentScaled(taxRate);
-      // undiscounted line via integer arithmetic for consistency
       int netCents;
       int grossCents;
       int taxCents;
       try {
-        final int qtyScaled = money.scaledFromNum(quantity, scale: 3, field: 'menge', allowNegative: false);
-        final int priceScaled = money.scaledFromNum(unitPrice, scale: 4, field: 'einzelpreis', allowNegative: false);
-        final int lineUndiscounted = _roundHalfUp(priceScaled * qtyScaled, 100000);
-        final int discountScaled = r['rabatt_prozent'] == null
-            ? 0
-            : money.scaledFromNum(_asNum(r['rabatt_prozent']), scale: 2, field: 'rabatt', allowNegative: false);
-        final int lineCents = discountScaled == 0
-            ? lineUndiscounted
-            : _roundHalfUp(lineUndiscounted * (10000 - discountScaled), 10000);
+        final num lineAmount = VorschauService.lineTotal(
+          quantity: quantity,
+          unitPrice: unitPrice,
+          rabattProzent: r['rabatt_prozent'] == null ? null : _asNum(r['rabatt_prozent']),
+        );
+        final int lineCents = money.toCents(lineAmount.toString());
         if (eingabemodus == 'netto') {
           netCents = lineCents;
           taxCents = _roundHalfUp(netCents * rateScaled, 10000);
@@ -1539,17 +1890,20 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
           taxCents = grossCents - netCents;
         }
       } catch (_) {
-        // fallback to grossRaw approximation
+        // Fall back to the stored line amount when legacy inputs are invalid.
         if (eingabemodus == 'netto') {
-          netCents = money.toCents(grossRaw.toString());
+          netCents = money.toCents(grossRaw.abs().toString());
           taxCents = _roundHalfUp(netCents * rateScaled, 10000);
           grossCents = netCents + taxCents;
         } else {
-          grossCents = money.toCents(grossRaw.toString());
+          grossCents = money.toCents(grossRaw.abs().toString());
           netCents = _roundHalfUp(grossCents * 10000, 10000 + rateScaled);
           taxCents = grossCents - netCents;
         }
       }
+      netCents *= lineSign;
+      taxCents *= lineSign;
+      grossCents *= lineSign;
       result.add(
         PdfPositionSnapshot(
           description: description,

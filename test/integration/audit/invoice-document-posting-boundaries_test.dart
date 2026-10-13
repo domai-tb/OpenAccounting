@@ -501,11 +501,40 @@ void main() {
       final invoiceId = await createDocument(type: 'rechnung_eingang', supplierId: supplierId);
 
       await ds.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE');
-      final original = (await db.executor.runSelect(
+      final originalTax = (await db.executor.runSelect(
         'SELECT betrag FROM vorsteuer_ansprueche WHERE rechnung_id = ?',
         <Object?>[invoiceId],
       )).single;
+      final originalAmounts = (await db.executor.runSelect(
+        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+        <Object?>[invoiceId],
+      )).single;
+      final originalLine = (await db.executor.runSelect(
+        'SELECT gesamt FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position LIMIT 1',
+        <Object?>[invoiceId],
+      )).single;
       final stornoId = await ds.stornoRechnung(rechnungId: invoiceId, grund: 'Tax reversal regression');
+
+      final stornoAmounts = (await db.executor.runSelect(
+        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+        <Object?>[stornoId],
+      )).single;
+      final stornoLine = (await db.executor.runSelect(
+        'SELECT gesamt FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position LIMIT 1',
+        <Object?>[stornoId],
+      )).single;
+      expect(num.parse(originalLine['gesamt'].toString()), closeTo(100, 0.001));
+      expect(num.parse(stornoLine['gesamt'].toString()), closeTo(-num.parse(originalLine['gesamt'].toString()), 0.001));
+      expect(num.parse(originalAmounts['netto_betrag'].toString()), closeTo(100, 0.001));
+      expect(num.parse(originalAmounts['ust_betrag'].toString()), closeTo(19, 0.001));
+      expect(num.parse(originalAmounts['brutto_betrag'].toString()), closeTo(119, 0.001));
+      for (final String column in <String>['netto_betrag', 'ust_betrag', 'brutto_betrag']) {
+        expect(
+          num.parse(stornoAmounts[column].toString()),
+          closeTo(-num.parse(originalAmounts[column].toString()), 0.001),
+          reason: column,
+        );
+      }
 
       final reversals = await db.executor.runSelect(
         'SELECT betrag FROM vorsteuer_ansprueche WHERE rechnung_id = ?',
@@ -514,7 +543,7 @@ void main() {
       expect(reversals, hasLength(1));
       expect(
         num.parse(reversals.single['betrag'].toString()),
-        closeTo(-num.parse(original['betrag'].toString()), 0.001),
+        closeTo(-num.parse(originalTax['betrag'].toString()), 0.001),
       );
     });
 

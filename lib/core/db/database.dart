@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:openaccounting/core/db/data_paths.dart';
 import 'package:openaccounting/core/db/gobd_triggers.dart';
 import 'package:openaccounting/core/db/migrations.dart';
+import 'package:openaccounting/features/documents/artifact_transaction.dart';
 import 'package:openaccounting/core/db/rechnung_triggers.dart';
 import 'package:openaccounting/core/db/seed.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
@@ -20,7 +21,7 @@ import 'package:openaccounting/pages/stammdaten/lieferanten_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
 import 'package:openaccounting/pages/stammdaten/unternehmen_repository.dart';
 
-/// Drift-backed app database with 41 tables per spec §Table Definitions.
+/// Drift-backed app database with 41 declared tables per spec §Table Definitions.
 /// Ponytail ultra: raw SQL via drift executor — no codegen, minimal boilerplate.
 /// Handles WAL, FK, schema versioning, GoBD triggers, seed, profiles.
 class AppDatabase {
@@ -91,6 +92,9 @@ class AppDatabase {
     'inventarbewegungen',
     'inventuren',
     'inventur_positionen',
+    'settlement_groups',
+    'settlement_allocations',
+    'statutory_timing_rules',
   ];
 
   QueryExecutor get executor => _executor;
@@ -158,6 +162,19 @@ class AppDatabase {
         ),
         stackTrace,
       );
+    }
+    await _addColumnIfMissing('rechnungen', 'dokumentenpaket_id', 'INTEGER REFERENCES dokumentenpakete(id)');
+    for (final entry in <String, String>{
+      'dateiname': 'TEXT',
+      'original_name': 'TEXT',
+      'mime_type': 'TEXT',
+      'dateigroesse': 'INTEGER DEFAULT 0',
+      'sha256': 'TEXT',
+      'hochgeladen_am': 'TEXT',
+      'beleg_pdfa_pfad': 'TEXT',
+      'loeschdatum': 'TEXT',
+    }.entries) {
+      await _addColumnIfMissing('belege', entry.key, entry.value);
     }
     // Ensure triggers and seed idempotent even when no migration
     await GobdTriggers.install(_executor);
@@ -233,6 +250,14 @@ class AppDatabase {
     final v = await runner.getUserVersion();
     if (v == 0) {
       await runner.setUserVersion(currentVersion);
+    }
+    // Crash recovery for owned artifact/source directories (best-effort,
+    // profile-scoped only; never touches unknown files or test memory DBs).
+    final String? recoveryDir = profileDir;
+    if (recoveryDir != null && recoveryDir.isNotEmpty) {
+      try {
+        await ArtifactRecovery.reconcileAtStartup(_executor, recoveryDir);
+      } catch (_) {}
     }
     _opened = true;
   }
@@ -358,7 +383,7 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   );
 });
 
-/// Raw DDL for 41 tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
+/// Raw DDL for the declared tables — uses NUMERIC(12,2) for money, NUMERIC(12,4) for vk_netto.
 const List<String> _schemaSql = <String>[
   // 1 unternehmen
   '''
@@ -594,6 +619,8 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   storno_von INTEGER REFERENCES rechnungen(id),
   absender_snapshot TEXT,
   ausgegeben_am TEXT,
+  original_pdf_pfad TEXT,
+  dokumentenpaket_id INTEGER REFERENCES dokumentenpakete(id),
   mahnstufe_aktuell INTEGER DEFAULT 0,
   vorlage_id INTEGER
 )''',
@@ -604,8 +631,8 @@ CREATE TABLE IF NOT EXISTS rechnungspositionen (
   rechnung_id INTEGER NOT NULL REFERENCES rechnungen(id) ON DELETE CASCADE,
   artikel_id INTEGER REFERENCES artikel(id),
   bezeichnung TEXT NOT NULL,
-  menge NUMERIC(12,2) DEFAULT 1,
-  einzelpreis NUMERIC(12,2) NOT NULL,
+  menge NUMERIC(12,3) DEFAULT 1,
+  einzelpreis NUMERIC(12,4) NOT NULL,
   gesamt NUMERIC(12,2) NOT NULL,
   ust_satz NUMERIC(12,2) DEFAULT 19,
   position INTEGER DEFAULT 0
@@ -624,7 +651,15 @@ CREATE TABLE IF NOT EXISTS belege (
   unternehmen_id INTEGER REFERENCES unternehmen(id),
   status TEXT DEFAULT 'neu',
   beschreibung TEXT,
-  dateipfad TEXT
+  dateipfad TEXT,
+  dateiname TEXT,
+  original_name TEXT,
+  mime_type TEXT,
+  dateigroesse INTEGER DEFAULT 0,
+  sha256 TEXT,
+  hochgeladen_am TEXT,
+  beleg_pdfa_pfad TEXT,
+  loeschdatum TEXT
 )''',
   // 14 journal
   // if multi-entry groups required, migrate via ALTER TABLE + PRAGMA table_info check (see migrations.dart).
@@ -658,7 +693,11 @@ CREATE TABLE IF NOT EXISTS journal (
   vorsteuer_betrag NUMERIC(12,2),
   km_anzahl NUMERIC(12,2),
   vorlage_id INTEGER REFERENCES buchungsvorlagen(id),
-  gruppe_id INTEGER REFERENCES journal(id)
+  gruppe_id INTEGER REFERENCES journal(id),
+  source_kind TEXT,
+  source_id TEXT,
+  reversal_of_group_id INTEGER REFERENCES journal(id),
+  legacy_unverified INTEGER NOT NULL DEFAULT 1
 )''',
   // 15 bank_templates
   '''
@@ -750,7 +789,8 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen (
   lieferant_id INTEGER REFERENCES lieferanten(id),
   status TEXT DEFAULT 'aktiv'
 )''',
-  // 22 anlageverzeichnis
+  // 22 anlageverzeichnis — canonical asset fields (v17) live in the base DDL
+  // so fresh profiles carry them; legacy columns stay for review.
   '''
 CREATE TABLE IF NOT EXISTS anlageverzeichnis (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -969,6 +1009,47 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
   referenz_typ TEXT,
   referenz_id INTEGER
 )''',
+  // 40 master_data_import_templates (v16, profile-local CSV mapping templates).
+  '''
+CREATE TABLE IF NOT EXISTS master_data_import_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  entity TEXT NOT NULL CHECK (entity IN ('customer', 'supplier', 'article')),
+  mapping_json TEXT NOT NULL,
+  has_header INTEGER NOT NULL DEFAULT 1 CHECK (has_header IN (0, 1)),
+  delimiter TEXT NOT NULL,
+  decimal_convention TEXT NOT NULL,
+  duplicate_policy TEXT NOT NULL,
+  match_field TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)''',
+  // 41 anlage_afa_jahreswerte (v17, owned by fixed-asset-register-workspace).
+  // Append-only annual schedule snapshots; immutable via triggers below.
+  '''
+CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  anlage_id INTEGER NOT NULL REFERENCES anlageverzeichnis(id) ON DELETE RESTRICT,
+  jahr INTEGER NOT NULL,
+  quell_snapshot TEXT NOT NULL,
+  quell_hash TEXT NOT NULL,
+  regel_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('verfuegbar', 'nicht_verfuegbar')),
+  formel TEXT,
+  betrag NUMERIC(12,2),
+  blockierungsgrund TEXT,
+  berechnet_am TEXT NOT NULL,
+  CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
+  UNIQUE (anlage_id, jahr, quell_hash, regel_version)
+)''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_update
+BEFORE UPDATE ON anlage_afa_jahreswerte
+BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_delete
+BEFORE DELETE ON anlage_afa_jahreswerte
+BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
   // 42 inventuren + 43 inventur_positionen (v18, count evidence only).
   // Recorded rows are immutable via the triggers below; snapshots never
   // touch artikel stock, inventarbewegungen, or accounting records.
@@ -1030,6 +1111,52 @@ CREATE TRIGGER IF NOT EXISTS trg_inventur_positionen_no_delete_recorded
 BEFORE DELETE ON inventur_positionen
 WHEN (SELECT status FROM inventuren WHERE id = OLD.inventur_id) = 'erfasst'
 BEGIN SELECT RAISE(ABORT, 'Position einer erfassten Inventur ist unveraenderlich'); END''',
+  // 44 settlement_groups + 45 settlement_allocations + 46 statutory_timing_rules (v19).
+  // Balanced posting groups, payment allocations, and versioned statutory
+  // timing exceptions. Fresh profiles carry them; upgrades add them via
+  // _migratePostingGroups with legacy marking for pre-existing journal rows.
+  '''
+CREATE TABLE IF NOT EXISTS settlement_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_kind TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  bank_transaction_id INTEGER REFERENCES bank_transaktionen(id),
+  signed_amount_cents INTEGER NOT NULL CHECK (signed_amount_cents != 0),
+  settlement_date TEXT NOT NULL,
+  unapplied_cents INTEGER NOT NULL DEFAULT 0,
+  group_root_journal_id INTEGER NOT NULL REFERENCES journal(id),
+  reversal_of_group_id INTEGER REFERENCES settlement_groups(id),
+  reversed_by_group_id INTEGER REFERENCES settlement_groups(id),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (source_kind, source_id)
+)''',
+  '''
+CREATE TABLE IF NOT EXISTS settlement_allocations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL REFERENCES settlement_groups(id) ON DELETE CASCADE,
+  forderung_id INTEGER REFERENCES forderungen(id),
+  applied_cents INTEGER NOT NULL CHECK (applied_cents != 0),
+  settlement_date TEXT NOT NULL,
+  kategorie_id INTEGER REFERENCES kategorien(id),
+  euer_zeile INTEGER,
+  direction TEXT NOT NULL DEFAULT 'einnahme' CHECK (direction IN ('einnahme', 'ausgabe')),
+  ust_satz NUMERIC(5,2),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)''',
+  '''
+CREATE TABLE IF NOT EXISTS statutory_timing_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id TEXT NOT NULL,
+  rule_version TEXT NOT NULL,
+  legal_basis TEXT NOT NULL,
+  affected_year INTEGER NOT NULL,
+  approver TEXT NOT NULL,
+  source_trace TEXT NOT NULL,
+  settlement_group_id INTEGER NOT NULL REFERENCES settlement_groups(id) ON DELETE CASCADE,
+  attributed_year INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (rule_id, rule_version, settlement_group_id)
+)''',
 ];
 
 const List<String> _indexSql = <String>[
@@ -1041,45 +1168,8 @@ const List<String> _indexSql = <String>[
       'ON lieferanten(lieferantennummer) WHERE lieferantennummer IS NOT NULL',
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_bank_transaktionen_dedupe '
       'ON bank_transaktionen(konto_id, dedupe_hash) WHERE dedupe_hash IS NOT NULL',
-  // 40 master_data_import_templates (v16, profile-local CSV mapping templates).
-  '''
-CREATE TABLE IF NOT EXISTS master_data_import_templates (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  entity TEXT NOT NULL CHECK (entity IN ('customer', 'supplier', 'article')),
-  mapping_json TEXT NOT NULL,
-  has_header INTEGER NOT NULL DEFAULT 1 CHECK (has_header IN (0, 1)),
-  delimiter TEXT NOT NULL,
-  decimal_convention TEXT NOT NULL,
-  duplicate_policy TEXT NOT NULL,
-  match_field TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-)''',
-  // 41 anlage_afa_jahreswerte (v17, owned by fixed-asset-register-workspace).
-  // Append-only annual schedule snapshots; immutable via triggers below.
-  '''
-CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  anlage_id INTEGER NOT NULL REFERENCES anlageverzeichnis(id) ON DELETE RESTRICT,
-  jahr INTEGER NOT NULL,
-  quell_snapshot TEXT NOT NULL,
-  quell_hash TEXT NOT NULL,
-  regel_version TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('verfuegbar', 'nicht_verfuegbar')),
-  formel TEXT,
-  betrag NUMERIC(12,2),
-  blockierungsgrund TEXT,
-  berechnet_am TEXT NOT NULL,
-  CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
-  UNIQUE (anlage_id, jahr, quell_hash, regel_version)
-)''',
-  '''
-CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_update
-BEFORE UPDATE ON anlage_afa_jahreswerte
-BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
-  '''
-CREATE TRIGGER IF NOT EXISTS trg_anlage_afa_no_delete
-BEFORE DELETE ON anlage_afa_jahreswerte
-BEGIN SELECT RAISE(ABORT, 'anlage_afa_jahreswerte is append-only'); END''',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_source_unique '
+      'ON journal(source_kind, source_id) WHERE source_kind IS NOT NULL AND source_id IS NOT NULL AND gruppe_id = id',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_groups_source_unique '
+      'ON settlement_groups(source_kind, source_id)',
 ];

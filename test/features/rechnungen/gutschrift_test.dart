@@ -6,7 +6,7 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
 void main() {
-  test('gutschrift from invoice creates negative amounts with GS nummer and link', () async {
+  test('test_invoice_gutschrift_links_source_and_uses_gs_number', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -32,7 +32,7 @@ void main() {
     expect(rows.single['gutschrift_von'], fin.id);
   });
 
-  test('standalone gutschrift without reference', () async {
+  test('test_standalone_gutschrift_has_gs_number_and_no_source_reference', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -49,6 +49,13 @@ void main() {
     expect(gs.typ, 'gutschrift');
     expect(gs.rechnungsnummer, 'GS-260001');
     expect(gs.positionen.single.gesamt, -100);
+    final totals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [gs.id],
+    );
+    expect(totals.single['netto_betrag'], -100);
+    expect(totals.single['ust_betrag'], -19);
+    expect(totals.single['brutto_betrag'], -119);
     final rows = await db.executor.runSelect('SELECT gutschrift_von FROM rechnungen WHERE id = ?', [gs.id]);
     expect(rows.single['gutschrift_von'], isNull);
   });
@@ -103,5 +110,98 @@ void main() {
     final storno = await uc.stornoRechnung(rechnungId: gs.id, grund: 'Storno Gutschrift');
     expect(storno.typ, 'storno');
     expect(storno.positionen.single.gesamt, 200);
+  });
+
+  test('test_rechnung_correction_and_standalone_gutschrift_have_negative_totals', () async {
+    final db = AppDatabase.createTestDatabase();
+    addTearDown(db.close);
+    await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
+    );
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
+    );
+
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final draft = await uc.createDraftRechnung(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
+    );
+    final invoice = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
+    final fromInvoice = await uc.createGutschrift(vonRechnungId: invoice.id, grund: 'Korrektur');
+    final standalone = await uc.createGutschrift(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
+    );
+
+    for (final credit in [fromInvoice, standalone]) {
+      final totals = await db.executor.runSelect(
+        'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+        [credit.id],
+      );
+      expect(credit.positionen.single.gesamt, -100);
+      expect(totals.single['netto_betrag'], -100);
+      expect(totals.single['ust_betrag'], -19);
+      expect(totals.single['brutto_betrag'], -119);
+    }
+  });
+
+  test('test_invoice_gutschrift_reverses_discounted_totals', () async {
+    final db = AppDatabase.createTestDatabase();
+    addTearDown(db.close);
+    await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
+    );
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
+    );
+
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final draft = await uc.createDraftRechnung(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
+      rabattProzent: 10,
+    );
+    final invoice = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
+    final credit = await uc.createGutschrift(vonRechnungId: invoice.id, grund: 'Rabattkorrektur');
+    final totals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag, rabatt_prozent FROM rechnungen WHERE id = ?',
+      [credit.id],
+    );
+
+    expect(totals.single['netto_betrag'], -90);
+    expect(totals.single['ust_betrag'], -17.1);
+    expect(totals.single['brutto_betrag'], -107.1);
+    expect(totals.single['rabatt_prozent'], 10);
+  });
+
+  test('test_standalone_gutschrift_persists_negative_totals_without_source', () async {
+    final db = AppDatabase.createTestDatabase();
+    addTearDown(db.close);
+    await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
+    );
+
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final credit = await uc.createGutschrift(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
+    );
+    final totals = await db.executor.runSelect(
+      'SELECT gutschrift_von, netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [credit.id],
+    );
+
+    expect(totals.single['gutschrift_von'], isNull);
+    expect(credit.positionen.single.gesamt, -100);
+    expect(totals.single['netto_betrag'], -100);
+    expect(totals.single['ust_betrag'], -19);
+    expect(totals.single['brutto_betrag'], -119);
   });
 }

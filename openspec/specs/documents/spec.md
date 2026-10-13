@@ -3,7 +3,6 @@
 ## Purpose
 Document type management for invoices, receipts, corrections, and outgoing correspondence.
 
-
 ## Requirements
 
 ### Requirement: Document Types
@@ -74,36 +73,67 @@ A finalized Rechnung, Gutschrift, or Storno can be marked as Bezahlt (paid). The
 
 ### Requirement: Storno
 
-A finalized Rechnung or Gutschrift can be storniert (cancelled). Storno MUST: create a new Stornorechnung document with negative amounts, require a storno_grund (VARCHAR(500), mandatory), set storno_datum to the current date, assign a nummer from the stornorechnung number range, link to the original via storno_rechnungsnummer, and restore any stock that was decremented. The Stornorechnung PDF MUST display title "Stornorechnung", show the storno_datum, original date, negative amounts, and MUST NOT include a payment block. The original document MUST remain visible but marked as storniert.
+A finalized outgoing or incoming Rechnung, or a Gutschrift, can be storniert. Storno MUST create a new Stornorechnung with line, net, VAT, and gross amounts that exactly invert the source, including a positive Storno when the source is a negative Gutschrift. It MUST require a non-empty `storno_grund` of at most 500 characters, set `storno_datum` to the current date, assign a number from the Stornorechnung number range, link to the source, and restore stock decremented by a source Rechnung. A Storno MUST NOT be generated from another Storno. Its PDF MUST display the title "Stornorechnung", the Storno date, original date, signed amounts, and no payment block. The original MUST remain visible and marked as storniert.
+
+#### Scenario: Storno of a Rechnung reverses its balances
+- **GIVEN** a finalized Rechnung has positive net `100.00`, VAT `19.00`, and gross `119.00`
+- **WHEN** it is storniert
+- **THEN** the Storno has net `-100.00`, VAT `-19.00`, and gross `-119.00`
+
+#### Scenario: Storno of a Gutschrift reverses its negative balances
+- **GIVEN** a finalized Gutschrift has net `-100.00`, VAT `-19.00`, and gross `-119.00`
+- **WHEN** it is storniert
+- **THEN** the Storno has net `100.00`, VAT `19.00`, and gross `119.00`
+
+#### Scenario: Storno of an incoming invoice reverses its balances and input tax
+- **GIVEN** a finalized incoming invoice has line/header net `100.00`, VAT `19.00`, gross `119.00`, and an input-tax claim
+- **WHEN** it is storniert
+- **THEN** the Storno line and header net, VAT, and gross are `-100.00`, `-19.00`, and `-119.00`, and it carries the equal-and-opposite input-tax claim
 
 #### Scenario: Storno with stock restoration
-- GIVEN a Rechnung with 10 units of an article (stock was 20, now 10 after finalization)
-- WHEN the Rechnung is storniert
-- THEN the Stornorechnung is created, stock for the article is restored to 20, and the original Rechnung shows "Storniert" badge
+- **GIVEN** a finalized Rechnung decremented stock from 20 to 10 for an article
+- **WHEN** that Rechnung is storniert
+- **THEN** stock is restored to 20 from the source's recorded stock movement
+- **AND** the original Rechnung remains visible with a storniert marker
 
 #### Scenario: Storno requires reason
-- GIVEN a finalized Rechnung exists
-- WHEN a user attempts to storno it without entering a storno_grund
-- THEN the system blocks the action with error "Stornogrund ist Pflicht"
+- **GIVEN** a finalized Rechnung exists
+- **WHEN** a user attempts to storno it without a non-empty `storno_grund`
+- **THEN** the system blocks the action with error `Stornogrund ist Pflicht`
+
+#### Scenario: Storno PDF preserves dates, signed amounts, and omits payment details
+- **GIVEN** a finalized Rechnung dated `2026-03-10` is storniert
+- **WHEN** its Stornorechnung PDF is generated
+- **THEN** the PDF shows the title `Stornorechnung`, the Storno date, original date `10.03.2026`, signed line and header amounts, and no payment details
 
 #### Scenario: Storno of already-storned invoice blocked
-- GIVEN a Rechnung has already been storniert (storno_datum is set)
-- WHEN a user attempts to storno it again
-- THEN the system rejects the action with error "Rechnung ist bereits storniert"
+- **GIVEN** a Rechnung has already been storniert
+- **WHEN** a user attempts to storno it again
+- **THEN** the system rejects the action with error `Rechnung ist bereits storniert`
 
 ### Requirement: Gutschrift
 
-A Gutschrift (credit note) can be created from a finalized Rechnung or as a standalone document. When created from a Rechnung, it MUST reference the original via gutschrift_zu_rechnung_id. The Gutschrift has its own nummernkreis (GS-YY####) and PDF template. Gutschrift amounts are negative relative to the original invoice. A Gutschrift CAN be storniert following the same rules as Rechnung.
+A Gutschrift can be created from an eligible finalized Rechnung or as a standalone document. It MUST reference a source Rechnung when one is selected. A standalone or invoice-derived Gutschrift SHALL have line and header net, VAT, and gross amounts negative relative to the positive input/source. It has its own `GS-YY####` number range and PDF template. A Gutschrift can be storniert; that Storno MUST reverse the Gutschrift's signed amounts exactly.
+
+#### Scenario: Gutschrift from invoice reverses its discounted totals
+- **GIVEN** a finalized Rechnung has net `90.00`, VAT `17.10`, and gross `107.10` after a document discount
+- **WHEN** a Gutschrift is created from it
+- **THEN** the Gutschrift has net `-90.00`, VAT `-17.10`, and gross `-107.10`
+
+#### Scenario: Standalone Gutschrift has no source and negative totals
+- **GIVEN** a user enters a standalone Gutschrift with positive net `100.00`, VAT `19.00`, and gross `119.00`
+- **WHEN** the Gutschrift is saved
+- **THEN** it has no source link and persists net `-100.00`, VAT `-19.00`, and gross `-119.00`
 
 #### Scenario: Gutschrift from invoice
-- GIVEN a finalized Rechnung with total 500 EUR
-- WHEN a user creates a Gutschrift for that Rechnung
-- THEN the Gutschrift has negative amounts (-500 EUR), references the original Rechnung, and has its own GS-number
+- **GIVEN** a finalized Rechnung has total `500.00`
+- **WHEN** a user creates a Gutschrift for that Rechnung
+- **THEN** the Gutschrift has negative amounts, references the original Rechnung, and has its own GS number
 
 #### Scenario: Standalone Gutschrift without invoice reference
-- GIVEN no specific invoice is selected
-- WHEN a user creates a standalone Gutschrift
-- THEN the Gutschrift has its own nummer and gutschrift_zu_rechnung_id is NULL
+- **GIVEN** no specific invoice is selected
+- **WHEN** a user creates a standalone Gutschrift
+- **THEN** the Gutschrift has its own number and `gutschrift_von` is null
 
 ### Requirement: Ersatzrechnung
 
@@ -161,31 +191,105 @@ When converting between document types, positions MUST be copied with all fields
 
 ### Requirement: Dokumentenpakete
 
-The system MUST support Dokumentenpakete (document bundles). A Dokumentenpaket groups multiple documents (e.g., Rechnung + Lieferschein + Angebot) under a single entity. Each package has id and bezeichnung. Documents reference the package via dokumentenpaket_id FK. Packages are used for organized display and batch operations (e.g., print all, email all).
+A Dokumentenpaket SHALL retain the existing document membership contract: each accounting document references the package through `dokumentenpaket_id`. Packages SHALL support supporting-evidence membership through the existing `dokumentenpaket_belege` relationship and provide organized display and a ZIP export of the selected snapshot. Package views SHALL show metadata and current document and Beleg members with their source identifiers. Adding or removing membership SHALL NOT change or delete the underlying document or Beleg. Empty package creation SHALL remain rejected. Batch printing and email delivery are deferred until their platform/transport capabilities are specified; this requirement SHALL NOT imply those actions are available or successful.
+
+#### Scenario: Package groups documents and receipt evidence
+- **GIVEN** a finalized invoice, a Lieferschein, and an imported receipt are available
+- **WHEN** the user adds them to one document package
+- **THEN** the invoice and Lieferschein reference the package through `dokumentenpaket_id`, the Beleg is a member through `dokumentenpaket_belege`, and the package lists all three source identifiers
+- **AND** each original record and artifact remains unchanged
+
+#### Scenario: Package export preserves member snapshot
+- **GIVEN** a package contains readable finalized documents and supporting Belege
+- **WHEN** the user exports the package
+- **THEN** the ZIP contains a manifest and a copy of each selected member artifact, records source identifiers, and verifies the copied digests before reporting success
+- **AND** no member document, relationship, or source file is changed
+
+#### Scenario: Missing member cannot be added
+- **GIVEN** an imported receipt identifier does not exist in the active profile
+- **WHEN** the user attempts to add it to a package
+- **THEN** the operation reports the unavailable member and leaves the package membership unchanged
 
 #### Scenario: Create package from multiple documents
-- GIVEN a user selects a Rechnung, Lieferschein, and Angebot
-- WHEN the user creates a Dokumentenpaket
-- THEN all three documents have dokumentenpaket_id pointing to the new package, and the package page shows all three
+- **GIVEN** a user selects a Rechnung, Lieferschein, and Angebot
+- **WHEN** the user creates a Dokumentenpaket
+- **THEN** all three documents have `dokumentenpaket_id` pointing to the new package, and the package page shows all three
 
 #### Scenario: Empty package creation blocked
-- GIVEN no documents are selected
-- WHEN a user attempts to create a Dokumentenpaket
-- THEN the system rejects the action with error "Mindestens ein Dokument auswählen"
+- **GIVEN** no documents are selected
+- **WHEN** a user attempts to create a Dokumentenpaket
+- **THEN** the system rejects the action with error `Mindestens ein Dokument auswählen`
 
 ### Requirement: Belege — Upload and Attach
 
-The system MUST support uploading Belege (receipts/proof documents) and attaching them to invoices or journal entries. Each Beleg has id, dateiname, original_name, mime_type, dateigroesse, sha256, hochgeladen_am, and optionally beleg_pdfa_pfad (PDF/A-3 path for GoBD archiving). Belege can be viewed inline, downloaded, renamed, or deleted. Attaching a Beleg to an invoice sets beleg_id FK on the rechnungen record.
+The system SHALL retain Beleg metadata (`dateiname`, `original_name`, `mime_type`, `dateigroesse`, `sha256`,
+`hochgeladen_am`, optional `beleg_pdfa_pfad`, and optional `loeschdatum`) and support upload, inline view, download,
+rename, and deletion.
+Uploaded sources SHALL be limited to PDF, PNG, JPEG, and XML files used by supported XRechnung or ZUGFeRD/Factur-X
+flows; each source SHALL be at most 50 MiB. The importer SHALL verify the content format rather than trust the filename
+or client MIME type, store originals below the active profile root, and preserve the source bytes. A Beleg MAY be
+attached to an invoice or journal entry using its existing relationship. Explicit deletion SHALL be available only
+when the Beleg has no invoice, journal, template, package, customer, or supplier relationship; the user must explicitly
+unlink every relationship first. Deletion SHALL remove its metadata and stored source bytes. Removing a Beleg from a
+package or contact SHALL only remove that relationship and SHALL NOT delete the Beleg.
+An existing `loeschdatum` SHALL be displayed as informational metadata; automatic purge remains disabled until a
+retention policy is accepted. The accompanying documentation SHALL not claim that automatic cleanup currently occurs.
 
 #### Scenario: Attach receipt to invoice
-- GIVEN a user uploads a PDF receipt
-- WHEN the user attaches it to Rechnung #100
-- THEN Rechnung #100 has beleg_id pointing to the uploaded Beleg, and the receipt is viewable from the invoice detail page
+- **GIVEN** a user uploads a PDF receipt
+- **WHEN** the user attaches it to Rechnung #100
+- **THEN** Rechnung #100 has `beleg_id` pointing to the uploaded Beleg, and the receipt is viewable from the invoice detail page
 
 #### Scenario: Unsupported file type rejected
-- GIVEN a user attempts to upload a .exe file as a Beleg
-- WHEN the upload is processed
-- THEN the system rejects the file with error "Dateityp nicht unterstützt"
+- **GIVEN** a user attempts to upload a `.exe` file as a Beleg
+- **WHEN** the upload is processed
+- **THEN** the system rejects the file with error `Dateityp nicht unterstützt`
+
+#### Scenario: Oversized or mislabeled source is rejected
+- **GIVEN** a source exceeds 50 MiB or its bytes do not match a supported format
+- **WHEN** the user imports the source
+- **THEN** import fails before creating a Beleg record or final stored file
+
+#### Scenario: Linked evidence cannot be deleted
+- **GIVEN** a Beleg is linked to an invoice, journal entry, template, package, customer, or supplier
+- **WHEN** the user requests deletion
+- **THEN** deletion is rejected with a localized explanation and all source bytes and relationships remain unchanged
+
+#### Scenario: Customer association must be removed before evidence deletion
+- **GIVEN** a Beleg has a customer association through `kunden_belege`
+- **WHEN** the user requests deletion
+- **THEN** deletion is rejected and the customer association and source bytes remain unchanged
+- **AND** after explicit unlinking, the Beleg remains available until the user separately confirms deletion
+
+#### Scenario: Unlinked evidence can be deleted
+- **GIVEN** a Beleg has no invoice, journal, template, package, customer, or supplier relationship
+- **WHEN** the user confirms deletion
+- **THEN** its metadata and stored source bytes are removed
+
+#### Scenario: Scheduled deletion date does not silently purge evidence
+- **GIVEN** an unlinked Beleg has an expired `loeschdatum`
+- **WHEN** the application starts or displays the Beleg
+- **THEN** the source remains available, the date is shown as due, and no automatic deletion occurs
+
+### Requirement: Customer document links preserve shared evidence
+
+The customer-document workspace SHALL retain upload, inline preview, rename, and delete operations for customer
+documents. Removing a customer-document association SHALL only remove its `kunden_belege` relationship and SHALL NOT
+delete the shared Beleg metadata or source bytes. Deleting the underlying Beleg SHALL follow the Beleg deletion rule
+above and SHALL require every customer and other relationship to be explicitly unlinked first. A `loeschdatum` SHALL
+remain visible as informational metadata with the maintained due/overdue warning, but SHALL NOT trigger automatic
+purging until an explicit retention policy is accepted.
+
+#### Scenario: Remove customer association without deleting shared evidence
+- **GIVEN** a Beleg is linked to a customer through `kunden_belege` and also has another active relationship
+- **WHEN** a user removes it from the customer documents list
+- **THEN** only the customer association is removed and the Beleg metadata, source bytes, and other relationship remain
+  unchanged
+
+#### Scenario: Customer document deletion date does not purge shared evidence
+- **GIVEN** a customer-linked Beleg has an expired `loeschdatum`
+- **WHEN** the customer document list or application starts
+- **THEN** the due warning is displayed and the source remains available without automatic deletion
 
 ### Requirement: Original PDF Storage
 
@@ -263,26 +367,37 @@ All calculations MUST happen server-side via a single preview endpoint (POST /vo
 
 ### Requirement: Rabatt — Position and Document Level
 
-The system MUST support two levels of Rabatt (discount):
-- Position-level: rabatt_prozent per position (NUMERIC(5,2)), applied to that position's line total
-- Document-level: either rabatt_prozent (percentage of subtotal) or rabatt_betrag (fixed EUR amount), mutually exclusive
+The system MUST support position-level percentage discounts and either a document-level percentage or fixed-amount discount; both document discount fields MUST NOT be non-zero together. Position discount SHALL be applied to the exact price-times-quantity result before its single cent rounding. A document percentage SHALL be applied once to the summed post-line-discount net subtotal. Fixed or percentage document discount cents SHALL first be allocated across VAT buckets proportionally by largest remainder, ties by ascending VAT rate, then within each bucket across persisted positions proportionally by largest remainder, ties by ascending persisted position. VAT SHALL be recalculated and rounded per discounted position, then summed. A document amount discount MUST NOT exceed the post-line-discount net subtotal. The PDF MUST show the discount and subtotal when a discount is active.
 
-Document-level Rabatt is applied after summing all position totals. The PDF MUST show the Rabatt line and Zwischensumme when any Rabatt is active.
+#### Scenario: Document fixed discount spans two VAT rates
+- **GIVEN** net buckets of `0.01` at `7.00%` and `0.01` at `19.00%` have a fixed discount of `0.01`
+- **WHEN** the document total is calculated
+- **THEN** the cent is allocated to the `7.00%` bucket by the stable tie rule and bucket totals reconcile exactly
 
 #### Scenario: Position Rabatt
-- GIVEN a position has Einzelpreis 200, Menge 2, Rabatt 10%
-- WHEN the position total is calculated
-- THEN position total = 200 × 2 × 0.90 = 360.00
+- **GIVEN** a position has unit price `200.00`, quantity `2`, and a `10%` position discount
+- **WHEN** its line total is calculated
+- **THEN** the result is `360.00` after applying the discount before the single cent rounding
 
 #### Scenario: Document-level fixed Rabatt
-- GIVEN a document subtotal is 1000 and rabatt_betrag = 50
-- WHEN the document total is calculated
-- THEN the document total is 950.00 (before USt)
+- **GIVEN** a document subtotal is `1000.00` and its fixed discount is `50.00`
+- **WHEN** the document total is calculated
+- **THEN** the pre-tax discounted subtotal is `950.00`
 
 #### Scenario: Conflicting document-level Rabatt rejected
-- GIVEN a document has rabatt_prozent = 10
-- WHEN a user sets rabatt_betrag = 50 (both non-zero)
-- THEN the system rejects the save with error "Nur ein Rabatt pro Dokument erlaubt (Prozent ODER Betrag)"
+- **GIVEN** a document has a non-zero percentage discount
+- **WHEN** a non-zero fixed discount is also set
+- **THEN** validation rejects it with `conflictingDocumentDiscounts` before amounts are persisted
+
+#### Scenario: Excessive or conflicting document discount is rejected
+- **GIVEN** a document has net subtotal `100.00`
+- **WHEN** its fixed discount exceeds `100.00` or both document discount fields are non-zero
+- **THEN** validation rejects it with the corresponding stable error code before amounts are persisted
+
+#### Scenario: Discounted invoice PDF shows subtotal and discount
+- **GIVEN** a Rechnung has a net subtotal of `100.00` and an active document discount of `10.00`
+- **WHEN** its PDF is generated
+- **THEN** the PDF shows the subtotal `100.00` and discount `10.00`
 
 ### Requirement: Einleitungstext und Schlusstext
 
@@ -480,3 +595,23 @@ Each new generated document PDF SHALL be stored at a path unique to its persiste
 - **GIVEN** a finalized incoming alias is linked to a supplier and has no existing receivable
 - **WHEN** `createForRechnung` is called
 - **THEN** it creates one `rechnung_eingang` payable for that supplier
+
+### Requirement: Correction and conversion drafts preserve source context
+
+When creating a replacement or converting a document, the system SHALL preserve the source relationship and the source context required by the `documents` contract: counterparty identity and one-time customer address where applicable, delivery address, input mode, introduction and closing text, and every position field already covered by Position Propagation. A replacement SHALL retain its bidirectional source link. A converted document SHALL retain its source and target links. The target remains editable when created as a draft, and later user edits SHALL NOT rewrite the source document.
+
+#### Scenario: Replacement draft retains source fields and links
+- **GIVEN** a storniert invoice contains a customer, one-time address, delivery address, input mode, texts, and positions
+- **WHEN** a replacement draft is created from it
+- **THEN** the draft retains those source fields and positions, the original points to the replacement, and the replacement points to the original
+
+#### Scenario: Ineligible source creates no partial target
+- **GIVEN** a finalized invoice is not storniert
+- **WHEN** a replacement is requested from that invoice
+- **THEN** the operation returns the existing ineligible-source error and creates no target row, target positions, or relationship update
+
+#### Scenario: Supported conversion preserves source context
+- **GIVEN** a finalized Angebot contains its company snapshot, customer, input mode, texts, and positions
+- **WHEN** the user converts it to an allowed Auftrag draft
+- **THEN** the new draft preserves those fields and position values, has a source link to the Angebot, and the Angebot has a reciprocal target link
+- **AND** later edits to the draft do not modify the Angebot

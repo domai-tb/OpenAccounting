@@ -62,8 +62,7 @@ import 'l10n_en.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,8 +70,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -84,19 +82,15 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[
-    Locale('de'),
-    Locale('en'),
-  ];
+  static const List<Locale> supportedLocales = <Locale>[Locale('de'), Locale('en')];
 
   /// No description provided for @appTitle.
   ///
@@ -4040,6 +4034,186 @@ abstract class AppLocalizations {
   /// **'Nächste Nummer'**
   String get numberRangeNextLabel;
 
+  /// No description provided for @smtpTestSuccess.
+  ///
+  /// In de, this message translates to:
+  /// **'SMTP-Prüfung erfolgreich: Begrüßung, TLS-Aufbau und Anmeldung abgeschlossen. Es wurde keine Nachricht gesendet.'**
+  String get smtpTestSuccess;
+
+  /// No description provided for @smtpTestHostUnreachable.
+  ///
+  /// In de, this message translates to:
+  /// **'Host nicht erreichbar. Es wurde keine Nachricht gesendet.'**
+  String get smtpTestHostUnreachable;
+
+  /// No description provided for @smtpTestTlsFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'TLS-Prüfung fehlgeschlagen. Es wurde kein Klartext-Versuch unternommen.'**
+  String get smtpTestTlsFailed;
+
+  /// No description provided for @smtpTestAuthFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Anmeldung fehlgeschlagen. Zugangsdaten prüfen.'**
+  String get smtpTestAuthFailed;
+
+  /// No description provided for @smtpModeImplicitTls.
+  ///
+  /// In de, this message translates to:
+  /// **'Implizites TLS'**
+  String get smtpModeImplicitTls;
+
+  /// No description provided for @smtpModeStarttls.
+  ///
+  /// In de, this message translates to:
+  /// **'STARTTLS (erforderlich)'**
+  String get smtpModeStarttls;
+
+  /// No description provided for @smtpVaultUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Der System-Schlüsselspeicher ist nicht verfügbar. SMTP bleibt deaktiviert.'**
+  String get smtpVaultUnavailable;
+
+  /// No description provided for @smtpMigrationRetry.
+  ///
+  /// In de, this message translates to:
+  /// **'Bitte Zugriff erneut versuchen oder das Passwort neu eingeben.'**
+  String get smtpMigrationRetry;
+
+  /// No description provided for @smtpPasswordMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein SMTP-Passwort gespeichert. Bitte Passwort eingeben.'**
+  String get smtpPasswordMissing;
+
+  /// No description provided for @smtpDisabled.
+  ///
+  /// In de, this message translates to:
+  /// **'SMTP deaktiviert'**
+  String get smtpDisabled;
+
+  /// No description provided for @docEmailSend.
+  ///
+  /// In de, this message translates to:
+  /// **'Per E-Mail senden'**
+  String get docEmailSend;
+
+  /// No description provided for @docEmailPreviewTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Nachricht prüfen'**
+  String get docEmailPreviewTitle;
+
+  /// No description provided for @docEmailConfirmSend.
+  ///
+  /// In de, this message translates to:
+  /// **'Geprüfte Nachricht senden'**
+  String get docEmailConfirmSend;
+
+  /// No description provided for @docEmailRecipient.
+  ///
+  /// In de, this message translates to:
+  /// **'Empfänger'**
+  String get docEmailRecipient;
+
+  /// No description provided for @docEmailSender.
+  ///
+  /// In de, this message translates to:
+  /// **'Absender'**
+  String get docEmailSender;
+
+  /// No description provided for @docEmailSubject.
+  ///
+  /// In de, this message translates to:
+  /// **'Betreff'**
+  String get docEmailSubject;
+
+  /// No description provided for @docEmailBody.
+  ///
+  /// In de, this message translates to:
+  /// **'Nachricht'**
+  String get docEmailBody;
+
+  /// No description provided for @docEmailAttachments.
+  ///
+  /// In de, this message translates to:
+  /// **'Anhänge'**
+  String get docEmailAttachments;
+
+  /// No description provided for @docEmailAccepted.
+  ///
+  /// In de, this message translates to:
+  /// **'Vom SMTP-Server angenommen (kein Zustellnachweis).'**
+  String get docEmailAccepted;
+
+  /// No description provided for @docEmailRejected.
+  ///
+  /// In de, this message translates to:
+  /// **'Vom Server abgelehnt. Nicht als versendet markiert.'**
+  String get docEmailRejected;
+
+  /// No description provided for @docEmailUnknown.
+  ///
+  /// In de, this message translates to:
+  /// **'Ergebnis unklar. Erneutes Senden erst nach Bestätigung.'**
+  String get docEmailUnknown;
+
+  /// No description provided for @docEmailUnknownRetryConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Möglicherweise bereits zugestellt. Trotzdem erneut senden?'**
+  String get docEmailUnknownRetryConfirm;
+
+  /// No description provided for @docEmailBlockedDraft.
+  ///
+  /// In de, this message translates to:
+  /// **'Entwürfe können nicht versendet werden.'**
+  String get docEmailBlockedDraft;
+
+  /// No description provided for @docEmailBlockedRecipient.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein gültiger Empfänger.'**
+  String get docEmailBlockedRecipient;
+
+  /// No description provided for @docEmailBlockedArtifact.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein erzeugtes PDF für dieses Dokument vorhanden.'**
+  String get docEmailBlockedArtifact;
+
+  /// No description provided for @docEmailTemplateUnresolved.
+  ///
+  /// In de, this message translates to:
+  /// **'Platzhalter konnte nicht aufgelöst werden. Senden blockiert.'**
+  String get docEmailTemplateUnresolved;
+
+  /// No description provided for @docEmailHeaderLineBreak.
+  ///
+  /// In de, this message translates to:
+  /// **'Betreff und Adressen dürfen keine Zeilenumbrüche enthalten.'**
+  String get docEmailHeaderLineBreak;
+
+  /// No description provided for @docEmailNoSendControl.
+  ///
+  /// In de, this message translates to:
+  /// **'Versand für diesen Dokumenttyp noch nicht verfügbar.'**
+  String get docEmailNoSendControl;
+
+  /// No description provided for @docEmailDuplicateInProgress.
+  ///
+  /// In de, this message translates to:
+  /// **'Sendeversuch läuft bereits.'**
+  String get docEmailDuplicateInProgress;
+
+  /// No description provided for @docEmailHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Sendeversuche'**
+  String get docEmailHistory;
+
   /// No description provided for @csvImportTitle.
   ///
   /// In de, this message translates to:
@@ -4500,7 +4674,7 @@ abstract class AppLocalizations {
   ///
   /// In de, this message translates to:
   /// **'Ungültige Eingabe: {field}'**
-  String assetInvalidField(Object field);
+  String assetInvalidField(String field);
 
   /// No description provided for @assetEmpty.
   ///
@@ -4549,10 +4723,105 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Unaufgelöst: Prüfung erforderlich'**
   String get assetUnresolved;
+
+  /// No description provided for @receiptInboxTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Beleg-Eingang'**
+  String get receiptInboxTitle;
+
+  /// No description provided for @receiptInboxSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Importieren, prüfen und zuordnen — ohne den Datensatz zu verlassen.'**
+  String get receiptInboxSubtitle;
+
+  /// No description provided for @receiptReviewAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfen'**
+  String get receiptReviewAction;
+
+  /// No description provided for @receiptLinkAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Zuordnen'**
+  String get receiptLinkAction;
+
+  /// No description provided for @receiptPreviewAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle ansehen'**
+  String get receiptPreviewAction;
+
+  /// No description provided for @receiptSourceUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle ist nicht verfügbar'**
+  String get receiptSourceUnavailable;
+
+  /// No description provided for @paketWorkspaceTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Dokumentenpakete'**
+  String get paketWorkspaceTitle;
+
+  /// No description provided for @paketWorkspaceSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Dokumente und Belege gruppieren und als Snapshot exportieren.'**
+  String get paketWorkspaceSubtitle;
+
+  /// No description provided for @paketCreateAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Paket erstellen'**
+  String get paketCreateAction;
+
+  /// No description provided for @paketExportAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Paket exportieren'**
+  String get paketExportAction;
+
+  /// No description provided for @gobdExportTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'GoBD-Export'**
+  String get gobdExportTitle;
+
+  /// No description provided for @gobdExportSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Zeitraum wählen, exportieren und prüfen.'**
+  String get gobdExportSubtitle;
+
+  /// No description provided for @gobdVerifyAction.
+  ///
+  /// In de, this message translates to:
+  /// **'Prüfen'**
+  String get gobdVerifyAction;
+
+  /// No description provided for @gobdIncomplete.
+  ///
+  /// In de, this message translates to:
+  /// **'Unvollständig: fehlende Nachweise prüfen'**
+  String get gobdIncomplete;
+
+  /// No description provided for @belegDropHint.
+  ///
+  /// In de, this message translates to:
+  /// **'PDF, PNG, JPEG oder E-Rechnungs-XML hier ablegen (max. 50 MiB)'**
+  String get belegDropHint;
+
+  /// No description provided for @belegUnsupportedType.
+  ///
+  /// In de, this message translates to:
+  /// **'Dateityp nicht unterstützt'**
+  String get belegUnsupportedType;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -4561,8 +4830,7 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['de', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['de', 'en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;

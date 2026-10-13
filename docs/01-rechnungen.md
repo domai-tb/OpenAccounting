@@ -49,6 +49,18 @@ Entwurf ──[Finalisieren]──▶ Finalisiert ──[Bezahlen]──▶ Beza
 - Original PDF generated and stored
 - Cannot be edited, only storniert or copied
 
+### E-Mail-Versand (manual)
+
+Finalized `Rechnung`, `Angebot`, `Auftrag`, and `Proforma` documents can be
+sent from `/invoices/:id` after reviewing sender, recipient, expanded
+subject/body, and attachments, followed by explicit confirmation. Attachments
+are limited to the document's generated PDF plus explicitly selected related
+artifacts that already exist — arbitrary files cannot be attached. History
+records `accepted` (SMTP server accepted the message — not delivered or
+read), `rejected`, or `unknown`. Only `accepted` sets `ausgegeben_am` when
+still null; `unknown` never claims output and retries need explicit
+confirmation. Sending is always manual: finalization never sends.
+
 ### Bezahlt (Paid)
 
 - `bezahlt_betrag` tracks actual payment received

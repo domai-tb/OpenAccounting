@@ -203,7 +203,17 @@ Dunning PDFs generated per Mahnstufe:
 
 ## Mail-Versand
 
-Integration with SMTP backend:
+Reminder sending is deferred until the dunning detail route and the accepted
+dunning/artifact contracts land, including the atomic accepted-outcome
+transaction shared with document email delivery. `sendMail()` today only marks
+a reminder sent — it does not transmit any message, and no Mahnung send
+control is offered. Once enabled, reminders will use the same SMTP
+configuration (see Einstellungen), the same `accepted`/`rejected`/`unknown`
+outcome contract (acceptance is not delivery), and the same rule that an
+`unknown` attempt never creates a second reminder and retries need explicit
+duplicate-risk confirmation.
+
+### Planned message shape
 
 ```json
 {
@@ -223,7 +233,7 @@ Integration with SMTP backend:
 }
 ```
 
-### Attachment Configuration per Level
+### Attachment Configuration per Level (planned)
 
 ```json
 {

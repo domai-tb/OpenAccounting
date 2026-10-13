@@ -217,17 +217,55 @@ The system SHALL maintain a single Unternehmen (company) record as a singleton (
 
 ### Requirement: Unternehmen — SMTP-Konfiguration
 
-The Unternehmen record MUST store SMTP configuration: smtp_aktiv, smtp_host, smtp_port, smtp_ssl, smtp_user, smtp_passwort (encrypted at rest), smtp_von_adresse, smtp_zertifikat_ignorieren, smtp_zertifikat_fingerprint. The system MUST provide a test-connection endpoint that validates credentials without sending mail.
+The Unternehmen record SHALL store SMTP activation, host, port, an explicit secure transport mode (`implicit_tls` or `starttls_required`), username, sender address, and an optional SHA-256 certificate fingerprint. Before database opening, startup SHALL ensure each profile has an immutable profile ID in profile metadata; existing profiles SHALL receive and persist this ID before credential migration. Vault keys SHALL use this ID rather than a mutable name or path. Passwords SHALL be stored through a maintained, profile-scoped platform credential adapter backed by macOS Keychain, Windows Credential Manager/DPAPI, or Linux Secret Service. Passwords MUST NOT be newly written to ordinary database fields or plaintext files; any encrypted adapter storage file MUST be protected by an OS-managed secret key. TLS SHALL use version 1.2 or later and SHALL validate the certificate chain and hostname; an optional fingerprint SHALL add a constraint, never bypass validation. Plaintext transport, `smtp_zertifikat_ignorieren`, and silent fallback/downgrade SHALL NOT be supported. Migration SHALL map legacy `smtp_ssl = true` to `implicit_tls` and `smtp_ssl = false` to `starttls_required`. The vault migration SHALL run before `AppDatabase.ensureOpen()` invokes `UnternehmenRepository._ensureSchema()` cleanup of `smtp_passwort`: write each legacy value, read it back and verify it, then remove the old copy. If the credential adapter is unavailable or verification fails, SMTP SHALL remain disabled and the only existing legacy source SHALL remain in place and readable only by the migration recovery path; the system MUST NOT make a new plaintext copy or clear that source. The migration SHALL preserve access across profile rename by retaining the immutable profile ID. The test-connection operation SHALL perform SMTP greeting and EHLO, the selected TLS negotiation, a second EHLO after successful STARTTLS, and authentication without issuing a message-sending command, and SHALL return a typed result that names the operations actually completed.
 
 #### Scenario: SMTP test connection with invalid host
-- GIVEN SMTP is configured with smtp_host = "invalid.local"
-- WHEN a user triggers SMTP test connection
-- THEN the system returns error "Verbindung fehlgeschlagen: Host nicht erreichbar" within 10 seconds
+
+- **GIVEN** SMTP is configured with `smtp_host = "invalid.local"`
+- **WHEN** a user triggers the SMTP test connection
+- **THEN** the system returns a typed host-unreachable error within 10 seconds and sends no message
 
 #### Scenario: SMTP test connection succeeds
-- GIVEN SMTP is configured with valid host, port, and credentials
-- WHEN a user triggers SMTP test connection
-- THEN the system returns success "Verbindung erfolgreich hergestellt"
+
+- **GIVEN** SMTP is configured with a reachable host, supported secure mode, valid TLS certificate and hostname, and valid credentials in the OS vault
+- **WHEN** a user triggers the SMTP test connection
+- **THEN** the system completes greeting and EHLO, negotiates TLS, repeats EHLO after STARTTLS, authenticates using the post-TLS capabilities, returns a typed success result naming those completed steps, and sends no message
+
+#### Scenario: TLS or credential failure is reported without downgrade
+
+- **GIVEN** the TLS certificate is invalid or the SMTP server rejects authentication
+- **WHEN** a user triggers the SMTP test connection
+- **THEN** the system returns a typed TLS or authentication failure and makes no plaintext connection or message submission
+
+#### Scenario: Legacy SMTP settings migrate securely
+
+- **GIVEN** a profile contains legacy SMTP fields and a vault that is available
+- **WHEN** the SMTP settings migration runs
+- **THEN** `smtp_ssl = true` becomes `implicit_tls`, `smtp_ssl = false` becomes `starttls_required`, a legacy password is transferred and read-back verified in the profile-ID-scoped OS vault before schema cleanup can remove its old copy, and the certificate bypass is removed
+
+#### Scenario: Legacy secret file migrates only after vault verification
+
+- **GIVEN** a profile has a legacy `.smtp_secret` and its OS vault is available
+- **WHEN** the pre-database SMTP migration runs
+- **THEN** the secret is written to and read back from the vault before the legacy file is removed
+
+#### Scenario: Vault unavailable during migration
+
+- **GIVEN** a profile contains a legacy SMTP password and the OS vault is unavailable
+- **WHEN** the SMTP settings migration runs
+- **THEN** SMTP remains disabled, the only legacy source remains available for a later migration retry, no new plaintext location is written, and the UI requests retry or credential re-entry after vault access becomes available
+
+#### Scenario: Legacy password was already cleared
+
+- **GIVEN** a profile has no password in the database or legacy secret file after a previous migration
+- **WHEN** SMTP configuration is opened
+- **THEN** SMTP remains unavailable until the user enters a password into the OS vault and the UI does not report an authenticated connection
+
+#### Scenario: Profile rename preserves the vault credential
+
+- **GIVEN** SMTP credentials are stored under an immutable profile ID and the user renames the profile
+- **WHEN** the renamed profile opens SMTP settings
+- **THEN** the same vault credential is available under the unchanged profile ID without copying it to a name- or path-based key
 
 ### Requirement: Unternehmen — PDF-Vorlage
 
@@ -457,7 +495,26 @@ Each customer MAY have multiple Lieferadressen (delivery addresses). Each addres
 
 ### Requirement: Kunden-Belege
 
-Each customer MAY have associated Belege (customer documents: contracts, certificates, etc.). Each Beleg has id, kunde_id FK, dateiname, original_name, mime_type, dateigroesse, sha256, hochgeladen_am, and loeschdatum (DATE, nullable for DSGVO). The system MUST provide upload, inline preview, rename, and delete operations. Documents past their loeschdatum MUST be flagged visually (red if overdue, yellow if ≤ 30 days).
+Each customer MAY have associated Belege (customer documents: contracts, certificates, etc.). The Beleg record is
+stored in `belege`; customer associations are stored in `kunden_belege(kunde_id, beleg_id, rolle)`, which is the
+canonical customer-link model. A Beleg has no
+`kunde_id` column. The system MUST provide upload, inline preview, rename, and delete operations. Removing a customer
+document from the customer record SHALL remove only its `kunden_belege` association and SHALL NOT delete shared Beleg
+metadata or source bytes. Deletion checks SHALL query `kunden_belege`; a present row blocks deletion. Deleting the underlying Beleg SHALL require all customer, supplier, invoice, journal, template,
+and package relationships to be explicitly removed first, as defined by the `documents` capability. Documents past
+their loeschdatum MUST be flagged visually (red if overdue, yellow if ≤ 30 days); the date is informational and MUST
+NOT trigger automatic purge until a retention policy is accepted.
+
+#### Scenario: Customer document is unlinked without deleting evidence
+- **GIVEN** a customer document is backed by a Beleg that has another active relationship
+- **WHEN** the user removes the document from the customer record
+- **THEN** the customer association is removed while the Beleg metadata, source bytes, and other relationship remain
+  unchanged
+
+#### Scenario: Customer document remains after its due date
+- **GIVEN** a customer document has a loeschdatum in the past
+- **WHEN** the application starts or displays the customer document list
+- **THEN** the maintained overdue warning is shown and the source remains available without automatic deletion
 
 #### Scenario: DSGVO expiry warning
 - GIVEN a customer document has loeschdatum = 2026-02-15 and today is 2026-02-10

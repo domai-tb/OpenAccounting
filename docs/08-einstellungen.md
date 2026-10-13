@@ -218,69 +218,80 @@ Network backup via SMB protocol:
   "smtp_aktiv": true,
   "smtp_host": "smtp.gmail.com",
   "smtp_port": 587,
-  "smtp_ssl": true,
+  "smtp_transport_modus": "starttls_required",
   "smtp_user": "user@gmail.com",
-  "smtp_passwort": "app_password_here",
   "smtp_von_adresse": "rechnung@meinunternehmen.de"
 }
 ```
+
+Passwords are stored only in the OS credential vault (Keychain / Credential
+Manager / Secret Service), never in the database or files. Legacy `smtp_ssl`
+maps to `implicit_tls` (`true`) or `starttls_required` (`false`); legacy
+`smtp_passwort` and `.smtp_secret` values migrate into the vault with
+read-back verification before removal.
 
 ### SSL/TLS Modes
 
 | Port | Mode | Description |
 |------|------|-------------|
-| 587 | STARTTLS | Upgrade from plain to TLS |
-| 465 | SSL/TLS | Direct SSL connection |
-| 25 | Plain | Unencrypted (not recommended) |
+| 587 | STARTTLS (required) | EHLO, STARTTLS upgrade, second EHLO, then AUTH |
+| 465 | Implicit TLS | Direct TLS connection, then AUTH |
+
+Plaintext (formerly port 25) is not supported and STARTTLS never falls back.
+TLS 1.2+ with certificate-chain and hostname validation is required before
+AUTH. There is no certificate-ignore option.
+
+### Connection Test
+
+The test performs greeting and EHLO, the configured TLS negotiation, a second
+EHLO after STARTTLS, and authentication using the post-TLS capabilities. It
+sends no message (no MAIL/RCPT/DATA) and reports the completed steps.
 
 ### Certificate Pinning
 
-Trust-on-First-Use (TOFU) for self-signed certificates:
+An optional SHA-256 fingerprint additionally constrains an otherwise valid
+certificate:
 
 ```json
 {
-  "smtp_zertifikat_ignorieren": false,
   "smtp_zertifikat_fingerprint": null
 }
 ```
 
+A matching fingerprint never bypasses chain or hostname validation; a
+mismatch aborts before credentials are sent. `smtp_zertifikat_ignorieren` is
+removed.
+
 #### Flow
 
-1. First connection: store SHA-256 fingerprint of presented certificate
-2. Subsequent connections: verify fingerprint matches exactly
+1. Connect with full TLS validation
+2. Optionally compare the SHA-256 fingerprint of the presented certificate
 3. Mismatch → abort before sending credentials
 4. Reset: manual action in Einstellungen → SMTP
 
-#### Override
-
-```json
-{
-  "smtp_zertifikat_ignorieren": true
-}
-```
-
-Opt-in to accept any certificate (including self-signed). Only recommended with TOFU fingerprinting active.
-
 ### Mail Templates
 
-Per-document-type templates:
+Per-document-type plain-text templates for `Rechnung`, `Angebot`, `Auftrag`,
+and `Proforma` (profile-local, editable; per-send overrides leave the stored
+template unchanged):
 
 ```json
 {
-  "mail_betreff_angebot": "Ihr Angebot {rechnungsnummer}",
+  "mail_betreff_angebot": "Ihr Angebot {dokumentnummer}",
   "mail_text_angebot": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unser Angebot...",
-  "mail_betreff_rechnung": "Ihre Rechnung {rechnungsnummer}",
+  "mail_betreff_rechnung": "Ihre Rechnung {dokumentnummer}",
   "mail_text_rechnung": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie Ihre Rechnung...",
-  "mail_betreff_proforma": "Proforma-Rechnung {rechnungsnummer}",
+  "mail_betreff_proforma": "Proforma-Rechnung {dokumentnummer}",
   "mail_text_proforma": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Proforma-Rechnung...",
-  "mail_betreff_auftrag": "Auftrag {rechnungsnummer}",
-  "mail_text_auftrag": "Sehr geehrte Damen und Herren,\n\nhiermit bestätigen wir Ihren Auftrag...",
-  "mail_betreff_lieferschein": "Lieferschein {rechnungsnummer}",
-  "mail_text_lieferschein": "Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie Ihren Lieferschein..."
+  "mail_betreff_auftrag": "Auftrag {dokumentnummer}",
+  "mail_text_auftrag": "Sehr geehrte Damen und Herren,\n\nhiermit bestätigen wir Ihren Auftrag..."
 }
 ```
 
-Placeholders: `{rechnungsnummer}`, `{betrag}`, `{faelligkeit}`, `{firma}`.
+Placeholders: `{dokumentnummer}`, `{betrag}`, `{faelligkeit}`, `{firma}`.
+Unknown tokens, tokens without a source value, and line breaks in the subject
+block send preparation. `Lieferschein` and `Mahnung` have no template action
+yet (deferred until their artifact/route contracts land).
 
 ---
 

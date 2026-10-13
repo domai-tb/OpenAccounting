@@ -4,6 +4,7 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
+import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
 void main() {
   test('creates a draft invoice with positions', () async {
@@ -237,6 +238,124 @@ void main() {
         "INSERT INTO rechnungen (typ, datum, ist_entwurf, eingabemodus) VALUES ('rechnung', '2026-08-30', 1, 'ungueltig')",
       ),
       throwsA(isA<Object>()),
+    );
+  });
+
+  test('test_fixed_discount_tie_across_vat_rates_goes_to_lower_rate', () {
+    const List<RechnungPositionItem> centBuckets = <RechnungPositionItem>[
+      RechnungPositionItem(bezeichnung: '7 percent', menge: 1, einzelpreis: 0.01, gesamt: 0.01, ustSatz: 7),
+      RechnungPositionItem(bezeichnung: '19 percent', menge: 1, einzelpreis: 0.01, gesamt: 0.01),
+    ];
+    final VorschauResult exactCase = VorschauService.calculate(
+      eingabemodus: 'netto',
+      positionen: centBuckets,
+      rabattBetrag: 0.01,
+    );
+
+    expect(exactCase.rabattCents, 1);
+    expect(exactCase.nettoCents, 1);
+    expect(exactCase.bruttoCents, 1);
+
+    const List<RechnungPositionItem> observableTie = <RechnungPositionItem>[
+      RechnungPositionItem(bezeichnung: '7 percent', menge: 1, einzelpreis: 0.03, gesamt: 0.03, ustSatz: 7),
+      RechnungPositionItem(bezeichnung: '19 percent', menge: 1, einzelpreis: 0.03, gesamt: 0.03),
+    ];
+    final VorschauResult visibleAllocation = VorschauService.calculate(
+      eingabemodus: 'netto',
+      positionen: observableTie,
+      rabattBetrag: 0.01,
+    );
+
+    // Three-cent buckets make the VAT total reveal which equal-weight rate received the cent.
+    expect(visibleAllocation.ustCents, 1);
+  });
+
+  test('test_position_discount_applies_before_single_cent_rounding', () {
+    final VorschauResult preview = VorschauService.calculate(
+      eingabemodus: 'netto',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(
+          bezeichnung: 'Position discount',
+          menge: 3,
+          einzelpreis: 0.3350,
+          gesamt: 0.90,
+          rabattProzent: 10,
+        ),
+      ],
+    );
+
+    expect(preview.nettoCents, 90);
+  });
+
+  test('test_document_fixed_discount_reduces_pre_tax_subtotal', () {
+    final VorschauResult preview = VorschauService.calculate(
+      eingabemodus: 'netto',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(bezeichnung: 'Subtotal', menge: 1, einzelpreis: 1000, gesamt: 1000),
+      ],
+      rabattBetrag: 50,
+    );
+
+    expect(preview.nettoCents, 95000);
+    expect(preview.rabattCents, 5000);
+  });
+
+  test('test_document_discount_fields_cannot_both_be_nonzero', () async {
+    final AppDatabase database = AppDatabase.createTestDatabase();
+    addTearDown(database.close);
+    await database.ensureOpen();
+    final RechnungenUseCases useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor)),
+    );
+
+    await expectLater(
+      useCases.createDraftRechnung(
+        datum: '2026-10-11',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(bezeichnung: 'Discount', menge: 1, einzelpreis: 100, gesamt: 100),
+        ],
+        rabattProzent: 1,
+        rabattBetrag: 1,
+      ),
+      throwsA(
+        isA<InvoiceMoneyValidationException>().having(
+          (InvoiceMoneyValidationException error) => error.code,
+          'code',
+          'conflictingDocumentDiscounts',
+        ),
+      ),
+    );
+    final List<Map<String, Object?>> rows = await database.executor.runSelect(
+      'SELECT COUNT(*) AS count FROM rechnungen',
+      const <Object?>[],
+    );
+    expect((rows.single['count']! as num).toInt(), 0);
+  });
+
+  test('test_excessive_or_conflicting_document_discount_is_rejected', () {
+    const List<RechnungPositionItem> positionen = <RechnungPositionItem>[
+      RechnungPositionItem(bezeichnung: 'Subtotal', menge: 1, einzelpreis: 100, gesamt: 100),
+    ];
+
+    expect(
+      () => VorschauService.calculate(eingabemodus: 'netto', positionen: positionen, rabattBetrag: 100.01),
+      throwsA(
+        isA<InvoiceMoneyValidationException>().having(
+          (InvoiceMoneyValidationException error) => error.code,
+          'code',
+          'excessiveDocumentDiscount',
+        ),
+      ),
+    );
+    expect(
+      () => VorschauService.calculate(eingabemodus: 'netto', positionen: positionen, rabattBetrag: 1, rabattProzent: 1),
+      throwsA(
+        isA<InvoiceMoneyValidationException>().having(
+          (InvoiceMoneyValidationException error) => error.code,
+          'code',
+          'conflictingDocumentDiscounts',
+        ),
+      ),
     );
   });
 }

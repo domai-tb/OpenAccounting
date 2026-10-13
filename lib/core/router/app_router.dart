@@ -35,8 +35,12 @@ import 'package:openaccounting/features/setup/profile_data_section.dart';
 import 'package:openaccounting/features/setup/profile_export_service.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
+import 'package:openaccounting/features/accounting/gobd_export_page.dart';
+import 'package:openaccounting/features/documents/dokumentenpaket_page.dart';
+import 'package:openaccounting/features/receipts/receipt_inbox_page.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_document_page.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
+import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_more_pages.dart';
 import 'package:openaccounting/pages/stammdaten/master_data_pages.dart';
@@ -50,7 +54,6 @@ export 'package:openaccounting/app/app_shell.dart';
 
 /// Sidebar destinations — order per DESIGN §4.
 enum AppRoute {
-  assets('/assets'),
   dashboard('/'),
   invoices('/invoices'),
   receipts('/receipts'),
@@ -58,6 +61,7 @@ enum AppRoute {
   contacts('/contacts'),
   taxes('/taxes'),
   reports('/reports'),
+  assets('/assets'),
   settings('/settings'),
   setup('/setup'),
   help('/help'),
@@ -150,6 +154,7 @@ GoRouter createRouter(AppDatabase db) {
               ),
             ),
             routes: <RouteBase>[
+              GoRoute(path: 'inbox', builder: (context, state) => const ReceiptInboxPage()),
               GoRoute(
                 path: ':id',
                 builder: (context, state) => ProductionRecordDetailPage(
@@ -160,6 +165,8 @@ GoRouter createRouter(AppDatabase db) {
               ),
             ],
           ),
+          GoRoute(path: '/packages', builder: (context, state) => const DokumentenpaketPage()),
+          GoRoute(path: '/gobd-export', builder: (context, state) => const GobdExportPage()),
           GoRoute(
             path: '/banking',
             builder: (context, state) => BankImportPage(routeUri: state.uri),
@@ -231,8 +238,11 @@ GoRouter createRouter(AppDatabase db) {
             ],
           ),
           GoRoute(path: '/help', builder: (context, state) => const HelpPage()),
+          GoRoute(
+            path: '/assets',
+            builder: (context, state) => AssetsPage(routeUri: state.uri),
+          ),
           GoRoute(path: '/setup', builder: (context, state) => const SetupPage()),
-          GoRoute(path: '/assets', builder: (context, state) => AssetsPage(routeUri: state.uri)),
           GoRoute(path: '/inventory', builder: (context, state) => const StocktakeWorkspacePage()),
           // German alias per specs/app/spec.md deep-link scenario — preserve query and id.
           GoRoute(
@@ -472,7 +482,7 @@ class _InvoiceDraftPageState extends ConsumerState<InvoiceDraftPage> {
                 bezeichnung: _descriptionController.text.trim(),
                 menge: quantity,
                 einzelpreis: price,
-                gesamt: quantity * price,
+                gesamt: VorschauService.lineTotal(quantity: quantity, unitPrice: price),
                 // The domain default is 19%.
                 position: 0,
               ),

@@ -6,7 +6,7 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
 void main() {
-  test('storno creates negative amounts with own nummernkreis and links original', () async {
+  test('test_rechnung_storno_reverses_positive_balances', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -28,6 +28,13 @@ void main() {
     expect(storno.typ, 'storno');
     expect(storno.rechnungsnummer, 'ST-260001');
     expect(storno.positionen.single.gesamt, -200);
+    final totals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [storno.id],
+    );
+    expect(totals.single['netto_betrag'], -200);
+    expect(totals.single['ust_betrag'], -38);
+    expect(totals.single['brutto_betrag'], -238);
     expect(storno.positionen.single.menge, 2);
     final rows = await db.executor.runSelect(
       'SELECT storno_grund, storno_datum, storno_von FROM rechnungen WHERE id = ?',
@@ -40,7 +47,7 @@ void main() {
     expect(orig.single['status'], 'storniert');
   });
 
-  test('storno requires grund', () async {
+  test('test_storno_requires_non_empty_reason', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -63,9 +70,28 @@ void main() {
       uc.stornoRechnung(rechnungId: finalized.id, grund: '   '),
       throwsA(predicate((e) => e.toString().contains('Stornogrund'))),
     );
+
+    final String tooLongReason = List<String>.filled(501, 'x').join();
+    await expectLater(
+      uc.stornoRechnung(rechnungId: finalized.id, grund: tooLongReason),
+      throwsA(predicate((e) => e.toString().contains('Stornogrund zu lang'))),
+    );
+    final List<Map<String, Object?>> uncreatedStorno = await db.executor.runSelect(
+      'SELECT id FROM rechnungen WHERE storno_von = ?',
+      <Object?>[finalized.id],
+    );
+    expect(uncreatedStorno, isEmpty);
+
+    final String maxLengthReason = List<String>.filled(500, 'x').join();
+    final storno = await uc.stornoRechnung(rechnungId: finalized.id, grund: maxLengthReason);
+    final List<Map<String, Object?>> createdStorno = await db.executor.runSelect(
+      'SELECT storno_grund FROM rechnungen WHERE id = ?',
+      <Object?>[storno.id],
+    );
+    expect(createdStorno.single['storno_grund'], maxLengthReason);
   });
 
-  test('duplicate storno blocked', () async {
+  test('test_already_storniert_invoice_cannot_be_storniert_again', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -90,7 +116,7 @@ void main() {
     );
   });
 
-  test('storno restores stock', () async {
+  test('test_storno_restores_stock_from_source_movement', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
@@ -135,5 +161,76 @@ void main() {
       uc.stornoRechnung(rechnungId: draft.id, grund: 'Grund'),
       throwsA(predicate((e) => e.toString().contains('finalisiert'))),
     );
+  });
+
+  test('test_gutschrift_storno_reverses_negative_balances', () async {
+    final db = AppDatabase.createTestDatabase();
+    addTearDown(db.close);
+    await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
+    );
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
+    );
+
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final gutschrift = await uc.createGutschrift(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'G', menge: 1, einzelpreis: 100, gesamt: 100)],
+    );
+    final storno = await uc.stornoRechnung(rechnungId: gutschrift.id, grund: 'Gutschrift ausgleichen');
+    final sourceTotals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [gutschrift.id],
+    );
+    final totals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [storno.id],
+    );
+
+    expect(gutschrift.positionen.single.gesamt, -100);
+    expect(sourceTotals.single['netto_betrag'], -100);
+    expect(sourceTotals.single['ust_betrag'], -19);
+    expect(sourceTotals.single['brutto_betrag'], -119);
+    expect(storno.positionen.single.gesamt, 100);
+    expect(totals.single['netto_betrag'], 100);
+    expect(totals.single['ust_betrag'], 19);
+    expect(totals.single['brutto_betrag'], 119);
+  });
+
+  test('test_gutschrift_storno_is_exact_positive_inverse', () async {
+    final db = AppDatabase.createTestDatabase();
+    addTearDown(db.close);
+    await db.ensureOpen();
+    await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
+    );
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
+    );
+    await db.executor.runCustom(
+      "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
+    );
+
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final draft = await uc.createDraftRechnung(
+      datum: '2026-08-30',
+      positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
+      rabattProzent: 10,
+    );
+    final invoice = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: draft.id);
+    final gutschrift = await uc.createGutschrift(vonRechnungId: invoice.id, grund: 'Preisnachlass');
+    final storno = await uc.stornoRechnung(rechnungId: gutschrift.id, grund: 'Gutschrift ersetzen');
+    final totals = await db.executor.runSelect(
+      'SELECT netto_betrag, ust_betrag, brutto_betrag FROM rechnungen WHERE id = ?',
+      [storno.id],
+    );
+
+    expect(totals.single['netto_betrag'], 90);
+    expect(totals.single['ust_betrag'], 17.1);
+    expect(totals.single['brutto_betrag'], 107.1);
   });
 }
