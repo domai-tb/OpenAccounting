@@ -8,6 +8,7 @@ TBD - created by archiving change routed-domain-capability-surface. Update Purpo
 ### Requirement: Canonical route inventory
 
 The application SHALL expose typed pages for exactly these canonical routes: `/`, `/invoices`, `/invoices/new`, `/invoices/:id`, `/receipts`, `/banking`, `/contacts`, `/mahnwesen`, `/taxes`, `/reports`, `/assets`, `/settings`, `/help`, `/setup`, `/inventory`, and `/recurring`. Each route SHALL implement the service owner, typed projection/actions, and empty/unavailable boundary in the route matrix. Each route SHALL define loading, populated, empty, and failure states plus a primary action or explicit read-only/unavailable boundary. German aliases SHALL preserve IDs and the complete query string when redirecting; `/anlagen` SHALL redirect to `/assets`.
+The application SHALL expose typed pages for exactly these canonical routes: `/`, `/invoices`, `/invoices/new`, `/invoices/:id`, `/receipts`, `/banking`, `/contacts`, `/mahnwesen`, `/taxes`, `/reports`, `/assets`, `/settings`, `/help`, `/setup`, `/inventory`, and `/recurring`. Each route SHALL implement the service owner, typed projection/actions, and empty/unavailable boundary in the route matrix. Each route SHALL define loading, populated, empty, and failure states plus a primary action or explicit read-only/unavailable boundary. German aliases SHALL preserve IDs and the complete query string when redirecting.
 
 #### Scenario: Every canonical route has a useful surface
 
@@ -15,6 +16,11 @@ The application SHALL expose typed pages for exactly these canonical routes: `/`
 - **WHEN** the user visits every route in the inventory, including `/assets`
 - **THEN** each page SHALL show its typed title, route-specific state, and documented primary action or truthful boundary
 
+#### Scenario: Recurring workspace resolves through its use case
+- **GIVEN** the active profile and recurring-booking service are available
+- **WHEN** the user opens `/recurring`
+- **THEN** the recurring template and due-instance workspace SHALL show typed data and its supported primary action
+#### Scenario: Database outage is not an empty route
 #### Scenario: Contact detail discriminator selects the correct record type
 
 - **GIVEN** customer ID `42` and supplier ID `42` both exist

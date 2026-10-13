@@ -54,15 +54,60 @@ class BuchungsVorlage {
   final List<Map<String, dynamic>> positionen;
 }
 
+/// Review-first occurrence identity for the workspace. One row per
+/// `(vorlage_id, faelligkeit)`; detection reuses it and never writes a
+/// financial record. Only `posted`/`handed_off` completes an occurrence;
+/// `failed` stays reviewable with its persisted `handoff_error`.
+class BuchungsOccurrence {
+  const BuchungsOccurrence({
+    required this.id,
+    required this.vorlageId,
+    required this.faelligkeit,
+    this.journalId,
+    this.rechnungId,
+    required this.reviewStatus,
+    this.blockReason,
+    this.handoffError,
+  });
+
+  final int id;
+  final int vorlageId;
+  final String faelligkeit;
+  final int? journalId;
+  final int? rechnungId;
+  final String reviewStatus;
+  final String? blockReason;
+  final String? handoffError;
+
+  /// Completed when posted through the shared boundary or handed off as a
+  /// draft. Only completed occurrences advance the stored schedule.
+  bool get isCompleted => reviewStatus == 'posted' || reviewStatus == 'handed_off';
+}
+
 class BuchungsVorlagenRepository {
   BuchungsVorlagenRepository(this.executor);
 
   final QueryExecutor executor;
   Future<void>? _schemaReady;
 
-  static const Set<String> allowedInterval = <String>{'monatlich', 'quartalsweise', 'jährlich'};
+  static const Set<String> allowedInterval = <String>{
+    'monatlich',
+    'quartalsweise',
+    'jährlich',
+    'monthly',
+    'quarterly',
+    'yearly',
+  };
   static const Set<String> allowedModus = <String>{'direkt', 'beleg'};
   static const Set<String> allowedArt = <String>{'Einnahme', 'Ausgabe'};
+  static const Set<String> allowedReviewStatus = <String>{
+    'pending',
+    'blocked',
+    'ready',
+    'handed_off',
+    'posted',
+    'failed',
+  };
 
   Future<void> ensureSchema() => _schemaReady ??= _ensureSchema();
 
@@ -77,9 +122,13 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
   faelligkeit TEXT NOT NULL,
   journal_id INTEGER REFERENCES journal(id),
   rechnung_id INTEGER REFERENCES rechnungen(id),
+  review_status TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending','blocked','ready','handed_off','posted','failed')),
+  block_reason TEXT,
+  handoff_error TEXT,
   UNIQUE(vorlage_id, faelligkeit)
 )''',
     );
+    await _ensureOccurrenceReviewColumns();
     for (final ({String name, String definition}) column in <({String name, String definition})>[
       (name: 'ust_satz', definition: 'NUMERIC(12,2) DEFAULT 19'),
       (name: 'eingabemodus', definition: "TEXT DEFAULT 'brutto'"),
@@ -92,6 +141,30 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
       if (!verified.any((row) => row['name'] == column.name)) {
         throw StateError('Buchungsvorlage konnte Spalte ${column.name} nicht verifizieren');
       }
+    }
+  }
+
+  /// Adds the v21 review-state columns to pre-existing occurrence tables.
+  /// Fresh tables already carry them via the CREATE TABLE above; existing
+  /// rows backfill to `pending`/NULL through the column defaults, keeping
+  /// their identity and journal/invoice links untouched.
+  Future<void> _ensureOccurrenceReviewColumns() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(buchungsvorlagen_occurrences)',
+      const <Object?>[],
+    );
+    final Set<String> names = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!names.contains('review_status')) {
+      await executor.runCustom(
+        "ALTER TABLE buchungsvorlagen_occurrences ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending' "
+        "CHECK (review_status IN ('pending','blocked','ready','handed_off','posted','failed'))",
+      );
+    }
+    if (!names.contains('block_reason')) {
+      await executor.runCustom('ALTER TABLE buchungsvorlagen_occurrences ADD COLUMN block_reason TEXT');
+    }
+    if (!names.contains('handoff_error')) {
+      await executor.runCustom('ALTER TABLE buchungsvorlagen_occurrences ADD COLUMN handoff_error TEXT');
     }
   }
 
@@ -115,6 +188,9 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     final String cleanName = name.trim();
     if (cleanName.isEmpty) {
       throw const BuchungsVorlagenException('Name ist Pflicht');
+    }
+    if (naechsteFaelligkeit != null && naechsteFaelligkeit.trim().isEmpty) {
+      throw const BuchungsVorlagenException('Nächste Fälligkeit ist Pflicht');
     }
     if (!allowedModus.contains(modus)) {
       throw BuchungsVorlagenException('Ungültiger modus: $modus');
@@ -306,13 +382,20 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
 
   DateTime nextDue(DateTime from, String intervall) => _nextDueFrom(from, intervall);
 
+  /// One interval step from the prior stored date with month-end clamping.
+  /// Accepts the stored German values and the documented English aliases.
+  DateTime advanceDueDate(DateTime prior, String intervall) => _nextDueFrom(prior, intervall);
+
   DateTime _nextDueFrom(DateTime from, String intervall) {
-    switch (intervall) {
+    switch (intervall.trim()) {
       case 'monatlich':
+      case 'monthly':
         return _addMonths(from, 1);
       case 'quartalsweise':
+      case 'quarterly':
         return _addMonths(from, 3);
       case 'jährlich':
+      case 'yearly':
         return _addMonths(from, 12);
       default:
         throw BuchungsVorlagenException('Ungültiges Intervall: $intervall');
@@ -562,12 +645,217 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
     }
   }
 
+  /// Stages (or reuses) the single due review instance for [vorlage].
+  /// Detection creates no journal entry, input-tax claim, or finalized
+  /// invoice and never advances the stored next due date. Throws when the
+  /// template is paused/ended or not yet due, so paused templates produce
+  /// no newly actionable instance.
+  Future<BuchungsOccurrence> stageDueInstance(BuchungsVorlage vorlage, {DateTime? heute}) async {
+    await ensureSchema();
+    if (!vorlage.aktiv || vorlage.status != 'aktiv') {
+      throw const BuchungsVorlagenException('Vorlage ist pausiert oder beendet');
+    }
+    if (vorlage.naechsteFaelligkeit == null || vorlage.naechsteFaelligkeit!.trim().isEmpty) {
+      throw const BuchungsVorlagenException('Nächste Fälligkeit ist Pflicht');
+    }
+    if (!isDue(vorlage, heute ?? DateTime.now())) {
+      throw const BuchungsVorlagenException('Vorlage ist noch nicht fällig');
+    }
+    final String datumStr = vorlage.naechsteFaelligkeit!.trim();
+    await executor.runCustom(
+      'INSERT OR IGNORE INTO buchungsvorlagen_occurrences (vorlage_id, faelligkeit) VALUES (?, ?)',
+      <Object?>[vorlage.id, datumStr],
+    );
+    final BuchungsOccurrence? staged = await findOccurrence(vorlage.id, datumStr);
+    if (staged == null) throw const BuchungsVorlagenException('Fälligkeit konnte nicht angelegt werden');
+    return staged;
+  }
+
+  /// Review-first schedule scan. Stages at most one due instance per active
+  /// template and only when no uncompleted occurrence is still open (single
+  /// oldest overdue rule: the next period becomes eligible only after the
+  /// oldest occurrence reaches `posted` or `handed_off`). Never writes a
+  /// financial record and never advances a stored date.
+  Future<List<BuchungsOccurrence>> stageDueInstances({DateTime? heute}) async {
+    await ensureSchema();
+    final DateTime now = heute ?? DateTime.now();
+    final List<BuchungsVorlage> alle = await list();
+    final List<BuchungsOccurrence> staged = <BuchungsOccurrence>[];
+    for (final BuchungsVorlage vorlage in alle) {
+      if (!isDue(vorlage, now)) continue;
+      final List<BuchungsOccurrence> open = await listOccurrences(vorlage.id);
+      final bool hasUncompleted = open.any((BuchungsOccurrence occurrence) => !occurrence.isCompleted);
+      if (hasUncompleted) {
+        final BuchungsOccurrence oldest = open.firstWhere((BuchungsOccurrence occurrence) => !occurrence.isCompleted);
+        staged.add(oldest);
+        continue;
+      }
+      staged.add(await stageDueInstance(vorlage, heute: now));
+    }
+    return staged;
+  }
+
+  Future<BuchungsOccurrence?> findOccurrence(int vorlageId, String faelligkeit) async {
+    await ensureSchema();
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT id, vorlage_id, faelligkeit, journal_id, rechnung_id, review_status, block_reason, handoff_error '
+      'FROM buchungsvorlagen_occurrences WHERE vorlage_id = ? AND faelligkeit = ? LIMIT 1',
+      <Object?>[vorlageId, faelligkeit],
+    );
+    if (rows.isEmpty) return null;
+    return _occurrenceFromRow(rows.single);
+  }
+
+  Future<List<BuchungsOccurrence>> listOccurrences(int vorlageId) async {
+    await ensureSchema();
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT id, vorlage_id, faelligkeit, journal_id, rechnung_id, review_status, block_reason, handoff_error '
+      'FROM buchungsvorlagen_occurrences WHERE vorlage_id = ? ORDER BY faelligkeit, id',
+      <Object?>[vorlageId],
+    );
+    return rows.map(_occurrenceFromRow).toList(growable: false);
+  }
+
+  Future<List<BuchungsOccurrence>> listAllOccurrences() async {
+    await ensureSchema();
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT id, vorlage_id, faelligkeit, journal_id, rechnung_id, review_status, block_reason, handoff_error '
+      'FROM buchungsvorlagen_occurrences ORDER BY vorlage_id, faelligkeit',
+      const <Object?>[],
+    );
+    return rows.map(_occurrenceFromRow).toList(growable: false);
+  }
+
+  /// Persists review state without advancing the schedule. Displays read
+  /// these persisted values; a missing contract, mapping, or draft failure
+  /// leaves a non-terminal status with its reason stored.
+  Future<BuchungsOccurrence> setReviewState({
+    required int vorlageId,
+    required String faelligkeit,
+    required String reviewStatus,
+    String? blockReason,
+    String? handoffError,
+    int? journalId,
+    int? rechnungId,
+  }) async {
+    await ensureSchema();
+    if (!allowedReviewStatus.contains(reviewStatus)) {
+      throw BuchungsVorlagenException('Ungültiger review_status: $reviewStatus');
+    }
+    final BuchungsOccurrence? current = await findOccurrence(vorlageId, faelligkeit);
+    if (current == null) throw const BuchungsVorlagenException('Fälligkeit nicht gefunden');
+    await executor.runUpdate(
+      'UPDATE buchungsvorlagen_occurrences SET review_status = ?, block_reason = ?, handoff_error = ?, '
+      'journal_id = COALESCE(?, journal_id), rechnung_id = COALESCE(?, rechnung_id) '
+      'WHERE vorlage_id = ? AND faelligkeit = ?',
+      <Object?>[reviewStatus, blockReason, handoffError, journalId, rechnungId, vorlageId, faelligkeit],
+    );
+    return (await findOccurrence(vorlageId, faelligkeit))!;
+  }
+
+  Future<BuchungsOccurrence> markBlocked({
+    required int vorlageId,
+    required String faelligkeit,
+    required String reason,
+  }) async {
+    return setReviewState(vorlageId: vorlageId, faelligkeit: faelligkeit, reviewStatus: 'blocked', blockReason: reason);
+  }
+
+  Future<BuchungsOccurrence> markFailed({
+    required int vorlageId,
+    required String faelligkeit,
+    required String error,
+  }) async {
+    return setReviewState(vorlageId: vorlageId, faelligkeit: faelligkeit, reviewStatus: 'failed', handoffError: error);
+  }
+
+  Future<BuchungsOccurrence> markReady({required int vorlageId, required String faelligkeit}) async {
+    return setReviewState(vorlageId: vorlageId, faelligkeit: faelligkeit, reviewStatus: 'ready');
+  }
+
+  Future<BuchungsOccurrence> markHandedOff({
+    required int vorlageId,
+    required String faelligkeit,
+    int? rechnungId,
+  }) async {
+    return setReviewState(
+      vorlageId: vorlageId,
+      faelligkeit: faelligkeit,
+      reviewStatus: 'handed_off',
+      rechnungId: rechnungId,
+    );
+  }
+
+  Future<BuchungsOccurrence> markPosted({required int vorlageId, required String faelligkeit, int? journalId}) async {
+    return setReviewState(vorlageId: vorlageId, faelligkeit: faelligkeit, reviewStatus: 'posted', journalId: journalId);
+  }
+
+  /// Advances the stored next due date by exactly one interval step computed
+  /// from the prior stored date (month-end clamped). Call only after the
+  /// occurrence reached `posted` or `handed_off`; failed or blocked attempts
+  /// leave the date unchanged. The advancement itself creates no financial
+  /// event.
+  Future<BuchungsVorlage> advanceScheduleAfterCompletion(int vorlageId) async {
+    await ensureSchema();
+    final BuchungsVorlage? vorlage = await findById(vorlageId);
+    if (vorlage == null) throw const BuchungsVorlagenException('Vorlage nicht gefunden');
+    if (vorlage.naechsteFaelligkeit == null) throw const BuchungsVorlagenException('Nächste Fälligkeit ist Pflicht');
+    final DateTime prior = DateTime.parse(vorlage.naechsteFaelligkeit!.trim());
+    final DateTime next = _nextDueFrom(prior, vorlage.intervall);
+    await executor.runUpdate('UPDATE buchungsvorlagen SET naechste_faelligkeit = ? WHERE id = ?', <Object?>[
+      _formatDate(next),
+      vorlageId,
+    ]);
+    return (await findById(vorlageId))!;
+  }
+
+  /// Recovery lookup for the idempotent Beleg handoff: returns the draft
+  /// already linked to the occurrence, or a draft row still carrying the
+  /// occurrence identity `(vorlage_id, faelligkeit via datum)` whose link was
+  /// not yet persisted. Read-only; creates no draft and no financial record.
+  Future<int?> findDraftIdByIdentity(int vorlageId, String faelligkeit) async {
+    await ensureSchema();
+    final BuchungsOccurrence? occurrence = await findOccurrence(vorlageId, faelligkeit);
+    if (occurrence?.rechnungId != null) return occurrence!.rechnungId;
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT id FROM rechnungen WHERE vorlage_id = ? AND datum = ? ORDER BY id LIMIT 1',
+      <Object?>[vorlageId, faelligkeit],
+    );
+    if (rows.isEmpty) return null;
+    return (rows.single['id'] as num?)?.toInt();
+  }
+
+  BuchungsOccurrence _occurrenceFromRow(Map<String, Object?> row) {
+    return BuchungsOccurrence(
+      id: ((row['id'] as num?) ?? 0).toInt(),
+      vorlageId: ((row['vorlage_id'] as num?) ?? 0).toInt(),
+      faelligkeit: row['faelligkeit']?.toString() ?? '',
+      journalId: (row['journal_id'] as num?)?.toInt(),
+      rechnungId: (row['rechnung_id'] as num?)?.toInt(),
+      reviewStatus: row['review_status']?.toString() ?? 'pending',
+      blockReason: row['block_reason']?.toString(),
+      handoffError: row['handoff_error']?.toString(),
+    );
+  }
+
+  /// Canonical 2-decimal form regardless of SQLite NUMERIC affinity, which
+  /// strips trailing zeros on storage. Falls back to the raw value for
+  /// legacy rows that do not parse.
+  String? _canonicalBetrag(Object? raw) {
+    if (raw == null) return null;
+    try {
+      return money.fromCents(money.parseScaled(raw.toString(), scale: 2, field: 'betrag', allowNegative: true));
+    } catch (_) {
+      return raw.toString();
+    }
+  }
+
   BuchungsVorlage _fromRow(Map<String, Object?> r) {
     final int id = ((r['id'] as num?) ?? 0).toInt();
     final String name = r['name'] as String? ?? '';
     final int? kategorieId = (r['kategorie_id'] as num?)?.toInt();
     final int? kontoId = (r['konto_id'] as num?)?.toInt();
-    final String? betrag = r['betrag']?.toString();
+    final String? betrag = _canonicalBetrag(r['betrag']);
     final String? beschreibung = r['beschreibung'] as String?;
     final String modus = (r['modus'] as String?) ?? 'direkt';
     final String art = (r['art'] as String?) ?? 'Ausgabe';

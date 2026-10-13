@@ -20,6 +20,28 @@ The application SHALL expose typed pages for exactly these canonical routes: `/`
 - **WHEN** any canonical route is requested
 - **THEN** the page SHALL show a localized unavailable/retry state, SHALL preserve the requested canonical route and query, and SHALL not redirect the user to first-run setup
 
+#### Scenario: Contact detail discriminator selects the correct record type
+
+- **GIVEN** customer ID `42` and supplier ID `42` both exist
+- **WHEN** the user opens `/contacts/42?kind=supplier`
+- **THEN** the route resolves only the supplier record with ID `42`
+- **AND** opening `/contacts/42?kind=customer` resolves only the customer with that ID
+- **AND** list return state remains in the other query parameters
+
+#### Scenario: Missing or invalid contact discriminator does not guess
+
+- **GIVEN** a contact detail route has no `kind` query or an unsupported value
+- **WHEN** the route resolves
+- **THEN** it shows a localized type-selection state without querying either entity table
+- **AND** it preserves the requested ID and other query parameters
+
+#### Scenario: Article and article-group routes use their typed owner
+
+- **GIVEN** an article and article group can share the same numeric ID
+- **WHEN** the user opens `/articles/42?kind=group` or `/articles/42?kind=item`
+- **THEN** each route resolves only the selected entity type
+- **AND** `/articles?view=groups` exposes the typed group list and its documented create/update/lifecycle actions
+
 #### Scenario: Alias matrix preserves deep links
 - **GIVEN** a user opens `/rechnungen/123?status=offen&seite=2`, `/belege/456?filter=unbezahlt`, or any alias in the documented matrix
 - **WHEN** the router canonicalizes the path
