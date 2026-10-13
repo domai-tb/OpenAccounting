@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices manages the complete lifecycle of financial documents: creation, finalization, reversal (Storno), credit notes (Gutschrift), replacement invoices (Ersatzrechnung), and archival. All finalized documents are GoBD-compliant with immutable snapshots and original PDF storage.
+OpenInvoices manages the complete lifecycle of financial documents: creation, finalization, reversal (Storno), credit notes (Gutschrift), replacement invoices (Ersatzrechnung), and archival. Finalized documents keep immutable snapshots and stored PDFs with startup reconciliation of staged or unreferenced artifacts. The GoBD export reports technical integrity (manifest hashes, completeness); it is not a certification of legal compliance.
 
 ---
 
@@ -243,9 +243,9 @@ Overpayments tracked in `forderungen` table:
 
 ---
 
-## Dokumentenpakete (Document Bundles)
+## Dokumentenpakete (Document Packages)
 
-Group related documents for mailing or archival:
+Group related documents and supporting evidence for archival:
 
 ```json
 {
@@ -262,9 +262,11 @@ Group related documents for mailing or archival:
 
 ### Use Cases
 
-- Bundle related documents for customer mailing
-- Archive project documentation
-- Export grouped documents
+- Group related documents for archival
+- Export a ZIP snapshot with manifest (missing artifacts are reported, never silently omitted)
+- Keep member records unchanged by membership operations
+
+Batch printing and email delivery are deferred until their platform/transport capabilities are specified; the package screen does not claim they work.
 
 ---
 
@@ -292,11 +294,11 @@ Upload supporting documents to any entity:
 
 ### DSGVO Löschdatum
 
-`loeschdatum` tracks when document should be deleted:
+`loeschdatum` tracks when a document is due for deletion review:
 
 - Red badge: overdue (past deletion date)
 - Yellow badge: ≤ 30 days until deletion
-- Automatic cleanup removes expired documents
+- The date is informational only: no automatic cleanup occurs until a retention policy is accepted
 
 ### Linked Entities
 
