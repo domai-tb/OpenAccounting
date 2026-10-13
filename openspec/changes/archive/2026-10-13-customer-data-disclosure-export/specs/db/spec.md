@@ -105,6 +105,14 @@ The v13 feature_table_state table SHALL contain exactly one durable row for each
 - **AND** it SHALL mark existing valid occurrence tables `initialized` and absent occurrence tables `unknown`
 - **AND** it SHALL increment user_version to 13 only after successful verification
 
+#### Scenario: V8-to-v9 migration adds shared markers and mileage tables
+
+- **GIVEN** a valid profile is at schema version 8 with forderung_zahlungen present
+- **WHEN** the next sequential migration runs
+- **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v9 transaction
+- **AND** it SHALL mark existing valid lazy occurrence tables initialized and absent lazy tables unknown
+- **AND** it SHALL increment user_version to 9 only after successful verification
+
 #### Scenario: V9 migration adds category history
 
 - **GIVEN** a valid profile is at schema version 8
@@ -126,6 +134,13 @@ The v13 feature_table_state table SHALL contain exactly one durable row for each
 - **THEN** its application-table set SHALL equal the required inventory for that schema version plus only initialized lazy tables
 - **AND** no existing table SHALL be silently dropped or recreated
 - **AND** all occurrence-table marker pairs SHALL satisfy their declared presence rules
+
+#### Scenario: Version-aware table count verification
+
+GIVEN a supported database is upgraded through schema v18
+WHEN its declared table set is checked
+THEN the v18 base registry SHALL contain exactly 41 tables
+AND no table SHALL be silently dropped or created outside the version-specific inventory.
 
 #### Scenario: Unknown or malformed application tables fail schema health
 

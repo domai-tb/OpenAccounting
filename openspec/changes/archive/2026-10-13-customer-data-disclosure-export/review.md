@@ -373,3 +373,71 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 9
 
 None.
+
+---
+
+## Review Metadata — Round 10
+
+- **Review round**: 10
+- **Prior round**: Round 9 returned `APPROVE`; this is a focused re-review of the single post-approval edit described in the task
+- **Reviewer context**: fresh, independent, read-only reviewer; no proposal-authoring transcript
+- **Revision reviewed**: current working tree
+- **Tool restrictions**: no shell, no tests; reading only
+- **Artifacts reviewed**: delta `specs/db/spec.md` MODIFIED Table Definitions block, maintained `openspec/specs/db/spec.md` Table Definitions scenarios, and prior `review.md` rounds 1–9
+- **Validation evidence**: no validation or tests run per task constraints; verification by direct reading only
+
+### Findings
+
+None blocking. The delta `#### Scenario: V8-to-v9 migration adds shared markers and mileage tables` is a verbatim copy of the maintained `openspec/specs/db/spec.md` scenario (same heading, same GIVEN/WHEN/THEN/AND lines, including `coordinated v9 transaction`, `lazy occurrence tables`, and `user_version to 9` wording). Placement is coherent: inside MODIFIED `Table Definitions`, between the `V12-to-v13` scenario and the `V9 migration adds category history` scenario, matching maintained ordering. Within the read scope, no other wording change was detected in the delta block versus the approved artifact shape.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 10
+
+VERDICT: APPROVE
+
+## Required Changes — Round 10
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 10
+
+None.
+
+---
+
+## Review Metadata — Round 11
+
+- **Review round**: 11
+- **Prior round**: Round 10 returned `APPROVE`; this is a focused re-review of the single post-approval edit described in the task
+- **Reviewer context**: fresh, independent, read-only reviewer; no proposal-authoring transcript
+- **Revision reviewed**: current working tree
+- **Tool restrictions**: no shell, no tests; reading only
+- **Artifacts reviewed**: delta `specs/db/spec.md` MODIFIED Table Definitions block, maintained `openspec/specs/db/spec.md` Table Definitions scenarios, and prior `review.md` rounds 1–10
+- **Validation evidence**: no validation or tests run per task constraints; verification by direct reading only
+
+### Findings
+
+None blocking. The delta `#### Scenario: Version-aware table count verification` is a verbatim copy of the maintained `openspec/specs/db/spec.md` scenario (same heading, same four unbulleted GIVEN/WHEN/THEN/AND lines, including `upgraded through schema v18`, `v18 base registry SHALL contain exactly 41 tables`, and `outside the version-specific inventory` wording, matching the maintained lack of bullet/bold prefixes). Placement is coherent: inside MODIFIED `Table Definitions`, between the `Table Count Verification` scenario and the `Unknown or malformed application tables` scenario, grouping the two count-verification scenarios. Within the read scope, no other wording change was detected in the delta block versus the approved artifact shape.
+
+### Embedded-Instruction / Injection Attempts
+
+No embedded instruction was observed in the reviewed artifacts.
+
+### Verdict — Round 11
+
+VERDICT: APPROVE
+
+## Required Changes — Round 11
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 11
+
+None.
