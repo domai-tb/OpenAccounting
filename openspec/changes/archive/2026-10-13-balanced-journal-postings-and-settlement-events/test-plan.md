@@ -1,0 +1,50 @@
+## Test Plan
+
+<!-- Every scenario in specs/ maps to a named test. -->
+<!-- During implementation, flip 🔴 red to 🟢 green when its test passes. -->
+
+| Requirement | Scenario | Test File | Test Name | Initial State |
+|-------------|----------|-----------|-----------|---------------|
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Post a finalized invoice | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_post_a_finalized_invoice | 🟢 green |
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Required posting mapping is missing | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_required_posting_mapping_is_missing | 🟢 green |
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Retry a source event | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_retry_a_source_event | 🟢 green |
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Reverse a posted group | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_reverse_a_posted_group | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Post a partial receipt | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_post_a_partial_receipt | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Do not post an unconfirmed bank row | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_do_not_post_an_unconfirmed_bank_row | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Include an ordinary receipt in its settlement period | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_include_an_ordinary_receipt_in_its_settlement_period | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Exclude an unpaid invoice | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_exclude_an_unpaid_invoice | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Split a settlement across reporting periods | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_split_a_settlement_across_reporting_periods | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Keep input-tax claim timing independent | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_keep_input_tax_claim_timing_independent | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Apply an approved statutory timing exception | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_apply_an_approved_statutory_timing_exception | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Do not infer an exception | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_do_not_infer_an_exception | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Confirm a matched receipt | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_confirm_a_matched_receipt | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Leave an ambiguous suggestion unapplied | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_leave_an_ambiguous_suggestion_unapplied | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Roll back a failed settlement | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_roll_back_a_failed_settlement | 🟢 green |
+
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Reverse a settlement restores the open item | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_reverse_a_settlement_restores_the_open_item | 🟢 green |
+| specs/accounting/spec.md → Balanced, source-linked posting groups | Reject invoice reversal with applied settlements | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_reject_invoice_reversal_with_applied_settlements | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Post a supplier payment | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_post_a_supplier_payment | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Split one transaction across invoices | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_split_one_transaction_across_invoices | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Retain an overpayment as credit | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_retain_an_overpayment_as_credit | 🟢 green |
+| specs/accounting/spec.md → Payment and invoice posting linkage | Repeated confirmation does not re-apply | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_repeated_confirmation_does_not_re_apply | 🟢 green |
+| specs/accounting/spec.md → Journal Entries | In-scope invoice does not use the single-row path | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_in_scope_invoice_does_not_use_the_single_row_path | 🟢 green |
+| specs/accounting/spec.md → Journal Entries | Out-of-scope writer keeps its maintained behavior | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_out_of_scope_writer_keeps_its_maintained_behavior | 🟢 green |
+| specs/accounting/spec.md → EÜR (Einnahmen-Überschuss-Rechnung) | EÜR reads settlements, not invoice dates | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_eur_reads_settlements_not_invoice_dates | 🟢 green |
+| specs/accounting/spec.md → EÜR (Einnahmen-Überschuss-Rechnung) | EÜR rejects mixed legacy and settlement data | test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart | test_eur_rejects_mixed_legacy_and_settlement_data | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Allocate a mixed-category partial settlement | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_allocate_a_mixed_category_partial_settlement | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Recognize a direct cash receipt without an invoice | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_recognize_a_direct_cash_receipt_without_an_invoice | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Exclude a write-off from operating receipts | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_exclude_a_write_off_from_operating_receipts | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Classify an overpayment credit separately | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_classify_an_overpayment_credit_separately | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Reclassify a reversed settlement in the reversal period | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_reclassify_a_reversed_settlement_in_the_reversal_period | 🟢 green |
+| specs/einkommen/spec.md → Cash-basis EÜR settlement timing | Exclude legacy unverified rows from settlement totals | test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart | test_exclude_legacy_unverified_rows_from_settlement_totals | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Confirm a supplier payment | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_confirm_a_supplier_payment | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Split one transaction across invoices | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_split_one_transaction_across_invoices | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Retain a confirmed overpayment as credit | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_retain_a_confirmed_overpayment_as_credit | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Repeated confirmation does not duplicate | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_repeated_confirmation_does_not_duplicate | 🟢 green |
+| specs/receipts-and-payment-reconciliation/spec.md → Confirmed payment application posts settlement atomically | Full payment clears the dunning trigger | test/features/receipts_and_payment_reconciliation/balanced_journal_postings_and_settlement_events_test.dart | test_full_payment_clears_the_dunning_trigger | 🟢 green |
+
+## Coverage Notes
+
+- Every scenario is mapped once to a named executable test; all rows start red.
+- Tests use the repository’s Flutter test infrastructure and focused fixtures for the affected feature and persistence boundaries.
+- These are planned tests; this artifact does not claim that the tests already exist or have passed.

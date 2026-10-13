@@ -67,3 +67,49 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 No author rebuttals were supplied for this first review round.
+
+---
+
+## Round 2 re-review (fresh-context, append-only)
+
+### Review Metadata — Round 2
+
+- **Round**: 2; **prior**: round 1 VERDICT REVISE (5 critical + 3 moderate finding groups).
+- **Restrictions**: artifact read-only; no shell, no tests; only this `review.md` appended.
+- **Artifacts**: `proposal.md`, `design.md`, all three delta specs, `tasks.md` (108 tasks), `test-plan.md` (36 rows).
+- **VERDICT: APPROVE**
+- **CHANGES_APPLIED: n/a**
+- **Scope**: verdict governs spec quality only. Tasks 9.1–9.3 (mixed-category allocation) stay BLOCKED until the money contract is accepted; implementation of that trio waits.
+
+### Round-1 closure (all 8 groups closed normatively)
+
+Criticals:
+
+1. Money-contract gating — CLOSED. Amounts are integer cents from the approved money contract; remainder rule delegated, not reinvented; ship blocked pending acceptance (`proposal.md:7,27`; `design.md:25,49`; `specs/accounting/spec.md:5`; `specs/einkommen/spec.md:5,45`).
+2. EÜR canonical model — CLOSED. Accounting EÜR MODIFIED defines the eligible settlement source, excludes unconfirmed/suggested/invoice-date rows, and rules partial/mixed, direct cash, write-offs, overpayment/supplier credits, refunds/corrections, reversals, legacy fail-closed, and VAT independence (`specs/accounting/spec.md:137,187-197`; `specs/einkommen/spec.md:5,48-75`).
+3. Line/account invariants + writers — CLOSED. XOR single-side legs, ≥2 legs, equal totals, atomic tx, `(source_kind, source_id)` uniqueness with stated kinds, in-scope ban on gross-row/fallback-`1`, explicit out-of-scope writer list, `legacy_unverified` marker (`specs/accounting/spec.md:5,91`; `design.md:25-26,29-30`).
+4. Payment identity/cardinality — CLOSED. One tx → one group with N allocations, applied+unapplied = signed amount, sign → receivable/payable, overpayment credits, stable `(bank_transaction_id)` uniqueness, replay returns group; supplier/split/overpayment/repeat scenarios added (`specs/accounting/spec.md:49,64-85`; `specs/receipts-and-payment-reconciliation/spec.md:5,26-47`).
+5. Reversal lifecycle — CLOSED. Atomic settlement reversal with balance restore and EÜR reclass in reversal period, invoice-with-settlements rejected pre-reversal, VAT/doc links delegated, duplicate rejected (`design.md:28`; `specs/accounting/spec.md:5,27-45`; `specs/einkommen/spec.md:65-69`).
+
+Moderates:
+
+6. Settlement date + statutory exceptions — CLOSED. Booking/value date (imports), manual date (cash), confirmation date excluded, verbatim preservation; exceptions only via versioned rule result (id/version/basis/year/approver/trace) (`design.md:28,37`; `specs/einkommen/spec.md:5,30-40`).
+7. Receivable/dunning effects — CLOSED. `offen`→`teilbezahlt`→`bezahlt`, full-payment zero plus dunning clear, overpayment handling (`specs/receipts-and-payment-reconciliation/spec.md:5,49-53`).
+8. Migration rollback/legacy marker — CLOSED. Forward-only; rollback = pre-migration backup restore (only if no new groups); durable `legacy_unverified` marker (`design.md:29,42`; `proposal.md:27`).
+
+### Copied-13 reconcilability (mandated reading)
+
+- Journal-Entries copies (Booking creation, GoBD, Storno, Buchungsgruppen, Missing fields) read as out-of-scope/legacy writers: reconcilable; none irreconcilable. Residual (non-blocking): scenarios lack explicit legacy-only qualifiers — Storno (negative-`betrag` single row vs balanced-leg reversal) and Booking creation (unqualified "new journal entry") most misread-prone; preamble plus new in-scope-ban scenarios carry the scope.
+- EÜR copies (Zeile 12/15/16/33/60/106-107, Vorsteuer, no-entries) read as legacy periods: reconcilable; none irreconcilable. Residual (non-blocking): Zeile 12/15/16/60 assert invoice-date journal sums with no period qualifier, in direct text tension with the settlement-date rule; only the mandated legacy-period reading resolves it. Recommend explicit period qualifiers.
+- Conclusion: zero copied scenarios irreconcilable under the mandated reading.
+
+### Tasks/test-plan coverage
+
+- 36 new scenarios each have a red-green-refactor trio plus a test-plan row: §1 trios 1.1–1.12 / rows `test-plan.md:8-11`; §2 2.1–2.6 / rows 12–13; §3 3.1–3.18 / rows 14–19; §4 4.1–4.9 / rows 20–22; §5 5.1–5.6 / rows 24–25; §6 6.1–6.12 / rows 26–29; §7 7.1–7.6 / rows 30–31; §8 8.1–8.6 / rows 32–33; §9 9.1–9.18 (9.1–9.3 BLOCKED) / rows 34–39; §10 10.1–10.15 / rows 40–44.
+- 13 copied scenarios have no new trios/rows (maintained behavior, existing suite). Coverage Notes line 48 ("Every scenario is mapped once") holds for new scenarios only — one-line fix recommended, non-blocking.
+- Test-plan row 34 lacks the BLOCKED note tasks 9.1–9.3 carry — align, non-blocking; implementation waits regardless.
+
+### Residual non-blocking notes
+
+- `specs/accounting/spec.md:5` blanket "posting is blocked" vs narrow 9.1–9.3 blocking in tasks: scope the spec sentence to split/residual posting to match `proposal.md:7` / `design.md:49`.
+- **VERDICT: APPROVE**; **CHANGES_APPLIED: n/a**.
