@@ -15,17 +15,22 @@ import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_status_chip.dart';
 import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/l10n/l10n.dart';
+import 'package:openaccounting/pages/rechnungen/invoice_output_format.dart';
+import 'package:openaccounting/pages/rechnungen/invoice_workspace.dart' show invoiceByIdProvider, localeTagFor;
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
+import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
+import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 import 'package:path/path.dart' as p;
-
-final invoiceByIdProvider = FutureProvider.family<RechnungItem?, int>((ref, id) {
-  return ref.watch(appServicesProvider).rechnungen.findById(id);
-});
 
 /// Invoice detail designed as a document workspace rather than a database
 /// inspector. The preview mirrors the printed hierarchy and keeps lifecycle
-/// actions beside the document state.
+/// actions beside the document state. Displayed totals are copied from one
+/// authoritative domain preview result; this page never sums position
+/// aggregates to derive a document total.
 class InvoiceDocumentPage extends ConsumerStatefulWidget {
   const InvoiceDocumentPage({required this.id, super.key});
 
@@ -36,26 +41,250 @@ class InvoiceDocumentPage extends ConsumerStatefulWidget {
 }
 
 class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
-  bool _finalizing = false;
+  bool _pending = false;
+  bool _exportPending = false;
 
-  Future<void> _finalize() async {
-    if (_finalizing) return;
-    setState(() => _finalizing = true);
+  /// Explicit per-invoice choice for the open draft, keyed by invoice id so
+  /// reopening another document never reuses a stale selection.
+  EInvoiceOutputFormat? _chosenFormat;
+  int? _chosenForId;
+
+  /// Validation details from the last failed export, shown beside the format.
+  List<EInvoiceDiagnostic> _exportDiagnostics = const <EInvoiceDiagnostic>[];
+
+  /// Session flag: XRechnung was validated and written for this invoice.
+  bool _xrechnungExported = false;
+  int? _exportedForId;
+
+  RechnungenUseCases get _useCases => ref.read(appServicesProvider).rechnungen;
+
+  void _refreshAfter(int? createdId) {
+    ref.invalidate(invoiceByIdProvider(widget.id));
+    if (createdId != null) ref.invalidate(invoiceByIdProvider(createdId));
+    ref.invalidate(routeRecordsProvider('rechnungen'));
+  }
+
+  void _fail(Object _) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).invoiceActionFailed)));
+  }
+
+  /// Authoritative preview for the persisted document. Null when the stored
+  /// values fail domain validation (stale totals are never presented).
+  VorschauResult? _authoritativePreview(RechnungItem invoice) {
     try {
-      final String locale = localeTag(Localizations.localeOf(context));
-      await ref.read(appServicesProvider).rechnungen.finalizeRechnung(rechnungId: widget.id, locale: locale);
-      ref.invalidate(invoiceByIdProvider(widget.id));
-      ref.invalidate(routeRecordsProvider('rechnungen'));
+      return VorschauService.calculate(
+        eingabemodus: invoice.eingabemodus,
+        positionen: invoice.positionen,
+        rabattProzent: invoice.rabattProzent,
+        rabattBetrag: invoice.rabattBetrag,
+      );
+      // This domain validation type intentionally remains ArgumentError-derived for API compatibility.
+      // ignore: avoid_catching_errors
+    } on InvoiceMoneyValidationException {
+      return null;
+    }
+  }
+
+  Future<void> _finalize(RechnungItem invoice, VorschauResult? preview) async {
+    if (_pending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    if (preview == null) return; // Invalid preview blocks confirmation.
+    final String locale = localeTag(Localizations.localeOf(context));
+    final EInvoiceOutputFormat selection = _draftSelection(invoice);
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.invoiceFinalizeConfirmTitle),
+        content: Text(l10n.invoiceFinalizeConfirmMessage),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('invoice_finalize_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('invoice_finalize_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.invoiceFinalizeConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return; // Cancelled: draft stays editable.
+    setState(() => _pending = true);
+    try {
+      // The explicitly selected output format is persisted atomically with
+      // finalization; the customer preference only supplied the default.
+      await _useCases.finalizeRechnung(
+        rechnungId: widget.id,
+        locale: locale,
+        ausgabeformat: eInvoiceOutputFormatStorage(selection),
+      );
+      _refreshAfter(null);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).setupSaved)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.invoiceLifecycleDone)));
       }
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('${appLocalizationsOf(context).loadError}: $error')));
-      }
+      _fail(error);
     } finally {
-      if (mounted) setState(() => _finalizing = false);
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  Future<void> _storno(RechnungItem invoice) async {
+    if (_pending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    String reason = '';
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.invoiceActionStorno),
+        content: TextField(
+          autofocus: true,
+          onChanged: (String value) => reason = value,
+          decoration: InputDecoration(labelText: l10n.invoiceStornoReasonLabel),
+          maxLength: 500,
+        ),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('invoice_storno_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('invoice_storno_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.actionConfirm),
+          ),
+        ],
+      ),
+    );
+    final String trimmed = reason.trim();
+    if (confirmed != true) return;
+    if (trimmed.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.invoiceStornoReasonRequired)));
+      }
+      return; // Blank reason never reaches the use case.
+    }
+    setState(() => _pending = true);
+    try {
+      final RechnungItem created = await _useCases.stornoRechnung(rechnungId: widget.id, grund: trimmed);
+      _refreshAfter(created.id);
+      if (mounted) context.go('/invoices/${created.id}');
+    } catch (error) {
+      _fail(error);
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  Future<void> _gutschrift(RechnungItem invoice) async {
+    if (_pending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.invoiceActionCreditNote),
+        content: Text(l10n.invoiceCreditNoteConfirmMessage),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('invoice_gutschrift_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('invoice_gutschrift_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.actionConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _pending = true);
+    try {
+      // Invoice-derived credit note: date and positions omitted, the
+      // optional reason passes through `grund` with its empty default.
+      final RechnungItem created = await _useCases.createGutschrift(vonRechnungId: widget.id);
+      _refreshAfter(created.id);
+      if (mounted) context.go('/invoices/${created.id}');
+    } catch (error) {
+      _fail(error);
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  Future<void> _ersatz(RechnungItem invoice) async {
+    if (_pending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.invoiceActionReplacement),
+        content: Text(l10n.invoiceReplacementConfirmMessage),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('invoice_replacement_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('invoice_replacement_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.actionConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _pending = true);
+    try {
+      final RechnungItem created = await _useCases.createErsatzRechnung(vonRechnungId: widget.id);
+      _refreshAfter(created.id);
+      if (mounted) context.go('/invoices/${created.id}');
+    } catch (error) {
+      _fail(error);
+    } finally {
+      if (mounted) setState(() => _pending = false);
+    }
+  }
+
+  Future<void> _konvertieren(RechnungItem invoice, String zielTyp) async {
+    if (_pending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.invoiceConvertConfirmTitle),
+        content: Text(_documentLabel(zielTyp, l10n)),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('invoice_convert_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('invoice_convert_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.actionConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _pending = true);
+    try {
+      final RechnungItem created = await _useCases.konvertiereDokument(quelleId: widget.id, zielTyp: zielTyp);
+      _refreshAfter(created.id);
+      if (mounted) context.go('/invoices/${created.id}');
+    } catch (error) {
+      _fail(error);
+    } finally {
+      if (mounted) setState(() => _pending = false);
     }
   }
 
@@ -89,14 +318,119 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
       if (location == null) return;
       await source.copy(location.path);
       _showMessage(l10n.setupSaved);
-    } catch (error) {
-      _showMessage('${l10n.loadError}: $error');
+    } catch (_) {
+      _showMessage(l10n.loadError);
     }
   }
 
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Explicit per-invoice output selection. Finalized invoices restore the
+  /// persisted choice; drafts use the user override or the customer default.
+  EInvoiceOutputFormat _draftSelection(RechnungItem invoice) {
+    if (!invoice.istEntwurfDokument) return parseEInvoiceOutputFormat(invoice.ausgabeformat);
+    if (_chosenForId == invoice.id && _chosenFormat != null) return _chosenFormat!;
+    return ref.read(invoiceOutputDefaultProvider(invoice.id)).asData?.value ?? EInvoiceOutputFormat.pdf;
+  }
+
+  bool _isOrdinaryOutgoing(RechnungItem invoice) {
+    return invoice.typ.trim().toLowerCase() == 'rechnung' && invoice.lieferantId == null;
+  }
+
+  /// Readiness derived from validated artifacts only. XRechnung shows as not
+  /// yet validated until this session exports it; legacy rows resolve to PDF.
+  EInvoiceReadiness _readiness(RechnungItem invoice) {
+    if (invoice.istEntwurfDokument) return EInvoiceReadiness.notValidated;
+    switch (parseEInvoiceOutputFormat(invoice.ausgabeformat)) {
+      case EInvoiceOutputFormat.pdf:
+        return (invoice.originalPdfPath?.trim().isNotEmpty ?? false)
+            ? EInvoiceReadiness.valid
+            : EInvoiceReadiness.notValidated;
+      case EInvoiceOutputFormat.zugferd:
+        return _zugferdXmlExists(invoice.id) ? EInvoiceReadiness.valid : EInvoiceReadiness.invalid;
+      case EInvoiceOutputFormat.xrechnung:
+        return (_exportedForId == invoice.id && _xrechnungExported)
+            ? EInvoiceReadiness.valid
+            : EInvoiceReadiness.notValidated;
+    }
+  }
+
+  bool _zugferdXmlExists(int invoiceId) {
+    try {
+      final String? profileDir = ref.read(appDatabaseProvider).profileDir;
+      if (profileDir == null || profileDir.trim().isEmpty) return false;
+      return File('$profileDir/pdfs/documents/$invoiceId.zugferd.xml').existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _exportXRechnung(RechnungItem invoice) async {
+    if (_exportPending) return;
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    String buyerReference = '';
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(l10n.eInvoiceExportXrechnung),
+        content: TextField(
+          key: const ValueKey<String>('e_invoice_buyer_reference'),
+          autofocus: true,
+          onChanged: (String value) => buyerReference = value,
+          decoration: InputDecoration(
+            labelText: l10n.eInvoiceBuyerReferenceLabel,
+            hintText: l10n.eInvoiceBuyerReferenceHint,
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('e_invoice_export_dialog_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.actionCancel),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('e_invoice_export_dialog_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.actionSave),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() {
+      _exportPending = true;
+      _exportDiagnostics = const <EInvoiceDiagnostic>[];
+    });
+    try {
+      // Validation runs before any save dialog or file write inside the use
+      // case; a failing snapshot never opens a dialog and changes nothing.
+      final String? destination = await _useCases.exportXRechnung(
+        rechnungId: widget.id,
+        buyerReference: buyerReference.trim().isEmpty ? null : buyerReference.trim(),
+      );
+      if (!mounted) return;
+      if (destination == null) {
+        _showMessage(l10n.eInvoiceExportCancelled);
+      } else {
+        setState(() {
+          _xrechnungExported = true;
+          _exportedForId = widget.id;
+        });
+        _showMessage(l10n.eInvoiceExportSaved);
+      }
+    } on EInvoiceExportValidationException catch (error) {
+      if (mounted) {
+        setState(() => _exportDiagnostics = error.result.diagnostics);
+        _showMessage(l10n.eInvoiceReadinessInvalid);
+      }
+    } catch (_) {
+      if (mounted) _showMessage(l10n.invoiceActionFailed);
+    } finally {
+      if (mounted) setState(() => _exportPending = false);
+    }
   }
 
   @override
@@ -152,8 +486,11 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
   Widget _documentPage(BuildContext context, RechnungItem invoice) {
     final String locale = localeTag(Localizations.localeOf(context));
     final String heading = invoice.rechnungsnummer ?? appLocalizationsOf(context).invoiceDraftNumber(invoice.id);
-    final num total = invoice.positionen.fold<num>(0, (num sum, RechnungPositionItem p) => sum + p.gesamt);
-    final bool isDraft = invoice.istEntwurf || invoice.status.toLowerCase() == 'entwurf';
+    final VorschauResult? preview = _authoritativePreview(invoice);
+    // The document total is the preview result's gross value. When the
+    // stored values fail validation no amount is presented as current.
+    final num? total = preview?.bruttoBetrag;
+    final bool isDraft = invoice.istEntwurfDokument;
     return AppPage(
       maxWidth: 1100,
       header: AppPageHeader(
@@ -162,36 +499,21 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
         subtitle:
             '$heading · ${_documentLabel(invoice.typ, appLocalizationsOf(context))} · ${_formatDate(invoice.datum, locale)}',
         showFilterToolbar: false,
-        actions: <Widget>[
-          if (isDraft)
-            FilledButton.icon(
-              onPressed: _finalizing ? null : _finalize,
-              icon: _finalizing
-                  ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.task_alt),
-              label: Text(
-                _finalizing ? appLocalizationsOf(context).setupSaving : appLocalizationsOf(context).actionContinue,
-              ),
-            )
-          else ...<Widget>[
-            OutlinedButton.icon(
-              onPressed: () => _savePdf(invoice),
-              icon: const Icon(Icons.save_alt_outlined),
-              label: Text(appLocalizationsOf(context).actionSave),
-            ),
-            FilledButton.icon(
-              onPressed: () => _showPreview(context, invoice),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(appLocalizationsOf(context).pdfInvoice),
-            ),
-          ],
-        ],
+        actions: _headerActions(context, invoice, preview),
       ),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _summaryCard(context, invoice, total, isDraft),
+            const SizedBox(height: AppSpacing.lg),
+            _lifecycleCard(context, invoice, preview),
+            if (_isOrdinaryOutgoing(invoice)) ...<Widget>[
+              const SizedBox(height: AppSpacing.lg),
+              _eInvoiceCard(context, invoice),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            _relationshipCard(context, invoice),
             const SizedBox(height: AppSpacing.lg),
             _previewCard(context, invoice, total, isDraft),
           ],
@@ -200,9 +522,192 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     );
   }
 
-  Widget _summaryCard(BuildContext context, RechnungItem invoice, num total, bool isDraft) {
+  List<Widget> _headerActions(BuildContext context, RechnungItem invoice, VorschauResult? preview) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final bool isDraft = invoice.istEntwurfDokument;
+    if (isDraft) {
+      final bool canFinalize = _useCases.kannFinalisieren(invoice) && preview != null;
+      return <Widget>[
+        TextButton.icon(
+          onPressed: () => context.go('/invoices/${invoice.id}/edit'),
+          icon: const Icon(Icons.edit_outlined),
+          label: Text(l10n.invoiceWorkspaceEditDraft),
+        ),
+        FilledButton.icon(
+          key: const ValueKey<String>('invoice_finalize_header'),
+          onPressed: (_pending || !canFinalize) ? null : () => _finalize(invoice, preview),
+          icon: _pending
+              ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.task_alt),
+          label: Text(_pending ? l10n.setupSaving : l10n.invoiceActionFinalize),
+        ),
+      ];
+    }
+    return <Widget>[
+      OutlinedButton.icon(
+        onPressed: () => _savePdf(invoice),
+        icon: const Icon(Icons.save_alt_outlined),
+        label: Text(l10n.actionSave),
+      ),
+      FilledButton.icon(
+        onPressed: () => _showPreview(context, invoice, preview?.bruttoBetrag),
+        icon: const Icon(Icons.picture_as_pdf_outlined),
+        label: Text(l10n.pdfInvoice),
+      ),
+    ];
+  }
+
+  /// Contextual lifecycle actions derived from persisted type, status and
+  /// relationships. Only eligible operations are enabled.
+  Widget _lifecycleCard(BuildContext context, RechnungItem invoice, VorschauResult? preview) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final bool correctionsReady = _useCases.correctionActionsAvailable;
+    final Set<String> targets = correctionsReady ? _useCases.konvertierZiele(invoice) : <String>{};
+    final bool showFinalize = _useCases.kannFinalisieren(invoice);
+    final bool showStorno = correctionsReady && !invoice.istEntwurfDokument && _useCases.kannStorno(invoice);
+    final bool showCredit = correctionsReady && _useCases.kannGutschrift(invoice);
+    final bool showErsatz = correctionsReady && _useCases.kannErsatz(invoice);
+    final bool anyAction = showFinalize || showStorno || showCredit || showErsatz || targets.isNotEmpty;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(l10n.invoiceLifecycleTitle, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          if (!correctionsReady && !invoice.istEntwurfDokument)
+            Text(l10n.invoiceLifecycleUnavailable, style: Theme.of(context).textTheme.bodySmall),
+          if (anyAction)
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.sm,
+              children: <Widget>[
+                if (showFinalize)
+                  FilledButton.icon(
+                    key: const ValueKey<String>('invoice_finalize_lifecycle'),
+                    onPressed: (_pending || preview == null) ? null : () => _finalize(invoice, preview),
+                    icon: const Icon(Icons.task_alt),
+                    label: Text(l10n.invoiceActionFinalize),
+                  ),
+                if (showStorno)
+                  OutlinedButton.icon(
+                    key: const ValueKey<String>('invoice_action_storno'),
+                    onPressed: _pending ? null : () => _storno(invoice),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: Text(l10n.invoiceActionStorno),
+                  ),
+                if (showCredit)
+                  OutlinedButton.icon(
+                    key: const ValueKey<String>('invoice_action_credit_note'),
+                    onPressed: _pending ? null : () => _gutschrift(invoice),
+                    icon: const Icon(Icons.receipt_outlined),
+                    label: Text(l10n.invoiceActionCreditNote),
+                  ),
+                if (showErsatz)
+                  OutlinedButton.icon(
+                    key: const ValueKey<String>('invoice_action_replacement'),
+                    onPressed: _pending ? null : () => _ersatz(invoice),
+                    icon: const Icon(Icons.autorenew),
+                    label: Text(l10n.invoiceActionReplacement),
+                  ),
+                for (final String ziel in targets)
+                  OutlinedButton.icon(
+                    key: ValueKey<String>('invoice_action_convert_$ziel'),
+                    onPressed: _pending ? null : () => _konvertieren(invoice, ziel),
+                    icon: const Icon(Icons.swap_horiz),
+                    label: Text('${l10n.invoiceActionConvert}: ${_documentLabel(ziel, l10n)}'),
+                  ),
+              ],
+            )
+          else
+            Text(l10n.invoiceLifecycleUnavailable, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  /// Explicit e-invoice output surface: draft choice with customer default,
+  /// finalized restore with readiness and export. The widget never issues
+  /// SQL; export runs through the registered invoice use case.
+  Widget _eInvoiceCard(BuildContext context, RechnungItem invoice) {
+    final bool isDraft = invoice.istEntwurfDokument;
+    if (isDraft) {
+      final AsyncValue<EInvoiceOutputFormat> defaultFormat = ref.watch(invoiceOutputDefaultProvider(invoice.id));
+      return AppCard(
+        child: defaultFormat.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (Object error, StackTrace stack) => InvoiceOutputFormatSelector(
+            selected: _chosenFormat ?? EInvoiceOutputFormat.pdf,
+            readiness: EInvoiceReadiness.notValidated,
+            onChanged: (EInvoiceOutputFormat value) {
+              setState(() {
+                _chosenFormat = value;
+                _chosenForId = invoice.id;
+              });
+            },
+          ),
+          data: (EInvoiceOutputFormat fallback) {
+            final EInvoiceOutputFormat selected = (_chosenForId == invoice.id && _chosenFormat != null)
+                ? _chosenFormat!
+                : fallback;
+            return InvoiceOutputFormatSelector(
+              selected: selected,
+              readiness: EInvoiceReadiness.notValidated,
+              onChanged: (EInvoiceOutputFormat value) {
+                setState(() {
+                  _chosenFormat = value;
+                  _chosenForId = invoice.id;
+                });
+              },
+            );
+          },
+        ),
+      );
+    }
+    final EInvoiceOutputFormat selected = parseEInvoiceOutputFormat(invoice.ausgabeformat);
+    return AppCard(
+      child: InvoiceOutputFormatSelector(
+        selected: selected,
+        readiness: _readiness(invoice),
+        diagnostics: _exportDiagnostics,
+        isDraft: false,
+        exportAvailable: true,
+        exportPending: _exportPending,
+        onExport: () => _exportXRechnung(invoice),
+      ),
+    );
+  }
+
+  /// Reciprocal typed source/target links with navigable targets.
+  Widget _relationshipCard(BuildContext context, RechnungItem invoice) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(l10n.invoiceRelationshipsTitle, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          if (invoice.beziehungen.isEmpty)
+            Text(l10n.invoiceRelationshipsEmpty, style: Theme.of(context).textTheme.bodySmall)
+          else
+            for (final RechnungBeziehung link in invoice.beziehungen)
+              ListTile(
+                key: ValueKey<String>('relationship_${link.kind}_${link.documentId}'),
+                leading: const Icon(Icons.link),
+                title: Text('${_relationshipLabel(link.kind, l10n)} · ${link.label}'),
+                subtitle: link.available ? null : Text('${l10n.invoiceRelationshipMissing} #${link.documentId}'),
+                trailing: link.available ? const Icon(Icons.arrow_forward) : null,
+                enabled: link.available,
+                onTap: link.available ? () => context.go('/invoices/${link.documentId}') : null,
+              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryCard(BuildContext context, RechnungItem invoice, num? total, bool isDraft) {
     final String locale = localeTag(Localizations.localeOf(context));
     final AppLocalizations l10n = appLocalizationsOf(context);
+    final VorschauResult? preview = _authoritativePreview(invoice);
     return AppCard(
       child: Wrap(
         spacing: AppSpacing.xxl,
@@ -223,12 +728,29 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(l10n.pdfTotal, style: Theme.of(context).textTheme.bodySmall),
-              MoneyText(total, textAlign: TextAlign.left, style: Theme.of(context).textTheme.titleLarge),
+              if (preview != null && total != null)
+                MoneyText(total, textAlign: TextAlign.left, style: Theme.of(context).textTheme.titleLarge)
+              else
+                Text(
+                  l10n.invoiceWorkspacePreviewStale,
+                  key: const ValueKey<String>('detail_total_stale'),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
             ],
           ),
+          if (preview != null) ...<Widget>[
+            _SummaryMetric(
+              label: l10n.pdfNet,
+              value: formatMoney(preview.nettoBetrag, locale: locale),
+            ),
+            _SummaryMetric(
+              label: l10n.pdfTax,
+              value: formatMoney(preview.ustBetrag, locale: locale),
+            ),
+          ],
           if (!isDraft)
             TextButton.icon(
-              onPressed: () => _showPreview(context, invoice),
+              onPressed: () => _showPreview(context, invoice, total),
               icon: const Icon(Icons.visibility_outlined),
               label: Text(l10n.pdfInvoice),
             ),
@@ -237,7 +759,7 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     );
   }
 
-  Widget _previewCard(BuildContext context, RechnungItem invoice, num total, bool isDraft) {
+  Widget _previewCard(BuildContext context, RechnungItem invoice, num? total, bool isDraft) {
     final Color pageBackground = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF20242C)
         : Colors.white;
@@ -274,8 +796,7 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     );
   }
 
-  void _showPreview(BuildContext context, RechnungItem invoice) {
-    final num total = invoice.positionen.fold<num>(0, (num sum, RechnungPositionItem p) => sum + p.gesamt);
+  void _showPreview(BuildContext context, RechnungItem invoice, num? total) {
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) => Dialog(
@@ -323,11 +844,12 @@ class _InvoicePaper extends StatelessWidget {
   const _InvoicePaper({required this.invoice, required this.total});
 
   final RechnungItem invoice;
-  final num total;
+  final num? total;
 
   @override
   Widget build(BuildContext context) {
-    final String locale = localeTag(Localizations.localeOf(context));
+    final String locale = localeTagFor(context);
+    final num? displayedTotal = total;
     final AppLocalizations l10n = appLocalizationsOf(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -384,7 +906,7 @@ class _InvoicePaper extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    l10n.pdfGross,
+                    invoice.eingabemodus == 'brutto' ? l10n.pdfGross : l10n.pdfNet,
                     textAlign: TextAlign.right,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
@@ -417,10 +939,22 @@ class _InvoicePaper extends StatelessWidget {
                 Expanded(
                   child: Text(l10n.pdfTotal, style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
-                Text(
-                  formatMoney(total, locale: locale),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+                if (displayedTotal != null)
+                  Flexible(
+                    child: Text(
+                      formatMoney(displayedTotal, locale: locale),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: Text(
+                      l10n.invoiceWorkspacePreviewStale,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -519,11 +1053,25 @@ String _statusLabel(String value, AppLocalizations l10n) {
 }
 
 String _documentLabel(String value, AppLocalizations l10n) {
-  return switch (value) {
+  return switch (value.trim().toLowerCase()) {
     'rechnung' => l10n.pdfInvoice,
     'gutschrift' => l10n.pdfCreditNote,
+    'storno' => l10n.pdfStorno,
+    'angebot' => l10n.pdfQuote,
+    'auftrag' => l10n.pdfOrder,
+    'proforma' => l10n.pdfProforma,
+    'lieferschein' => l10n.pdfDelivery,
     _ => l10n.pdfInvoice,
   };
+}
+
+String _relationshipLabel(String kind, AppLocalizations l10n) {
+  final String normalized = kind.toLowerCase();
+  if (normalized.contains('storno')) return l10n.pdfStorno;
+  if (normalized.contains('gutschrift')) return l10n.pdfCreditNote;
+  if (normalized.contains('ersatz')) return l10n.invoiceActionReplacement;
+  if (normalized.contains('konvertierung')) return l10n.invoiceActionConvert;
+  return l10n.invoiceRelationshipsTitle;
 }
 
 String _formatDate(String value, String locale) {

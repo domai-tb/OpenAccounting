@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -5,11 +7,20 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
+Future<AppDatabase> _openProfileDb() async {
+  final Directory profile = await Directory.systemTemp.createTemp('correction-flow-');
+  final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profile.path);
+  addTearDown(() async {
+    await db.close();
+    await profile.delete(recursive: true);
+  });
+  await db.ensureOpen();
+  return db;
+}
+
 void main() {
   test('test_rechnung_storno_reverses_positive_balances', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -18,7 +29,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 2, einzelpreis: 100, gesamt: 200)],
@@ -48,15 +59,13 @@ void main() {
   });
 
   test('test_storno_requires_non_empty_reason', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -92,9 +101,7 @@ void main() {
   });
 
   test('test_already_storniert_invoice_cannot_be_storniert_again', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -103,7 +110,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -112,14 +119,12 @@ void main() {
     await uc.stornoRechnung(rechnungId: fin.id, grund: 'Grund');
     await expectLater(
       uc.stornoRechnung(rechnungId: fin.id, grund: 'Erneut'),
-      throwsA(predicate((e) => e.toString().contains('bereits storniert'))),
+      throwsA(isA<StateError>().having((error) => error.message, 'message', contains('nicht zulässig'))),
     );
   });
 
   test('test_storno_restores_stock_from_source_movement', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -131,7 +136,7 @@ void main() {
     await db.executor.runCustom("INSERT INTO artikel (bezeichnung, vk_netto, bestand) VALUES ('Widget', 10, 20)");
     final art = await db.executor.runSelect('SELECT id FROM artikel WHERE bezeichnung = ?', ['Widget']);
     final int artikelId = (art.single['id'] as num?)?.toInt() ?? 0;
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: [
@@ -147,26 +152,22 @@ void main() {
   });
 
   test('storno of draft blocked', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
     );
     await expectLater(
       uc.stornoRechnung(rechnungId: draft.id, grund: 'Grund'),
-      throwsA(predicate((e) => e.toString().contains('finalisiert'))),
+      throwsA(isA<StateError>().having((error) => error.message, 'message', contains('nicht zulässig'))),
     );
   });
 
   test('test_gutschrift_storno_reverses_negative_balances', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
@@ -175,7 +176,7 @@ void main() {
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final gutschrift = await uc.createGutschrift(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'G', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -201,9 +202,7 @@ void main() {
   });
 
   test('test_gutschrift_storno_is_exact_positive_inverse', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
@@ -215,7 +214,7 @@ void main() {
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],

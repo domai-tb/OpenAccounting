@@ -44,7 +44,7 @@ The invoice workspace SHALL expose supported finalization, Storno, Gutschrift, r
 conversion operations in the context of the selected document, using invoice use cases for all mutations. The UI SHALL
 enable only operations permitted by `openspec/specs/documents/spec.md`, and each use case SHALL revalidate type, state,
 and existing lifecycle relationships inside the write transaction before creating a document or side effect. Storno is
-permitted only for a finalized outgoing Rechnung or Gutschrift that is not already storniert; an invoice-derived
+permitted for a finalized outgoing or incoming Rechnung, or a Gutschrift, that is not already storniert; an invoice-derived
 Gutschrift requires a finalized outgoing Rechnung; Ersatzrechnung requires a storniert outgoing Rechnung with no
 existing replacement; conversion requires a finalized source and a supported conversion-chain pair; finalization
 requires a valid Entwurf type. Finalization and conversion SHALL require user confirmation. Storno SHALL collect a
@@ -63,6 +63,11 @@ numbering, or accounting side effects.
 - **WHEN** the user selects Storno, enters a non-empty reason, and confirms
 - **THEN** `stornoRechnung(rechnungId: id, grund: trimmedReason)` is invoked once
 - **AND** the source detail shows the resulting Storno relationship and status
+
+#### Scenario: Incoming invoice Storno remains available
+- **GIVEN** a finalized incoming Rechnung that is not already storniert
+- **WHEN** the user selects Storno, enters a non-empty reason, and confirms
+- **THEN** the incoming invoice is reversed through the existing documents Storno use case and shows its Storno relationship
 
 #### Scenario: Replacement invoice is offered for a storniert source
 - **GIVEN** a storniert outgoing invoice that is eligible for an Ersatzrechnung

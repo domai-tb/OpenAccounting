@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -5,11 +7,20 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
+Future<AppDatabase> _openProfileDb() async {
+  final Directory profile = await Directory.systemTemp.createTemp('correction-flow-');
+  final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profile.path);
+  addTearDown(() async {
+    await db.close();
+    await profile.delete(recursive: true);
+  });
+  await db.ensureOpen();
+  return db;
+}
+
 void main() {
   test('test_invoice_gutschrift_links_source_and_uses_gs_number', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -18,7 +29,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 500, gesamt: 500)],
@@ -33,15 +44,13 @@ void main() {
   });
 
   test('test_standalone_gutschrift_has_gs_number_and_no_source_reference', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final gs = await uc.createGutschrift(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Gutschrift', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -61,9 +70,7 @@ void main() {
   });
 
   test('ersatzrechnung bidirectional link only from storniert', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -72,7 +79,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -91,9 +98,7 @@ void main() {
   });
 
   test('gutschrift can be storniert', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await db.executor.runCustom(
@@ -102,7 +107,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final gs = await uc.createGutschrift(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'G', menge: 1, einzelpreis: 200, gesamt: 200)],
@@ -113,9 +118,7 @@ void main() {
   });
 
   test('test_rechnung_correction_and_standalone_gutschrift_have_negative_totals', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
@@ -124,7 +127,7 @@ void main() {
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
     );
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -149,9 +152,7 @@ void main() {
   });
 
   test('test_invoice_gutschrift_reverses_discounted_totals', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
@@ -160,7 +161,7 @@ void main() {
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
     );
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],
@@ -180,15 +181,13 @@ void main() {
   });
 
   test('test_standalone_gutschrift_persists_negative_totals_without_source', () async {
-    final db = AppDatabase.createTestDatabase();
-    addTearDown(db.close);
-    await db.ensureOpen();
+    final db = await _openProfileDb();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'GS-YY####', naechste_nummer = 1 WHERE typ = 'gutschrift'",
     );
 
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
     final credit = await uc.createGutschrift(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 100, gesamt: 100)],

@@ -50,3 +50,68 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 None.
+
+## Independent Implementation Review — Round 4 (2026-10-13)
+
+### Scope and validation
+
+Reviewed the current invoice-authoring-and-lifecycle-workspace implementation against its proposal, design, delta spec, maintained `documents` rules, and the prior Round 3 review. Focus areas were the correction-artifact capability gate, customer/edit/save validation, lifecycle UI behavior and relationship navigation, and authoritative money preview.
+
+Ran the agreed scoped suite from the repository root:
+
+```bash
+fvm flutter test --dart-define=platform=vm \
+  test/features/rechnungen/workspace_editor_test.dart \
+  test/features/rechnungen/workspace_preview_test.dart \
+  test/features/rechnungen/workspace_responsive_test.dart \
+  test/features/rechnungen/workspace_lifecycle_actions_test.dart \
+  test/features/rechnungen/workspace_lifecycle_ui_test.dart \
+  test/features/rechnungen/workspace_relationships_test.dart \
+  test/features/rechnungen/correction_artifact_transaction_wiring_test.dart \
+  test/features/rechnungen/storno_test.dart \
+  test/features/rechnungen/gutschrift_test.dart \
+  test/features/documents/document_correction_artifacts_and_receipt_intake_test.dart \
+  test/integration/audit/correction-document-accounting-integrity_test.dart
+```
+
+Result: exit 0, **76 tests passed**. This review independently ran the test command; no device or platform-runtime validation is claimed.
+
+### Findings
+
+#### Moderate — test-plan result ledger is stale
+
+`test-plan.md` still marks every row `🔴 pending` and says results remain pending until the final scoped result is provided. The final scoped result now exists: the command above passed 76/76. The listed test names correspond to real tests. In particular, `workspace_lifecycle_actions_test.dart` covers use-case/action orchestration, while `workspace_lifecycle_ui_test.dart` contains direct widget tests for Storno, Gutschrift, replacement, conversion, and incoming-invoice Storno. Update the result ledger and its coverage note to record the run and preserve that distinction.
+
+### Implementation review
+
+- The artifact capability is exposed through the use-case/repository boundary and requires a profile directory; the correction writer commits the artifact inside the database transaction path. The scoped tests cover unavailable capability, committed artifact paths, and rollback when the committed file is unreadable.
+- New-draft customer selection is required and persists the selected customer. Invalid dates and malformed numeric input are surfaced while preserving the current editor text. Draft edits validate before the atomic update; rejected edits retain the previous stored values.
+- The detail actions recheck lifecycle eligibility, collect and trim Storno reasons, and require confirmation for finalization, Gutschrift, replacement, and conversion. The widget suite exercises the confirmation/cancel/write behavior, including incoming-invoice Storno. Reciprocal relationship reads, missing-target state, and navigation are covered.
+- The editor and document detail preview use the canonical invoice calculator for net, VAT, and gross totals, including header discounts, and suppress stale totals after invalid input. The embedded detail row label now follows the input mode (`Netto` or `Brutto`) instead of labeling a net line amount as gross.
+- Prior findings on discount round-tripping, reordered row identity, lifecycle confirmation coverage, Storno dialog state lifetime, and relationship navigation are resolved in the current snapshot and covered by the passing scoped run.
+
+### Verdict
+
+VERDICT: REVISE
+
+The implementation findings reviewed here are resolved and the scoped suite passes. The change remains unready for approval until its test-plan ledger records the completed results rather than reporting every test as pending.
+
+CHANGES_APPLIED: yes
+
+## Independent Implementation Review — Round 5 (2026-10-13)
+
+### Review update
+
+The Round 4 test-plan finding is resolved: `test-plan.md` now records all 36 planned cases as passed and its coverage note records the final aggregate result. The net-mode document line label also matches the displayed net line amount. The exact 11-file aggregate was rerun against this implementation snapshot and completed with exit 0: **76 tests passed**.
+
+### Findings
+
+None.
+
+### Verdict
+
+VERDICT: APPROVE
+
+The reviewed implementation and test artifacts now agree. The scoped suite covers customer selection and save validation, draft edits and ordering, discount-aware authoritative preview, lifecycle capability and confirmations, reciprocal relationships, correction artifact rollback, and accounting integrity.
+
+CHANGES_APPLIED: yes

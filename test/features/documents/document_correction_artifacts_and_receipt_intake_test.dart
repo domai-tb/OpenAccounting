@@ -14,8 +14,12 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
 Future<AppDatabase> _openDb() async {
-  final AppDatabase db = AppDatabase.createTestDatabase();
-  addTearDown(db.close);
+  final Directory profile = await Directory.systemTemp.createTemp('document-fixture-');
+  final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profile.path);
+  addTearDown(() async {
+    await db.close();
+    await profile.delete(recursive: true);
+  });
   await db.ensureOpen();
   return db;
 }
@@ -37,7 +41,9 @@ void main() {
     test('test_replacement_draft_retains_source_fields_and_links', () async {
       final AppDatabase db = await _openDb();
       await _seedRanges(db);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final RechnungItem draft = await uc.createDraftRechnung(
         datum: '2026-04-02',
         positionen: const <RechnungPositionItem>[
@@ -77,7 +83,9 @@ void main() {
     test('test_ineligible_source_creates_no_partial_target', () async {
       final AppDatabase db = await _openDb();
       await _seedRanges(db);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final RechnungItem draft = await uc.createDraftRechnung(
         datum: '2026-04-02',
         positionen: const <RechnungPositionItem>[
@@ -101,8 +109,10 @@ void main() {
     test('test_supported_conversion_preserves_source_context', () async {
       final AppDatabase db = await _openDb();
       await _seedRanges(db);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
-      final RechnungItem angebot = await uc.createDokument(
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
+      final RechnungItem angebotDraft = await uc.createDokument(
         typ: 'angebot',
         datum: '2026-04-02',
         positionen: const <RechnungPositionItem>[
@@ -112,8 +122,10 @@ void main() {
       await db.executor.runUpdate('UPDATE rechnungen SET einleitungstext = ?, schlusstext = ? WHERE id = ?', <Object?>[
         'Sehr geehrte Damen und Herren',
         'Mit freundlichen Grüßen',
-        angebot.id,
+        angebotDraft.id,
       ]);
+      final RechnungItem angebot = await uc.finalizeRechnung(locale: 'de_DE', rechnungId: angebotDraft.id);
+      expect(angebot.istEntwurf, isFalse);
       final RechnungItem auftrag = await uc.konvertiereDokument(quelleId: angebot.id, zielTyp: 'auftrag');
       final List<Map<String, Object?>> target = await db.executor.runSelect(
         'SELECT konvertiert_von, eingabemodus, einleitungstext, schlusstext FROM rechnungen WHERE id = ?',
@@ -147,7 +159,9 @@ void main() {
       addTearDown(() => profile.delete(recursive: true));
       final BelegRepository belege = BelegRepository(db.executor, profileDir: profile.path);
       final DokumentenpaketRepository pakete = DokumentenpaketRepository(db.executor, profileDir: profile.path);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final RechnungItem invoice = await uc.createDokument(
         typ: 'rechnung',
         datum: '2026-05-01',
@@ -182,7 +196,9 @@ void main() {
       addTearDown(() => profile.delete(recursive: true));
       final BelegRepository belege = BelegRepository(db.executor, profileDir: profile.path);
       final DokumentenpaketRepository pakete = DokumentenpaketRepository(db.executor, profileDir: profile.path);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final RechnungItem invoice = await uc.createDokument(
         typ: 'rechnung',
         datum: '2026-05-01',
@@ -253,7 +269,9 @@ void main() {
       final AppDatabase db = await _openDb();
       await _seedRanges(db);
       final DokumentenpaketRepository pakete = DokumentenpaketRepository(db.executor);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       Future<RechnungItem> draft(String typ) => uc.createDokument(
         typ: typ,
         datum: '2026-05-01',
@@ -287,7 +305,9 @@ void main() {
       final Directory profile = await Directory.systemTemp.createTemp('beleg-attach-');
       addTearDown(() => profile.delete(recursive: true));
       final BelegRepository belege = BelegRepository(db.executor, profileDir: profile.path);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final int belegId = await belege.importSource(bytes: _pdfBytes('beleg'), filename: 'beleg.pdf');
       final RechnungItem invoice = await uc.createDokument(
         typ: 'rechnung',
@@ -346,7 +366,9 @@ void main() {
       final Directory profile = await Directory.systemTemp.createTemp('beleg-linked-');
       addTearDown(() => profile.delete(recursive: true));
       final BelegRepository belege = BelegRepository(db.executor, profileDir: profile.path);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final int belegId = await belege.importSource(bytes: _pdfBytes('beleg'), filename: 'beleg.pdf');
       final RechnungItem invoice = await uc.createDokument(
         typ: 'rechnung',
@@ -443,7 +465,9 @@ void main() {
       final Directory profile = await Directory.systemTemp.createTemp('beleg-shared-');
       addTearDown(() => profile.delete(recursive: true));
       final BelegRepository belege = BelegRepository(db.executor, profileDir: profile.path);
-      final RechnungenUseCases uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+      final RechnungenUseCases uc = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)),
+      );
       final int belegId = await belege.importSource(bytes: _pdfBytes('shared'), filename: 'shared.pdf');
       final int kundeId = await db.executor.runInsert(
         "INSERT INTO kunden (name, strasse, plz, ort) VALUES ('ACME', 'Straße 1', '80331', 'München')",
