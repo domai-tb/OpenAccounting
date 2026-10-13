@@ -1,6 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/desktop/desktop_capability.dart';
+import 'package:openaccounting/features/document_delivery/artifact_resolver.dart';
+import 'package:openaccounting/features/document_delivery/document_delivery_context.dart';
+import 'package:openaccounting/features/document_delivery/document_delivery_service.dart';
+import 'package:openaccounting/features/document_delivery/email_attempt_repository.dart';
+import 'package:openaccounting/features/document_delivery/email_template_service.dart';
+import 'package:openaccounting/features/document_delivery/smtp_configuration_service.dart';
+import 'package:openaccounting/features/document_delivery/smtp_credential_vault.dart';
+import 'package:openaccounting/features/document_delivery/smtp_transport.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
 import 'package:openaccounting/features/assets/asset_repository.dart';
 import 'package:openaccounting/features/assets/asset_schedule_service.dart';
@@ -21,6 +29,11 @@ import 'package:openaccounting/features/feature_modules/feature_module_repositor
 import 'package:openaccounting/features/feature_modules/feature_module_service.dart';
 import 'package:openaccounting/features/inventory/stocktake_repository.dart';
 import 'package:openaccounting/features/inventory/stocktake_usecases.dart';
+import 'package:openaccounting/features/accounting/gobd_export_service.dart';
+import 'package:openaccounting/features/documents/beleg_repository.dart';
+import 'package:openaccounting/features/documents/dokumentenpaket_repository.dart';
+import 'package:openaccounting/features/documents/kunden_beleg_repository.dart';
+import 'package:openaccounting/features/receipts/receipt_inbox_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -38,11 +51,6 @@ import 'package:path/path.dart' as p;
 /// Aggregated use-cases for the application.
 /// Pages resolve from here instead of constructing repositories directly.
 class AppServices {
-  late final AssetRegisterUseCases assets = AssetRegisterUseCases(
-    AssetRepository(_db.executor),
-    scheduleService: const AssetScheduleService(),
-  );
-
   AppServices(this._db, {DesktopCapabilityRegistry? desktopCapabilities})
     : desktopCapabilities = desktopCapabilities ?? DesktopCapabilityRegistry();
 
@@ -106,6 +114,10 @@ class AppServices {
   late final MahnwesenEinstellungenRepository mahnwesenEinstellungen = MahnwesenEinstellungenRepository(_db.executor);
   late final SperrungService sperrung = SperrungService(_db.executor);
   late final BankingUseCase banking = BankingUseCase(_db.executor);
+  late final AssetRegisterUseCases assets = AssetRegisterUseCases(
+    AssetRepository(_db.executor),
+    scheduleService: const AssetScheduleService(),
+  );
   late final IncomeTaxScheduleAvailabilityUseCase incomeTax = const IncomeTaxScheduleAvailabilityUseCase();
   late final WizardService setup = WizardService(repository: SetupRepository(_db.executor), profileId: _db.profileDir);
 
@@ -115,6 +127,16 @@ class AppServices {
   );
 
   late final ProfileExportService profileExport = _createProfileExport();
+
+  late final BelegRepository belege = BelegRepository(_db.executor, profileDir: _db.profileDir);
+
+  late final KundenBelegRepository kundenBelege = KundenBelegRepository(_db.executor);
+
+  late final DokumentenpaketRepository pakete = DokumentenpaketRepository(_db.executor, profileDir: _db.profileDir);
+
+  late final ReceiptInboxRepository receipts = ReceiptInboxRepository(_db.executor, profileDir: _db.profileDir);
+
+  late final GobdExportService gobd = GobdExportService(_db.executor, profileDir: _db.profileDir);
 
   late final CustomerDataDisclosureExportService customerDisclosureExport = _createCustomerDisclosureExport();
 
@@ -132,6 +154,22 @@ class AppServices {
       profileLabel: label,
     );
   }
+
+  late final DocumentDeliveryService documentDelivery = DocumentDeliveryService(
+    contexts: DocumentDeliveryContextProvider(_db.executor),
+    templates: EmailTemplateRepository(_db.executor),
+    artifacts: DocumentArtifactResolver(_db.executor, profileDir: _db.profileDir),
+    attempts: EmailAttemptRepository(_db.executor),
+    configuration: SmtpConfigurationService(
+      executor: _db.executor,
+      transport: const DartIoSmtpTransport(),
+      migration: SmtpCredentialMigration(
+        vault: const UnavailableVault(),
+        legacyFile: LegacySecretFile(_db.profileDir),
+        identity: ProfileIdentityStore(_db.profileDir),
+      ),
+    ),
+  );
 
   ProfileExportService _createProfileExport() {
     final String? directory = _db.profileDir;
