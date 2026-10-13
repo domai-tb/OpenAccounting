@@ -1,4 +1,7 @@
 // ignore_for_file: file_names, avoid_redundant_argument_values, cast_nullable_to_non_nullable
+
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
@@ -10,10 +13,12 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 void main() {
   group('Recurring persistence — Plan C', () {
     late AppDatabase db;
+    late Directory profileDir;
     late BuchungsVorlagenRepository repo;
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      profileDir = await Directory.systemTemp.createTemp('recurring-persistence-');
+      db = AppDatabase.createTestDatabase(profileDir: profileDir.path);
       await db.ensureOpen();
       await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
@@ -37,7 +42,10 @@ void main() {
       ]);
     });
 
-    tearDown(() async => db.close());
+    tearDown(() async {
+      await db.close();
+      await profileDir.delete(recursive: true);
+    });
 
     test('positions round-trip N=3 preserves order, amount, konto, tax', () async {
       final BuchungsVorlage created = await repo.create(
@@ -129,7 +137,7 @@ void main() {
       expect(header.single['brutto_betrag'], 172.50);
 
       // Finalization must recalculate from positions — not zero out.
-      final RechnungenDataSource ds = RechnungenDataSource(db.executor);
+      final RechnungenDataSource ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       await ds.finalizeRechnung(locale: 'de_DE', rechnungId: rechnungId);
       final List<Map<String, Object?>> after = await db.executor.runSelect(
         'SELECT netto_betrag, ust_betrag, brutto_betrag, typ, status, ist_entwurf FROM rechnungen WHERE id = ?',
@@ -203,7 +211,7 @@ void main() {
         <Object?>[ids.single],
       );
       expect((hdr.single['brutto_betrag'] as num) > 0, isTrue);
-      final RechnungenDataSource ds = RechnungenDataSource(db.executor);
+      final RechnungenDataSource ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       await ds.finalizeRechnung(locale: 'de_DE', rechnungId: ids.single);
       final List<Map<String, Object?>> after = await db.executor.runSelect(
         'SELECT brutto_betrag FROM rechnungen WHERE id = ?',
@@ -241,7 +249,7 @@ void main() {
 
     test('auftrag lineage preserved through template create+instantiate', () async {
       // Create auftrag document as lineage source — via centralized helper path (no raw SQL bypass).
-      final RechnungenDataSource ds = RechnungenDataSource(db.executor);
+      final RechnungenDataSource ds = RechnungenDataSource(db.executor, profileDir: db.profileDir);
       final int auftragId = await ds.createDokument(
         typ: 'auftrag',
         datum: '2026-01-01',

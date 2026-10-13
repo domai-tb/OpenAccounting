@@ -665,37 +665,47 @@ The system SHALL manage a configurable set of Steuersätze (tax rates) with 0%, 
 
 ### Requirement: Buchungsvorlagen
 
-The system SHALL support recurring booking templates (Buchungsvorlagen) for fixed costs and regular income.
+The system SHALL support recurring booking templates for fixed costs and regular income. Saving a template SHALL store its configured type, category, amount, interval, and position data without creating a financial event. When a template is due, execution SHALL first create or reuse one durable review instance identified by the template and stored due date. Schedule detection MUST NOT write a journal entry, input-tax claim, or finalized incoming invoice. After explicit user confirmation, a direct booking SHALL use the accepted shared accounting posting contract; Beleg mode SHALL hand off to the existing incoming-invoice draft use case. If the posting contract, a mapping required by that contract, or a required tax interpretation is unavailable, the instance MUST remain pending with no financial side effect. A template referencing an article SHALL use the article's current price when preparing a confirmed booking, as defined by this maintained requirement. A paused template SHALL create no new actionable instances. A deactivated category with `catalog_verified` or `user_confirmed` status SHALL retain the existing warning behavior when the accepted shared posting contract permits the booking, without changing its provenance status. A deactivated category with `legacy_unverified` or `review_required` status whose mapping is required SHALL remain blocked even with the warning, until explicitly reviewed. A deactivated `unmapped` category SHALL proceed only with a warning when the posting supplies all required account and tax data independently, inferring no mapping.
 
 #### Scenario: Template creation
+- **GIVEN** a template is created with `art`, category, amount, interval, and optional position data
+- **WHEN** the template is saved
+- **THEN** those values are stored and no journal entry or input-tax claim is created
 
-- GIVEN a Buchungsvorlage created with art='Ausgabe', category, and betrag
-- WHEN the template is saved
-- THEN the system SHALL store the template with interval configuration and position data as JSON
+#### Scenario: Due template is staged for review
+- **GIVEN** a Buchungsvorlage is due under its stored schedule
+- **WHEN** the due-instance workflow runs
+- **THEN** one durable review instance is available and no financial event is created
 
 #### Scenario: Template execution
-
-- GIVEN a Buchungsvorlage that is due
-- WHEN the execution is triggered
-- THEN the system SHALL create a journal entry (or Eingangsrechnung) from the template, using the current art-korrekte USt-Konten
+- **GIVEN** a reviewed direct-mode instance has complete mappings and the accepted shared posting contract is available
+- **WHEN** the user confirms execution
+- **THEN** the resulting financial event is created through that contract and linked to the due occurrence
 
 #### Scenario: Template with article
-
-- GIVEN a Buchungsvorlage referencing an artikel_id
-- WHEN the template is executed
-- THEN the system SHALL use the article's current price for the booking, not the price at template creation time
+- **GIVEN** a template references an article whose current price differs from the stored template price
+- **WHEN** a booking is prepared for user confirmation
+- **THEN** the current article price is used in the review data, and no event is posted before confirmation
 
 #### Scenario: Template lifecycle
+- **GIVEN** a template is paused (`aktiv=false`, `beendet=false`) or ended (`beendet=true`)
+- **WHEN** its scheduled date arrives
+- **THEN** the paused template produces no new booking until reactivated, while the ended template remains archived
 
-- GIVEN a Buchungsvorlage paused (aktiv=false, beendet=false)
-- WHEN the scheduled execution date arrives
-- THEN no new bookings SHALL be created until reactivated. When beendet=true, the template SHALL be archived
+#### Scenario: Unavailable mapping or shared contract fails closed
+- **GIVEN** a due template has a deactivated/unresolved category or the shared posting contract or tax interpretation is unavailable
+- **WHEN** execution is requested
+- **THEN** the occurrence remains pending, identifies the missing mapping or contract, and no journal entry or input-tax claim is created
 
 #### Scenario: Template with deleted category
+- **GIVEN** a Buchungsvorlage references a deactivated (`aktiv=0`) category with `catalog_verified` or `user_confirmed` status
+- **WHEN** the user confirms the reviewed occurrence and the accepted shared posting contract permits the configured category
+- **THEN** the booking uses the deactivated category, the workspace records or displays the warning required by this maintained category policy, and deactivation does not change its provenance status
 
-- GIVEN a Buchungsvorlage referencing a category that has been deactivated (aktiv=0)
-- WHEN the template is executed
-- THEN the system SHALL still create the booking using the deactivated category and log a warning
+#### Scenario: Deactivated category with unresolved provenance stays blocked
+- **GIVEN** a Buchungsvorlage references a deactivated category with `legacy_unverified` or `review_required` status whose mapping is required by the posting
+- **WHEN** the user confirms the reviewed occurrence
+- **THEN** execution remains blocked with the mapping-review reason, the inactive-category warning does not bypass the block, and no journal entry or input-tax claim is created
 
 ### Requirement: Schnellbuchungen
 

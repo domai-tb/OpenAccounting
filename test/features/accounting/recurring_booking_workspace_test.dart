@@ -215,10 +215,7 @@ void main() {
       );
       await useCases.refreshDueInstances(heute: DateTime(2026, 2, 1));
 
-      final DueInstanceView review = await useCases.reviewInstance(
-        vorlageId: template.id,
-        faelligkeit: '2026-02-01',
-      );
+      final DueInstanceView review = await useCases.reviewInstance(vorlageId: template.id, faelligkeit: '2026-02-01');
       expect(review.effektiverBetrag, contains('12.34'));
       expect(await _count(db, 'journal'), 0);
       expect(await _count(db, 'vorsteuer_ansprueche'), 0);

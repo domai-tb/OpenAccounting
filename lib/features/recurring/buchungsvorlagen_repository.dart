@@ -844,7 +844,7 @@ CREATE TABLE IF NOT EXISTS buchungsvorlagen_occurrences (
   String? _canonicalBetrag(Object? raw) {
     if (raw == null) return null;
     try {
-      return money.fromCents(money.parseScaled(raw.toString(), scale: 2, field: 'betrag', allowNegative: true));
+      return money.fromCents(money.parseScaled(raw.toString(), scale: 2, field: 'betrag'));
     } catch (_) {
       return raw.toString();
     }

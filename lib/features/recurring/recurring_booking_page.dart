@@ -183,7 +183,6 @@ class _RecurringBookingPageState extends ConsumerState<RecurringBookingPage> {
       child: ListTile(
         contentPadding: EdgeInsets.zero,
         selected: selected,
-        autofocus: false,
         title: Text(template.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(
           '${template.art} · ${template.modus} · ${template.intervall} · ${template.naechsteFaelligkeit ?? '—'}',

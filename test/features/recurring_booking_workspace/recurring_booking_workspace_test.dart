@@ -444,10 +444,7 @@ void main() {
       expect(unchanged.naechsteFaelligkeit, '2026-02-01');
 
       // The instance stays reviewable with its persisted failure shown.
-      final DueInstanceView again = await useCases.reviewInstance(
-        vorlageId: template.id,
-        faelligkeit: '2026-02-01',
-      );
+      final DueInstanceView again = await useCases.reviewInstance(vorlageId: template.id, faelligkeit: '2026-02-01');
       expect(again.reviewStatus, 'failed');
       expect(again.handoffError, contains('Übergabe'));
     });

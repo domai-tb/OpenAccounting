@@ -290,7 +290,7 @@ class RecurringBookingWorkspaceUseCases {
       );
       await _vorlagen.advanceScheduleAfterCompletion(vorlageId);
       final BuchungsVorlage updated = (await _vorlagen.findById(vorlageId))!;
-      return _toView(updated, occurrence);
+      return await _toView(updated, occurrence);
     } catch (error) {
       occurrence = await _vorlagen.markBlocked(
         vorlageId: vorlageId,
@@ -323,14 +323,14 @@ class RecurringBookingWorkspaceUseCases {
       );
       await _vorlagen.advanceScheduleAfterCompletion(vorlageId);
       final BuchungsVorlage updated = (await _vorlagen.findById(vorlageId))!;
-      return _toView(updated, occurrence);
+      return await _toView(updated, occurrence);
     }
     final int? recovered = await _findDraftByIdentity(vorlageId, faelligkeit);
     if (recovered != null) {
       occurrence = await _vorlagen.markHandedOff(vorlageId: vorlageId, faelligkeit: faelligkeit, rechnungId: recovered);
       await _vorlagen.advanceScheduleAfterCompletion(vorlageId);
       final BuchungsVorlage updated = (await _vorlagen.findById(vorlageId))!;
-      return _toView(updated, occurrence);
+      return await _toView(updated, occurrence);
     }
     if (!_belegDrafts.isAvailable) {
       occurrence = await _vorlagen.markFailed(
@@ -359,7 +359,7 @@ class RecurringBookingWorkspaceUseCases {
       );
       await _vorlagen.advanceScheduleAfterCompletion(vorlageId);
       final BuchungsVorlage updated = (await _vorlagen.findById(vorlageId))!;
-      return _toView(updated, occurrence);
+      return await _toView(updated, occurrence);
     } catch (error) {
       occurrence = await _vorlagen.markFailed(vorlageId: vorlageId, faelligkeit: faelligkeit, error: '$error');
       return _toView(vorlage, occurrence);
