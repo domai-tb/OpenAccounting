@@ -55,3 +55,44 @@ CHANGES_APPLIED: yes
 ## Rebuttals
 
 None in this round.
+
+---
+
+## Round 3 Review Metadata
+
+- **Review round**: 3
+- **Prior round**: Round 2 was `APPROVE_WITH_CHANGES`; its §141 and route/service corrections are present.
+- **Review date**: 2026-10-13
+- **Reviewer context**: Fresh independent local subagent; re-checked the corrected EÜR period, source-contract dependency, GuV guard scenario, route matrix, and review freshness.
+- **Artifacts reviewed**: `design.md`, all change specs, `test-plan.md`, `tasks.md`, relevant EÜR and optional-module tests, and the prior review.
+- **Tool restrictions**: Read-only inspection; the reviewer did not run tests.
+
+### Validation and Evidence
+
+- The reviewer confirmed `openspec validate accounting-reporting-workspaces --type change --strict --json` passed (1/1) and `git diff --check` was clean.
+- Focused accounting source test passed 17/17; focused optional-module test passed 7/7.
+- Scoped `fvm flutter analyze` passed with no issues.
+
+### Findings
+
+#### Critical
+
+None.
+
+#### Moderate
+
+None open. The annual EÜR fixtures now use 2025 invoice, settlement, and legacy-row dates; active dependency references name the accepted `invoice-money-contract`; and the GuV scenario matches the guard behavior and its test.
+
+### Verdict
+
+VERDICT: APPROVE_WITH_CHANGES
+
+## Required Changes (if APPROVE WITH CHANGES)
+
+1. Record this fresh review round before the worker loop resumes implementation. No further source or specification edits are required by this review.
+
+CHANGES_APPLIED: yes
+
+## Rebuttals
+
+None in this round.

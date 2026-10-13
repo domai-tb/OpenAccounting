@@ -615,7 +615,7 @@ void main() {
       final int kundeId = await seedKunde();
       await postings.postInvoice(
         eventId: 'inv-eur',
-        datum: '2026-01-10',
+        datum: '2025-01-10',
         beschreibung: 'Januarrechnung',
         kategorieId: kat,
         totalCents: 10000,
@@ -632,7 +632,7 @@ void main() {
         sourceKind: PostingSource.cashPayment,
         sourceId: 'cash-eur',
         signedAmountCents: 4000,
-        settlementDate: '2026-04-15',
+        settlementDate: '2025-04-15',
         bankKontoId: bank,
         counterKontoId: clearing,
         allocations: <SettlementAllocationInput>[
@@ -642,7 +642,7 @@ void main() {
       );
 
       final EuerService euer = EuerService(db.executor);
-      final result = await euer.generate(jahr: 2026);
+      final result = await euer.generate(jahr: 2025);
 
       expect(result.zeile(15), '40.00');
     });
@@ -654,7 +654,7 @@ void main() {
       final int kundeId = await seedKunde();
       final int legacyId = await db.executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable) VALUES (?, ?, ?, ?, ?, 0)',
-        <Object?>['2026-02-01', 'Altbuchung', kat, '999.00', 'Einnahme'],
+        <Object?>['2025-02-01', 'Altbuchung', kat, '999.00', 'Einnahme'],
       );
       final Forderung forderung = await forderungen.create(
         typ: 'rechnung',
@@ -666,7 +666,7 @@ void main() {
         sourceKind: PostingSource.cashPayment,
         sourceId: 'cash-mixed',
         signedAmountCents: 4000,
-        settlementDate: '2026-04-15',
+        settlementDate: '2025-04-15',
         bankKontoId: bank,
         counterKontoId: clearing,
         allocations: <SettlementAllocationInput>[
@@ -677,7 +677,7 @@ void main() {
 
       final EuerService euer = EuerService(db.executor);
       await expectLater(
-        euer.generate(jahr: 2026),
+        euer.generate(jahr: 2025),
         throwsA(predicate<Object>((Object e) => e.toString().contains('$legacyId'))),
       );
     });

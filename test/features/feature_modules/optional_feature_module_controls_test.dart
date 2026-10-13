@@ -154,6 +154,37 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
       expect(artikelAfter, artikelBefore);
     });
 
+    testWidgets('test_guv_preference_is_independent_of_missing_provider', (tester) async {
+      final FeatureModuleRepository repo = FeatureModuleRepository(db.executor);
+      await repo.save(FeatureModuleState.defaults().withEnabled(FeatureModuleCatalog.guv, value: true));
+      final FeatureModuleService service = serviceWith(const <String>{FeatureModuleProviders.accountingJournal});
+      int calculationAttempts = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FeatureModuleGuard(
+              service: service,
+              moduleId: FeatureModuleCatalog.guv,
+              child: Builder(
+                builder: (BuildContext context) {
+                  calculationAttempts++;
+                  return const Text('GuV calculation');
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect((await repo.loadOrDefaults()).isEnabled(FeatureModuleCatalog.guv), isTrue);
+      expect(await service.isEffectivelyEnabled(FeatureModuleCatalog.guv), isFalse);
+      expect(find.text('Modul nicht verfügbar'), findsOneWidget);
+      expect(find.text('GuV calculation'), findsNothing);
+      expect(calculationAttempts, 0);
+    });
+
     testWidgets('test_user_changes_a_supported_module', (tester) async {
       final repo = FeatureModuleRepository(db.executor);
       await repo.save(FeatureModuleState.defaults());

@@ -4,7 +4,7 @@
 
 The application SHALL expose typed workspaces at `/reports` and `/taxes` for EÜR, EKS, management GuV, UStVA, ZM, DATEV, and report status/history. A workspace SHALL call the corresponding application service and SHALL use its named maintained accounting/tax contract. It SHALL NOT fall back to a generic database table or derive report totals in the page.
 
-A report is available only when its calculation contract, source data, period, required profile configuration, and versioned mapping are supported. For financial summaries, EÜR, GuV, UStVA, and DATEV, both `balanced-journal-postings-and-settlement-events` and `invoice-money-invariants` MUST be independently approved before their canonical posting/settlement values can be exposed. Until then, these outputs SHALL be unavailable with the blocking dependency named. Invoice totals, invoice-date journal summaries, and positive unconfirmed bank rows SHALL NOT be substituted. EKS remains unavailable until its accepted form version and `Bewilligungszeitraum` period contract are defined. ZM is limited to the supported transaction scope in the modified `accounting` capability.
+A report is available only when its calculation contract, source data, period, required profile configuration, and versioned mapping are supported. For financial summaries, EÜR, GuV, UStVA, and DATEV, both `balanced-journal-postings-and-settlement-events` and the accepted `invoice-money-contract` (completed by `invoice-money-contract-completion`) MUST be independently approved before their canonical posting/settlement values can be exposed. Until then, these outputs SHALL be unavailable with the blocking dependency named. Invoice totals, invoice-date journal summaries, and positive unconfirmed bank rows SHALL NOT be substituted. EKS remains unavailable until its accepted form version and `Bewilligungszeitraum` period contract are defined. ZM is limited to the supported transaction scope in the modified `accounting` capability.
 
 Supported periods SHALL use the following exact boundaries; all ranges are start-inclusive and end-exclusive:
 
@@ -28,7 +28,7 @@ Every result SHALL identify its report type, exact period endpoints, calculation
 
 #### Scenario: Financial prerequisite is still unapproved
 
-- **GIVEN** either `balanced-journal-postings-and-settlement-events` or `invoice-money-invariants` lacks independent approval
+- **GIVEN** either `balanced-journal-postings-and-settlement-events` or `invoice-money-contract` lacks independent approval
 - **WHEN** the user requests EÜR, GuV, UStVA, DATEV, or an annual summary
 - **THEN** the workspace shows an unavailable state naming the unapproved prerequisite
 - **AND** it displays no complete or estimated total from invoice amounts, invoice-date journal summaries, or unconfirmed bank rows

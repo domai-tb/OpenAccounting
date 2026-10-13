@@ -211,9 +211,16 @@
 - [ ] 12.11 Implement the specified behavior for "Missing or invalid report selection fails closed" to pass 12.10, using the typed owner in `design.md`.
 - [ ] 12.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
+## 13. Preserve accepted accounting-source and GuV availability behavior
+
+- [x] 13.1 Run `test_eur_reads_settlements_not_invoice_dates` in `test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart` for scenario "EÜR reads settlements, not invoice dates".
+- [x] 13.2 Run `test_eur_rejects_mixed_legacy_and_settlement_data` in `test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart` for scenario "EÜR rejects mixed legacy and settlement data".
+- [x] 13.3 Add `test_guv_preference_is_independent_of_missing_provider` in `test/features/feature_modules/optional_feature_module_controls_test.dart` for scenario "GuV preference is independent of a missing provider"; assert the saved preference stays enabled while the guard exposes unavailable state and never builds its calculator child.
+- [x] 13.4 Run the focused accounting-source and optional-module tests; mark their test-plan scenarios green only after they pass.
+
 ## Implementation Notes
 
 - Implement typed report catalogs, route parsing, and truthful unavailable boundaries before exposing calculations.
-- Keep financial outputs blocked until the named posting/settlement and invoice-money contracts are independently approved.
+- Keep financial outputs unavailable until the accepted posting/settlement and invoice-money sources are wired with accepted report mappings, complete source coverage, and supported periods.
 - Build and validate the complete DATEV fixture against the pinned format before enabling export; local files remain distinct from submitted reports.
 - Add the listed tests, source/result fixtures, and validator fixture before enabling production report behavior.

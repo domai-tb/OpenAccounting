@@ -61,6 +61,20 @@ EÜR income and expense recognition SHALL use settlement dates and source amount
 - **THEN** all mapped amount fields show the official form's required empty/zero representation
 - **AND** the result records that source coverage was complete
 
+#### Scenario: EÜR reads settlements, not invoice dates
+
+- **GIVEN** a committed settlement allocation dated in 2025 and an invoice dated earlier in 2025
+- **WHEN** the supported 2025 annual EÜR is generated
+- **THEN** the settled portion SHALL be included under its mapped `euer_zeile`
+- **AND** the unpaid invoice-date amount SHALL remain excluded
+
+#### Scenario: EÜR rejects mixed legacy and settlement data
+
+- **GIVEN** the supported 2025 annual EÜR source contains both settlement allocations and `legacy_unverified` rows
+- **WHEN** the 2025 EÜR is generated
+- **THEN** generation SHALL fail closed identifying the unverified rows
+- **AND** no partial settlement-only total SHALL be presented as complete
+
 #### Scenario: EÜR 2026 has no accepted mapping
 
 - **GIVEN** the selected tax year is 2026 and no accepted 2026 field map and fixture exist
@@ -202,6 +216,13 @@ A §141 AO bookkeeping-duty warning SHALL be separate from the optional manageme
 - **GIVEN** the balanced-posting/settlement or invoice-money prerequisite is not independently approved
 - **WHEN** the management GuV is requested
 - **THEN** the result is unavailable and no raw journal-range estimate is shown
+
+#### Scenario: GuV preference is independent of a missing provider
+
+- **GIVEN** the catalog preference for `guv` is enabled but the GuV calculator provider is unavailable
+- **WHEN** the optional-module guard resolves `guv`
+- **THEN** the saved preference remains enabled while the guard displays its unavailable state
+- **AND** the calculator child is not built
 
 ### Requirement: ZM (Zusammenfassende Meldung)
 
