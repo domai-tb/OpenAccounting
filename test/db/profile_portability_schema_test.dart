@@ -32,7 +32,7 @@ void main() {
         'category_mapping_history',
       };
 
-      expect(tableNames, hasLength(46));
+      expect(tableNames, hasLength(51));
       expect(tableNames, containsAll(AppDatabase.allTableNames));
       expect(tableNames, contains('feature_table_state'));
       expect(tableNames, containsAll(migrationRequiredTables));
@@ -427,9 +427,9 @@ CREATE TABLE kategorien (
         const <Object?>[],
       );
       final Set<String> tableNames = <String>{for (final row in rows) row['name'].toString()};
-      // v17 inventory: 39 base + feature_table_state + 4 migration-required
-      // tables + CSV templates + AfA schedule + only the initialized lazy table.
-      expect(tableNames, hasLength(47));
+      // v19 inventory: 44 base + feature_table_state + 4 migration-required
+      // tables + 2 email tables + only the initialized lazy table.
+      expect(tableNames, hasLength(52));
       expect(tableNames, containsAll(AppDatabase.allTableNames));
       expect(
         tableNames,

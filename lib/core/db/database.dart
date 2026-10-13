@@ -484,6 +484,7 @@ CREATE TABLE IF NOT EXISTS konten (
   name TEXT NOT NULL,
   iban TEXT,
   bic TEXT,
+  inhaber TEXT,
   waehrung TEXT DEFAULT 'EUR',
   kontoart TEXT,
   unternehmen_id INTEGER REFERENCES unternehmen(id),
@@ -622,7 +623,9 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   original_pdf_pfad TEXT,
   dokumentenpaket_id INTEGER REFERENCES dokumentenpakete(id),
   mahnstufe_aktuell INTEGER DEFAULT 0,
-  vorlage_id INTEGER
+  vorlage_id INTEGER,
+  ausgabeformat TEXT CHECK (ausgabeformat IS NULL OR ausgabeformat IN ('pdf', 'zugferd', 'xrechnung')),
+  kunde_snapshot TEXT
 )''',
   // 12 rechnungspositionen
   '''

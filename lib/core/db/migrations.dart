@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 18;
+  static const int currentVersion = 22;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -221,7 +221,7 @@ class MigrationRunner {
 
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
-      if (await _receivableFeatureNeedsRepair()) {
+      if (await _receivableFeatureNeedsRepair() || await _postingSchemaNeedsRepair()) {
         await _repairCurrentFeature(afterFeatureSchemaDdl);
         return true;
       }
@@ -310,6 +310,10 @@ class MigrationRunner {
       await _migrateMasterDataImportTemplates();
       await _migrateAssetRegister();
       await _migrateStocktake();
+      await _migratePostingGroups();
+      await _migrateAccountHolder();
+      await _migrateOccurrenceReviewState();
+      await _migrateEInvoiceOutputFormat();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -437,6 +441,22 @@ class MigrationRunner {
       await _migrateTo(17, createSchema);
       await _migrateStocktake();
     }
+    if (version == 19) {
+      await _migrateTo(18, createSchema);
+      await _migratePostingGroups();
+    }
+    if (version == 20) {
+      await _migrateTo(19, createSchema);
+      await _migrateAccountHolder();
+    }
+    if (version == 21) {
+      await _migrateTo(20, createSchema);
+      await _migrateOccurrenceReviewState();
+    }
+    if (version == 22) {
+      await _migrateTo(21, createSchema);
+      await _migrateEInvoiceOutputFormat();
+    }
   }
 
   Future<void> _migrateProfilePortabilityTables({required bool freshProfile}) async {
@@ -482,6 +502,10 @@ class MigrationRunner {
     await executor.runCustom('BEGIN');
     try {
       await _migrateReceivableFeature();
+      await _migratePostingGroups();
+      await _migrateAccountHolder();
+      await _migrateOccurrenceReviewState();
+      await _migrateEInvoiceOutputFormat();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -1085,24 +1109,12 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     }
   }
 
-  static int _asInt(Object? v) => v is int
-      ? v
-      : v is num
-      ? v.toInt()
-      : v is String
-      ? int.tryParse(v) ?? -1
-      : -1;
-
-  Future<void> _addColumnIfMissing(String table, String name, String definition) async {
-    final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
-    if (columns.any((column) => column['name'] == name)) return;
-    await executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
-    final verified = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
-    if (!verified.any((column) => column['name'] == name)) {
-      throw StateError('Migration konnte Spalte $table.$name nicht verifizieren');
-    }
-  }
-
+  /// Master-data CSV import templates (v16, next sequential after the v15
+  /// baseline). Dedicated profile-local `master_data_import_templates` table;
+  /// never reuses bank-owned `import_mapping_vorlagen`. Stores template name,
+  /// entity, column mapping JSON, header/delimiter/numeric/duplicate options,
+  /// optional match field, and timestamps. No file bytes or row values.
+  /// Idempotent: safe on fresh schemas and reruns.
   Future<void> _migrateMasterDataImportTemplates() async {
     await executor.runCustom(_masterDataImportTemplatesTableSql);
     await executor.runCustom(
@@ -1263,6 +1275,246 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     await _verifyStocktakeSchema();
   }
 
+  /// Balanced posting groups + settlement allocations (v19, next sequential
+  /// after the v18 baseline). Adds source/group/reversal columns to `journal`
+  /// (`source_kind`, `source_id`, `reversal_of_group_id`, durable
+  /// `legacy_unverified` defaulting to 1 so every pre-existing row stays
+  /// readable history) plus `settlement_groups`, `settlement_allocations`,
+  /// and `statutory_timing_rules`. The migration runner is forward-only;
+  /// rollback means restoring the pre-migration backup, not removing schema
+  /// in place. Idempotent: reruns and full-schema fixtures emit no
+  /// duplicate DDL; any DDL or verification failure rolls back with the
+  /// version bump.
+  Future<void> _migratePostingGroups() async {
+    final List<Map<String, Object?>> journalTables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal'",
+      const <Object?>[],
+    );
+    if (journalTables.isEmpty) {
+      throw StateError('Ausgleichsbuchungen brauchen die Tabelle journal');
+    }
+    await _addColumnIfMissing('journal', 'source_kind', 'TEXT');
+    await _addColumnIfMissing('journal', 'source_id', 'TEXT');
+    await _addColumnIfMissing('journal', 'reversal_of_group_id', 'INTEGER REFERENCES journal(id)');
+    await _addColumnIfMissing('journal', 'legacy_unverified', 'INTEGER NOT NULL DEFAULT 1');
+    // Pre-existing rows without balanced legs stay durable legacy history.
+    await executor.runCustom(
+      'UPDATE journal SET legacy_unverified = 1 WHERE source_kind IS NULL AND (legacy_unverified IS NULL OR legacy_unverified = 0)',
+    );
+    await executor.runCustom(_postingGroupsTableSql);
+    await executor.runCustom(_settlementAllocationsTableSql);
+    await executor.runCustom(_statutoryTimingRulesTableSql);
+    await executor.runCustom('DROP INDEX IF EXISTS idx_journal_source_unique');
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX idx_journal_source_unique '
+      'ON journal(source_kind, source_id) '
+      'WHERE source_kind IS NOT NULL AND source_id IS NOT NULL AND gruppe_id = id',
+    );
+    await executor.runCustom(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_settlement_groups_source_unique '
+      'ON settlement_groups(source_kind, source_id)',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_settlement_groups_bank ON settlement_groups(bank_transaction_id) '
+      'WHERE bank_transaction_id IS NOT NULL',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_settlement_allocations_group ON settlement_allocations(group_id)',
+    );
+    await _verifyPostingGroupsSchema();
+  }
+
+  /// Bank-account holder (v20, next sequential after the v19 baseline). Adds
+  /// nullable `konten.inhaber` without rewriting existing account values or
+  /// changing IDs. Create and duplicate-IBAN update paths persist the
+  /// normalized holder; setup summaries read it back from the same row.
+  Future<void> _migrateAccountHolder() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'konten'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Kontoinhaber braucht die Tabelle konten');
+    }
+    await _addColumnIfMissing('konten', 'inhaber', 'TEXT');
+    final List<Map<String, Object?>> columns = await executor.runSelect('PRAGMA table_info(konten)', const <Object?>[]);
+    if (!columns.any((Map<String, Object?> row) => row['name'] == 'inhaber')) {
+      throw StateError('Kontoinhaber-Spalte konnte nicht verifiziert werden');
+    }
+  }
+
+  /// Occurrence review-state persistence (v21, next sequential after the v20
+  /// baseline). Adds durable `review_status` (pending/blocked/ready/
+  /// handed_off/posted/failed, default pending), `block_reason`, and
+  /// `handoff_error` to the lazy `buchungsvorlagen_occurrences` table without
+  /// touching the unique `(vorlage_id, faelligkeit)` key or the linked
+  /// journal/invoice references. Existing rows backfill to `pending` with
+  /// NULL reasons via the column default. Displays read these persisted
+  /// values; the migration itself creates no financial record. Idempotent:
+  /// reruns and fresh profiles (where the lazy table does not exist yet)
+  /// emit no duplicate DDL.
+  Future<void> _migrateOccurrenceReviewState() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'buchungsvorlagen_occurrences'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) return;
+    await _addColumnIfMissing(
+      'buchungsvorlagen_occurrences',
+      'review_status',
+      "TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN "
+          "('pending','blocked','ready','handed_off','posted','failed'))",
+    );
+    await _addColumnIfMissing('buchungsvorlagen_occurrences', 'block_reason', 'TEXT');
+    await _addColumnIfMissing('buchungsvorlagen_occurrences', 'handoff_error', 'TEXT');
+    await _verifyOccurrenceReviewState();
+  }
+
+  /// E-invoice output-format persistence (v22, next sequential after the v21
+  /// baseline). Adds nullable `rechnungen.ausgabeformat` (`pdf`, `zugferd`,
+  /// or `xrechnung`) plus `rechnungen.kunde_snapshot` (finalized customer
+  /// JSON for standalone exports). Existing finalized rows backfill to
+  /// `pdf` because the pre-change application never produced structured
+  /// output; drafts keep NULL until finalization writes the explicit choice.
+  /// Readers resolve any remaining NULL to `pdf` without consulting current
+  /// customer settings. Idempotent: reruns emit no duplicate DDL.
+  Future<void> _migrateEInvoiceOutputFormat() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rechnungen'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('Ausgabeformat braucht die Tabelle rechnungen');
+    }
+    await _addColumnIfMissing(
+      'rechnungen',
+      'ausgabeformat',
+      "TEXT CHECK (ausgabeformat IS NULL OR ausgabeformat IN ('pdf', 'zugferd', 'xrechnung'))",
+    );
+    await _addColumnIfMissing('rechnungen', 'kunde_snapshot', 'TEXT');
+    await executor.runCustom(
+      "UPDATE rechnungen SET ausgabeformat = 'pdf' WHERE ist_entwurf = 0 AND ausgabeformat IS NULL",
+    );
+    await _verifyEInvoiceOutputFormat();
+  }
+
+  Future<void> _verifyEInvoiceOutputFormat() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(rechnungen)',
+      const <Object?>[],
+    );
+    final Set<String> names = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!names.contains('ausgabeformat') || !names.contains('kunde_snapshot')) {
+      throw StateError('E-Rechnungs-Ausgabeformat-Schema konnte nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> legacy = await executor.runSelect(
+      'SELECT id FROM rechnungen WHERE ist_entwurf = 0 AND ausgabeformat IS NULL LIMIT 1',
+      const <Object?>[],
+    );
+    if (legacy.isNotEmpty) {
+      throw StateError('Finalisierte Rechnungen ohne Ausgabeformat konnten nicht migriert werden');
+    }
+  }
+
+  Future<void> _verifyOccurrenceReviewState() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'buchungsvorlagen_occurrences'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) return;
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(buchungsvorlagen_occurrences)',
+      const <Object?>[],
+    );
+    const Set<String> required = <String>{
+      'id',
+      'vorlage_id',
+      'faelligkeit',
+      'journal_id',
+      'rechnung_id',
+      'review_status',
+      'block_reason',
+      'handoff_error',
+    };
+    final Set<String> names = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!required.every(names.contains)) {
+      throw StateError('Buchungsvorlagen-Occurrence-Review-Schema konnte nicht verifiziert werden');
+    }
+  }
+
+  Future<bool> _postingSchemaNeedsRepair() async {
+    try {
+      await _verifyPostingGroupsSchema();
+      await _verifyOccurrenceReviewState();
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _verifyPostingGroupsSchema() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+      "('settlement_groups', 'settlement_allocations', 'statutory_timing_rules')",
+      const <Object?>[],
+    );
+    if (tables.length != 3) {
+      throw StateError('Ausgleichs-Tabellen konnten nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> journalColumns = await executor.runSelect(
+      'PRAGMA table_info(journal)',
+      const <Object?>[],
+    );
+    final Set<String> journalNames = <String>{
+      for (final Map<String, Object?> row in journalColumns) row['name'].toString(),
+    };
+    const Set<String> journalRequired = <String>{
+      'source_kind',
+      'source_id',
+      'reversal_of_group_id',
+      'legacy_unverified',
+    };
+    if (!journalRequired.every(journalNames.contains)) {
+      throw StateError('Journal-Quellspalten konnten nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> sourceIndexes = await executor.runSelect(
+      "PRAGMA index_list('journal')",
+      const <Object?>[],
+    );
+    if (!sourceIndexes.any(
+      (Map<String, Object?> row) =>
+          row['name'] == 'idx_journal_source_unique' && row['unique'] == 1 && row['partial'] == 1,
+    )) {
+      throw StateError('Journal-Quellindex konnte nicht verifiziert werden');
+    }
+    final List<Map<String, Object?>> sourceIndexSql = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_journal_source_unique'",
+      const <Object?>[],
+    );
+    if (sourceIndexSql.isEmpty || !sourceIndexSql.single['sql'].toString().contains('gruppe_id = id')) {
+      throw StateError('Journal-Quellindex muss nur die Gruppenwurzel eindeutigen');
+    }
+    final List<Map<String, Object?>> groupColumns = await executor.runSelect(
+      'PRAGMA table_info(settlement_groups)',
+      const <Object?>[],
+    );
+    final Set<String> groupNames = <String>{
+      for (final Map<String, Object?> row in groupColumns) row['name'].toString(),
+    };
+    const Set<String> groupRequired = <String>{
+      'id',
+      'source_kind',
+      'source_id',
+      'signed_amount_cents',
+      'settlement_date',
+      'unapplied_cents',
+      'group_root_journal_id',
+    };
+    if (!groupRequired.every(groupNames.contains)) {
+      throw StateError('Ausgleichsgruppen-Schema konnte nicht verifiziert werden');
+    }
+  }
+
   Future<void> _verifyStocktakeSchema() async {
     final List<Map<String, Object?>> tables = await executor.runSelect(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('inventuren', 'inventur_positionen')",
@@ -1310,6 +1562,24 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     );
     if (guards.length != 7) {
       throw StateError('Inventur-Schutz konnte nicht verifiziert werden');
+    }
+  }
+
+  static int _asInt(Object? v) => v is int
+      ? v
+      : v is num
+      ? v.toInt()
+      : v is String
+      ? int.tryParse(v) ?? -1
+      : -1;
+
+  Future<void> _addColumnIfMissing(String table, String name, String definition) async {
+    final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (columns.any((column) => column['name'] == name)) return;
+    await executor.runCustom('ALTER TABLE $table ADD COLUMN $name $definition');
+    final verified = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
+    if (!verified.any((column) => column['name'] == name)) {
+      throw StateError('Migration konnte Spalte $table.$name nicht verifizieren');
     }
   }
 
@@ -1607,7 +1877,9 @@ CREATE TABLE rechnungen (
   storno_von INTEGER REFERENCES rechnungen(id),
   absender_snapshot TEXT,
   ausgegeben_am TEXT,
-  mahnstufe_aktuell INTEGER DEFAULT 0
+  mahnstufe_aktuell INTEGER DEFAULT 0,
+  ausgabeformat TEXT CHECK (ausgabeformat IS NULL OR ausgabeformat IN ('pdf', 'zugferd', 'xrechnung')),
+  kunde_snapshot TEXT
 )''';
 
 const String _quickBookingTableSql = '''
@@ -1732,6 +2004,50 @@ CREATE TABLE IF NOT EXISTS anlage_afa_jahreswerte (
   berechnet_am TEXT NOT NULL,
   CHECK ((status = 'verfuegbar' AND betrag IS NOT NULL AND blockierungsgrund IS NULL) OR (status = 'nicht_verfuegbar' AND betrag IS NULL AND blockierungsgrund IS NOT NULL AND trim(blockierungsgrund) <> '')),
   UNIQUE (anlage_id, jahr, quell_hash, regel_version)
+)''';
+
+const String _postingGroupsTableSql = '''
+CREATE TABLE IF NOT EXISTS settlement_groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_kind TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  bank_transaction_id INTEGER REFERENCES bank_transaktionen(id),
+  signed_amount_cents INTEGER NOT NULL CHECK (signed_amount_cents != 0),
+  settlement_date TEXT NOT NULL,
+  unapplied_cents INTEGER NOT NULL DEFAULT 0,
+  group_root_journal_id INTEGER NOT NULL REFERENCES journal(id),
+  reversal_of_group_id INTEGER REFERENCES settlement_groups(id),
+  reversed_by_group_id INTEGER REFERENCES settlement_groups(id),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (source_kind, source_id)
+)''';
+
+const String _settlementAllocationsTableSql = '''
+CREATE TABLE IF NOT EXISTS settlement_allocations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL REFERENCES settlement_groups(id) ON DELETE CASCADE,
+  forderung_id INTEGER REFERENCES forderungen(id),
+  applied_cents INTEGER NOT NULL CHECK (applied_cents != 0),
+  settlement_date TEXT NOT NULL,
+  kategorie_id INTEGER REFERENCES kategorien(id),
+  euer_zeile INTEGER,
+  direction TEXT NOT NULL DEFAULT 'einnahme' CHECK (direction IN ('einnahme', 'ausgabe')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)''';
+
+const String _statutoryTimingRulesTableSql = '''
+CREATE TABLE IF NOT EXISTS statutory_timing_rules (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id TEXT NOT NULL,
+  rule_version TEXT NOT NULL,
+  legal_basis TEXT NOT NULL,
+  affected_year INTEGER NOT NULL,
+  approver TEXT NOT NULL,
+  source_trace TEXT NOT NULL,
+  settlement_group_id INTEGER NOT NULL REFERENCES settlement_groups(id) ON DELETE CASCADE,
+  attributed_year INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (rule_id, rule_version, settlement_group_id)
 )''';
 
 const String _inventurenTableSql = '''

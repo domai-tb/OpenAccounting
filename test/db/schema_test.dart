@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 
 void main() {
-  group('Schema — version 13 application inventory', () {
+  group('Schema — version 19 application inventory', () {
     late AppDatabase db;
 
     setUp(() async {
@@ -14,20 +14,20 @@ void main() {
       await db.close();
     });
 
-    test('39 base tables and six required feature tables exist after creation', () async {
+    test('50 non-payment tables exist after creation', () async {
       final rows = await db.executor.runSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen' ORDER BY name",
         const [],
       );
       final names = rows.map((r) => r['name']?.toString() ?? '').toList()..sort();
-      expect(names.length, 45, reason: 'Expected 39 base + 6 non-payment feature tables, got ${names.length}: $names');
+      expect(names.length, 50, reason: 'Expected 50 non-payment tables, got ${names.length}: $names');
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t), reason: 'Missing table $t');
       }
       expect(names, contains('category_mapping_history'), reason: 'Missing feature table category_mapping_history');
     });
 
-    test('non-payment table count remains 45 after second open', () async {
+    test('non-payment table count remains 50 after second open', () async {
       await db.close();
       final db2 = AppDatabase.createTestDatabase();
       await db2.ensureOpen();
@@ -35,7 +35,7 @@ void main() {
         "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         const [],
       );
-      expect(rows.first['c'], 45);
+      expect(rows.first['c'], 50);
       await db2.close();
     });
 

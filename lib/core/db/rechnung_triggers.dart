@@ -31,7 +31,9 @@ WHEN OLD.ist_entwurf = 0 AND (
   NEW.unternehmen_id IS NOT OLD.unternehmen_id OR
   NEW.nummernkreis_id IS NOT OLD.nummernkreis_id OR
   NEW.storno_von IS NOT OLD.storno_von OR
-  NEW.ausgegeben_am IS NOT OLD.ausgegeben_am OR
+  NEW.ausgabeformat IS NOT OLD.ausgabeformat OR
+  NEW.kunde_snapshot IS NOT OLD.kunde_snapshot OR
+  (NEW.ausgegeben_am IS NOT OLD.ausgegeben_am AND OLD.ausgegeben_am IS NOT NULL) OR
   NEW.status IS NULL OR
   NEW.status NOT IN ('offen', 'teilbezahlt', 'bezahlt', 'storniert')
 )
@@ -54,7 +56,10 @@ END
 CREATE TRIGGER protect_rechnung_snapshot_update
 BEFORE UPDATE ON rechnungen
 FOR EACH ROW
-WHEN OLD.ist_entwurf = 0 AND NEW.absender_snapshot IS NOT OLD.absender_snapshot
+WHEN OLD.ist_entwurf = 0 AND (
+  NEW.absender_snapshot IS NOT OLD.absender_snapshot OR
+  NEW.kunde_snapshot IS NOT OLD.kunde_snapshot
+)
 BEGIN
   SELECT RAISE(ABORT, 'Absender-Snapshot ist nach Finalisierung unveränderlich');
 END
