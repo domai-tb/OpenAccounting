@@ -53,6 +53,66 @@ Each created Mahnung SHALL link to exactly one invoice and snapshot the invoice 
 - **WHEN** a dunning run evaluates it
 - **THEN** no new Mahnung SHALL be created for that invoice
 
+### Requirement: Mail-Versand via SMTP
+
+The system SHALL send a dunning letter only when SMTP is configured and a readable generated PDF artifact is available. It SHALL record transport acceptance only after the mail transport accepts the message with the expected attachment. UI and history SHALL say “transport accepted” and SHALL NOT claim delivered or read. A failed or unavailable send SHALL leave the Mahnung unsent and retryable; it SHALL not advance the invoice's current dunning level.
+
+#### Scenario: Send dunning letter
+- **GIVEN** SMTP is configured and the Mahnung has a readable PDF artifact
+- **WHEN** the user sends it and the transport accepts the message
+- **THEN** the message SHALL contain the PDF and the Mahnung SHALL record transport acceptance and its timestamp
+
+#### Scenario: SMTP not configured
+- **GIVEN** SMTP is missing, the PDF is unavailable, or the transport rejects the message
+- **WHEN** the user attempts to send the Mahnung
+- **THEN** the system SHALL show an actionable error and SHALL leave the Mahnung unsent and retryable
+
+#### Scenario: Retrying a pending letter does not create a second record
+- **GIVEN** a Mahnung exists but its previous send attempt failed
+- **WHEN** the user retries the send
+- **THEN** the existing Mahnung SHALL be retried and no duplicate Mahnung record SHALL be created
+
+### Requirement: Invoice Dunning Level
+
+Each eligible invoice SHALL retain its current dunning level as the highest level with a transport-accepted Mahnung. A level SHALL not advance while its letter is only a draft or its send failed. Full settlement SHALL clear the current level; partial settlement SHALL preserve the level while reducing outstanding principal and future interest.
+
+#### Scenario: Invoice at level 2
+- **GIVEN** an invoice has no current dunning level and the transport accepts a level 1 Mahnung
+- **WHEN** the send operation completes
+- **THEN** the invoice's current dunning level SHALL become level 1
+
+#### Scenario: Failed send does not advance the level
+- **GIVEN** a Mahnung exists for the next level but its send failed
+- **WHEN** the send operation returns failure
+- **THEN** the invoice's current dunning level SHALL remain unchanged
+
+#### Scenario: Invoice payment resets level
+- **GIVEN** an invoice has a current dunning level
+- **WHEN** its settled outstanding principal becomes zero
+- **THEN** the current dunning level SHALL be cleared
+
+### Requirement: Mahnwesen Settings Singleton
+
+The system SHALL continue storing `initial_grace_days`, `email_template`, and `default_interest_rate` in the singleton for profile compatibility. `initial_grace_days` SHALL be deprecated and non-operative: no dunning eligibility, preview, calculation, creation, or send SHALL use it, and the dunning settings UI SHALL NOT present it as an active control. Stage eligibility SHALL use only the absolute `due_date + days_after_due` threshold. Existing values SHALL be preserved during initialization.
+
+#### Scenario: Configure grace period
+
+- **GIVEN** an existing profile stores `initial_grace_days = 14` and stage 1 is configured for 7 days after an invoice due date
+- **WHEN** manual or assisted eligibility is evaluated on the day before and on the absolute stage threshold
+- **THEN** the invoice SHALL be ineligible before `due_date + 7` and eligible on that threshold when other stage rules are met
+- **AND** the stored 14-day compatibility value SHALL NOT defer eligibility
+- **AND** the settings UI SHALL show the saved value only as deprecated, non-editable compatibility data
+
+#### Scenario: Default settings on fresh install
+
+- **GIVEN** a fresh database has no dunning settings
+- **WHEN** the system initializes the singleton
+- **THEN** it SHALL create default settings with `initial_grace_days = 0` and the documented default interest rate
+- **AND** the zero grace value SHALL remain non-operative
+
+
+## ADDED Requirements
+
 ### Requirement: Dunning Evaluation and Exclusions
 
 The system SHALL evaluate only finalized outgoing invoices whose settled outstanding principal is positive and whose current business date is on or after `due_date + stage.days_after_due`. Stage offsets are absolute calendar-day thresholds; `initial_grace_days` SHALL NOT be added to or used to defer them. A later stage SHALL be eligible only after its preceding stage has a transport-accepted Mahnung. This change SHALL support manual and assisted runs only; it SHALL NOT schedule or trigger automatic evaluation from a dashboard load or background task. Assisted mode SHALL show a reviewable preview and create letters only after confirmation. Both modes SHALL respect customer and invoice exclusions and SHALL not bypass an active Mahnsperre. Each Mahnung SHALL reference one invoice; a run MAY group separate letters for review but SHALL NOT create a consolidated customer letter. For each invoice and stage, a repeated run SHALL reuse an existing unsent Mahnung or report an already transport-accepted Mahnung rather than create a duplicate.
@@ -129,44 +189,6 @@ The dunning monetary path SHALL remain disabled until both `invoice-money-invari
 - **WHEN** a dunning calculation is requested
 - **THEN** the operation SHALL fail closed with the source error and SHALL not substitute the invoice gross or net total
 
-### Requirement: Mail-Versand via SMTP
-
-The system SHALL send a dunning letter only when SMTP is configured and a readable generated PDF artifact is available. It SHALL record transport acceptance only after the mail transport accepts the message with the expected attachment. UI and history SHALL say “transport accepted” and SHALL NOT claim delivered or read. A failed or unavailable send SHALL leave the Mahnung unsent and retryable; it SHALL not advance the invoice's current dunning level.
-
-#### Scenario: Send dunning letter
-- **GIVEN** SMTP is configured and the Mahnung has a readable PDF artifact
-- **WHEN** the user sends it and the transport accepts the message
-- **THEN** the message SHALL contain the PDF and the Mahnung SHALL record transport acceptance and its timestamp
-
-#### Scenario: SMTP not configured
-- **GIVEN** SMTP is missing, the PDF is unavailable, or the transport rejects the message
-- **WHEN** the user attempts to send the Mahnung
-- **THEN** the system SHALL show an actionable error and SHALL leave the Mahnung unsent and retryable
-
-#### Scenario: Retrying a pending letter does not create a second record
-- **GIVEN** a Mahnung exists but its previous send attempt failed
-- **WHEN** the user retries the send
-- **THEN** the existing Mahnung SHALL be retried and no duplicate Mahnung record SHALL be created
-
-### Requirement: Invoice Dunning Level
-
-Each eligible invoice SHALL retain its current dunning level as the highest level with a transport-accepted Mahnung. A level SHALL not advance while its letter is only a draft or its send failed. Full settlement SHALL clear the current level; partial settlement SHALL preserve the level while reducing outstanding principal and future interest.
-
-#### Scenario: Invoice at level 2
-- **GIVEN** an invoice has no current dunning level and the transport accepts a level 1 Mahnung
-- **WHEN** the send operation completes
-- **THEN** the invoice's current dunning level SHALL become level 1
-
-#### Scenario: Failed send does not advance the level
-- **GIVEN** a Mahnung exists for the next level but its send failed
-- **WHEN** the send operation returns failure
-- **THEN** the invoice's current dunning level SHALL remain unchanged
-
-#### Scenario: Invoice payment resets level
-- **GIVEN** an invoice has a current dunning level
-- **WHEN** its settled outstanding principal becomes zero
-- **THEN** the current dunning level SHALL be cleared
-
 ### Requirement: Collection Package
 
 For a customer selected for collection preparation, the system SHALL produce a customer-linked package containing the current account statement, selected open invoices, previous Mahnungen, and the as-of outstanding balance from the accepted settlement source. Every included artifact SHALL resolve to a readable stored document; an unavailable required artifact SHALL be reported and SHALL not be represented by a placeholder. An unavailable, invalid, or conflicting balance source SHALL block package creation without writing an artifact.
@@ -180,27 +202,6 @@ For a customer selected for collection preparation, the system SHALL produce a c
 - **GIVEN** a selected prior Mahnung has no readable artifact
 - **WHEN** the user creates a collection package
 - **THEN** the system SHALL report the missing artifact and SHALL not label the package complete
-
-### Requirement: Mahnwesen Settings Singleton
-
-The system SHALL continue storing `initial_grace_days`, `email_template`, and `default_interest_rate` in the singleton for profile compatibility. `initial_grace_days` SHALL be deprecated and non-operative: no dunning eligibility, preview, calculation, creation, or send SHALL use it, and the dunning settings UI SHALL NOT present it as an active control. Stage eligibility SHALL use only the absolute `due_date + days_after_due` threshold. Existing values SHALL be preserved during initialization.
-
-#### Scenario: Configure grace period
-
-- **GIVEN** an existing profile stores `initial_grace_days = 14` and stage 1 is configured for 7 days after an invoice due date
-- **WHEN** manual or assisted eligibility is evaluated on the day before and on the absolute stage threshold
-- **THEN** the invoice SHALL be ineligible before `due_date + 7` and eligible on that threshold when other stage rules are met
-- **AND** the stored 14-day compatibility value SHALL NOT defer eligibility
-- **AND** the settings UI SHALL show the saved value only as deprecated, non-editable compatibility data
-
-#### Scenario: Default settings on fresh install
-
-- **GIVEN** a fresh database has no dunning settings
-- **WHEN** the system initializes the singleton
-- **THEN** it SHALL create default settings with `initial_grace_days = 0` and the documented default interest rate
-- **AND** the zero grace value SHALL remain non-operative
-
-## ADDED Requirements
 
 ### Requirement: Dunning Reference Documentation Matches the Runtime Contract
 

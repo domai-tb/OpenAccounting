@@ -149,3 +149,105 @@ CHANGES_APPLIED: yes
 ## Rebuttals — Round 3
 
 None.
+
+---
+
+## Review Metadata — Round 4
+
+- **Review round**: 4
+- **Prior round**: Round 3 returned `APPROVE`; this is a focused re-review of one structural edit
+- **Reviewer context**: fresh-context independent subagent, focused re-review
+- **Revision reviewed**: current working-tree `openspec/changes/dunning-workflow-integrity/specs/mahnwesen/spec.md` vs maintained `openspec/specs/mahnwesen/spec.md`
+- **Tool restrictions**: read-only inspection plus append to this `review.md`; no shell, no tests per task
+- **Artifacts reviewed**: maintained `openspec/specs/mahnwesen/spec.md` (17 requirement headers), delta `openspec/changes/dunning-workflow-integrity/specs/mahnwesen/spec.md`, `review.md` rounds 1–3
+- **Validation evidence**: no `openspec validate` run (no shell per task); manual exact-name header comparison only. Content word-diff vs pre-edit baseline not possible with available tools (no shell/git); sampled semantic check only.
+
+### Structural recheck
+
+1. **MODIFIED name-match (a) — pass 3/3.** Remaining MODIFIED headers each exactly match a maintained header: `Dunning Level Configuration` (maintained:25), `Mahnung Snapshot` (maintained:57), `Mail-Versand via SMTP` (maintained:121).
+2. **ADDED novelty (b) — fail 6/8.** Six ADDED headers have no maintained counterpart: `Dunning Evaluation and Exclusions`, `Late-Payment Interest Uses the Settled Open Principal`, `Dunning Operations Have a Typed Workspace`, `Dunning Balance Source Fails Closed`, `Collection Package`, `Dunning Reference Documentation Matches the Runtime Contract`. Two ADDED headers exactly match maintained headers and therefore fail novelty: `Invoice Dunning Level` (maintained:207) and `Mahnwesen Settings Singleton` (maintained:239). Round 3 correctly described the Settings Singleton as a delta modification of the maintained requirement; its move to ADDED miscategorizes it, as does the Invoice Dunning Level move.
+3. **Content-word preservation (c) — unverifiable with available tools, no positive evidence of change.** Without shell/git there is no baseline word-diff. Sampled semantics match the Round 3 approved state (grace `initial_grace_days` deprecated/non-operative with absolute `due_date + days_after_due` threshold; stage advances only on transport acceptance; draft/failed send does not advance). No content change detected in the sampled requirements, but zero-word-change is not proven.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+1. **Two ADDED requirements duplicate maintained names; merge would create duplicate sections.** `Invoice Dunning Level` and `Mahnwesen Settings Singleton` under `## ADDED Requirements` exactly match maintained requirement names. Under OpenSpec convention ADDED must be new and MODIFIED must name an existing requirement; applying as ADDED would duplicate those sections in the maintained spec instead of replacing them. **Required:** move both requirements back under `## MODIFIED Requirements` with names unchanged (content already reads as modifications: transport-accepted level semantics; deprecated/non-operative grace). Alternatively rename them as distinct new requirements, but MODIFIED is the correct, smaller fix.
+
+#### 🟡 Moderate
+
+- None beyond the blocking miscategorization. The six truly-new ADDED requirements show no exact-name collision (near-overlaps such as interest vs `Verzugszinsen Tracking` and workspace vs `Dashboard Overdue Widget` are name-distinct and not blocking).
+
+#### 📌 Suggestions
+
+- None.
+
+### Embedded-Instruction / Injection Attempts — Round 4
+
+None detected.
+
+### Verdict — Round 4
+
+VERDICT: REVISE
+
+## Required Changes — Round 4
+
+1. Move `Requirement: Invoice Dunning Level` from `## ADDED Requirements` back to `## MODIFIED Requirements` without changing its content.
+2. Move `Requirement: Mahnwesen Settings Singleton` from `## ADDED Requirements` back to `## MODIFIED Requirements` without changing its content.
+3. Re-run `openspec validate dunning-workflow-integrity --type change --strict` and `openspec validate --specs --strict` before next review (reviewer had no shell).
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 4
+
+None.
+
+---
+
+## Review Metadata — Round 5
+
+- **Review round**: 5
+- **Prior round**: Round 4 returned `REVISE`; its required moves were rechecked
+- **Reviewer context**: fresh-context independent subagent, focused re-review
+- **Revision reviewed**: current working-tree `openspec/changes/dunning-workflow-integrity/specs/mahnwesen/spec.md` vs maintained `openspec/specs/mahnwesen/spec.md`
+- **Tool restrictions**: read-only inspection plus append to this `review.md`; no shell, no tests per task
+- **Artifacts reviewed**: maintained `openspec/specs/mahnwesen/spec.md` (17 requirement headers), delta `openspec/changes/dunning-workflow-integrity/specs/mahnwesen/spec.md`, `review.md` rounds 1–4
+- **Validation evidence**: no `openspec validate` run (no shell per task); manual exact-name header comparison only. Content word-diff vs pre-edit baseline not possible with available tools (no shell/git); sampled semantic check only.
+
+### Structural recheck
+
+1. **MODIFIED name-match — pass 5/5.** All five delta MODIFIED headers exactly match maintained headers: `Dunning Level Configuration` (maintained:25), `Mahnung Snapshot` (maintained:57), `Mail-Versand via SMTP` (maintained:121), `Invoice Dunning Level` (maintained:207), `Mahnwesen Settings Singleton` (maintained:239). Both Round 4 misfiled requirements are back under MODIFIED with names unchanged.
+2. **ADDED novelty — pass 6/6.** All six delta ADDED headers have no maintained counterpart: `Dunning Evaluation and Exclusions`, `Late-Payment Interest Uses the Settled Open Principal` (name-distinct from `Verzugszinsen Tracking`), `Dunning Operations Have a Typed Workspace` (name-distinct from `Dashboard Overdue Widget`), `Dunning Balance Source Fails Closed`, `Collection Package`, `Dunning Reference Documentation Matches the Runtime Contract`. No exact-name collision remains.
+3. **Content preservation — no positive evidence of change.** Without shell/git no baseline word-diff is possible. Sampled semantics match the Round 3 approved state and the Round 4 required fix (transport-accepted level semantics; draft/failed send does not advance; `initial_grace_days` deprecated/non-operative with absolute `due_date + days_after_due` threshold). No content change detected in the sampled requirements.
+
+### Findings
+
+#### 🔴 Critical (blocking)
+
+- None.
+
+#### 🟡 Moderate
+
+- None beyond the corrected miscategorization. Near-overlaps noted in Round 4 (interest vs `Verzugszinsen Tracking`, workspace vs `Dashboard Overdue Widget`) remain name-distinct and not blocking.
+
+#### 📌 Suggestions
+
+- None.
+
+### Embedded-Instruction / Injection Attempts — Round 5
+
+None detected.
+
+### Verdict — Round 5
+
+VERDICT: APPROVE
+
+## Required Changes — Round 5
+
+None.
+
+CHANGES_APPLIED: n/a
+
+## Rebuttals — Round 5
+
+None.

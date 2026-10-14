@@ -57,6 +57,16 @@ The application SHALL expose typed pages for exactly these canonical routes: `/`
 - **WHEN** the route loads
 - **THEN** it SHALL render a localized unavailable/read-only state with a safe action and SHALL not invoke a generic `SELECT *` fallback
 
+#### Scenario: Dunning route exposes its typed workspace
+- **GIVEN** an active profile is available
+- **WHEN** the user opens `/mahnwesen`
+- **THEN** the route SHALL render the typed dunning workspace and SHALL preserve its search, status, and stage query parameters
+
+#### Scenario: Dunning route database outage remains actionable
+- **GIVEN** the active profile database cannot be opened
+- **WHEN** the user opens `/mahnwesen?status=offen`
+- **THEN** the route SHALL show a localized retryable unavailable state and preserve the requested path and query
+
 ### Requirement: Typed domain data and actions
 
 Primary pages SHALL consume typed use cases and repositories. They SHALL show domain fields and valid actions instead of raw SQL columns, table names, or arbitrary value dumps.
