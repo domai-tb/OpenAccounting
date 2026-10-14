@@ -9,6 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String settingsRegionPreferenceKey = 'openaccounting.region';
 
+/// Injectable seam for the concrete [ProfileManager] used by Settings.
+/// Production default constructs a real manager; route tests override with a
+/// deterministic fake. Single instance shared via app_router re-export.
+final profileManagerProvider = Provider<ProfileManager>((ref) => ProfileManager());
+
 /// Active-profile backup service assembled with the active profile directory,
 /// database path, and existing maintenance gates.
 final backupServiceProvider = FutureProvider<BackupService>((ref) async {

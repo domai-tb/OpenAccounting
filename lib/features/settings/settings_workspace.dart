@@ -28,6 +28,15 @@ import 'package:path/path.dart' as p;
 /// keyboard-operable with a localized accessible name, visible focus, and
 /// deterministic order. Narrow widths and larger text scales stay reachable
 /// by keyboard and scrolling without horizontal clipping.
+class _ProfileSnapshot {
+  const _ProfileSnapshot({required this.active, required this.profiles});
+
+  final String active;
+  final List<String> profiles;
+}
+
+const Duration _profileLoadTimeout = Duration(seconds: 2);
+
 class SettingsWorkspace extends ConsumerStatefulWidget {
   const SettingsWorkspace({super.key});
 
@@ -41,6 +50,34 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
   String? _error;
   bool _restartRequired = false;
   bool _busy = false;
+  late ProfileManager _profileManager;
+  late Future<_ProfileSnapshot> _profiles;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileManager = ref.read(profileManagerProvider);
+    _profiles = _loadProfiles();
+  }
+
+  Future<_ProfileSnapshot> _loadProfiles() async {
+    final List<dynamic> results = await Future.wait<dynamic>(<Future<dynamic>>[
+      _profileManager.getActiveProfile(),
+      _profileManager.listProfiles(),
+    ]).timeout(_profileLoadTimeout);
+    final String active = results[0] as String;
+    final List<String> profiles = (results[1] as List).cast<String>();
+    if (profiles.contains(active)) {
+      return _ProfileSnapshot(active: active, profiles: profiles);
+    }
+    return _ProfileSnapshot(active: active, profiles: <String>[active, ...profiles]);
+  }
+
+  void _reloadProfiles() {
+    setState(() {
+      _profiles = _loadProfiles();
+    });
+  }
 
   void _showNotice(String message) {
     setState(() {
@@ -227,10 +264,9 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
 
   Widget _profileSection(BuildContext context) {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    final ProfileManager manager = ProfileManager();
-    return FutureBuilder<List<String>>(
-      future: manager.listProfiles(),
-      builder: (BuildContext context, AsyncSnapshot<List<String>> snapshot) {
+    return FutureBuilder<_ProfileSnapshot>(
+      future: _profiles,
+      builder: (BuildContext context, AsyncSnapshot<_ProfileSnapshot> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const LinearProgressIndicator();
         }
@@ -239,14 +275,14 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(l10n.settingsProfileLoadError),
+                Text(l10n.profileLoadError),
                 const SizedBox(height: 8),
-                FilledButton(onPressed: () => setState(() {}), child: Text(l10n.actionRetry)),
+                FilledButton(onPressed: _reloadProfiles, child: Text(l10n.retry)),
               ],
             ),
           );
         }
-        final List<String> profiles = snapshot.data ?? <String>[];
+        final List<String> profiles = snapshot.data?.profiles ?? <String>[];
         return AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,17 +295,19 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                     spacing: 8,
                     children: <Widget>[
                       TextButton(
-                        onPressed: _busy ? null : () => _runGuarded(() => _selectProfile(manager, name)),
+                        onPressed: _busy ? null : () => _runGuarded(() => _selectProfile(_profileManager, name)),
                         child: Text(l10n.actionOpen),
                       ),
                       TextButton(
-                        onPressed: _busy ? null : () => _runGuarded(() => _renameProfile(context, manager, name)),
+                        onPressed: _busy
+                            ? null
+                            : () => _runGuarded(() => _renameProfile(context, _profileManager, name)),
                         child: Text(l10n.actionEdit),
                       ),
                       TextButton(
                         onPressed: _busy || profiles.length <= 1
                             ? null
-                            : () => _runGuarded(() => _removeProfile(context, manager, name)),
+                            : () => _runGuarded(() => _removeProfile(context, _profileManager, name)),
                         child: Text(l10n.actionDelete),
                       ),
                     ],
@@ -281,12 +319,12 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
               Row(
                 children: <Widget>[
                   FilledButton.icon(
-                    onPressed: _busy ? null : () => _runGuarded(() => _createProfile(context, manager)),
+                    onPressed: _busy ? null : () => _runGuarded(() => _createProfile(context, _profileManager)),
                     icon: const Icon(Icons.add),
                     label: Text(l10n.actionCreate),
                   ),
                   const SizedBox(width: 12),
-                  OutlinedButton(onPressed: () => setState(() {}), child: Text(l10n.actionRefresh)),
+                  OutlinedButton(onPressed: _reloadProfiles, child: Text(l10n.actionRefresh)),
                 ],
               ),
             ],

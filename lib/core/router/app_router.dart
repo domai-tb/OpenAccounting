@@ -10,7 +10,6 @@ import 'package:openaccounting/features/income_tax_supporting_reports/income_tax
 import 'package:openaccounting/features/mahnwesen/mahnwesen_workspace_page.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
-import 'package:openaccounting/core/db/profile_manager.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/router/route_data_repository.dart';
 import 'package:openaccounting/core/router/typed_workspace_search.dart';
@@ -29,6 +28,8 @@ import 'package:openaccounting/features/dashboard/dashboard_page.dart';
 import 'package:openaccounting/features/setup/wizard_page.dart';
 import 'package:openaccounting/features/setup/wizard_service.dart';
 import 'package:openaccounting/features/settings/settings_workspace.dart';
+
+export 'package:openaccounting/features/settings/settings_providers.dart' show profileManagerProvider;
 import 'package:openaccounting/features/accounting/gobd_export_page.dart';
 import 'package:openaccounting/features/documents/dokumentenpaket_page.dart';
 import 'package:openaccounting/features/receipts/receipt_inbox_page.dart';
@@ -353,8 +354,6 @@ GoRouter createRouter(AppDatabase db) {
     errorBuilder: (context, state) => const NotFoundPage(),
   );
 }
-
-final profileManagerProvider = Provider<ProfileManager>((ref) => ProfileManager());
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final db = ref.watch(appDatabaseProvider);

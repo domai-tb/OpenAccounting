@@ -189,7 +189,8 @@ void main() {
   });
 
   test('test_profile_load_timeout_constant_is_shared_by_initial_and_retry', () {
-    final String source = File('lib/core/router/app_router.dart').readAsStringSync();
+    // Canonical location moved with the Settings workspace refactor.
+    final String source = File('lib/features/settings/settings_workspace.dart').readAsStringSync();
     expect(RegExp(r'const Duration _profileLoadTimeout = Duration\(seconds: 2\);').allMatches(source), hasLength(1));
 
     final int loadStart = source.indexOf('Future<_ProfileSnapshot> _loadProfiles()');
