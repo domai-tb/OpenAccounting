@@ -492,7 +492,7 @@ class _WizardPageState extends State<WizardPage> {
                       '${l10n.setupCompanyName}: ${_nameCtrl.text.isEmpty ? l10n.setupCompanyName : _nameCtrl.text}',
                     ),
                     Text('${l10n.setupIban}: ${_ibanCtrl.text.trim().isEmpty ? '—' : _ibanCtrl.text.trim()}'),
-                    Text('Kontoinhaber: $holder'),
+                    Text('${l10n.settingsHolder}: $holder'),
                     Text('${l10n.setupCashBalance}: ${_kasseCtrl.text} €'),
                     Text('${l10n.setupCategories}: ${categorySummary.isEmpty ? l10n.setupRequired : categorySummary}'),
                   ],
