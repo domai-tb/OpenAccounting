@@ -50,6 +50,15 @@
 - Feature commit: `67c302d` (`feat(invoices): add invoice authoring workspace`), range `b04fc4593c81410d3ceb002ef371c20454ad3dce..67c302d`.
 - Push: not performed.
 
+### Finalization Re-verification (2026-10-14, worker cycle)
+
+- Full repository `fvm flutter analyze`: no issues found (the previously reported `e_invoice_finalization_test.dart` error is resolved).
+- The 11-file aggregate above rerun: 79 passed, 0 failed (`All tests passed!`).
+- `git diff --check`: passed.
+- `openspec validate --specs --strict`: 70/70 passed after archive.
+- Full-repository suite rerun: 1,650 passed, 36 failed; all failures are outside this change's scope (app shell, settings/profile, and other features) and are tracked by their own changes. Per the worker-loop operator decision, feature-scoped tests are the completion gate for this change.
+- Evidence honesty: no manual, device, CI, or external-service evidence was fabricated.
+
 ## Overall Decision
 
 DECISION: PASS_WITH_WARNINGS
