@@ -5,6 +5,7 @@ import 'package:openaccounting/features/accounting/reporting/bookkeeping_duty_us
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/guv_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/ustva_report_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/zm_preview_use_case.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 
 void main() {
@@ -607,6 +608,154 @@ void main() {
       expect(from.effectiveDate, '2026-04-01');
       expect(from.noticeDate, '2025-12-15');
       expect(from.wirtschaftsjahrBoundary, '04-01');
+    });
+  });
+
+  group('reporting contracts: ZM preview', () {
+    late AppDatabase db;
+    late ZmPreviewUseCase useCase;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      useCase = ZmPreviewUseCase(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<int> insertKunde({required int id, required String land, String? ustIdNr}) async {
+      await db.executor.runInsert(
+        'INSERT INTO kunden (id, name, strasse, plz, ort, land, ust_idnr) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[id, 'Kunde $id', 'Str 1', '10115', 'Berlin', land, ustIdNr],
+      );
+      return id;
+    }
+
+    Future<int> insertRechnung({required int id, required int kundeId, required String datum}) async {
+      await db.executor.runInsert(
+        'INSERT INTO rechnungen (id, typ, status, ist_entwurf, kunde_id, datum) VALUES (?, ?, ?, 0, ?, ?)',
+        <Object?>[id, 'rechnung', 'final', kundeId, datum],
+      );
+      return id;
+    }
+
+    Future<void> insertEuSupplyJournal({
+      required int rechnungId,
+      required String betrag,
+      required String lieferdatum,
+    }) async {
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, immutable, rechnung_id, ist_eu_lieferung) '
+        'VALUES (?, ?, ?, ?, 0, ?, 1)',
+        <Object?>[lieferdatum, 'ig Lieferung', betrag, 'Einnahme', rechnungId],
+      );
+    }
+
+    test('test_zm_with_ig_lieferungen', () async {
+      final int fr = await insertKunde(id: 51, land: 'FR', ustIdNr: 'FR123');
+      final int nl = await insertKunde(id: 52, land: 'NL', ustIdNr: 'NL456');
+      final int r71 = await insertRechnung(id: 71, kundeId: fr, datum: '2025-09-05');
+      final int r72 = await insertRechnung(id: 72, kundeId: fr, datum: '2025-09-10');
+      final int r73 = await insertRechnung(id: 73, kundeId: nl, datum: '2025-09-12');
+      await insertEuSupplyJournal(rechnungId: r71, betrag: '1000.00', lieferdatum: '2025-09-01');
+      await insertEuSupplyJournal(rechnungId: r72, betrag: '500.00', lieferdatum: '2025-09-02');
+      await insertEuSupplyJournal(rechnungId: r73, betrag: '250.00', lieferdatum: '2025-09-03');
+
+      final ReportWorkspaceResult<ZmPreview> result = await useCase.preview(month: '2025-09');
+
+      expect(result.availability, ReportAvailability.available);
+      final ZmPreview preview = result.value!;
+      // Amounts grouped by recipient USt-IdNr in the invoice-issue month.
+      final Map<String, int> totals = <String, int>{
+        for (final ZmRecipientTotal t in preview.recipients) t.ustIdNr: t.taxableBaseCents,
+      };
+      expect(totals, <String, int>{'FR123': 150000, 'NL456': 25000});
+      // Each total links to its source invoices and records the §18a version.
+      expect(preview.recipients.firstWhere((ZmRecipientTotal t) => t.ustIdNr == 'FR123').sourceRechnungIds, <int>[
+        r71,
+        r72,
+      ]);
+      expect(preview.sourceContractVersion, 'ustg-18a-2026');
+      expect(preview.periodStart, '2025-09-01');
+      expect(preview.periodEnd, '2025-10-01');
+      // Preview only — never an official filing artifact or submission status.
+      expect(preview.isFilingArtifact, isFalse);
+    });
+
+    test('test_zm_with_ig_erwerb', () async {
+      final int fr = await insertKunde(id: 51, land: 'FR', ustIdNr: 'FR123');
+      final int r71 = await insertRechnung(id: 71, kundeId: fr, datum: '2025-09-05');
+      await insertEuSupplyJournal(rechnungId: r71, betrag: '1000.00', lieferdatum: '2025-09-01');
+      // Ordinary intra-community acquisition on an incoming invoice.
+      await db.executor.runInsert(
+        'INSERT INTO lieferanten (id, name, strasse, plz, ort, land) VALUES (?, ?, ?, ?, ?, ?)',
+        <Object?>[61, 'Lieferant 61', 'Str 2', '10115', 'Berlin', 'AT'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO rechnungen (id, typ, status, ist_entwurf, lieferant_id, datum) VALUES (?, ?, ?, 0, ?, ?)',
+        <Object?>[75, 'rechnung', 'final', 61, '2025-09-06'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, immutable, rechnung_id, ust_sonderfall) '
+        'VALUES (?, ?, ?, ?, 0, 75, ?)',
+        <Object?>['2025-09-04', 'ig Erwerb', '999.00', 'Ausgabe', 'ig_erwerb'],
+      );
+
+      final ReportWorkspaceResult<ZmPreview> result = await useCase.preview(month: '2025-09');
+
+      // The acquisition is excluded and does not block the complete preview.
+      expect(result.availability, ReportAvailability.available);
+      final ZmPreview preview = result.value!;
+      expect(preview.recipients, hasLength(1));
+      expect(preview.recipients.single.ustIdNr, 'FR123');
+      expect(preview.recipients.single.taxableBaseCents, 100000);
+    });
+
+    test('test_no_eu_transactions_in_period', () async {
+      final ReportWorkspaceResult<ZmPreview> result = await useCase.preview(month: '2025-12');
+
+      // Complete month with no supported or unsupported EU transactions.
+      expect(result.availability, ReportAvailability.available);
+      final ZmPreview preview = result.value!;
+      expect(preview.recipients, isEmpty);
+      expect(preview.noEligibleEvents, isTrue);
+      expect(preview.isFilingArtifact, isFalse);
+    });
+
+    test('test_missing_zm_source_field_blocks_preview', () async {
+      final int at = await insertKunde(id: 53, land: 'AT');
+      final int r75 = await insertRechnung(id: 75, kundeId: at, datum: '2025-11-05');
+      await insertEuSupplyJournal(rechnungId: r75, betrag: '300.00', lieferdatum: '2025-11-01');
+
+      final ReportWorkspaceResult<ZmPreview> result = await useCase.preview(month: '2025-11');
+
+      // Unavailable with the source invoice and missing field identified.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('ustIdNr'));
+      expect(result.reasonCode, contains('75'));
+      expect(result.value, isNull);
+    });
+
+    test('test_unsupported_reportable_service_blocks_zm_preview', () async {
+      final int fr = await insertKunde(id: 51, land: 'FR', ustIdNr: 'FR123');
+      final int at = await insertKunde(id: 54, land: 'AT', ustIdNr: 'AT789');
+      // Eligible goods supply in the same month.
+      final int r77 = await insertRechnung(id: 77, kundeId: fr, datum: '2025-10-08');
+      await insertEuSupplyJournal(rechnungId: r77, betrag: '400.00', lieferdatum: '2025-10-01');
+      // Potentially reportable §3a(2)-style EU service: finalized outgoing
+      // invoice to an EU taxable recipient with no §6a(1) goods posting.
+      await insertRechnung(id: 76, kundeId: at, datum: '2025-10-10');
+
+      final ReportWorkspaceResult<ZmPreview> result = await useCase.preview(month: '2025-10');
+
+      // Period unavailable, linking the service source — never an apparently
+      // complete report omitting the service.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('Direction'));
+      expect(result.reasonCode, contains('76'));
+      expect(result.value, isNull);
     });
   });
 }

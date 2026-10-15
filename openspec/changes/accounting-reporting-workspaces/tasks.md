@@ -90,21 +90,21 @@
 
 ## 4. accounting: ZM (Zusammenfassende Meldung)
 
-- [ ] 4.1 Write failing test `test_zm_with_ig_lieferungen` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "ZM with ig Lieferungen"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 4.2 Implement the specified behavior for "ZM with ig Lieferungen" to pass 4.1, using the typed owner in `design.md`.
-- [ ] 4.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 4.4 Write failing test `test_zm_with_ig_erwerb` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "ZM with ig Erwerb"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 4.5 Implement the specified behavior for "ZM with ig Erwerb" to pass 4.4, using the typed owner in `design.md`.
-- [ ] 4.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 4.7 Write failing test `test_no_eu_transactions_in_period` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "No EU transactions in period"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 4.8 Implement the specified behavior for "No EU transactions in period" to pass 4.7, using the typed owner in `design.md`.
-- [ ] 4.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 4.10 Write failing test `test_missing_zm_source_field_blocks_preview` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Missing ZM source field blocks preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 4.11 Implement the specified behavior for "Missing ZM source field blocks preview" to pass 4.10, using the typed owner in `design.md`.
-- [ ] 4.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 4.13 Write failing test `test_unsupported_reportable_service_blocks_zm_preview` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Unsupported reportable service blocks ZM preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 4.14 Implement the specified behavior for "Unsupported reportable service blocks ZM preview" to pass 4.13, using the typed owner in `design.md`.
-- [ ] 4.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 4.1 Write failing test `test_zm_with_ig_lieferungen` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "ZM with ig Lieferungen"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 4.2 Implement the specified behavior for "ZM with ig Lieferungen" to pass 4.1, using the typed owner in `design.md`.
+- [x] 4.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 4.4 Write failing test `test_zm_with_ig_erwerb` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "ZM with ig Erwerb"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 4.5 Implement the specified behavior for "ZM with ig Erwerb" to pass 4.4, using the typed owner in `design.md`.
+- [x] 4.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 4.7 Write failing test `test_no_eu_transactions_in_period` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "No EU transactions in period"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 4.8 Implement the specified behavior for "No EU transactions in period" to pass 4.7, using the typed owner in `design.md`.
+- [x] 4.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 4.10 Write failing test `test_missing_zm_source_field_blocks_preview` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Missing ZM source field blocks preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 4.11 Implement the specified behavior for "Missing ZM source field blocks preview" to pass 4.10, using the typed owner in `design.md`.
+- [x] 4.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 4.13 Write failing test `test_unsupported_reportable_service_blocks_zm_preview` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Unsupported reportable service blocks ZM preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 4.14 Implement the specified behavior for "Unsupported reportable service blocks ZM preview" to pass 4.13, using the typed owner in `design.md`.
+- [x] 4.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 5. accounting: DATEV EXTF Export
 
