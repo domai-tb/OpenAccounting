@@ -31,6 +31,9 @@ import 'package:openaccounting/features/settings/settings_workspace.dart';
 
 export 'package:openaccounting/features/settings/settings_providers.dart' show profileManagerProvider;
 import 'package:openaccounting/features/accounting/gobd_export_page.dart';
+import 'package:openaccounting/features/accounting/reporting/report_catalog_page.dart';
+import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/report_workspace_page.dart';
 import 'package:openaccounting/features/documents/dokumentenpaket_page.dart';
 import 'package:openaccounting/features/receipts/receipt_inbox_page.dart';
 import 'package:openaccounting/features/incoming_invoices/incoming_invoice_capture_page.dart';
@@ -645,14 +648,24 @@ class TaxesPage extends ConsumerWidget {
         },
       );
     }
-    return ProductionRoutePage(
-      title: l10n.routeTaxes,
-      table: 'ustva_exporte',
-      icon: Icons.percent,
-      subtitle: l10n.taxesSubtitle,
-      emptyTitle: l10n.emptyEntries,
-      emptyMessage: l10n.taxesSubtitle,
-    );
+    if (query.isEmpty) {
+      final AppScope? scope = AppScope.maybeOf(context);
+      if (scope == null) {
+        return AppPage(
+          header: AppPageHeader(title: l10n.routeTaxes, showFilterToolbar: false),
+          child: Text(l10n.reportStatusUnavailable),
+        );
+      }
+      return ReportCatalogPage(scope: ReportCatalogScope.taxes, catalog: scope.services.reportCatalog);
+    }
+    final AppScope? scope = AppScope.maybeOf(context);
+    if (scope == null) {
+      return AppPage(
+        header: AppPageHeader(title: l10n.routeTaxes, showFilterToolbar: false),
+        child: Text(l10n.reportStatusUnavailable),
+      );
+    }
+    return ReportWorkspacePage(uri: uri, workspace: scope.services.reportingWorkspace);
   }
 }
 
@@ -662,14 +675,25 @@ class ReportsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    return ProductionRoutePage(
-      title: l10n.routeReports,
-      table: 'journal',
-      icon: Icons.bar_chart,
-      subtitle: l10n.reportsSubtitle,
-      emptyTitle: l10n.emptyEntries,
-      emptyMessage: l10n.reportsSubtitle,
-    );
+    final Uri uri = GoRouterState.of(context).uri;
+    if (uri.queryParameters.isEmpty) {
+      final AppScope? scope = AppScope.maybeOf(context);
+      if (scope == null) {
+        return AppPage(
+          header: AppPageHeader(title: l10n.routeReports, showFilterToolbar: false),
+          child: Text(l10n.reportStatusUnavailable),
+        );
+      }
+      return ReportCatalogPage(scope: ReportCatalogScope.reports, catalog: scope.services.reportCatalog);
+    }
+    final AppScope? scope = AppScope.maybeOf(context);
+    if (scope == null) {
+      return AppPage(
+        header: AppPageHeader(title: l10n.routeReports, showFilterToolbar: false),
+        child: Text(l10n.reportStatusUnavailable),
+      );
+    }
+    return ReportWorkspacePage(uri: uri, workspace: scope.services.reportingWorkspace);
   }
 }
 

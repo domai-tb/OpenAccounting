@@ -166,6 +166,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routeReports => 'Reports';
 
   @override
+  String get reportCatalogEuer => 'EÜR income surplus';
+
+  @override
+  String get reportCatalogEks => 'Anlage EKS';
+
+  @override
+  String get reportCatalogGuv => 'Profit and loss';
+
+  @override
+  String get reportCatalogDatev => 'DATEV export';
+
+  @override
+  String get reportCatalogHistory => 'Export history';
+
+  @override
+  String get reportCatalogUstva => 'VAT pre-return';
+
+  @override
+  String get reportCatalogZm => 'EU Sales List';
+
+  @override
+  String get reportStatusAvailable => 'Available';
+
+  @override
+  String get reportStatusUnavailable => 'Unavailable';
+
+  @override
+  String get reportSelectionInvalid => 'Invalid report selection';
+
+  @override
   String get routeSettings => 'Settings';
 
   @override

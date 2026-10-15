@@ -166,6 +166,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String get routeReports => 'Auswertungen';
 
   @override
+  String get reportCatalogEuer => 'EÜR';
+
+  @override
+  String get reportCatalogEks => 'Anlage EKS';
+
+  @override
+  String get reportCatalogGuv => 'GuV';
+
+  @override
+  String get reportCatalogDatev => 'DATEV-Export';
+
+  @override
+  String get reportCatalogHistory => 'Exportverlauf';
+
+  @override
+  String get reportCatalogUstva => 'Umsatzsteuer-Voranmeldung';
+
+  @override
+  String get reportCatalogZm => 'Zusammenfassende Meldung';
+
+  @override
+  String get reportStatusAvailable => 'Verfügbar';
+
+  @override
+  String get reportStatusUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get reportSelectionInvalid => 'Ungültige Berichtsabfrage';
+
+  @override
   String get routeSettings => 'Einstellungen';
 
   @override

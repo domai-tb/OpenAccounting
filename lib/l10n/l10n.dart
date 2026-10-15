@@ -404,6 +404,66 @@ abstract class AppLocalizations {
   /// **'Auswertungen'**
   String get routeReports;
 
+  /// No description provided for @reportCatalogEuer.
+  ///
+  /// In de, this message translates to:
+  /// **'EÜR'**
+  String get reportCatalogEuer;
+
+  /// No description provided for @reportCatalogEks.
+  ///
+  /// In de, this message translates to:
+  /// **'Anlage EKS'**
+  String get reportCatalogEks;
+
+  /// No description provided for @reportCatalogGuv.
+  ///
+  /// In de, this message translates to:
+  /// **'GuV'**
+  String get reportCatalogGuv;
+
+  /// No description provided for @reportCatalogDatev.
+  ///
+  /// In de, this message translates to:
+  /// **'DATEV-Export'**
+  String get reportCatalogDatev;
+
+  /// No description provided for @reportCatalogHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Exportverlauf'**
+  String get reportCatalogHistory;
+
+  /// No description provided for @reportCatalogUstva.
+  ///
+  /// In de, this message translates to:
+  /// **'Umsatzsteuer-Voranmeldung'**
+  String get reportCatalogUstva;
+
+  /// No description provided for @reportCatalogZm.
+  ///
+  /// In de, this message translates to:
+  /// **'Zusammenfassende Meldung'**
+  String get reportCatalogZm;
+
+  /// No description provided for @reportStatusAvailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Verfügbar'**
+  String get reportStatusAvailable;
+
+  /// No description provided for @reportStatusUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get reportStatusUnavailable;
+
+  /// No description provided for @reportSelectionInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültige Berichtsabfrage'**
+  String get reportSelectionInvalid;
+
   /// No description provided for @routeSettings.
   ///
   /// In de, this message translates to:

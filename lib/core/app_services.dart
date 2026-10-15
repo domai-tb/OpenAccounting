@@ -38,6 +38,8 @@ import 'package:openaccounting/features/feature_modules/feature_module_service.d
 import 'package:openaccounting/features/inventory/stocktake_repository.dart';
 import 'package:openaccounting/features/inventory/stocktake_usecases.dart';
 import 'package:openaccounting/features/accounting/gobd_export_service.dart';
+import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
 import 'package:openaccounting/features/documents/beleg_repository.dart';
 import 'package:openaccounting/features/documents/dokumentenpaket_repository.dart';
 import 'package:openaccounting/features/documents/kunden_beleg_repository.dart';
@@ -160,6 +162,10 @@ class AppServices {
   );
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final DashboardUseCase dashboard = DashboardUseCase(_db.executor);
+
+  late final ReportingWorkspaceUseCase reportingWorkspace = ReportingWorkspaceUseCase(_db.executor);
+
+  late final ReportCatalogUseCase reportCatalog = ReportCatalogUseCase(reportingWorkspace);
   late final AssetRegisterUseCases assets = AssetRegisterUseCases(
     AssetRepository(_db.executor),
     scheduleService: const AssetScheduleService(),
