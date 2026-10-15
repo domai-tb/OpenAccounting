@@ -1,35 +1,35 @@
 ## 1. accounting: EÜR (Einnahmen-Überschuss-Rechnung)
 
-- [ ] 1.1 Write failing test `test_e_r_zeile_12_kleinunternehmer_19` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 12 — Kleinunternehmer §19"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.2 Implement the specified behavior for "EÜR Zeile 12 — Kleinunternehmer §19" to pass 1.1, using the typed owner in `design.md`.
-- [ ] 1.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.4 Write failing test `test_e_r_zeile_15_umsatzsteuerpflichtige_betriebseinnahmen` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 15 — Umsatzsteuerpflichtige Betriebseinnahmen"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.5 Implement the specified behavior for "EÜR Zeile 15 — Umsatzsteuerpflichtige Betriebseinnahmen" to pass 1.4, using the typed owner in `design.md`.
-- [ ] 1.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.7 Write failing test `test_e_r_zeile_16_steuerfreie_betriebseinnahmen_4` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 16 — Steuerfreie Betriebseinnahmen §4"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.8 Implement the specified behavior for "EÜR Zeile 16 — Steuerfreie Betriebseinnahmen §4" to pass 1.7, using the typed owner in `design.md`.
-- [ ] 1.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.10 Write failing test `test_e_r_zeile_33_abschreibungen_afa` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 33 — Abschreibungen (AfA)"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.11 Implement the specified behavior for "EÜR Zeile 33 — Abschreibungen (AfA)" to pass 1.10, using the typed owner in `design.md`.
-- [ ] 1.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.13 Write failing test `test_e_r_zeile_60_sonstige_betriebsausgaben` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 60 — Sonstige Betriebsausgaben"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.14 Implement the specified behavior for "EÜR Zeile 60 — Sonstige Betriebsausgaben" to pass 1.13, using the typed owner in `design.md`.
-- [ ] 1.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.16 Write failing test `test_e_r_zeile_106_107_privatentnahme_privateinlage` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 106/107 — Privatentnahme/Privateinlage"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.17 Implement the specified behavior for "EÜR Zeile 106/107 — Privatentnahme/Privateinlage" to pass 1.16, using the typed owner in `design.md`.
-- [ ] 1.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.19 Write failing test `test_vorsteuerabzug_soll_prinzip` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Vorsteuerabzug Soll-Prinzip"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.20 Implement the specified behavior for "Vorsteuerabzug Soll-Prinzip" to pass 1.19, using the typed owner in `design.md`.
-- [ ] 1.21 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.22 Write failing test `test_e_r_with_no_journal_entries` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR with no journal entries"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.23 Implement the specified behavior for "EÜR with no journal entries" to pass 1.22, using the typed owner in `design.md`.
-- [ ] 1.24 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.25 Write failing test `test_e_r_2026_has_no_accepted_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR 2026 has no accepted mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.26 Implement the specified behavior for "EÜR 2026 has no accepted mapping" to pass 1.25, using the typed owner in `design.md`.
-- [ ] 1.27 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 1.28 Write failing test `test_e_r_source_contract_is_unapproved` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR source contract is unapproved"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 1.29 Implement the specified behavior for "EÜR source contract is unapproved" to pass 1.28, using the typed owner in `design.md`.
-- [ ] 1.30 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.1 Write failing test `test_e_r_zeile_12_kleinunternehmer_19` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 12 — Kleinunternehmer §19"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.2 Implement the specified behavior for "EÜR Zeile 12 — Kleinunternehmer §19" to pass 1.1, using the typed owner in `design.md`.
+- [x] 1.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.4 Write failing test `test_e_r_zeile_15_umsatzsteuerpflichtige_betriebseinnahmen` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 15 — Umsatzsteuerpflichtige Betriebseinnahmen"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.5 Implement the specified behavior for "EÜR Zeile 15 — Umsatzsteuerpflichtige Betriebseinnahmen" to pass 1.4, using the typed owner in `design.md`.
+- [x] 1.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.7 Write failing test `test_e_r_zeile_16_steuerfreie_betriebseinnahmen_4` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 16 — Steuerfreie Betriebseinnahmen §4"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.8 Implement the specified behavior for "EÜR Zeile 16 — Steuerfreie Betriebseinnahmen §4" to pass 1.7, using the typed owner in `design.md`.
+- [x] 1.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.10 Write failing test `test_e_r_zeile_33_abschreibungen_afa` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 33 — Abschreibungen (AfA)"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.11 Implement the specified behavior for "EÜR Zeile 33 — Abschreibungen (AfA)" to pass 1.10, using the typed owner in `design.md`.
+- [x] 1.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.13 Write failing test `test_e_r_zeile_60_sonstige_betriebsausgaben` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 60 — Sonstige Betriebsausgaben"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.14 Implement the specified behavior for "EÜR Zeile 60 — Sonstige Betriebsausgaben" to pass 1.13, using the typed owner in `design.md`.
+- [x] 1.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.16 Write failing test `test_e_r_zeile_106_107_privatentnahme_privateinlage` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR Zeile 106/107 — Privatentnahme/Privateinlage"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.17 Implement the specified behavior for "EÜR Zeile 106/107 — Privatentnahme/Privateinlage" to pass 1.16, using the typed owner in `design.md`.
+- [x] 1.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.19 Write failing test `test_vorsteuerabzug_soll_prinzip` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Vorsteuerabzug Soll-Prinzip"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.20 Implement the specified behavior for "Vorsteuerabzug Soll-Prinzip" to pass 1.19, using the typed owner in `design.md`.
+- [x] 1.21 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.22 Write failing test `test_e_r_with_no_journal_entries` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR with no journal entries"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.23 Implement the specified behavior for "EÜR with no journal entries" to pass 1.22, using the typed owner in `design.md`.
+- [x] 1.24 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.25 Write failing test `test_e_r_2026_has_no_accepted_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR 2026 has no accepted mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.26 Implement the specified behavior for "EÜR 2026 has no accepted mapping" to pass 1.25, using the typed owner in `design.md`.
+- [x] 1.27 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 1.28 Write failing test `test_e_r_source_contract_is_unapproved` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "EÜR source contract is unapproved"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 1.29 Implement the specified behavior for "EÜR source contract is unapproved" to pass 1.28, using the typed owner in `design.md`.
+- [x] 1.30 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 2. accounting: UStVA (Umsatzsteuer-Voranmeldung)
 
