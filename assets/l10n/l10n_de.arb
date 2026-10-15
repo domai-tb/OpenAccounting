@@ -1173,6 +1173,8 @@
   "eInvoiceFormatZugferdDescription": "PDF mit eingebetteter ZUGFeRD-XML (2.5.2 EN 16931)",
   "eInvoiceFormatXrechnung": "XRechnung",
   "eInvoiceFormatXrechnungDescription": "XRechnung 3.0 XML-Export nach Finalisierung",
+  "customerZugferdDefaultTitle": "ZUGFeRD für neue Rechnungen vorauswählen",
+  "customerZugferdDefaultDescription": "Legt das Startformat fest; das Format kann für jede Rechnung geändert werden.",
   "eInvoiceReadinessValid": "E-Rechnung geprüft und gültig",
   "eInvoiceReadinessInvalid": "E-Rechnung fehlerhaft – Details prüfen",
   "eInvoiceReadinessNotValidated": "Noch nicht geprüft",

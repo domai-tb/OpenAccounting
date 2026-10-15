@@ -4,6 +4,7 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
+| tasks.md → Implementation prerequisite 1.4 | User can set and edit a customer's ZUGFeRD default | test/features/stammdaten/customer_zugferd_default_form_test.dart | customer form persists the ZUGFeRD invoice default | 🟢 green |
 | specs/documents/spec.md → Document Lifecycle — Finalization | Finalization locks document | test/features/rechnungen/e_invoice_finalization_test.dart | finalization_assigns_number_locks_fields_persists_format_and_stores_pdf | 🟢 green |
 | specs/documents/spec.md → Document Lifecycle — Finalization | Finalization captures company snapshot | test/features/rechnungen/e_invoice_finalization_test.dart | finalized_pdf_uses_captured_company_snapshot | 🟢 green |
 | specs/documents/spec.md → Document Lifecycle — Finalization | Re-finalization blocked | test/features/rechnungen/e_invoice_finalization_test.dart | rejects_finalization_of_already_finalized_invoice | 🟢 green |

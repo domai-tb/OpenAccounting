@@ -2653,6 +2653,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eInvoiceFormatXrechnungDescription => 'XRechnung 3.0 XML-Export nach Finalisierung';
 
   @override
+  String get customerZugferdDefaultTitle => 'ZUGFeRD für neue Rechnungen vorauswählen';
+
+  @override
+  String get customerZugferdDefaultDescription =>
+      'Legt das Startformat fest; das Format kann für jede Rechnung geändert werden.';
+
+  @override
   String get eInvoiceReadinessValid => 'E-Rechnung geprüft und gültig';
 
   @override

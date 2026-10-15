@@ -141,6 +141,7 @@ class ContactFormUseCase {
     num skontoProzent = 0,
     int skontoTage = 0,
     num? kreditlimit,
+    bool zugferdAktiv = false,
     String? note,
   }) {
     return kunden.create(
@@ -160,6 +161,7 @@ class ContactFormUseCase {
       skontoProzent: skontoProzent,
       skontoTage: skontoTage,
       kreditlimit: kreditlimit,
+      zugferdAktiv: zugferdAktiv,
       note: note,
     );
   }

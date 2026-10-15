@@ -2644,6 +2644,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eInvoiceFormatXrechnungDescription => 'XRechnung 3.0 XML export after finalization';
 
   @override
+  String get customerZugferdDefaultTitle => 'Preselect ZUGFeRD for new invoices';
+
+  @override
+  String get customerZugferdDefaultDescription =>
+      'This sets the starting format; you can choose another format for each invoice.';
+
+  @override
   String get eInvoiceReadinessValid => 'E-invoice validated';
 
   @override

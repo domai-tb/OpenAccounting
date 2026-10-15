@@ -5108,6 +5108,18 @@ abstract class AppLocalizations {
   /// **'XRechnung 3.0 XML-Export nach Finalisierung'**
   String get eInvoiceFormatXrechnungDescription;
 
+  /// No description provided for @customerZugferdDefaultTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'ZUGFeRD für neue Rechnungen vorauswählen'**
+  String get customerZugferdDefaultTitle;
+
+  /// No description provided for @customerZugferdDefaultDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Legt das Startformat fest; das Format kann für jede Rechnung geändert werden.'**
+  String get customerZugferdDefaultDescription;
+
   /// No description provided for @eInvoiceReadinessValid.
   ///
   /// In de, this message translates to:

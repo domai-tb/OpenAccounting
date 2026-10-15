@@ -7,7 +7,7 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 - [x] 1.1 Establish an accepted invoice-money contract and record it as a dependency; do not recalculate or round money during serialization.
 - [ ] 1.2 Approve a typed tax-category and exemption-reason mapping for every tax treatment in the initial supported scope.
 - [ ] 1.3 Package and demonstrate the pinned offline validator and PDF/A-3b validation on Linux, Windows, and macOS.
-- [ ] 1.4 Provide a user-facing master-data editor for the customer ZUGFeRD default, or establish the accepted dependency that supplies it.
+- [x] 1.4 Provide a user-facing master-data editor for the customer ZUGFeRD default, or establish the accepted dependency that supplies it.
 - [x] 1.5 Establish and migrate persistent finalized customer snapshot storage so standalone exports cannot read changed live customer data.
 
 ## 2. Document Lifecycle — Finalization

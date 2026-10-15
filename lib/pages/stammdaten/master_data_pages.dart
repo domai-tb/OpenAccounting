@@ -1161,6 +1161,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _vatId = TextEditingController();
   final TextEditingController _iban = TextEditingController();
+  bool _zugferdAktiv = false;
   bool _saving = false;
   bool _loaded = false;
   String? _loadError;
@@ -1208,6 +1209,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
           email: customer.email,
           phone: customer.telefon,
           vatId: customer.ustIdNr,
+          zugferdAktiv: customer.zugferdAktiv,
         );
       } else {
         final Lieferant? supplier = await services.contactDetail.supplierById(id);
@@ -1243,6 +1245,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
     String? phone,
     String? vatId,
     String? iban,
+    bool zugferdAktiv = false,
   }) {
     setState(() {
       _name.text = name;
@@ -1254,6 +1257,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
       _phone.text = phone ?? '';
       _vatId.text = vatId ?? '';
       _iban.text = iban ?? '';
+      _zugferdAktiv = zugferdAktiv;
     });
   }
 
@@ -1295,6 +1299,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
             'email': _nullIfEmpty(_email.text),
             'telefon': _nullIfEmpty(_phone.text),
             'ust_idnr': _nullIfEmpty(_vatId.text),
+            'zugferdAktiv': _zugferdAktiv,
           });
           if (mounted) context.go('/contacts/$id?kind=customer');
         } else {
@@ -1307,6 +1312,7 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
             email: _nullIfEmpty(_email.text),
             telefon: _nullIfEmpty(_phone.text),
             ustIdNr: _nullIfEmpty(_vatId.text),
+            zugferdAktiv: _zugferdAktiv,
           );
           if (mounted) context.go('/contacts/${created.id}?kind=customer');
         }
@@ -1460,6 +1466,16 @@ class _ContactFormViewState extends ConsumerState<ContactFormView> {
               TextFormField(
                 controller: _iban,
                 decoration: InputDecoration(labelText: l10n.formIban),
+              ),
+            ],
+            if (!supplier) ...<Widget>[
+              const SizedBox(height: AppSpacing.md),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(l10n.customerZugferdDefaultTitle),
+                subtitle: Text(l10n.customerZugferdDefaultDescription),
+                value: _zugferdAktiv,
+                onChanged: _saving ? null : (bool value) => setState(() => _zugferdAktiv = value),
               ),
             ],
             const SizedBox(height: AppSpacing.xxl),
