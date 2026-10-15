@@ -14,8 +14,11 @@ fvm flutter analyze
 fvm flutter test --dart-define=platform=vm
 ```
 
-Desktop development requires GTK 3. Linux builds also need the native
-dependencies declared by `hotkey_manager_linux` and `system_tray`.
+Linux builds need GTK 3, X11, and Xi development files:
+
+```bash
+sudo apt install libgtk-3-dev libx11-dev libxi-dev
+```
 
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,

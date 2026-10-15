@@ -1,12 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:system_tray/system_tray.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 const List<String> _kMenuLabels = <String>['Fenster anzeigen', 'Daten aktualisieren', 'Nach Updates suchen', 'Beenden'];
 const String appIconAssetPath = 'assets/branding/openaccounting_icon.png';
 
-/// Abstraction over system_tray plugin — injectable for VM tests.
+/// Injectable tray adapter for VM tests.
 abstract class TrayBackend {
   Future<bool> initSystemTray({required String title, required String iconPath, String? toolTip});
 
@@ -24,55 +26,93 @@ abstract class WindowBackend {
   Future<void> close();
 }
 
-/// Real system_tray adapter — VM-safe via try/catch.
-class SystemTrayBackend implements TrayBackend {
-  SystemTrayBackend({SystemTray? tray}) : _tray = tray ?? SystemTray();
-
-  final SystemTray _tray;
+/// Real tray_manager adapter — VM-safe via try/catch.
+class TrayManagerBackend implements TrayBackend {
+  TrayIcon? _tray;
+  Menu? _menu;
+  final List<MenuItem> _menuItems = <MenuItem>[];
 
   @override
   Future<bool> initSystemTray({required String title, required String iconPath, String? toolTip}) async {
+    TrayIcon? tray;
     try {
-      return await _tray.initSystemTray(title: title, iconPath: iconPath, toolTip: toolTip);
-    } on MissingPluginException catch (_) {
-      return false;
-    } on PlatformException catch (_) {
-      return false;
+      if (!TrayManager.instance.isSupported()) {
+        return false;
+      }
+      tray = TrayIcon.create();
+      if (tray == null) {
+        return false;
+      }
+      tray
+        ..icon = ImageAsset.fromAsset(iconPath)
+        ..setTitle(title)
+        ..setTooltip(toolTip);
+      if (!tray.setVisible(true)) {
+        tray.dispose();
+        return false;
+      }
+      _tray = tray;
+      return true;
     } catch (_) {
+      tray?.dispose();
       return false;
     }
   }
 
   @override
   Future<void> setContextMenu(List<String> labels, List<Future<void> Function()> handlers) async {
+    Menu? menu;
     try {
-      final List<MenuItemBase> items = <MenuItemBase>[];
+      final TrayIcon? tray = _tray;
+      if (tray == null) {
+        return;
+      }
+      menu = Menu.create();
+      if (menu == null) {
+        return;
+      }
+      final List<MenuItem> items = <MenuItem>[];
       for (int i = 0; i < labels.length; i++) {
         final int index = i;
-        items.add(
-          MenuItem(
-            label: labels[index],
-            onClicked: () {
-              // ignore: discarded_futures — fire and forget from native callback
-              handlers[index]();
-            },
-          ),
-        );
+        final MenuItem? item = MenuItem.createWithLabelAndType(labels[index], MenuItemType.normal);
+        if (item == null) {
+          menu.dispose();
+          return;
+        }
+        item.addListener((event) {
+          if (event is MenuItemClickedEvent) {
+            unawaited(handlers[index]());
+          }
+        });
+        menu.addItem(item);
+        items.add(item);
       }
-      await _tray.setContextMenu(items);
-    } on MissingPluginException catch (_) {
-      return;
-    } on PlatformException catch (_) {
-      return;
+      tray.setContextMenu(menu);
+      _menu?.dispose();
+      _menu = menu;
+      _menuItems
+        ..clear()
+        ..addAll(items);
     } catch (_) {
+      menu?.dispose();
       return;
     }
   }
 
   @override
   Future<void> dispose() async {
-    // system_tray has no explicit dispose; no-op VM-safe.
-    return;
+    try {
+      _tray?.setContextMenu(null);
+      _tray?.setVisible(false);
+      _menu?.dispose();
+      _tray?.dispose();
+    } catch (_) {
+      return;
+    } finally {
+      _menu = null;
+      _menuItems.clear();
+      _tray = null;
+    }
   }
 }
 
@@ -265,7 +305,7 @@ DesktopTrayService createDesktopTrayService() {
   if (kIsWeb) {
     return DesktopTrayServiceImpl(trayBackend: _UnsupportedTrayBackend(), windowBackend: _NoopWindowBackend());
   }
-  return DesktopTrayServiceImpl(trayBackend: SystemTrayBackend(), windowBackend: WindowManagerBackend());
+  return DesktopTrayServiceImpl(trayBackend: TrayManagerBackend(), windowBackend: WindowManagerBackend());
 }
 
 class _UnsupportedTrayBackend implements TrayBackend {

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -103,13 +102,6 @@ Future<void> _confirmStorno(WidgetTester tester, String reason) async {
 }
 
 void main() {
-  setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockStreamHandler(
-      const EventChannel('dev.leanflutter.plugins/hotkey_manager_event'),
-      MockStreamHandler.inline(onListen: (_, _) {}),
-    );
-  });
-
   testWidgets('test_invoice_detail_storno_confirms_reason_and_commits_artifact', (WidgetTester tester) async {
     final AppDatabase db = await _openProfileDb(tester);
     final RechnungenUseCases useCases = _useCases(db);

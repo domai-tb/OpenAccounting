@@ -1,9 +1,11 @@
+import 'dart:async';
+
 // ignore_for_file: prefer_initializing_formals
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
+import 'package:nativeapi/nativeapi.dart' as nativeapi;
 import 'package:openaccounting/features/desktop/desktop_tray.dart';
 
 abstract class HotkeyBackend {
@@ -25,64 +27,42 @@ abstract final class DesktopShortcutAccelerators {
   static const String zoomOut = 'Ctrl+-';
 }
 
-class HotkeyManagerBackend implements HotkeyBackend {
-  final Map<String, HotKey> _keys = <String, HotKey>{};
+class NativeApiHotkeyBackend implements HotkeyBackend {
+  final Map<String, nativeapi.Shortcut> _keys = <String, nativeapi.Shortcut>{};
+  final Map<int, Future<void> Function()> _handlers = <int, Future<void> Function()>{};
+  int? _listenerId;
 
-  HotKey _buildHotKey(String id, String key) {
-    final String normalized = key.toLowerCase();
-    final List<HotKeyModifier> mods = <HotKeyModifier>[];
-    if (normalized.contains('ctrl')) mods.add(HotKeyModifier.control);
-    if (normalized.contains('shift')) mods.add(HotKeyModifier.shift);
-    if (normalized.contains('alt')) mods.add(HotKeyModifier.alt);
-    if (normalized.contains('meta')) mods.add(HotKeyModifier.meta);
-    final String last = key.trim().split('+').last.trim().toLowerCase();
-    KeyboardKey k;
-    switch (last) {
-      case 'i':
-        k = LogicalKeyboardKey.keyI;
-        break;
-      case 'n':
-        k = LogicalKeyboardKey.keyN;
-        break;
-      case 'f':
-        k = LogicalKeyboardKey.keyF;
-        break;
-      case 'k':
-        k = LogicalKeyboardKey.keyK;
-        break;
-      case 'e':
-        k = LogicalKeyboardKey.keyE;
-        break;
-      case 'a':
-        k = LogicalKeyboardKey.keyA;
-        break;
-      case '+':
-      case 'add':
-        k = LogicalKeyboardKey.add;
-        break;
-      case '=':
-        k = LogicalKeyboardKey.equal;
-        break;
-      case '-':
-        k = LogicalKeyboardKey.minus;
-        break;
-      default:
-        k = LogicalKeyboardKey.keyI;
-    }
-    return HotKey(identifier: id, key: k, modifiers: mods.isEmpty ? null : mods);
-  }
+  nativeapi.ShortcutManager get _manager => nativeapi.ShortcutManager.instance;
 
   @override
   Future<bool> register(String id, String key, Future<void> Function() handler) async {
     try {
-      final HotKey hk = _buildHotKey(id, key);
-      await hotKeyManager.register(hk, keyDownHandler: (HotKey _) async => handler());
-      _keys[id] = hk;
+      if (!_manager.isSupported()) {
+        return false;
+      }
+      _listenerId ??= _manager.addListener((nativeapi.ShortcutEvent event) {
+        if (event is nativeapi.ShortcutActivatedEvent) {
+          final Future<void> Function()? callback = _handlers[event.shortcutId];
+          if (callback != null) {
+            return callback();
+          }
+        }
+      });
+      final nativeapi.Shortcut? shortcut = _manager.registerWithOptions(
+        nativeapi.ShortcutOptions(
+          accelerator: key == '+' ? 'Plus' : key,
+          callback: null,
+          description: id,
+          scope: nativeapi.ShortcutScope.global,
+          enabled: true,
+        ),
+      );
+      if (shortcut == null) {
+        return false;
+      }
+      _keys[id] = shortcut;
+      _handlers[shortcut.id] = handler;
       return true;
-    } on MissingPluginException catch (_) {
-      return false;
-    } on PlatformException catch (_) {
-      return false;
     } catch (_) {
       return false;
     }
@@ -90,29 +70,27 @@ class HotkeyManagerBackend implements HotkeyBackend {
 
   @override
   Future<void> unregister(String id) async {
-    try {
-      final HotKey? hk = _keys.remove(id);
-      if (hk != null) await hotKeyManager.unregister(hk);
-    } on MissingPluginException catch (_) {
-      return;
-    } on PlatformException catch (_) {
-      return;
-    } catch (_) {
+    final nativeapi.Shortcut? shortcut = _keys.remove(id);
+    if (shortcut == null) {
       return;
     }
+    _handlers.remove(shortcut.id);
+    _manager.unregisterWithId(shortcut.id);
+    shortcut.dispose();
   }
 
   @override
   Future<void> unregisterAll() async {
-    try {
-      await hotKeyManager.unregisterAll();
-      _keys.clear();
-    } on MissingPluginException catch (_) {
-      return;
-    } on PlatformException catch (_) {
-      return;
-    } catch (_) {
-      return;
+    for (final nativeapi.Shortcut shortcut in _keys.values) {
+      _manager.unregisterWithId(shortcut.id);
+      shortcut.dispose();
+    }
+    _keys.clear();
+    _handlers.clear();
+    final int? listenerId = _listenerId;
+    if (listenerId != null) {
+      _manager.removeListener(listenerId);
+      _listenerId = null;
     }
   }
 }
@@ -419,7 +397,7 @@ DesktopShortcutsService createDesktopShortcutsService({
     );
   }
   return DesktopShortcutsServiceImpl(
-    hotkeyBackend: HotkeyManagerBackend(),
+    hotkeyBackend: NativeApiHotkeyBackend(),
     windowBackend: windowBackend,
     navigate: navigate,
     onWarning: onWarning,

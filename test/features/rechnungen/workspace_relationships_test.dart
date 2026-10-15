@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
@@ -116,10 +115,6 @@ void main() {
     expect(relationship.kind, 'konvertierung Ziel');
     expect(relationship.available, isTrue);
 
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockStreamHandler(
-      const EventChannel('dev.leanflutter.plugins/hotkey_manager_event'),
-      MockStreamHandler.inline(onListen: (_, _) {}),
-    );
     final GoRouter router = createRouter(db);
     addTearDown(router.dispose);
 

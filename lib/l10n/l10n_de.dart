@@ -79,7 +79,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get localTitle => 'Lokal';
 
   @override
-  String get localDescription => 'Alle Daten werden lokal gespeichert — kein Cloud-Zugriff.';
+  String get localDescription =>
+      'Alle Daten werden lokal gespeichert — kein Cloud-Zugriff.';
 
   @override
   String get close => 'Schließen';
@@ -109,7 +110,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get confirmDelete => 'Möchtest du diese Rechnung wirklich löschen?';
 
   @override
-  String get emptyInvoices => 'Noch keine Rechnungen. Erstelle deine erste Rechnung.';
+  String get emptyInvoices =>
+      'Noch keine Rechnungen. Erstelle deine erste Rechnung.';
 
   @override
   String get language => 'Sprache';
@@ -130,7 +132,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPrivacy => 'Datenschutz';
 
   @override
-  String get settingsPrivacyDescription => 'Deine Buchhaltungsdaten bleiben auf diesem Gerät.';
+  String get settingsPrivacyDescription =>
+      'Deine Buchhaltungsdaten bleiben auf diesem Gerät.';
 
   @override
   String get settingsProfiles => 'Profile';
@@ -250,7 +253,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get globalSearchButton => 'Globale Suche';
 
   @override
-  String get globalSearchShortcutUnavailable => 'Globale Suche (Tastenkürzel nicht verfügbar)';
+  String get globalSearchShortcutUnavailable =>
+      'Globale Suche (Tastenkürzel nicht verfügbar)';
 
   @override
   String get globalSearchTitle => 'Suchen oder Befehl ausführen';
@@ -269,7 +273,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get globalSearchLoading => 'Suche läuft…';
 
   @override
-  String get globalSearchPartialFailure => 'Einige lokale Datensätze konnten nicht durchsucht werden.';
+  String get globalSearchPartialFailure =>
+      'Einige lokale Datensätze konnten nicht durchsucht werden.';
 
   @override
   String globalSearchSourceUnavailable(String source) {
@@ -319,13 +324,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankSelectedTransactionTitle => 'Ausgewählte Banktransaktion';
 
   @override
-  String get bankTransactionInvalidSelection => 'Der Transaktionslink ist ungültig.';
+  String get bankTransactionInvalidSelection =>
+      'Der Transaktionslink ist ungültig.';
 
   @override
-  String get bankTransactionNotFound => 'Diese Banktransaktion ist im aktiven Profil nicht verfügbar.';
+  String get bankTransactionNotFound =>
+      'Diese Banktransaktion ist im aktiven Profil nicht verfügbar.';
 
   @override
-  String get bankTransactionLoadFailed => 'Die Banktransaktion konnte nicht geladen werden.';
+  String get bankTransactionLoadFailed =>
+      'Die Banktransaktion konnte nicht geladen werden.';
 
   @override
   String get bankTransactionCounterparty => 'Gegenkonto';
@@ -361,13 +369,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get filterClearAll => 'Alle Filter löschen';
 
   @override
-  String get filterInvalidDateRange => 'Das Startdatum muss vor oder am Enddatum liegen.';
+  String get filterInvalidDateRange =>
+      'Das Startdatum muss vor oder am Enddatum liegen.';
 
   @override
-  String get filterInvalidAmount => 'Gib einen gültigen Betrag mit höchstens zwei Nachkommastellen ein.';
+  String get filterInvalidAmount =>
+      'Gib einen gültigen Betrag mit höchstens zwei Nachkommastellen ein.';
 
   @override
-  String get filterInvalidAmountRange => 'Der Mindestbetrag muss kleiner oder gleich dem Höchstbetrag sein.';
+  String get filterInvalidAmountRange =>
+      'Der Mindestbetrag muss kleiner oder gleich dem Höchstbetrag sein.';
 
   @override
   String get filterPreviousPage => 'Vorherige Seite';
@@ -453,7 +464,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dashboardInventory => 'Lager';
 
   @override
-  String get dashboardInventoryUnavailable => 'Die Lagerverwaltung ist derzeit nicht verfügbar.';
+  String get dashboardInventoryUnavailable =>
+      'Die Lagerverwaltung ist derzeit nicht verfügbar.';
 
   @override
   String get invoicesSubtitle => 'Rechnungen';
@@ -477,7 +489,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get helpSubtitle => 'Hilfe und Support';
 
   @override
-  String get notFoundDescription => 'Die angeforderte Seite wurde nicht gefunden.';
+  String get notFoundDescription =>
+      'Die angeforderte Seite wurde nicht gefunden.';
 
   @override
   String get databaseUnavailable => 'Die lokale Datenbank ist nicht verfügbar.';
@@ -495,7 +508,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setupCompanyName => 'Firmenname';
 
   @override
-  String get setupCompanyNameHint => 'Gib den rechtlichen Namen deines Unternehmens ein.';
+  String get setupCompanyNameHint =>
+      'Gib den rechtlichen Namen deines Unternehmens ein.';
 
   @override
   String get setupIban => 'IBAN';
@@ -513,16 +527,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setupCategories => 'Kategorien';
 
   @override
-  String get setupCategoriesHint => 'Wähle die Kategorien, die du am häufigsten nutzt.';
+  String get setupCategoriesHint =>
+      'Wähle die Kategorien, die du am häufigsten nutzt.';
 
   @override
   String get setupRequired => 'Bitte fülle die Pflichtfelder aus.';
 
   @override
-  String get setupInvalidIban => 'Gib eine gültige IBAN ein oder lasse das Feld leer.';
+  String get setupInvalidIban =>
+      'Gib eine gültige IBAN ein oder lasse das Feld leer.';
 
   @override
-  String get setupDatabaseError => 'Das Profil konnte nicht gespeichert werden.';
+  String get setupDatabaseError =>
+      'Das Profil konnte nicht gespeichert werden.';
 
   @override
   String get setupRetry => 'Einrichtung wiederholen';
@@ -543,10 +560,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get inventoryTitle => 'Lager';
 
   @override
-  String get inventoryUnavailable => 'Die Lagerverwaltung ist noch nicht verfügbar.';
+  String get inventoryUnavailable =>
+      'Die Lagerverwaltung ist noch nicht verfügbar.';
 
   @override
-  String get inventoryUnavailableDescription => 'Die Lagerverwaltung ist für dieses Profil nicht verfügbar.';
+  String get inventoryUnavailableDescription =>
+      'Die Lagerverwaltung ist für dieses Profil nicht verfügbar.';
 
   @override
   String get inventoryReadOnly => 'Nur lesen';
@@ -579,25 +598,30 @@ class AppLocalizationsDe extends AppLocalizations {
   String get stocktakePhysicalCount => 'Gezählte Istmenge';
 
   @override
-  String get stocktakeMissingCount => 'Für jeden Artikel eine gezählte Menge eingeben.';
+  String get stocktakeMissingCount =>
+      'Für jeden Artikel eine gezählte Menge eingeben.';
 
   @override
-  String get stocktakeInvalidCount => 'Bitte eine gültige gezählte Menge eingeben.';
+  String get stocktakeInvalidCount =>
+      'Bitte eine gültige gezählte Menge eingeben.';
 
   @override
   String get stocktakeInvalidDate => 'Stichtag im Format JJJJ-MM-TT eingeben';
 
   @override
-  String get stocktakeNegativeForbidden => 'Gezählte Mengen dürfen nicht negativ sein.';
+  String get stocktakeNegativeForbidden =>
+      'Gezählte Mengen dürfen nicht negativ sein.';
 
   @override
-  String get stocktakePrecisionInvalid => 'Gezählte Mengen dürfen höchstens drei Nachkommastellen haben.';
+  String get stocktakePrecisionInvalid =>
+      'Gezählte Mengen dürfen höchstens drei Nachkommastellen haben.';
 
   @override
   String get stocktakeNoCountable => 'Keine zählbaren Artikel vorhanden.';
 
   @override
-  String get stocktakeNoCountableDescription => 'Aktiviere die Lagerführung für mindestens einen Artikel.';
+  String get stocktakeNoCountableDescription =>
+      'Aktiviere die Lagerführung für mindestens einen Artikel.';
 
   @override
   String get stocktakeHistoryTitle => 'Erfasste Inventuren';
@@ -616,7 +640,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Keine geprüfte Bewertungsrichtlinie hinterlegt. Gezählte Mengen bleiben verfügbar.';
 
   @override
-  String get stocktakeCorrectionHint => 'Korrekturen über eine neue Inventur erfassen.';
+  String get stocktakeCorrectionHint =>
+      'Korrekturen über eine neue Inventur erfassen.';
 
   @override
   String get stocktakeDisabledNew => 'Neue Inventuren sind deaktiviert.';
@@ -849,7 +874,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get draftDiscardTitle => 'Entwurf verwerfen?';
 
   @override
-  String get draftDiscardMessage => 'Die eingegebenen Rechnungsdaten gehen verloren.';
+  String get draftDiscardMessage =>
+      'Die eingegebenen Rechnungsdaten gehen verloren.';
 
   @override
   String get actionKeepEditing => 'Weiter bearbeiten';
@@ -902,7 +928,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get invoiceDraftTitle => 'Rechnungsentwurf';
 
   @override
-  String get invoiceDraftDescription => 'Speichere eine Rechnungsposition als Entwurf.';
+  String get invoiceDraftDescription =>
+      'Speichere eine Rechnungsposition als Entwurf.';
 
   @override
   String get invoiceDraftPositionLabel => 'Position';
@@ -925,7 +952,8 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get profileSavedRestartHint => 'Profil gespeichert. Bitte OpenAccounting neu starten.';
+  String get profileSavedRestartHint =>
+      'Profil gespeichert. Bitte OpenAccounting neu starten.';
 
   @override
   String get profileAlreadyActive => 'Profil ist bereits aktiv.';
@@ -980,7 +1008,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Kategorien konnten nicht geladen werden. Manuelle Kategorisierung ist derzeit nicht verfügbar.';
 
   @override
-  String get bankHistoryLoadFailed => 'Importverlauf konnte nicht geladen werden.';
+  String get bankHistoryLoadFailed =>
+      'Importverlauf konnte nicht geladen werden.';
 
   @override
   String get bankUnsupportedFile =>
@@ -1047,7 +1076,8 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get bankImportAbortedHint => 'Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.';
+  String get bankImportAbortedHint =>
+      'Korrigiere die Datei oder wähle ein passendes Template und versuche es erneut.';
 
   @override
   String get bankStatusRejected => 'Abgelehnt';
@@ -1063,7 +1093,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankPathLabel => 'Dateipfad';
 
   @override
-  String get bankPathHint => 'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt';
+  String get bankPathHint =>
+      'Datei wählen oder Pfad einfügen; Drag & Drop unterstützt';
 
   @override
   String get bankStepAccountTemplate => '2. Konto und Template';
@@ -1099,7 +1130,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Änderungen und manuelle Kategorien werden erst nach deiner ausdrücklichen Importbestätigung gespeichert.';
 
   @override
-  String get bankDuplicateOverride => 'Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)';
+  String get bankDuplicateOverride =>
+      'Bereits importierte Duplikate erneut übernehmen (nur bewusst aktivieren)';
 
   @override
   String bankConfirmActionCount(int count) {
@@ -1150,7 +1182,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Datenbank meldete nicht gespeicherte Zeilen, konnte aber keinen einzelnen Zeilenfehler zurückgeben. Prüfe Konto, Datum und Betrag; ein erneuter Versuch bleibt dedupliziert.';
 
   @override
-  String get bankNotSavedFix => 'Nicht gespeichert — bitte korrigieren und erneut prüfen:';
+  String get bankNotSavedFix =>
+      'Nicht gespeichert — bitte korrigieren und erneut prüfen:';
 
   @override
   String bankFailureRowPrefix(int line, String error) {
@@ -1167,7 +1200,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankHistoryTitle => 'Importverlauf';
 
   @override
-  String get bankHistoryCardSubtitle => 'Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.';
+  String get bankHistoryCardSubtitle =>
+      'Quelle, Template, Mengen und Ergebnisstatus bleiben hier nachvollziehbar.';
 
   @override
   String get bankHistoryRefresh => 'Importverlauf aktualisieren';
@@ -1229,10 +1263,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankHeaderSubtitleHistory => 'Nachvollziehbarer Importverlauf';
 
   @override
-  String get bankHeaderSubtitleImport => 'Dateiimport mit Prüfung vor dem Speichern';
+  String get bankHeaderSubtitleImport =>
+      'Dateiimport mit Prüfung vor dem Speichern';
 
   @override
-  String get bankHeaderSubtitleTransactions => 'Gespeicherte Banktransaktionen suchen und filtern';
+  String get bankHeaderSubtitleTransactions =>
+      'Gespeicherte Banktransaktionen suchen und filtern';
 
   @override
   String get bankViewTransactions => 'Transaktionen';
@@ -1263,25 +1299,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankStatusImported => 'Importiert';
 
   @override
-  String get bankInvalidImportNoDiagnostic => 'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.';
+  String get bankInvalidImportNoDiagnostic =>
+      'Ungültiger Import: Es wurde keine Fehlerdiagnose angegeben.';
 
   @override
-  String get bankRecoveryCheckFileTemplate => 'Prüfe Datei und Template und versuche es erneut.';
+  String get bankRecoveryCheckFileTemplate =>
+      'Prüfe Datei und Template und versuche es erneut.';
 
   @override
-  String get bankInvalidImportNoAccount => 'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.';
+  String get bankInvalidImportNoAccount =>
+      'Ungültiger Import: Kein gültiges Bankkonto ausgewählt.';
 
   @override
-  String get bankRecoverySelectAccount => 'Wähle ein gültiges Bankkonto und versuche es erneut.';
+  String get bankRecoverySelectAccount =>
+      'Wähle ein gültiges Bankkonto und versuche es erneut.';
 
   @override
-  String get bankNoTransactionsToImport => 'Keine Transaktionen zum Importieren.';
+  String get bankNoTransactionsToImport =>
+      'Keine Transaktionen zum Importieren.';
 
   @override
-  String get bankRecoverySelectSupportedFile => 'Wähle eine unterstützte Datei mit mindestens einer Transaktion.';
+  String get bankRecoverySelectSupportedFile =>
+      'Wähle eine unterstützte Datei mit mindestens einer Transaktion.';
 
   @override
-  String get bankHistoryNotFinalSaved => 'Importhistorie konnte nicht abschließend gespeichert werden.';
+  String get bankHistoryNotFinalSaved =>
+      'Importhistorie konnte nicht abschließend gespeichert werden.';
 
   @override
   String bankHistoryCreateFailed(String error) {
@@ -1289,10 +1332,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get bankRecoveryFixDatabase => 'Behebe das Datenbankproblem und versuche es erneut.';
+  String get bankRecoveryFixDatabase =>
+      'Behebe das Datenbankproblem und versuche es erneut.';
 
   @override
-  String get bankRecoveryCheckDuplicates => 'Prüfe die vorhandenen Duplikate und versuche es erneut.';
+  String get bankRecoveryCheckDuplicates =>
+      'Prüfe die vorhandenen Duplikate und versuche es erneut.';
 
   @override
   String get bankUnknownError => 'Unbekannter Fehler';
@@ -1304,7 +1349,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankInvalidAmount => 'Betrag ungültig';
 
   @override
-  String get bankCsvUnclosedQuotes => 'Ungültige CSV: Anführungszeichen nicht geschlossen';
+  String get bankCsvUnclosedQuotes =>
+      'Ungültige CSV: Anführungszeichen nicht geschlossen';
 
   @override
   String bankCsvRowSuffix(int row) {
@@ -1312,13 +1358,15 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get bankRecoveryFixCsvRow => 'Korrigiere die CSV-Zeile und versuche den Import erneut.';
+  String get bankRecoveryFixCsvRow =>
+      'Korrigiere die CSV-Zeile und versuche den Import erneut.';
 
   @override
   String get bankNoTransactionsFound => 'Keine Transaktionen gefunden';
 
   @override
-  String get bankNoTemplateFound => 'Kein passendes Template gefunden. Bitte wähle ein Template.';
+  String get bankNoTemplateFound =>
+      'Kein passendes Template gefunden. Bitte wähle ein Template.';
 
   @override
   String get bankNoTemplateFoundNoTransactions =>
@@ -1331,22 +1379,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankNoHeader => 'Datei enthält keine Kopfzeile';
 
   @override
-  String get bankInvalidXmlNoTag => 'Ungültiges XML: kein XML-Tag gefunden (invalid)';
+  String get bankInvalidXmlNoTag =>
+      'Ungültiges XML: kein XML-Tag gefunden (invalid)';
 
   @override
-  String get bankInvalidXmlNoClosingTag => 'Ungültiges XML: kein schliessendes Tag (invalid)';
+  String get bankInvalidXmlNoClosingTag =>
+      'Ungültiges XML: kein schliessendes Tag (invalid)';
 
   @override
-  String get bankInvalidXmlDocumentUnclosed => 'Ungültiges XML: Document nicht geschlossen (invalid)';
+  String get bankInvalidXmlDocumentUnclosed =>
+      'Ungültiges XML: Document nicht geschlossen (invalid)';
 
   @override
-  String get bankInvalidXmlNtryUnclosed => 'Ungültiges XML: Ntry nicht geschlossen (invalid)';
+  String get bankInvalidXmlNtryUnclosed =>
+      'Ungültiges XML: Ntry nicht geschlossen (invalid)';
 
   @override
-  String get bankInvalidXmlMismatched => 'Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)';
+  String get bankInvalidXmlMismatched =>
+      'Ungültiges XML: verschachtelte Tags stimmen nicht überein (invalid)';
 
   @override
-  String get bankInvalidXmlTagUnclosed => 'Ungültiges XML: Tag nicht geschlossen (invalid)';
+  String get bankInvalidXmlTagUnclosed =>
+      'Ungültiges XML: Tag nicht geschlossen (invalid)';
 
   @override
   String get bankAmountMissingNtry => 'Betrag fehlt in Ntry';
@@ -1390,10 +1444,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setupErrorCashInvalid => 'Kassenbestand ungültig';
 
   @override
-  String get setupErrorCategoryRequired => 'Mindestens eine Kategorie erforderlich';
+  String get setupErrorCategoryRequired =>
+      'Mindestens eine Kategorie erforderlich';
 
   @override
-  String get setupErrorDatabaseStatus => 'Datenbank konnte für den Setup-Status nicht gelesen werden';
+  String get setupErrorDatabaseStatus =>
+      'Datenbank konnte für den Setup-Status nicht gelesen werden';
 
   @override
   String get dashboardCustomize => 'Dashboard anpassen';
@@ -1489,7 +1545,8 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get bankDuplicateOverrideLimit => 'Duplicate override limit reached (100) — manual cleanup required';
+  String get bankDuplicateOverrideLimit =>
+      'Duplicate override limit reached (100) — manual cleanup required';
 
   @override
   String get bankConfidenceHigh => 'Hohe Übereinstimmung';
@@ -1538,7 +1595,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankRuleCancel => 'Abbrechen';
 
   @override
-  String get bankRuleEmpty => 'Keine Regeln vorhanden. Lege eine Regel an, um Importe automatisch zu kategorisieren.';
+  String get bankRuleEmpty =>
+      'Keine Regeln vorhanden. Lege eine Regel an, um Importe automatisch zu kategorisieren.';
 
   @override
   String get bankRuleDisabled => 'Deaktiviert';
@@ -1655,19 +1713,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get incomeTaxScheduleG => 'Anlage G';
 
   @override
-  String get incomeTaxSelectPrompt => 'Anlage für die Verfügbarkeitsprüfung wählen';
+  String get incomeTaxSelectPrompt =>
+      'Anlage für die Verfügbarkeitsprüfung wählen';
 
   @override
   String get incomeTaxUnavailable => 'Noch nicht verfügbar';
 
   @override
-  String get incomeTaxBlockerForm => 'Kein akzeptierter Formular- und Quellvertrag';
+  String get incomeTaxBlockerForm =>
+      'Kein akzeptierter Formular- und Quellvertrag';
 
   @override
   String get incomeTaxBlockerPeriod => 'Kein akzeptierter Zeitraumvertrag';
 
   @override
-  String get incomeTaxBlockerClassification => 'Keine akzeptierte Klassifizierung';
+  String get incomeTaxBlockerClassification =>
+      'Keine akzeptierte Klassifizierung';
 
   @override
   String get incomeTaxBlockerSource => 'Keine vollständige Buchhaltungsquelle';
@@ -1767,25 +1828,29 @@ class AppLocalizationsDe extends AppLocalizations {
   String get featureModulesTitle => 'Funktionen';
 
   @override
-  String get featureModulesDescription => 'Optionale Module einzeln aktivieren.';
+  String get featureModulesDescription =>
+      'Optionale Module einzeln aktivieren.';
 
   @override
   String get featureModuleProfileManagerName => 'Profilverwaltung';
 
   @override
-  String get featureModuleProfileManagerDescription => 'Profilübersicht mit Anlegen, Wählen und Umbenennen.';
+  String get featureModuleProfileManagerDescription =>
+      'Profilübersicht mit Anlegen, Wählen und Umbenennen.';
 
   @override
   String get featureModuleInventoryName => 'Lagerverwaltung';
 
   @override
-  String get featureModuleInventoryDescription => 'Lagerwarnungen, Bestände und manuelle Korrekturen.';
+  String get featureModuleInventoryDescription =>
+      'Lagerwarnungen, Bestände und manuelle Korrekturen.';
 
   @override
   String get featureModuleGuvName => 'GuV';
 
   @override
-  String get featureModuleGuvDescription => 'Gewinn- und Verlustrechnung aus Journalbuchungen.';
+  String get featureModuleGuvDescription =>
+      'Gewinn- und Verlustrechnung aus Journalbuchungen.';
 
   @override
   String get featureModuleEnabled => 'Aktiviert';
@@ -1797,19 +1862,23 @@ class AppLocalizationsDe extends AppLocalizations {
   String get featureModuleUnavailable => 'Nicht verfügbar';
 
   @override
-  String get featureModuleDataRetained => 'Deaktivieren blendet Einträge aus. Bestehende Daten bleiben erhalten.';
+  String get featureModuleDataRetained =>
+      'Deaktivieren blendet Einträge aus. Bestehende Daten bleiben erhalten.';
 
   @override
-  String get featureModuleThresholdActive => 'GuV-Schwelle erreicht. GuV bleibt aktiviert.';
+  String get featureModuleThresholdActive =>
+      'GuV-Schwelle erreicht. GuV bleibt aktiviert.';
 
   @override
-  String get featureModuleSaveError => 'Speichern fehlgeschlagen. Erneut versuchen.';
+  String get featureModuleSaveError =>
+      'Speichern fehlgeschlagen. Erneut versuchen.';
 
   @override
   String get featureModuleUnavailableTitle => 'Modul nicht verfügbar';
 
   @override
-  String get featureModuleUnavailableDescription => 'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.';
+  String get featureModuleUnavailableDescription =>
+      'Dieses Modul ist deaktiviert. Keine Daten wurden geändert.';
 
   @override
   String get guidanceExplainAction => 'Erklärung';
@@ -1842,7 +1911,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Legt fest, welchem Standardkonto des Kontenrahmens (SKR 03/04) diese Kategorie in Auswertungen zugeordnet wird. Die Zuordnung steuert, in welcher Zeile der Auswertung Beträge dieser Kategorie erscheinen. Sie ändert keine Buchungen und ersetzt keine steuerliche Kontenwahl.';
 
   @override
-  String get guidanceTitleJournalImmutability => 'Unveränderbarkeit des Journals';
+  String get guidanceTitleJournalImmutability =>
+      'Unveränderbarkeit des Journals';
 
   @override
   String get guidanceBodyJournalImmutability =>
@@ -1926,14 +1996,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Verfolgt den Stand eines Auftrags von bestätigt über in Bearbeitung bis abgeschlossen oder storniert. Der Abschluss gibt die zugehörige Rechnung zur Erstellung frei. Stornierte Aufträge bleiben zu Nachweiszwecken erhalten.';
 
   @override
-  String get guidanceTitleCorrectionCreditSign => 'Vorzeichen der Korrekturbeträge';
+  String get guidanceTitleCorrectionCreditSign =>
+      'Vorzeichen der Korrekturbeträge';
 
   @override
   String get guidanceBodyCorrectionCreditSign =>
       'Korrekturbeträge behalten ihr Vorzeichen, damit die Umsatzsteuer-Mathematik der Ursprungsrechnung erhalten bleibt. Eine Gutschrift mindert, eine Nachbelastung erhöht die Bemessungsgrundlage. Die App erstellt keine umsatzsteuerliche Würdigung des Korrekturgrunds; das Verhalten ist auf unterstützte Korrekturfälle beschränkt.';
 
   @override
-  String get guidanceTitleTaxSpecial25a => 'Differenzbesteuerung nach § 25a UStG';
+  String get guidanceTitleTaxSpecial25a =>
+      'Differenzbesteuerung nach § 25a UStG';
 
   @override
   String get guidanceBodyTaxSpecial25a =>
@@ -2037,7 +2109,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get workspaceUnavailable => 'Daten nicht verfügbar';
 
   @override
-  String get workspaceUnavailableMessage => 'Die Daten konnten nicht geladen werden. Versuche es erneut.';
+  String get workspaceUnavailableMessage =>
+      'Die Daten konnten nicht geladen werden. Versuche es erneut.';
 
   @override
   String get saveFailed => 'Speichern fehlgeschlagen';
@@ -2143,13 +2216,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'SMTP-Prüfung erfolgreich: Begrüßung, TLS-Aufbau und Anmeldung abgeschlossen. Es wurde keine Nachricht gesendet.';
 
   @override
-  String get smtpTestHostUnreachable => 'Host nicht erreichbar. Es wurde keine Nachricht gesendet.';
+  String get smtpTestHostUnreachable =>
+      'Host nicht erreichbar. Es wurde keine Nachricht gesendet.';
 
   @override
-  String get smtpTestTlsFailed => 'TLS-Prüfung fehlgeschlagen. Es wurde kein Klartext-Versuch unternommen.';
+  String get smtpTestTlsFailed =>
+      'TLS-Prüfung fehlgeschlagen. Es wurde kein Klartext-Versuch unternommen.';
 
   @override
-  String get smtpTestAuthFailed => 'Anmeldung fehlgeschlagen. Zugangsdaten prüfen.';
+  String get smtpTestAuthFailed =>
+      'Anmeldung fehlgeschlagen. Zugangsdaten prüfen.';
 
   @override
   String get smtpModeImplicitTls => 'Implizites TLS';
@@ -2158,13 +2234,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get smtpModeStarttls => 'STARTTLS (erforderlich)';
 
   @override
-  String get smtpVaultUnavailable => 'Der System-Schlüsselspeicher ist nicht verfügbar. SMTP bleibt deaktiviert.';
+  String get smtpVaultUnavailable =>
+      'Der System-Schlüsselspeicher ist nicht verfügbar. SMTP bleibt deaktiviert.';
 
   @override
-  String get smtpMigrationRetry => 'Bitte Zugriff erneut versuchen oder das Passwort neu eingeben.';
+  String get smtpMigrationRetry =>
+      'Bitte Zugriff erneut versuchen oder das Passwort neu eingeben.';
 
   @override
-  String get smtpPasswordMissing => 'Noch kein SMTP-Passwort gespeichert. Bitte Passwort eingeben.';
+  String get smtpPasswordMissing =>
+      'Noch kein SMTP-Passwort gespeichert. Bitte Passwort eingeben.';
 
   @override
   String get smtpDisabled => 'SMTP deaktiviert';
@@ -2194,16 +2273,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get docEmailAttachments => 'Anhänge';
 
   @override
-  String get docEmailAccepted => 'Vom SMTP-Server angenommen (kein Zustellnachweis).';
+  String get docEmailAccepted =>
+      'Vom SMTP-Server angenommen (kein Zustellnachweis).';
 
   @override
-  String get docEmailRejected => 'Vom Server abgelehnt. Nicht als versendet markiert.';
+  String get docEmailRejected =>
+      'Vom Server abgelehnt. Nicht als versendet markiert.';
 
   @override
-  String get docEmailUnknown => 'Ergebnis unklar. Erneutes Senden erst nach Bestätigung.';
+  String get docEmailUnknown =>
+      'Ergebnis unklar. Erneutes Senden erst nach Bestätigung.';
 
   @override
-  String get docEmailUnknownRetryConfirm => 'Möglicherweise bereits zugestellt. Trotzdem erneut senden?';
+  String get docEmailUnknownRetryConfirm =>
+      'Möglicherweise bereits zugestellt. Trotzdem erneut senden?';
 
   @override
   String get docEmailBlockedDraft => 'Entwürfe können nicht versendet werden.';
@@ -2212,16 +2295,20 @@ class AppLocalizationsDe extends AppLocalizations {
   String get docEmailBlockedRecipient => 'Kein gültiger Empfänger.';
 
   @override
-  String get docEmailBlockedArtifact => 'Kein erzeugtes PDF für dieses Dokument vorhanden.';
+  String get docEmailBlockedArtifact =>
+      'Kein erzeugtes PDF für dieses Dokument vorhanden.';
 
   @override
-  String get docEmailTemplateUnresolved => 'Platzhalter konnte nicht aufgelöst werden. Senden blockiert.';
+  String get docEmailTemplateUnresolved =>
+      'Platzhalter konnte nicht aufgelöst werden. Senden blockiert.';
 
   @override
-  String get docEmailHeaderLineBreak => 'Betreff und Adressen dürfen keine Zeilenumbrüche enthalten.';
+  String get docEmailHeaderLineBreak =>
+      'Betreff und Adressen dürfen keine Zeilenumbrüche enthalten.';
 
   @override
-  String get docEmailNoSendControl => 'Versand für diesen Dokumenttyp noch nicht verfügbar.';
+  String get docEmailNoSendControl =>
+      'Versand für diesen Dokumenttyp noch nicht verfügbar.';
 
   @override
   String get docEmailDuplicateInProgress => 'Sendeversuch läuft bereits.';
@@ -2245,7 +2332,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get csvImportStepResult => '4. Ergebnis';
 
   @override
-  String get csvImportSourceHint => 'CSV-Text einfügen oder lokalen Dateipfad angeben. Die Vorschau schreibt nichts.';
+  String get csvImportSourceHint =>
+      'CSV-Text einfügen oder lokalen Dateipfad angeben. Die Vorschau schreibt nichts.';
 
   @override
   String get csvImportCsvLabel => 'CSV-Text';
@@ -2341,34 +2429,44 @@ class AppLocalizationsDe extends AppLocalizations {
   String get csvImportCounts => 'Anzahlen';
 
   @override
-  String get csvImportFileTooLarge => 'Datei überschreitet 20 MiB; kein Datensatz wurde geschrieben.';
+  String get csvImportFileTooLarge =>
+      'Datei überschreitet 20 MiB; kein Datensatz wurde geschrieben.';
 
   @override
-  String get csvImportRowLimit => 'Datei überschreitet 50.000 Zeilen; kein Datensatz wurde geschrieben.';
+  String get csvImportRowLimit =>
+      'Datei überschreitet 50.000 Zeilen; kein Datensatz wurde geschrieben.';
 
   @override
-  String get csvImportMalformed => 'Fehlerhafte Anführungszeichen; kein Datensatz wurde geschrieben.';
+  String get csvImportMalformed =>
+      'Fehlerhafte Anführungszeichen; kein Datensatz wurde geschrieben.';
 
   @override
-  String get csvImportUnsupportedEncoding => 'Nicht unterstützte Kodierung; nur UTF-8 wird unterstützt.';
+  String get csvImportUnsupportedEncoding =>
+      'Nicht unterstützte Kodierung; nur UTF-8 wird unterstützt.';
 
   @override
-  String get csvImportColumnMismatch => 'Uneinheitliche Spaltenzahl; kein Datensatz wurde geschrieben.';
+  String get csvImportColumnMismatch =>
+      'Uneinheitliche Spaltenzahl; kein Datensatz wurde geschrieben.';
 
   @override
-  String get csvImportEmptyFile => 'Datei ist leer; kein Datensatz wurde geschrieben.';
+  String get csvImportEmptyFile =>
+      'Datei ist leer; kein Datensatz wurde geschrieben.';
 
   @override
-  String get csvImportMappingConflict => 'Spaltenzuordnung ist mehrdeutig; die Vorschau wurde nicht geöffnet.';
+  String get csvImportMappingConflict =>
+      'Spaltenzuordnung ist mehrdeutig; die Vorschau wurde nicht geöffnet.';
 
   @override
-  String get csvImportEntityMismatch => 'Vorlage passt nicht zu dieser Datenart.';
+  String get csvImportEntityMismatch =>
+      'Vorlage passt nicht zu dieser Datenart.';
 
   @override
-  String get csvImportMatchFieldRequired => 'Für Überspringen/Aktualisieren ist ein Vergleichsfeld erforderlich.';
+  String get csvImportMatchFieldRequired =>
+      'Für Überspringen/Aktualisieren ist ein Vergleichsfeld erforderlich.';
 
   @override
-  String get csvImportPriceBasisRequired => 'Für Artikel ist eine Preisbasis (netto/brutto) erforderlich.';
+  String get csvImportPriceBasisRequired =>
+      'Für Artikel ist eine Preisbasis (netto/brutto) erforderlich.';
 
   @override
   String csvImportUnsupportedFieldForUpdate(String field) {
@@ -2376,10 +2474,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get csvImportBatchFailure => 'Import fehlgeschlagen; keine Zeile wurde übernommen.';
+  String get csvImportBatchFailure =>
+      'Import fehlgeschlagen; keine Zeile wurde übernommen.';
 
   @override
-  String get csvImportUnavailable => 'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.';
+  String get csvImportUnavailable =>
+      'Importdaten sind derzeit nicht verfügbar. Zuordnung bleibt erhalten.';
 
   @override
   String get customerDisclosureExportAction => 'Kundendaten exportieren';
@@ -2398,25 +2498,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get customerDisclosureExportProgress => 'Export läuft…';
 
   @override
-  String get customerDisclosureExportComplete => 'Export abgeschlossen und geprüft.';
+  String get customerDisclosureExportComplete =>
+      'Export abgeschlossen und geprüft.';
 
   @override
-  String get customerDisclosureExportIncomplete => 'Export unvollständig gespeichert. Bitte Hinweise prüfen.';
+  String get customerDisclosureExportIncomplete =>
+      'Export unvollständig gespeichert. Bitte Hinweise prüfen.';
 
   @override
-  String get customerDisclosureExportFailed => 'Export fehlgeschlagen. Bitte Ziel prüfen und erneut versuchen.';
+  String get customerDisclosureExportFailed =>
+      'Export fehlgeschlagen. Bitte Ziel prüfen und erneut versuchen.';
 
   @override
-  String get customerDisclosureExportCancelled => 'Export abgebrochen. Es wurde kein Archiv erstellt.';
+  String get customerDisclosureExportCancelled =>
+      'Export abgebrochen. Es wurde kein Archiv erstellt.';
 
   @override
-  String get customerDisclosureExportUnavailable => 'Auskunfts-Export ist nicht verfügbar.';
+  String get customerDisclosureExportUnavailable =>
+      'Auskunfts-Export ist nicht verfügbar.';
 
   @override
-  String get customerDisclosureExportNotFound => 'Kunde nicht gefunden. Es wurde kein Archiv erstellt.';
+  String get customerDisclosureExportNotFound =>
+      'Kunde nicht gefunden. Es wurde kein Archiv erstellt.';
 
   @override
-  String get customerDisclosureExportDestinationExists => 'Zieldatei existiert bereits. Bitte anderen Namen wählen.';
+  String get customerDisclosureExportDestinationExists =>
+      'Zieldatei existiert bereits. Bitte anderen Namen wählen.';
 
   @override
   String get routeAssets => 'Anlagen';
@@ -2425,7 +2532,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get assetRegisterTitle => 'Anlagenverzeichnis';
 
   @override
-  String get assetRegisterSubtitle => 'Anlagen verwalten und lineare AfA prüfen';
+  String get assetRegisterSubtitle =>
+      'Anlagen verwalten und lineare AfA prüfen';
 
   @override
   String get assetAdd => 'Anlage hinzufügen';
@@ -2469,7 +2577,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get assetEmpty => 'Noch keine Anlagen. Lege die erste Anlage an.';
 
   @override
-  String get assetDeleteRefused => 'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.';
+  String get assetDeleteRefused =>
+      'Anlage kann nicht gelöscht werden: AfA-Jahreswerte vorhanden. Bitte archivieren.';
 
   @override
   String get assetArchived => 'Anlage archiviert';
@@ -2481,7 +2590,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get assetScheduleUnavailable => 'Nicht verfügbar';
 
   @override
-  String get assetFinancialBlocked => 'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.';
+  String get assetFinancialBlocked =>
+      'Finanzielle Wirkung nicht verfügbar: kein Buchungsvertrag.';
 
   @override
   String get assetLoadFailed => 'Anlagen konnten nicht geladen werden.';
@@ -2493,7 +2603,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get receiptInboxTitle => 'Beleg-Eingang';
 
   @override
-  String get receiptInboxSubtitle => 'Importieren, prüfen und zuordnen — ohne den Datensatz zu verlassen.';
+  String get receiptInboxSubtitle =>
+      'Importieren, prüfen und zuordnen — ohne den Datensatz zu verlassen.';
 
   @override
   String get receiptReviewAction => 'Prüfen';
@@ -2511,7 +2622,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get paketWorkspaceTitle => 'Dokumentenpakete';
 
   @override
-  String get paketWorkspaceSubtitle => 'Dokumente und Belege gruppieren und als Snapshot exportieren.';
+  String get paketWorkspaceSubtitle =>
+      'Dokumente und Belege gruppieren und als Snapshot exportieren.';
 
   @override
   String get paketCreateAction => 'Paket erstellen';
@@ -2532,7 +2644,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gobdIncomplete => 'Unvollständig: fehlende Nachweise prüfen';
 
   @override
-  String get belegDropHint => 'PDF, PNG, JPEG oder E-Rechnungs-XML hier ablegen (max. 50 MiB)';
+  String get belegDropHint =>
+      'PDF, PNG, JPEG oder E-Rechnungs-XML hier ablegen (max. 50 MiB)';
 
   @override
   String get belegUnsupportedType => 'Dateityp nicht unterstützt';
@@ -2559,7 +2672,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get invoiceWorkspaceMoveDown => 'Nach unten verschieben';
 
   @override
-  String get invoiceWorkspacePreviewStale => 'Vorschau ist veraltet oder ungültig';
+  String get invoiceWorkspacePreviewStale =>
+      'Vorschau ist veraltet oder ungültig';
 
   @override
   String get invoiceWorkspaceInvalid => 'Eingaben prüfen';
@@ -2577,7 +2691,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get invoiceFinalizeConfirmTitle => 'Rechnung finalisieren?';
 
   @override
-  String get invoiceFinalizeConfirmMessage => 'Zusammenfassung prüfen und Finalisierung bestätigen.';
+  String get invoiceFinalizeConfirmMessage =>
+      'Zusammenfassung prüfen und Finalisierung bestätigen.';
 
   @override
   String get invoiceFinalizeConfirm => 'Finalisieren';
@@ -2595,7 +2710,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get invoiceActionCreditNote => 'Gutschrift erstellen';
 
   @override
-  String get invoiceCreditNoteConfirmMessage => 'Aus dieser Rechnung wird eine verknüpfte Gutschrift erstellt.';
+  String get invoiceCreditNoteConfirmMessage =>
+      'Aus dieser Rechnung wird eine verknüpfte Gutschrift erstellt.';
 
   @override
   String get invoiceActionReplacement => 'Ersatzrechnung erstellen';
@@ -2620,7 +2736,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get invoiceLifecycleDone => 'Aktion abgeschlossen';
 
   @override
-  String get invoiceActionFailed => 'Aktion fehlgeschlagen. Prüfen Sie das Dokument und versuchen Sie es erneut.';
+  String get invoiceActionFailed =>
+      'Aktion fehlgeschlagen. Prüfen Sie das Dokument und versuchen Sie es erneut.';
 
   @override
   String get invoiceRelationshipsTitle => 'Verknüpfungen';
@@ -2638,22 +2755,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eInvoiceFormatPdf => 'PDF';
 
   @override
-  String get eInvoiceFormatPdfDescription => 'Visuelles PDF ohne strukturierte Daten';
+  String get eInvoiceFormatPdfDescription =>
+      'Visuelles PDF ohne strukturierte Daten';
 
   @override
   String get eInvoiceFormatZugferd => 'ZUGFeRD';
 
   @override
-  String get eInvoiceFormatZugferdDescription => 'PDF mit eingebetteter ZUGFeRD-XML (2.5.2 EN 16931)';
+  String get eInvoiceFormatZugferdDescription =>
+      'PDF mit eingebetteter ZUGFeRD-XML (2.5.2 EN 16931)';
 
   @override
   String get eInvoiceFormatXrechnung => 'XRechnung';
 
   @override
-  String get eInvoiceFormatXrechnungDescription => 'XRechnung 3.0 XML-Export nach Finalisierung';
+  String get eInvoiceFormatXrechnungDescription =>
+      'XRechnung 3.0 XML-Export nach Finalisierung';
 
   @override
-  String get customerZugferdDefaultTitle => 'ZUGFeRD für neue Rechnungen vorauswählen';
+  String get customerZugferdDefaultTitle =>
+      'ZUGFeRD für neue Rechnungen vorauswählen';
 
   @override
   String get customerZugferdDefaultDescription =>
@@ -2663,7 +2784,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eInvoiceReadinessValid => 'E-Rechnung geprüft und gültig';
 
   @override
-  String get eInvoiceReadinessInvalid => 'E-Rechnung fehlerhaft – Details prüfen';
+  String get eInvoiceReadinessInvalid =>
+      'E-Rechnung fehlerhaft – Details prüfen';
 
   @override
   String get eInvoiceReadinessNotValidated => 'Noch nicht geprüft';
@@ -2684,7 +2806,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eInvoiceValidationTitle => 'Prüfergebnis';
 
   @override
-  String get eInvoiceDraftNoExport => 'Export erst nach Finalisierung verfügbar';
+  String get eInvoiceDraftNoExport =>
+      'Export erst nach Finalisierung verfügbar';
 
   @override
   String get eInvoiceBuyerReferenceLabel => 'Käuferreferenz (z. B. Leitweg-ID)';
@@ -2708,10 +2831,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get recurringNewTemplate => 'Neue Vorlage';
 
   @override
-  String get recurringEmpty => 'Noch keine Vorlagen. Lege deine erste Vorlage an.';
+  String get recurringEmpty =>
+      'Noch keine Vorlagen. Lege deine erste Vorlage an.';
 
   @override
-  String get recurringLoadFailed => 'Wiederkehrende Buchungen konnten nicht geladen werden';
+  String get recurringLoadFailed =>
+      'Wiederkehrende Buchungen konnten nicht geladen werden';
 
   @override
   String get recurringDueTitle => 'Fällige Buchungen';
@@ -2771,10 +2896,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsBackupFailed => 'Fehlgeschlagen';
 
   @override
-  String get settingsRestoreRestartRequired => 'Wiederherstellung vorbereitet. Bitte App beenden und neu starten.';
+  String get settingsRestoreRestartRequired =>
+      'Wiederherstellung vorbereitet. Bitte App beenden und neu starten.';
 
   @override
-  String get settingsProfileUnregister => 'Profil entfernen (Dateien bleiben erhalten)';
+  String get settingsProfileUnregister =>
+      'Profil entfernen (Dateien bleiben erhalten)';
 
   @override
   String get settingsProfileRename => 'Umbenennen';
@@ -2792,19 +2919,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsHolder => 'Kontoinhaber';
 
   @override
-  String get setupDeferredCategories => 'Kategorien sind zurückgestellt (kein geprüfter Katalog).';
+  String get setupDeferredCategories =>
+      'Kategorien sind zurückgestellt (kein geprüfter Katalog).';
 
   @override
   String get setupLegalForm => 'Rechtsform';
 
   @override
-  String get smtpConnectivityOnly => 'Verbindung geprüft (keine Anmeldung, kein Versand).';
+  String get smtpConnectivityOnly =>
+      'Verbindung geprüft (keine Anmeldung, kein Versand).';
 
   @override
   String get settingsNoErasure => 'Kein dauerhaftes Löschen verfügbar.';
 
   @override
-  String get settingsExportScope => 'Exporte stammen aus dem zuständigen Bereich.';
+  String get settingsExportScope =>
+      'Exporte stammen aus dem zuständigen Bereich.';
 
   @override
   String get routeDunning => 'Mahnwesen';
@@ -2816,7 +2946,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dunningTitle => 'Mahnwesen';
 
   @override
-  String get dunningSubtitle => 'Offene Forderungen prüfen, Mahnungen vorbereiten';
+  String get dunningSubtitle =>
+      'Offene Forderungen prüfen, Mahnungen vorbereiten';
 
   @override
   String get dunningPreviewAction => 'Lauf prüfen';
@@ -2899,7 +3030,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get incomingInvoiceSupplierLabel => 'Lieferant';
 
   @override
-  String get incomingInvoiceSourceNumberLabel => 'Rechnungsnummer des Lieferanten';
+  String get incomingInvoiceSourceNumberLabel =>
+      'Rechnungsnummer des Lieferanten';
 
   @override
   String get incomingInvoiceDueDateLabel => 'Fällig am';
@@ -2908,13 +3040,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get incomingInvoiceVatRateLabel => 'USt %';
 
   @override
-  String get incomingInvoiceSupplierRequired => 'Wählen Sie vor dem Speichern einen Lieferanten aus.';
+  String get incomingInvoiceSupplierRequired =>
+      'Wählen Sie vor dem Speichern einen Lieferanten aus.';
 
   @override
-  String get incomingInvoiceSaveFailed => 'Der Entwurf der Eingangsrechnung konnte nicht gespeichert werden.';
+  String get incomingInvoiceSaveFailed =>
+      'Der Entwurf der Eingangsrechnung konnte nicht gespeichert werden.';
 
   @override
-  String get incomingInvoiceCaptureSaved => 'Entwurf der Eingangsrechnung gespeichert.';
+  String get incomingInvoiceCaptureSaved =>
+      'Entwurf der Eingangsrechnung gespeichert.';
 
   @override
   String get incomingInvoiceUnsupportedProfile =>
@@ -2935,10 +3070,12 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get incomingInvoiceSourcePreviewUnavailable => 'Die Vorschau der Originalquelle ist nicht verfügbar.';
+  String get incomingInvoiceSourcePreviewUnavailable =>
+      'Die Vorschau der Originalquelle ist nicht verfügbar.';
 
   @override
-  String get incomingInvoiceTotalsDisplayOnly => 'Quellensummen dienen nur zum Vergleich.';
+  String get incomingInvoiceTotalsDisplayOnly =>
+      'Quellensummen dienen nur zum Vergleich.';
 
   @override
   String get incomingInvoiceConfirmUnsupportedValues =>
@@ -2953,13 +3090,16 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get dashboardReportingPending => 'Keine Periodenwerte – Auswertung ausstehend.';
+  String get dashboardReportingPending =>
+      'Keine Periodenwerte – Auswertung ausstehend.';
 
   @override
-  String get dashboardReportingPrerequisite => 'Periodenwerte nicht verfügbar – Auswertungs-Arbeitsbereich fehlt.';
+  String get dashboardReportingPrerequisite =>
+      'Periodenwerte nicht verfügbar – Auswertungs-Arbeitsbereich fehlt.';
 
   @override
-  String get dashboardUnsupportedPeriod => 'Monat/Quartal ist nicht verfügbar – Jahresansicht.';
+  String get dashboardUnsupportedPeriod =>
+      'Monat/Quartal ist nicht verfügbar – Jahresansicht.';
 
   @override
   String get dashboardInvalidPeriod => 'Ungültiger Zeitraum.';
@@ -3013,13 +3153,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dashboardTrendEmpty => 'Keine Verlaufsdaten für diesen Zeitraum.';
 
   @override
-  String get dashboardTrendError => 'Verlaufsdaten konnten nicht geladen werden.';
+  String get dashboardTrendError =>
+      'Verlaufsdaten konnten nicht geladen werden.';
 
   @override
   String get dashboardOpenBalance => 'Offener Saldo zum Jahresende';
 
   @override
-  String get dashboardIncompleteHistory => 'Unvollständige Historie – effektives Datum fehlt.';
+  String get dashboardIncompleteHistory =>
+      'Unvollständige Historie – effektives Datum fehlt.';
 
   @override
   String get dashboardUnavailable => 'Nicht verfügbar';
