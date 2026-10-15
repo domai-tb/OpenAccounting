@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:openaccounting/core/db/database.dart';
@@ -5,6 +7,7 @@ import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/reporting/accounting_period_summary_service.dart';
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/reporting_workspace_view.dart';
 import 'package:openaccounting/features/accounting/reporting/report_status_service.dart';
 
 void main() {
@@ -271,6 +274,92 @@ void main() {
       expect(provisional.state, ReportStatusState.geschatzt);
       expect(provisional.unresolvedCount, 2);
       expect(provisional.unresolvedSourceIds, <int>[11, 12]);
+    });
+  });
+
+  group('reporting workspace: accessibility', () {
+    const ReportingWorkspaceStrings strings = ReportingWorkspaceStrings(
+      loading: 'Bericht wird berechnet',
+      empty: 'Keine Daten im Zeitraum',
+      unavailable: 'Bericht nicht verfügbar',
+      error: 'Bericht konnte nicht geladen werden',
+      periodLabel: 'Zeitraum',
+      tableLabel: 'Berichtstabelle',
+    );
+
+    Widget buildView({
+      required ReportingWorkspaceViewState state,
+      List<String> periodOptions = const <String>['2025-07', '2025-08'],
+      String selectedPeriod = '2025-07',
+      List<ReportTableRowData> rows = const <ReportTableRowData>[],
+    }) {
+      return MaterialApp(
+        home: ReportingWorkspaceView(
+          strings: strings,
+          state: state,
+          periodOptions: periodOptions,
+          selectedPeriod: selectedPeriod,
+          onPeriodSelected: (_) {},
+          rows: rows,
+        ),
+      );
+    }
+
+    testWidgets('test_narrow_workspace_and_keyboard_navigation', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        buildView(
+          state: ReportingWorkspaceViewState.ready,
+          rows: const <ReportTableRowData>[
+            ReportTableRowData(label: 'Roherlöse', value: '1.000,00 EUR'),
+            ReportTableRowData(label: 'Materialaufwand', value: '400,00 EUR'),
+            ReportTableRowData(label: 'Personalaufwand', value: '250,00 EUR'),
+            ReportTableRowData(label: 'Sonstige Aufwendungen', value: '100,00 EUR'),
+            ReportTableRowData(label: 'Steuerliches Ergebnis', value: '250,00 EUR'),
+          ],
+        ),
+      );
+
+      // No horizontal clipping at a narrow desktop width.
+      expect(tester.takeException(), isNull);
+      expect(find.text('Roherlöse'), findsOneWidget);
+
+      // Keyboard: initial focus lands on the first period control; tabbing
+      // walks the period controls then the result table in logical order.
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus!.debugLabel, 'period-2025-07');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus!.debugLabel, 'period-2025-08');
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus!.debugLabel, 'report-row-0');
+
+      // Unavailable, loading, empty and error use localized text and
+      // accessible semantics — distinguishable without color alone.
+      final SemanticsHandle semantics = tester.ensureSemantics();
+      for (final ReportingWorkspaceViewState state in <ReportingWorkspaceViewState>[
+        ReportingWorkspaceViewState.unavailable,
+        ReportingWorkspaceViewState.loading,
+        ReportingWorkspaceViewState.empty,
+        ReportingWorkspaceViewState.error,
+      ]) {
+        await tester.pumpWidget(buildView(state: state));
+        final String expected = switch (state) {
+          ReportingWorkspaceViewState.unavailable => strings.unavailable,
+          ReportingWorkspaceViewState.loading => strings.loading,
+          ReportingWorkspaceViewState.empty => strings.empty,
+          ReportingWorkspaceViewState.error => strings.error,
+          ReportingWorkspaceViewState.ready => '',
+        };
+        expect(find.text(expected), findsOneWidget);
+        expect(find.bySemanticsLabel(expected), findsOneWidget);
+      }
+      semantics.dispose();
+      expect(tester.takeException(), isNull);
     });
   });
 }
