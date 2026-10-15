@@ -5587,6 +5587,180 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Ich habe die nicht unterstützten Quellenwerte geprüft und die Rechnung manuell erfasst.'**
   String get incomingInvoiceConfirmUnsupportedValues;
+
+  /// No description provided for @dashboardPeriodYear.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftsjahr'**
+  String get dashboardPeriodYear;
+
+  /// No description provided for @dashboardPeriodRange.
+  ///
+  /// In de, this message translates to:
+  /// **'{year} · {start} – {end}'**
+  String dashboardPeriodRange(int year, String start, String end);
+
+  /// No description provided for @dashboardReportingPending.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Periodenwerte – Auswertung ausstehend.'**
+  String get dashboardReportingPending;
+
+  /// No description provided for @dashboardReportingPrerequisite.
+  ///
+  /// In de, this message translates to:
+  /// **'Periodenwerte nicht verfügbar – Auswertungs-Arbeitsbereich fehlt.'**
+  String get dashboardReportingPrerequisite;
+
+  /// No description provided for @dashboardUnsupportedPeriod.
+  ///
+  /// In de, this message translates to:
+  /// **'Monat/Quartal ist nicht verfügbar – Jahresansicht.'**
+  String get dashboardUnsupportedPeriod;
+
+  /// No description provided for @dashboardInvalidPeriod.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiger Zeitraum.'**
+  String get dashboardInvalidPeriod;
+
+  /// No description provided for @dashboardNotComparable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht vergleichbar'**
+  String get dashboardNotComparable;
+
+  /// No description provided for @dashboardProfit.
+  ///
+  /// In de, this message translates to:
+  /// **'Gewinn'**
+  String get dashboardProfit;
+
+  /// No description provided for @dashboardMargin.
+  ///
+  /// In de, this message translates to:
+  /// **'Marge'**
+  String get dashboardMargin;
+
+  /// No description provided for @dashboardMarginUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Marge n. v.'**
+  String get dashboardMarginUnavailable;
+
+  /// No description provided for @dashboardVatReserveEstimate.
+  ///
+  /// In de, this message translates to:
+  /// **'USt-Rücklage (Schätzung)'**
+  String get dashboardVatReserveEstimate;
+
+  /// No description provided for @dashboardQuickLinkAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Link hinzufügen'**
+  String get dashboardQuickLinkAdd;
+
+  /// No description provided for @dashboardQuickLinkEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Link bearbeiten'**
+  String get dashboardQuickLinkEdit;
+
+  /// No description provided for @dashboardQuickLinkInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Route wird nicht unterstützt.'**
+  String get dashboardQuickLinkInvalid;
+
+  /// No description provided for @dashboardQuickLinkInvalidState.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungültiger Link – entfernen'**
+  String get dashboardQuickLinkInvalidState;
+
+  /// No description provided for @dashboardAttentionTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufgaben'**
+  String get dashboardAttentionTitle;
+
+  /// No description provided for @dashboardAttentionOverdue.
+  ///
+  /// In de, this message translates to:
+  /// **'Überfällige Rechnung'**
+  String get dashboardAttentionOverdue;
+
+  /// No description provided for @dashboardAttentionUnmatched.
+  ///
+  /// In de, this message translates to:
+  /// **'Abzustimmende Transaktion'**
+  String get dashboardAttentionUnmatched;
+
+  /// No description provided for @dashboardAttentionTaxDeadline.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuerfrist'**
+  String get dashboardAttentionTaxDeadline;
+
+  /// No description provided for @dashboardTaxCalendarMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Steuerkalender konfiguriert.'**
+  String get dashboardTaxCalendarMissing;
+
+  /// No description provided for @dashboardTrendTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Verlauf'**
+  String get dashboardTrendTitle;
+
+  /// No description provided for @dashboardTrendEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Verlaufsdaten für diesen Zeitraum.'**
+  String get dashboardTrendEmpty;
+
+  /// No description provided for @dashboardTrendError.
+  ///
+  /// In de, this message translates to:
+  /// **'Verlaufsdaten konnten nicht geladen werden.'**
+  String get dashboardTrendError;
+
+  /// No description provided for @dashboardOpenBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Offener Saldo zum Jahresende'**
+  String get dashboardOpenBalance;
+
+  /// No description provided for @dashboardIncompleteHistory.
+  ///
+  /// In de, this message translates to:
+  /// **'Unvollständige Historie – effektives Datum fehlt.'**
+  String get dashboardIncompleteHistory;
+
+  /// No description provided for @dashboardUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get dashboardUnavailable;
+
+  /// No description provided for @dashboardQuickLinkInvalidLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'ungültig'**
+  String get dashboardQuickLinkInvalidLabel;
+
+  /// No description provided for @dashboardQuickLinkLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Bezeichnung'**
+  String get dashboardQuickLinkLabel;
+
+  /// No description provided for @dashboardQuickLinkRoute.
+  ///
+  /// In de, this message translates to:
+  /// **'Route'**
+  String get dashboardQuickLinkRoute;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

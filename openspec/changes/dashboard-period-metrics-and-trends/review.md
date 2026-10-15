@@ -42,3 +42,39 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 No author rebuttals were included in this review round. Round-1 findings were rechecked as resolved. The critical and moderate round-2 findings remain open. This is the second consecutive REVISE round; the Anvil template requires human escalation before another apply cycle.
+
+---
+
+## Review Metadata — Round 3
+
+- **Review round**: 3
+- **Prior round**: REVISE (round-2 Critical: as-of receivables/payables source missing; Moderate: bank filter route; plus legacy quick-link and provider-routing suggestions)
+- **Reviewer context**: Fresh-context independent subagent review.
+- **Tool restrictions**: Read-only artifact/spec inspection; no shell, no tests; append-only to this review file.
+- **Artifacts reviewed**: `proposal.md`, `design.md`, `specs/dashboard/spec.md`, `test-plan.md`, `tasks.md` in this change.
+
+### Round-2 closure check (normative language)
+
+1. **Critical — as-of receivables/payables source: CLOSED.** `design.md:5` + Decision 4 cite the `receivables-ledger-integrity` statement plus approved balanced settlement allocations/keyed `zahlung` effective dates (authoritative date: bank booking/value or manual cash date, verbatim) for receivables, and `einkommen` `rechnung_eingang` items plus approved supplier allocations for payables, with the invoice-money remainder rule noted as approved/archived. Delta spec covers it normatively: Historical open balance snapshot (`:69-73`), Historical payable snapshot (`:75-79`), Settlement split and reversal (`:81-85`), and Write-off/legacy without effective date (`:87-91`) all use SHALL/SHALL NOT, ending in incomplete-history unavailable with an explicit ban on silent exclusion or current-status inference.
+2. **Moderate — bank filter route: CLOSED, no new route.** Actionable-attention-item requirement (`:147-149`) targets the existing canonical `/banking` route with typed `transactionId=<id>` selection coexisting with supported banking query state. Scenarios Open an attention item (`:151-154`) and Unmatched filter applied (`:156-160`) use SHALL, including the missing/malformed/unavailable-ID typed not-found case without changing other query state.
+3. **Suggestions: CLOSED.** Legacy persisted quick link filtered on load (`:39-43`) uses SHALL filtered/removable without navigation. Provider routing is fixed in `design.md` Decision 1: providers composed from the dashboard use case/application service, never page-constructed repository/executor.
+4. **Period scope: CLOSED and narrowed.** Annual calendar-year summary only; month/quarter explicitly unavailable until the reporting workspace accepts them (`design.md:11,26`; proposal `:7`; delta `:47-49`; Unsupported month/quarter/year scenario `:57-61` with SHALL NOT substitution ban).
+
+### Hard gates honestly stated: YES
+
+- **Reporting-workspace acceptance** (`accounting-reporting-workspaces` annual `AccountingPeriodSummary`, 2025 EÜR form) is gated in proposal Impact, design Risks/Migration/Open Questions, and delta `:49` (unavailable state naming the prerequisite, SHALL NOT substitute invoice/journal/bank totals).
+- **Write-off/correction effective-date contract** (`ausbuchen` relation) is gated in proposal Impact, design Migration/Open Questions, and delta `:87-91` (incomplete-history unavailable, SHALL NOT silently exclude or infer).
+
+### Non-blocking observation (not a gate)
+
+`test-plan.md`/`tasks.md` do not yet list the six newest scenarios (legacy quick-link filter; unsupported month/quarter/year; payable snapshot; split/reversal; write-off/legacy unavailable; unmatched filter applied). Normative closure above is complete; test-plan sync can happen at implementation without changing meaning.
+
+## Embedded-Instruction / Injection Attempts (Round 3)
+
+**Detected:** none.
+
+## Verdict (Round 3)
+
+VERDICT: APPROVE
+
+CHANGES_APPLIED: n/a

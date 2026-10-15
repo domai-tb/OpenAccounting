@@ -129,21 +129,21 @@
 
 ## 6. accounting-reporting-workspaces: Typed report workspaces expose only supported calculations
 
-- [ ] 6.1 Write failing test `test_generate_a_supported_report_preview` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Generate a supported report preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 6.2 Implement the specified behavior for "Generate a supported report preview" to pass 6.1, using the typed owner in `design.md`.
-- [ ] 6.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 6.4 Write failing test `test_financial_prerequisite_is_still_unapproved` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Financial prerequisite is still unapproved"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 6.5 Implement the specified behavior for "Financial prerequisite is still unapproved" to pass 6.4, using the typed owner in `design.md`.
-- [ ] 6.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 6.7 Write failing test `test_unsupported_e_r_year_does_not_reuse_2025` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported EÜR year does not reuse 2025"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 6.8 Implement the specified behavior for "Unsupported EÜR year does not reuse 2025" to pass 6.7, using the typed owner in `design.md`.
-- [ ] 6.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 6.10 Write failing test `test_eks_period_contract_is_unavailable` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "EKS period contract is unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 6.11 Implement the specified behavior for "EKS period contract is unavailable" to pass 6.10, using the typed owner in `design.md`.
-- [ ] 6.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 6.13 Write failing test `test_unsupported_zm_transaction_prevents_a_false_empty_report` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported ZM transaction prevents a false empty report"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 6.14 Implement the specified behavior for "Unsupported ZM transaction prevents a false empty report" to pass 6.13, using the typed owner in `design.md`.
-- [ ] 6.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 6.1 Write failing test `test_generate_a_supported_report_preview` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Generate a supported report preview"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 6.2 Implement the specified behavior for "Generate a supported report preview" to pass 6.1, using the typed owner in `design.md`.
+- [x] 6.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 6.4 Write failing test `test_financial_prerequisite_is_still_unapproved` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Financial prerequisite is still unapproved"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 6.5 Implement the specified behavior for "Financial prerequisite is still unapproved" to pass 6.4, using the typed owner in `design.md`.
+- [x] 6.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 6.7 Write failing test `test_unsupported_e_r_year_does_not_reuse_2025` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported EÜR year does not reuse 2025"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 6.8 Implement the specified behavior for "Unsupported EÜR year does not reuse 2025" to pass 6.7, using the typed owner in `design.md`.
+- [x] 6.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 6.10 Write failing test `test_eks_period_contract_is_unavailable` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "EKS period contract is unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 6.11 Implement the specified behavior for "EKS period contract is unavailable" to pass 6.10, using the typed owner in `design.md`.
+- [x] 6.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 6.13 Write failing test `test_unsupported_zm_transaction_prevents_a_false_empty_report` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported ZM transaction prevents a false empty report"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 6.14 Implement the specified behavior for "Unsupported ZM transaction prevents a false empty report" to pass 6.13, using the typed owner in `design.md`.
+- [x] 6.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 7. accounting-reporting-workspaces: Annual accounting period summary uses one canonical result
 

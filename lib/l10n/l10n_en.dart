@@ -2896,4 +2896,93 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get incomingInvoiceConfirmUnsupportedValues =>
       'I reviewed the unsupported source values and entered the invoice manually.';
+
+  @override
+  String get dashboardPeriodYear => 'Reporting year';
+
+  @override
+  String dashboardPeriodRange(int year, String start, String end) {
+    return '$year · $start – $end';
+  }
+
+  @override
+  String get dashboardReportingPending => 'No period metrics – reporting pending.';
+
+  @override
+  String get dashboardReportingPrerequisite => 'Period metrics unavailable – reporting workspace pending.';
+
+  @override
+  String get dashboardUnsupportedPeriod => 'Month/quarter is unavailable – annual view only.';
+
+  @override
+  String get dashboardInvalidPeriod => 'Invalid period.';
+
+  @override
+  String get dashboardNotComparable => 'Not comparable';
+
+  @override
+  String get dashboardProfit => 'Profit';
+
+  @override
+  String get dashboardMargin => 'Margin';
+
+  @override
+  String get dashboardMarginUnavailable => 'Margin n/a';
+
+  @override
+  String get dashboardVatReserveEstimate => 'VAT reserve (estimate)';
+
+  @override
+  String get dashboardQuickLinkAdd => 'Add link';
+
+  @override
+  String get dashboardQuickLinkEdit => 'Edit link';
+
+  @override
+  String get dashboardQuickLinkInvalid => 'Route is not supported.';
+
+  @override
+  String get dashboardQuickLinkInvalidState => 'Invalid link – remove';
+
+  @override
+  String get dashboardAttentionTitle => 'Attention';
+
+  @override
+  String get dashboardAttentionOverdue => 'Overdue invoice';
+
+  @override
+  String get dashboardAttentionUnmatched => 'Unmatched transaction';
+
+  @override
+  String get dashboardAttentionTaxDeadline => 'Tax deadline';
+
+  @override
+  String get dashboardTaxCalendarMissing => 'No tax calendar configured.';
+
+  @override
+  String get dashboardTrendTitle => 'Trend';
+
+  @override
+  String get dashboardTrendEmpty => 'No trend data for this period.';
+
+  @override
+  String get dashboardTrendError => 'Trend data could not be loaded.';
+
+  @override
+  String get dashboardOpenBalance => 'Open balance at year end';
+
+  @override
+  String get dashboardIncompleteHistory => 'Incomplete history – effective date missing.';
+
+  @override
+  String get dashboardUnavailable => 'Unavailable';
+
+  @override
+  String get dashboardQuickLinkInvalidLabel => 'invalid';
+
+  @override
+  String get dashboardQuickLinkLabel => 'Label';
+
+  @override
+  String get dashboardQuickLinkRoute => 'Route';
 }

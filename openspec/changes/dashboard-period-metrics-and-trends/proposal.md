@@ -4,7 +4,7 @@ The dashboard shows several values with incorrect or incomplete accounting meani
 
 ## What Changes
 
-- Add month/quarter/year selection and period-scoped income, expense, profit, margin, open-balance, and year-over-year metrics from the canonical reporting and open-item history sources.
+- Add annual calendar-year selection and period-scoped income, expense, profit, margin, open-balance, and year-over-year metrics from the canonical `AccountingPeriodSummary` (supported calendar years only, 2025 form first) and open-item event history sources. Month/quarter summaries remain unavailable until the reporting workspace accepts them.
 - Correct invoice, payment, and deadline widgets to use their documented business records and exclude cancelled documents; label estimates and unavailable data clearly.
 - Add monthly income/expense and profit trends, expense/VAT distribution, and actionable attention items for overdue invoices, unmatched transactions, and tax deadlines.
 - Complete quick-link editing and localize dashboard labels, values, accessibility names, and empty/error states.
@@ -22,4 +22,4 @@ None.
 
 ## Impact
 
-Dashboard query/use-case boundaries and widgets, persisted dashboard configuration, localization catalogs, `docs/07-dashboard.md`, and `openspec/specs/dashboard/spec.md`. Implementation follows the balanced-posting/settlement and accounting-reporting proposals; this change consumes their shared typed report and event-history sources instead of defining competing accounting semantics.
+Dashboard query/use-case boundaries and widgets, persisted dashboard configuration, localization catalogs, `docs/07-dashboard.md`, and `openspec/specs/dashboard/spec.md`. The `balanced-journal-postings-and-settlement-events` and `invoice-money-contract` sources are approved and archived; this change consumes their settlement groups/allocation rows (booking/value or manual date, verbatim) and integer-cent remainder rule. Financial summaries remain gated on acceptance of `accounting-reporting-workspaces` (annual `AccountingPeriodSummary`, 2025 EÜR form mapping). As-of balances with write-offs/corrections lacking an effective date remain gated on a write-off/correction effective-date contract (the `ausbuchen` relation currently has no accepted effective-date field).

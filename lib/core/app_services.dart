@@ -10,6 +10,7 @@ import 'package:openaccounting/features/document_delivery/smtp_configuration_ser
 import 'package:openaccounting/features/document_delivery/smtp_credential_vault.dart';
 import 'package:openaccounting/features/document_delivery/smtp_transport.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
+import 'package:openaccounting/features/dashboard/dashboard_usecases.dart';
 import 'package:openaccounting/features/assets/asset_repository.dart';
 import 'package:openaccounting/features/assets/asset_schedule_service.dart';
 import 'package:openaccounting/features/assets/asset_usecases.dart';
@@ -158,6 +159,7 @@ class AppServices {
     profileDir: _db.profileDir,
   );
   late final BankingUseCase banking = BankingUseCase(_db.executor);
+  late final DashboardUseCase dashboard = DashboardUseCase(_db.executor);
   late final AssetRegisterUseCases assets = AssetRegisterUseCases(
     AssetRepository(_db.executor),
     scheduleService: const AssetScheduleService(),

@@ -2,7 +2,28 @@
 
 ## Overview
 
-OpenInvoices provides a configurable dashboard with 13+ widgets showing key business metrics. Layout is customizable with drag-and-drop reordering, per-widget visibility toggles, and quick-access links.
+OpenAccounting provides a configurable dashboard with 13 widgets showing key business metrics. Layout is customizable with drag-and-drop reordering, per-widget visibility toggles, and quick-access links. Period KPIs use the annual calendar-year `AccountingPeriodSummary` only (supported years, 2025 form first); month/quarter remain unavailable until the reporting workspace accepts them.
+
+## Period metrics (supported)
+
+- Annual selector (`YYYY-01-01` through next `YYYY-01-01`); flow KPIs use the year, open balances use the year-end date.
+- Income/expenses from the accepted annual summary; profit = income − expenses; margin = profit / income × 100 when income is positive, else unavailable.
+- Year-over-year change = (current − prior) / abs(prior) × 100; zero baseline shows absolute values + "not comparable".
+- Monthly income/expense + profit trends, expense/VAT distribution from the canonical reporting service with exact values + accessible text.
+- Until `accounting-reporting-workspaces` is accepted, the summary shows its unavailable state naming that prerequisite; no invoice/journal/bank substitution.
+- Historical open balances from event history (receivables-ledger statement + approved settlement allocations/keyed `zahlung` dates verbatim; payables from `rechnung_eingang` + supplier allocations). Write-offs/corrections without an accepted effective date and `legacy_unverified` mixes yield incomplete-history unavailable.
+
+## Operational sources (corrected)
+
+- Open/overdue exclude cancelled/storno, drafts (`ist_entwurf`), and paid; receipts count only accounting-confirmed payments (`bank_transaktionen.journal_id`); unmatched rows stay as reconciliation work and never count as receipts.
+- VAT reserve only from the canonical tax source, labeled as estimate. Tax deadlines only from the configured tax calendar; otherwise a configuration/error state (never a hardcoded date).
+- Attention items link to filtered workspaces; unmatched items use the existing `/banking?transactionId=<id>` selection preserving other query state; missing/malformed/unavailable IDs show the typed not-found state.
+
+## Quick links
+
+- Stored as `{label, route}` in `unternehmen.dashboard_config`; defaults: new invoice, reports, inventory.
+- Routes are validated against the router allowlist before persistence; invalid entries show a localized validation message and are never persisted nor navigated to.
+- Legacy persisted invalid links are filtered on load without navigation and appear as a removable invalid-link state.
 
 ---
 

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/skeleton.dart';
 import 'package:openaccounting/features/accounting/rechnung_typ.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
+import 'package:openaccounting/features/dashboard/dashboard_period.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
+import 'package:openaccounting/features/dashboard/dashboard_usecases.dart';
 
 /// Widget data holder — ponytail minimal.
 class WidgetData {
@@ -174,6 +177,44 @@ class DashboardCard extends StatelessWidget {
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return DashboardRepository(db.executor);
+});
+
+/// Composed dashboard use case via the application service (never a
+/// page-constructed repository/executor, per runtime-composition contract).
+final dashboardUseCaseProvider = Provider<DashboardUseCase>((ref) {
+  final services = ref.watch(appServicesProvider);
+  return services.dashboard;
+});
+
+/// Selected annual calendar year (session state until product asks for
+/// persistence). Month/quarter modes are unavailable by contract.
+class DashboardYearNotifier extends Notifier<int> {
+  @override
+  int build() => DateTime.now().year;
+
+  // ignore: avoid_setters_without_getters
+  set year(int value) => state = value;
+}
+
+final dashboardSelectedYearProvider = NotifierProvider<DashboardYearNotifier, int>(DashboardYearNotifier.new);
+
+/// Annual KPI summary for the selected year, or null when the reporting
+/// prerequisite (`accounting-reporting-workspaces`) is not accepted.
+/// Callers SHALL show the unavailable state and never substitute totals.
+final dashboardAnnualSummaryProvider = FutureProvider.family<DashboardAnnualKpis?, int>((ref, year) async {
+  final useCase = ref.watch(dashboardUseCaseProvider);
+  return useCase.annualSummary(year);
+});
+
+/// Historical open-balance snapshots at the selected year end.
+final dashboardReceivablesAsOfProvider = FutureProvider.family<DashboardAsOfResult, String>((ref, yearEnd) async {
+  final useCase = ref.watch(dashboardUseCaseProvider);
+  return useCase.receivablesAsOf(yearEnd);
+});
+
+final dashboardPayablesAsOfProvider = FutureProvider.family<DashboardAsOfResult, String>((ref, yearEnd) async {
+  final useCase = ref.watch(dashboardUseCaseProvider);
+  return useCase.payablesAsOf(yearEnd);
 });
 
 final dashboardConfigProvider = FutureProvider<DashboardConfig>((ref) async {

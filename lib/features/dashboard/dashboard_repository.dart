@@ -151,7 +151,8 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchOffeneRechnungen() async {
     final rows = await executor.runSelect(
       "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'rechnung' AND ist_entwurf = 0",
+      "FROM rechnungen WHERE status NOT IN ('bezahlt', 'storniert', 'storno', 'entwurf', 'cancelled') "
+      "AND typ = 'rechnung' AND ist_entwurf = 0",
       const <Object?>[],
     );
     final c = (rows.first['c'] as num?)?.toInt() ?? 0;
@@ -162,7 +163,8 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchUeberfaelligeRechnungen() async {
     final rows = await executor.runSelect(
       "SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s "
-      "FROM rechnungen WHERE status != 'bezahlt' AND typ = 'rechnung' AND ist_entwurf = 0 "
+      "FROM rechnungen WHERE status NOT IN ('bezahlt', 'storniert', 'storno', 'entwurf', 'cancelled') "
+      "AND typ = 'rechnung' AND ist_entwurf = 0 "
       "AND faelligkeit IS NOT NULL AND date(faelligkeit) < date('now')",
       const <Object?>[],
     );
@@ -172,11 +174,43 @@ class DashboardRepository {
   }
 
   Future<List<Map<String, Object?>>> fetchZahlungseingaenge({int limit = 5}) async {
+    // Confirmed receipts only: linked to accounting. Unmatched rows stay
+    // visible as reconciliation work via fetchUnmatchedTransaktionen.
     return executor.runSelect(
       'SELECT id, datum, betrag, verwendungszweck FROM bank_transaktionen '
-      'WHERE betrag > 0 ORDER BY datum DESC LIMIT ?',
+      'WHERE betrag > 0 AND journal_id IS NOT NULL ORDER BY datum DESC LIMIT ?',
       <Object?>[limit],
     );
+  }
+
+  /// Reconciliation work: imported transactions without an accounting link.
+  /// These SHALL NOT count as receipts.
+  Future<List<Map<String, Object?>>> fetchUnmatchedTransaktionen({int limit = 20}) async {
+    try {
+      return await executor.runSelect(
+        'SELECT id, datum, betrag, verwendungszweck FROM bank_transaktionen '
+        'WHERE journal_id IS NULL ORDER BY datum DESC LIMIT ?',
+        <Object?>[limit],
+      );
+    } catch (_) {
+      return <Map<String, Object?>>[];
+    }
+  }
+
+  /// Confirmed receipt totals (accounting-linked only).
+  Future<Map<String, Object?>> fetchBestaetigteZahlungen() async {
+    try {
+      final rows = await executor.runSelect(
+        'SELECT COUNT(*) as c, COALESCE(SUM(ABS(betrag)),0) as s FROM bank_transaktionen '
+        'WHERE betrag > 0 AND journal_id IS NOT NULL',
+        const <Object?>[],
+      );
+      final c = (rows.first['c'] as num?)?.toInt() ?? 0;
+      final s = money.formatBetrag('${rows.first['s']}');
+      return <String, Object?>{'count': c, 'sum': s};
+    } catch (_) {
+      return <String, Object?>{'count': 0, 'sum': money.fromCents(0)};
+    }
   }
 
   Future<List<Map<String, Object?>>> fetchLagerwarnung() async {
@@ -242,7 +276,8 @@ class DashboardRepository {
   Future<Map<String, Object?>> fetchOffeneVerbindlichkeiten() async {
     final rows = await executor.runSelect(
       'SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s '
-      "FROM rechnungen WHERE status != 'bezahlt' AND typ = '${RechnungTyp.eingang}' AND ist_entwurf = 0",
+      "FROM rechnungen WHERE status NOT IN ('bezahlt', 'storniert', 'storno', 'entwurf', 'cancelled') "
+      "AND typ = '${RechnungTyp.eingang}' AND ist_entwurf = 0",
       const <Object?>[],
     );
     final c = (rows.first['c'] as num?)?.toInt() ?? 0;

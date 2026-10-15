@@ -8,6 +8,8 @@ import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/core/theme/app_theme.dart';
+import 'package:openaccounting/features/dashboard/dashboard_period.dart';
+import 'package:openaccounting/features/dashboard/dashboard_usecases.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
@@ -87,18 +89,27 @@ class DashboardPageImpl extends ConsumerWidget {
               final int cols = _columnsForWidth(c.maxWidth);
               return Padding(
                 padding: const EdgeInsets.all(32),
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: cols,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    mainAxisExtent: 176,
-                  ),
-                  itemCount: visible.length,
-                  itemBuilder: (BuildContext context, int i) {
-                    final String id = visible[i];
-                    return _WidgetCard(id: id);
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    const _PeriodHeader(),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          mainAxisExtent: 176,
+                        ),
+                        itemCount: visible.length,
+                        itemBuilder: (BuildContext context, int i) {
+                          final String id = visible[i];
+                          return _WidgetCard(id: id);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -147,34 +158,44 @@ class _DashboardConfigSheet extends ConsumerWidget {
                 ),
                 data: (DashboardConfig cfg) {
                   final List<String> order = cfg.order;
-                  return ReorderableListView.builder(
-                    itemCount: order.length,
-                    // ignore: deprecated_member_use
-                    onReorder: (int oldIndex, int newIndex) {
-                      var target = newIndex;
-                      if (target > oldIndex) target -= 1;
-                      final String id = order[oldIndex];
-                      final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
-                      unawaited(repo.reorderWidget(id, target).then((_) => ref.invalidate(dashboardConfigProvider)));
-                    },
-                    itemBuilder: (BuildContext context, int index) {
-                      final String id = order[index];
-                      final String title = _dashboardTitle(id, appLocalizationsOf(context));
-                      final bool visible = cfg.visibility[id] ?? true;
-                      return SwitchListTile(
-                        key: ValueKey<String>(id),
-                        title: Text(title),
-                        subtitle: Text(id),
-                        value: visible,
-                        secondary: const Icon(Icons.drag_handle),
-                        onChanged: (bool value) {
-                          final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
-                          unawaited(
-                            repo.toggleVisibility(id, value).then((_) => ref.invalidate(dashboardConfigProvider)),
-                          );
-                        },
-                      );
-                    },
+                  return Column(
+                    children: <Widget>[
+                      Expanded(
+                        child: ReorderableListView.builder(
+                          itemCount: order.length,
+                          // ignore: deprecated_member_use
+                          onReorder: (int oldIndex, int newIndex) {
+                            var target = newIndex;
+                            if (target > oldIndex) target -= 1;
+                            final String id = order[oldIndex];
+                            final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                            unawaited(
+                              repo.reorderWidget(id, target).then((_) => ref.invalidate(dashboardConfigProvider)),
+                            );
+                          },
+                          itemBuilder: (BuildContext context, int index) {
+                            final String id = order[index];
+                            final String title = _dashboardTitle(id, appLocalizationsOf(context));
+                            final bool visible = cfg.visibility[id] ?? true;
+                            return SwitchListTile(
+                              key: ValueKey<String>(id),
+                              title: Text(title),
+                              subtitle: Text(id),
+                              value: visible,
+                              secondary: const Icon(Icons.drag_handle),
+                              onChanged: (bool value) {
+                                final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                                unawaited(
+                                  repo.toggleVisibility(id, value).then((_) => ref.invalidate(dashboardConfigProvider)),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      _QuickLinkEditor(cfg: cfg),
+                    ],
                   );
                 },
               ),
@@ -311,15 +332,16 @@ class _WidgetCard extends ConsumerWidget {
   }
 }
 
-class _QuickLinkRow extends StatelessWidget {
+class _QuickLinkRow extends ConsumerWidget {
   const _QuickLinkRow({required this.link});
 
   final QuickLink link;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    final bool unavailable = link.route == '/inventory';
+    final bool allowed = isDashboardRouteAllowed(link.route);
+    final bool unavailable = link.route == '/inventory' || !allowed;
     final Color color = unavailable
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : Theme.of(context).colorScheme.primary;
@@ -329,7 +351,12 @@ class _QuickLinkRow extends StatelessWidget {
       '/inventory' => l10n.quickLinkItems,
       _ => link.label,
     };
-    final String label = unavailable ? l10n.quickLinkUnavailable(baseLabel) : baseLabel;
+    final String invalidHint = appLocalizationsOf(context).dashboardQuickLinkInvalidState;
+    final String label = unavailable && !allowed
+        ? '$baseLabel · $invalidHint'
+        : unavailable
+        ? l10n.quickLinkUnavailable(baseLabel)
+        : baseLabel;
     return Semantics(
       button: !unavailable,
       label: label,
@@ -446,5 +473,254 @@ class _DashboardErrorState extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Annual calendar-year selector + exact boundaries in the header.
+/// Month/quarter requests render the unavailable state by contract.
+class _PeriodHeader extends ConsumerWidget {
+  const _PeriodHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int year = ref.watch(dashboardSelectedYearProvider);
+    final DashboardUseCase useCase = ref.watch(dashboardUseCaseProvider);
+    final DashboardPeriodResult selected = useCase.selectYear(year);
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final DashboardYear period = DashboardYear(year);
+    final String title = l10n.dashboardPeriodYear;
+    final String unavailable = l10n.dashboardUnsupportedPeriod;
+    final String range = l10n.dashboardPeriodRange(period.year, period.start, period.yearEnd);
+    return Semantics(
+      header: true,
+      label: '$title $year $range',
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints c) {
+          return Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              Text('$title:', style: Theme.of(context).textTheme.titleSmall),
+              DropdownButton<int>(
+                value: year,
+                items: <DropdownMenuItem<int>>[
+                  for (int y = year - 3; y <= year + 1; y++) DropdownMenuItem<int>(value: y, child: Text('$y')),
+                ],
+                onChanged: (int? value) {
+                  if (value == null) return;
+                  ref.read(dashboardSelectedYearProvider.notifier).year = value;
+                },
+              ),
+              Text(
+                selected is DashboardPeriodOk ? range : unavailable,
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const _PeriodSummaryChip(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Headline annual summary chip: unavailable until the reporting workspace
+/// accepts the annual `AccountingPeriodSummary`. Never substitutes totals.
+class _PeriodSummaryChip extends ConsumerWidget {
+  const _PeriodSummaryChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int year = ref.watch(dashboardSelectedYearProvider);
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final AsyncValue<DashboardAnnualKpis?> summary = ref.watch(dashboardAnnualSummaryProvider(year));
+    return summary.when(
+      loading: () => const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+      error: (Object e, StackTrace s) => Text(l10n.dashboardUnavailable),
+      data: (DashboardAnnualKpis? kpis) {
+        if (kpis == null) {
+          return Semantics(
+            label: l10n.dashboardReportingPrerequisite,
+            child: Text(l10n.dashboardReportingPending, style: Theme.of(context).textTheme.bodySmall),
+          );
+        }
+        final String margin = kpis.marginPercent == null
+            ? l10n.dashboardMarginUnavailable
+            : '${kpis.marginPercent!.toStringAsFixed(1)} %';
+        return Semantics(
+          label: '${kpis.year} Gewinn ${kpis.profitCents} Marge $margin',
+          child: Text('${kpis.year} · $margin', style: Theme.of(context).textTheme.bodySmall),
+        );
+      },
+    );
+  }
+}
+
+/// Quick-link manager in the customization surface: add, edit, reorder via
+/// the repository order, remove, and validated save. Invalid routes show a
+/// localized validation message, are never persisted, and never navigate.
+/// Legacy persisted invalid links appear as a removable state here.
+class _QuickLinkEditor extends ConsumerWidget {
+  const _QuickLinkEditor({required this.cfg});
+
+  final DashboardConfig cfg;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppLocalizations l10n = appLocalizationsOf(context);
+    final DashboardUseCase useCase = ref.watch(dashboardUseCaseProvider);
+    final List<QuickLink> valid = useCase.validLinks(cfg.quickLinks);
+    final List<QuickLink> invalid = useCase.invalidLinks(cfg.quickLinks);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  l10n.dashboardWidgetQuickLinks,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                tooltip: l10n.dashboardQuickLinkAdd,
+                onPressed: () => _openLinkDialog(context, ref, null, valid.length),
+              ),
+            ],
+          ),
+          for (int i = 0; i < valid.length; i++)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(valid[i].label),
+              subtitle: Text(valid[i].route),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    tooltip: l10n.actionEdit,
+                    onPressed: () => _openLinkDialog(context, ref, valid[i], i),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: l10n.actionDelete,
+                    onPressed: () {
+                      final List<QuickLink> next = List<QuickLink>.from(cfg.quickLinks)
+                        ..removeWhere((QuickLink l) => l.label == valid[i].label && l.route == valid[i].route);
+                      final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                      unawaited(repo.setQuickLinks(next).then((_) => ref.invalidate(dashboardConfigProvider)));
+                    },
+                  ),
+                ],
+              ),
+            ),
+          for (final QuickLink link in invalid)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text('${link.label} · ${l10n.dashboardQuickLinkInvalidLabel}'),
+              subtitle: Text(link.route),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                tooltip: l10n.actionDelete,
+                onPressed: () {
+                  final List<QuickLink> next = List<QuickLink>.from(cfg.quickLinks)
+                    ..removeWhere((QuickLink l) => l.route == link.route && l.label == link.label);
+                  final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                  unawaited(repo.setQuickLinks(next).then((_) => ref.invalidate(dashboardConfigProvider)));
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openLinkDialog(BuildContext context, WidgetRef ref, QuickLink? existing, int index) async {
+    final TextEditingController label = TextEditingController(text: existing?.label ?? '');
+    final TextEditingController route = TextEditingController(text: existing?.route ?? '');
+    String? error;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            final AppLocalizations l10n = appLocalizationsOf(dialogContext);
+            return AlertDialog(
+              title: Text(existing == null ? l10n.dashboardQuickLinkAdd : l10n.dashboardQuickLinkEdit),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    TextField(
+                      controller: label,
+                      decoration: InputDecoration(labelText: l10n.dashboardQuickLinkLabel),
+                    ),
+                    TextField(
+                      controller: route,
+                      decoration: InputDecoration(
+                        labelText: l10n.dashboardQuickLinkRoute,
+                        errorText: error == null ? null : l10n.dashboardQuickLinkInvalid,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.actionCancel)),
+                FilledButton(
+                  onPressed: () {
+                    final DashboardUseCase useCase = ref.read(dashboardUseCaseProvider);
+                    final String nextRoute = route.text.trim();
+                    if (useCase.validateQuickLink(nextRoute) != null) {
+                      setState(() => error = 'invalid-route');
+                      return;
+                    }
+                    final QuickLink next = QuickLink(label: label.text.trim(), route: nextRoute);
+                    final DashboardRepository repo = ref.read(dashboardRepositoryProvider);
+                    unawaited(
+                      () async {
+                        if (existing == null) {
+                          await repo.addQuickLink(next);
+                        } else {
+                          final List<QuickLink> all = List<QuickLink>.from(
+                            ref.read(dashboardConfigProvider).value?.quickLinks ?? cfg.quickLinks,
+                          );
+                          final int at = all.indexWhere(
+                            (QuickLink l) => l.label == existing.label && l.route == existing.route,
+                          );
+                          if (at != -1) {
+                            all[at] = next;
+                          } else if (index < all.length) {
+                            all[index] = next;
+                          } else {
+                            all.add(next);
+                          }
+                          await repo.setQuickLinks(all);
+                        }
+                        ref.invalidate(dashboardConfigProvider);
+                      }().then((_) {
+                        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                      }),
+                    );
+                  },
+                  child: Text(l10n.actionSave),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    label.dispose();
+    route.dispose();
   }
 }

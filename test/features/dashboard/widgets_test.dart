@@ -190,9 +190,13 @@ void main() {
         'Geschäftskonto',
         '0.00',
       ]);
+      final journalId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag) VALUES (?, ?, ?)',
+        <Object?>['2026-01-02', 'Kundenzahlung', '125.00'],
+      );
       await db.executor.runInsert(
-        'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck) VALUES (?, ?, ?, ?)',
-        <Object?>[kontoId, '2026-01-02', '125.00', 'Kundenzahlung'],
+        'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck, journal_id) VALUES (?, ?, ?, ?, ?)',
+        <Object?>[kontoId, '2026-01-02', '125.00', 'Kundenzahlung', journalId],
       );
       await db.executor.runInsert(
         'INSERT INTO bank_transaktionen (konto_id, datum, betrag, verwendungszweck) VALUES (?, ?, ?, ?)',
@@ -265,6 +269,9 @@ void main() {
     });
 
     testWidgets('provider failure shows safe German error without exception details', (tester) async {
+      final db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
       const config = DashboardConfig(
         order: <String>['offene_rechnungen'],
         visibility: <String, bool>{'offene_rechnungen': true},
@@ -273,6 +280,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appDatabaseProvider.overrideWithValue(db),
             dashboardConfigProvider.overrideWith((ref) async => config),
             dashboardWidgetDataProvider('offene_rechnungen')
                 .overrideWith((ref) async => throw StateError('raw provider details')),
@@ -280,8 +288,7 @@ void main() {
           child: const MaterialApp(home: DashboardPageImpl()),
         ),
       );
-      await tester.pump();
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(find.text('Fehler beim Laden'), findsOneWidget);
       expect(find.textContaining('raw provider details'), findsNothing);

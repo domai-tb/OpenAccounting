@@ -36,17 +36,29 @@ unsupported routes SHALL be rejected before persistence with a localized validat
 - **AND** the unsupported link SHALL NOT be persisted
 - **AND** navigation SHALL not occur
 
+#### Scenario: Legacy persisted quick link is filtered on load
+- **GIVEN** a saved dashboard config contains a quick link whose route is no longer in the allowed destination list
+- **WHEN** the dashboard loads
+- **THEN** that link SHALL be filtered through the same allowlist without navigating to it
+- **AND** it SHALL appear as a removable invalid-link state
+
 ## ADDED Requirements
 
 ### Requirement: Period-scoped dashboard overview
 
-The dashboard SHALL provide a period selector and display income, expenses, profit, margin, and open receivables/payables for the selected period or period end. Income and expenses SHALL come from the canonical accounting-reporting workspace and use its approved accounting basis. Profit SHALL equal the reporting result's recognized income less deductible expenses. Margin SHALL equal profit divided by income times 100 when income is positive; otherwise it SHALL be shown as unavailable. An estimated VAT reserve SHALL be shown only when the canonical tax-reporting source provides a period value, and SHALL be labeled as an estimate.
+The dashboard SHALL provide an annual calendar-year selector and display income, expenses, profit, margin, and open receivables/payables for the selected year or year end. Income and expenses SHALL come from the accepted annual `AccountingPeriodSummary` and use its approved accounting basis; month/quarter requests SHALL render that workspace's unavailable state. Profit SHALL equal the reporting result's recognized income less deductible expenses. Margin SHALL equal profit divided by income times 100 when income is positive; otherwise it SHALL be shown as unavailable. An estimated VAT reserve SHALL be shown only when the canonical tax-reporting source provides a period value, and SHALL be labeled as an estimate. Until `accounting-reporting-workspaces` is accepted, the summary widget SHALL show its unavailable state naming that prerequisite and SHALL NOT substitute invoice totals, invoice-date journal totals, or unconfirmed bank rows.
 
 #### Scenario: Select a reporting period
-- **GIVEN** the dashboard has loaded and the company has an active fiscal-year setting
-- **WHEN** the user selects a period within that fiscal year
-- **THEN** each flow KPI uses that period and each open-balance KPI uses its end date
-- **AND** the selected period is shown in the dashboard header
+- **GIVEN** the dashboard has loaded and the selected calendar year is supported by the annual summary
+- **WHEN** the user selects that year
+- **THEN** each flow KPI uses that year and each open-balance KPI uses its year-end date
+- **AND** the selected year and its exact period boundaries are shown in the dashboard header
+
+#### Scenario: Unsupported month, quarter, or year
+- **GIVEN** the user requests a month, quarter, or calendar year without an accepted form mapping/source
+- **WHEN** the dashboard requests the period metrics
+- **THEN** it SHALL show the reporting workspace's localized unavailable state naming the missing period/form/source
+- **AND** it SHALL NOT present a partial-year, annual, or all-time value under the requested period label
 
 #### Scenario: Invalid or unavailable period
 - **GIVEN** the fiscal calendar is unavailable or the selected date range is invalid
@@ -55,10 +67,28 @@ The dashboard SHALL provide a period selector and display income, expenses, prof
 - **AND** it SHALL NOT present all-time values as if they belonged to the selected period
 
 #### Scenario: Historical open balance snapshot
-- **GIVEN** an invoice was issued by the selected period end and paid after that date, and another invoice was issued after that date
-- **WHEN** open receivables are calculated at the selected period end
-- **THEN** the first invoice SHALL be included at its remaining balance at that date
+- **GIVEN** an invoice was issued by the selected year end and paid after that date, and another invoice was issued after that date
+- **WHEN** open receivables are calculated at the selected year end
+- **THEN** the first invoice SHALL be included at its remaining balance at that date, derived from the `receivables-ledger-integrity` statement plus approved settlement allocations/keyed `zahlung` effective dates (authoritative date: bank booking/value or manual cash date, verbatim)
 - **AND** the later-issued invoice SHALL be excluded
+
+#### Scenario: Historical payable snapshot uses supplier allocations
+- **GIVEN** a supplier payable was issued by the selected year end with a settlement allocation dated after that date
+- **WHEN** open payables are calculated at the selected year end
+- **THEN** the payable SHALL be included at its remaining balance at that date from its `rechnung_eingang` item plus approved supplier settlement allocations
+- **AND** a payable issued after that date SHALL be excluded
+
+#### Scenario: Settlement split and reversal follow allocation dates
+- **GIVEN** one bank transaction holds two approved allocation rows with different settlement dates straddling the selected year end, and a later reversal reclassifies one allocation in the reversal period
+- **WHEN** the as-of balance is calculated
+- **THEN** only the allocation effective on/before the year end SHALL reduce the balance
+- **AND** the reversal SHALL affect only the reversal period, leaving the prior year-end snapshot unchanged
+
+#### Scenario: Write-off or legacy history without an effective date is unavailable
+- **GIVEN** an open item has a write-off/correction event without an accepted effective date, or its period mixes `legacy_unverified` rows
+- **WHEN** its as-of balance is requested
+- **THEN** the affected KPI SHALL show a localized incomplete-history unavailable state identifying the missing effective date/unverified rows
+- **AND** it SHALL NOT silently exclude the event or infer the balance from current status
 
 ### Requirement: Comparable KPI trends
 
@@ -83,9 +113,7 @@ For a selected period with a corresponding prior-year period, the dashboard SHAL
 
 ### Requirement: Period trend visualizations
 
-For the selected period, the dashboard SHALL provide monthly income and expense trends, profit development, expense
-distribution, and the VAT distribution returned by the canonical reporting services. Visualizations SHALL include a
-numeric value, active period, and accessible text summary; charts SHALL supplement rather than replace exact amounts.
+For the selected supported calendar year, the dashboard SHALL provide the annual summary's monthly income and expense trends, profit development, expense distribution, and the VAT distribution returned by the canonical reporting services. Visualizations SHALL include a numeric value, active year, and accessible text summary; charts SHALL supplement rather than replace exact amounts.
 
 #### Scenario: Render supported trend data
 - **GIVEN** the reporting workspace returns monthly totals and expense/VAT distribution for the selected period
@@ -118,12 +146,18 @@ Open and overdue invoice metrics SHALL exclude cancelled documents and drafts. P
 
 ### Requirement: Actionable dashboard attention items
 
-The dashboard SHALL include actionable attention items for overdue invoices, unreconciled transactions, and tax deadlines returned by the configured tax calendar. Each item SHALL link to the relevant filtered workspace. Missing or failed source data SHALL render an error state without substituting a hardcoded date or stale count.
+The dashboard SHALL include actionable attention items for overdue invoices, unreconciled transactions, and tax deadlines returned by the configured tax calendar. Each overdue-invoice item SHALL link to the relevant filtered invoice workspace; each unreconciled-transaction item SHALL link to the existing canonical `/banking` route with its typed selection state (`transactionId=<id>` for a single transaction, coexisting with supported banking query parameters), preserving unrelated query state. Missing or failed source data SHALL render an error state without substituting a hardcoded date or stale count.
 
 #### Scenario: Open an attention item
 - **GIVEN** an overdue invoice and an unreconciled transaction exist
 - **WHEN** the user activates either attention item
-- **THEN** the app SHALL navigate to the corresponding filtered invoice or bank workspace
+- **THEN** the app SHALL navigate to the corresponding filtered invoice workspace or to `/banking?transactionId=<id>` with that transaction selected and unrelated banking query preserved
+
+#### Scenario: Unmatched filter is applied on the banking route
+- **GIVEN** an unmatched-transaction attention item for transaction 42
+- **WHEN** the user activates it
+- **THEN** the banking workspace SHALL open with transaction 42 selected via its typed `transactionId` state alongside its existing typed search/filter (status/text/date/amount) state
+- **AND** a missing, malformed, or unavailable ID SHALL show the route's localized typed not-found state without changing other query state
 
 #### Scenario: Tax calendar is unavailable
 - **GIVEN** no filing calendar is configured or its query fails

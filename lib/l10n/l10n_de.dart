@@ -2906,4 +2906,93 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get incomingInvoiceConfirmUnsupportedValues =>
       'Ich habe die nicht unterstützten Quellenwerte geprüft und die Rechnung manuell erfasst.';
+
+  @override
+  String get dashboardPeriodYear => 'Geschäftsjahr';
+
+  @override
+  String dashboardPeriodRange(int year, String start, String end) {
+    return '$year · $start – $end';
+  }
+
+  @override
+  String get dashboardReportingPending => 'Keine Periodenwerte – Auswertung ausstehend.';
+
+  @override
+  String get dashboardReportingPrerequisite => 'Periodenwerte nicht verfügbar – Auswertungs-Arbeitsbereich fehlt.';
+
+  @override
+  String get dashboardUnsupportedPeriod => 'Monat/Quartal ist nicht verfügbar – Jahresansicht.';
+
+  @override
+  String get dashboardInvalidPeriod => 'Ungültiger Zeitraum.';
+
+  @override
+  String get dashboardNotComparable => 'Nicht vergleichbar';
+
+  @override
+  String get dashboardProfit => 'Gewinn';
+
+  @override
+  String get dashboardMargin => 'Marge';
+
+  @override
+  String get dashboardMarginUnavailable => 'Marge n. v.';
+
+  @override
+  String get dashboardVatReserveEstimate => 'USt-Rücklage (Schätzung)';
+
+  @override
+  String get dashboardQuickLinkAdd => 'Link hinzufügen';
+
+  @override
+  String get dashboardQuickLinkEdit => 'Link bearbeiten';
+
+  @override
+  String get dashboardQuickLinkInvalid => 'Route wird nicht unterstützt.';
+
+  @override
+  String get dashboardQuickLinkInvalidState => 'Ungültiger Link – entfernen';
+
+  @override
+  String get dashboardAttentionTitle => 'Aufgaben';
+
+  @override
+  String get dashboardAttentionOverdue => 'Überfällige Rechnung';
+
+  @override
+  String get dashboardAttentionUnmatched => 'Abzustimmende Transaktion';
+
+  @override
+  String get dashboardAttentionTaxDeadline => 'Steuerfrist';
+
+  @override
+  String get dashboardTaxCalendarMissing => 'Kein Steuerkalender konfiguriert.';
+
+  @override
+  String get dashboardTrendTitle => 'Verlauf';
+
+  @override
+  String get dashboardTrendEmpty => 'Keine Verlaufsdaten für diesen Zeitraum.';
+
+  @override
+  String get dashboardTrendError => 'Verlaufsdaten konnten nicht geladen werden.';
+
+  @override
+  String get dashboardOpenBalance => 'Offener Saldo zum Jahresende';
+
+  @override
+  String get dashboardIncompleteHistory => 'Unvollständige Historie – effektives Datum fehlt.';
+
+  @override
+  String get dashboardUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get dashboardQuickLinkInvalidLabel => 'ungültig';
+
+  @override
+  String get dashboardQuickLinkLabel => 'Bezeichnung';
+
+  @override
+  String get dashboardQuickLinkRoute => 'Route';
 }
