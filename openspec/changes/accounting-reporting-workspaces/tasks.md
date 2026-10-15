@@ -159,12 +159,12 @@
 
 ## 8. accounting-reporting-workspaces: Report status reflects evidence and unresolved input
 
-- [ ] 8.1 Write failing test `test_local_result_is_not_submitted` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Local result is not submitted"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 8.2 Implement the specified behavior for "Local result is not submitted" to pass 8.1, using the typed owner in `design.md`.
-- [ ] 8.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 8.4 Write failing test `test_required_inputs_are_unresolved` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Required inputs are unresolved"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 8.5 Implement the specified behavior for "Required inputs are unresolved" to pass 8.4, using the typed owner in `design.md`.
-- [ ] 8.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 8.1 Write failing test `test_local_result_is_not_submitted` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Local result is not submitted"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 8.2 Implement the specified behavior for "Local result is not submitted" to pass 8.1, using the typed owner in `design.md`.
+- [x] 8.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 8.4 Write failing test `test_required_inputs_are_unresolved` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Required inputs are unresolved"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 8.5 Implement the specified behavior for "Required inputs are unresolved" to pass 8.4, using the typed owner in `design.md`.
+- [x] 8.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 9. accounting-reporting-workspaces: Reporting workspaces remain accessible at desktop sizes
 

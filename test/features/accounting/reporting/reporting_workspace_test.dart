@@ -5,6 +5,7 @@ import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/reporting/accounting_period_summary_service.dart';
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/report_status_service.dart';
 
 void main() {
   group('reporting workspace dispatch', () {
@@ -214,6 +215,62 @@ void main() {
       expect(s.profitCents, 0);
       expect(s.marginPercent, isNull);
       expect(s.unresolvedCount, 0);
+    });
+  });
+
+  group('reporting workspace: report status', () {
+    ReportStatusEvidence evidence({
+      bool sourceComplete = true,
+      bool calculationSupported = true,
+      bool explicitlyProvisional = false,
+      int unresolvedCount = 0,
+      List<int> unresolvedSourceIds = const <int>[],
+      bool hasReviewEvidence = false,
+      bool hasSubmissionReceipt = false,
+    }) {
+      return ReportStatusEvidence(
+        sourceComplete: sourceComplete,
+        calculationSupported: calculationSupported,
+        explicitlyProvisional: explicitlyProvisional,
+        unresolvedCount: unresolvedCount,
+        unresolvedSourceIds: unresolvedSourceIds,
+        hasReviewEvidence: hasReviewEvidence,
+        hasSubmissionReceipt: hasSubmissionReceipt,
+      );
+    }
+
+    test('test_local_result_is_not_submitted', () async {
+      // Complete result or DATEV file saved locally without external receipt.
+      final ReportStatus local = ReportStatusService.evaluate(evidence: evidence());
+      final ReportStatus reviewed = ReportStatusService.evaluate(evidence: evidence(hasReviewEvidence: true));
+
+      // Berechnet (or Geprüft only when review evidence supports it), and
+      // never labeled Übermittelt without a receipt.
+      expect(local.state, ReportStatusState.berechnet);
+      expect(local.isSubmitted, isFalse);
+      expect(reviewed.state, ReportStatusState.geprueft);
+      expect(reviewed.isSubmitted, isFalse);
+      // A local file can never resolve to Übermittelt.
+      expect(local.state, isNot(ReportStatusState.uebermittelt));
+    });
+
+    test('test_required_inputs_are_unresolved', () async {
+      // Unresolved records exist for a supported calculation.
+      final ReportStatus strict = ReportStatusService.evaluate(
+        evidence: evidence(unresolvedCount: 2, unresolvedSourceIds: <int>[11, 12]),
+      );
+      final ReportStatus provisional = ReportStatusService.evaluate(
+        evidence: evidence(unresolvedCount: 2, unresolvedSourceIds: <int>[11, 12], explicitlyProvisional: true),
+      );
+
+      // Geschätzt only when the contract explicitly permits a provisional
+      // result; otherwise Unverfügbar with the unresolved count and sources.
+      expect(strict.state, ReportStatusState.unverfugbar);
+      expect(strict.unresolvedCount, 2);
+      expect(strict.unresolvedSourceIds, <int>[11, 12]);
+      expect(provisional.state, ReportStatusState.geschatzt);
+      expect(provisional.unresolvedCount, 2);
+      expect(provisional.unresolvedSourceIds, <int>[11, 12]);
     });
   });
 }
