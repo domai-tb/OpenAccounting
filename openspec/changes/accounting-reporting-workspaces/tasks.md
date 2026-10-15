@@ -147,15 +147,15 @@
 
 ## 7. accounting-reporting-workspaces: Annual accounting period summary uses one canonical result
 
-- [ ] 7.1 Write failing test `test_return_a_complete_supported_annual_summary` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Return a complete supported annual summary"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 7.2 Implement the specified behavior for "Return a complete supported annual summary" to pass 7.1, using the typed owner in `design.md`.
-- [ ] 7.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 7.4 Write failing test `test_unsupported_annual_period_has_no_summary` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported annual period has no summary"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 7.5 Implement the specified behavior for "Unsupported annual period has no summary" to pass 7.4, using the typed owner in `design.md`.
-- [ ] 7.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 7.7 Write failing test `test_empty_or_zero_income_supported_year` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Empty or zero-income supported year"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 7.8 Implement the specified behavior for "Empty or zero-income supported year" to pass 7.7, using the typed owner in `design.md`.
-- [ ] 7.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 7.1 Write failing test `test_return_a_complete_supported_annual_summary` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Return a complete supported annual summary"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 7.2 Implement the specified behavior for "Return a complete supported annual summary" to pass 7.1, using the typed owner in `design.md`.
+- [x] 7.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 7.4 Write failing test `test_unsupported_annual_period_has_no_summary` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Unsupported annual period has no summary"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 7.5 Implement the specified behavior for "Unsupported annual period has no summary" to pass 7.4, using the typed owner in `design.md`.
+- [x] 7.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 7.7 Write failing test `test_empty_or_zero_income_supported_year` in `test/features/accounting/reporting/reporting_workspace_test.dart` for scenario "Empty or zero-income supported year"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 7.8 Implement the specified behavior for "Empty or zero-income supported year" to pass 7.7, using the typed owner in `design.md`.
+- [x] 7.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 8. accounting-reporting-workspaces: Report status reflects evidence and unresolved input
 

@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/reporting/accounting_period_summary_service.dart';
+import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
-import 'package:openaccounting/features/accounting/reporting/report_workspace_result.dart';
 
 void main() {
   group('reporting workspace dispatch', () {
@@ -118,6 +120,100 @@ void main() {
       expect(result.reasonCode, contains('Direction'));
       expect(result.reasonCode, contains('76'));
       expect(result.value, isNull);
+    });
+  });
+
+  group('reporting workspace: annual accounting period summary', () {
+    late AppDatabase db;
+    late AccountingPeriodSummaryService service;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      service = AccountingPeriodSummaryService(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<void> insertKategorie({required int id, required int zeile}) async {
+      await db.executor.runInsert(
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, '
+        'mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[id, 'Kat $id', '800$zeile', '400$zeile', zeile, 'catalog_verified', 'TEST-EUER', '2025-form.1'],
+      );
+    }
+
+    Future<void> insertJournal({
+      required int kategorieId,
+      required String betrag,
+      required String datum,
+      String art = 'Einnahme',
+    }) async {
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable) VALUES (?, ?, ?, ?, ?, 0)',
+        <Object?>[datum, 'Test $kategorieId', kategorieId, betrag, art],
+      );
+    }
+
+    test('test_return_a_complete_supported_annual_summary', () async {
+      await insertKategorie(id: 922, zeile: 15);
+      await insertKategorie(id: 930, zeile: 36);
+      await insertJournal(kategorieId: 922, betrag: '2000.00', datum: '2025-03-10');
+      await insertJournal(kategorieId: 922, betrag: '300.00', datum: '2025-04-20');
+      await insertJournal(kategorieId: 930, betrag: '500.00', datum: '2025-05-05', art: 'Ausgabe');
+
+      final ReportWorkspaceResult<AccountingPeriodSummary> result = await service.summary(jahr: 2025);
+
+      // Exact January 1 through next-January-1 period, canonical totals,
+      // monthly series, distributions, source versions, and unresolved count.
+      expect(result.availability, ReportAvailability.available);
+      final AccountingPeriodSummary s = result.value!;
+      expect(s.periodStart, '2025-01-01');
+      expect(s.periodEnd, '2026-01-01');
+      expect(s.incomeCents, 230000);
+      expect(s.expenseCents, 50000);
+      expect(s.unresolvedCount, 0);
+      expect(s.sourceVersions['euerFormVersion'], 'anlage-euer-2025');
+      expect(s.monthlyTrend, hasLength(12));
+      expect(s.monthlyTrend[2].incomeCents, 200000); // March only.
+      expect(s.monthlyTrend[4].expenseCents, 50000); // May only.
+      // Expense distribution is grouped from journaled source facts.
+      expect(s.expenseDistribution.single.amountCents, 50000);
+
+      // Income, expense and profit totals equal the matching report results.
+      final ReportWorkspaceResult<EuerPreview> euer = await EuerReportUseCase(db.executor).preview(jahr: 2025);
+      expect(euer.availability, ReportAvailability.available);
+      expect(s.profitCents, money.parseScaled(euer.value!.gewinn, scale: 2));
+      expect(s.incomeCents - s.expenseCents, s.profitCents);
+      // Margin is profit / income * 100.
+      expect(s.marginPercent, isNotNull);
+      expect(s.marginPercent, closeTo(s.profitCents / s.incomeCents * 100, 0.0001));
+    });
+
+    test('test_unsupported_annual_period_has_no_summary', () async {
+      final ReportWorkspaceResult<AccountingPeriodSummary> result = await service.summary(jahr: 2026);
+
+      // Unavailable with the missing version identified; no month/quarter
+      // estimate or complete annual total is produced.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('FormVersion'));
+      expect(result.value, isNull);
+    });
+
+    test('test_empty_or_zero_income_supported_year', () async {
+      final ReportWorkspaceResult<AccountingPeriodSummary> result = await service.summary(jahr: 2025);
+
+      // Complete source, no events: zero totals, margin unavailable rather
+      // than infinity or a fabricated percentage.
+      expect(result.availability, ReportAvailability.available);
+      final AccountingPeriodSummary s = result.value!;
+      expect(s.incomeCents, 0);
+      expect(s.expenseCents, 0);
+      expect(s.profitCents, 0);
+      expect(s.marginPercent, isNull);
+      expect(s.unresolvedCount, 0);
     });
   });
 }
