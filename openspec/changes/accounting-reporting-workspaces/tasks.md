@@ -186,15 +186,15 @@
 
 ## 11. tax-reporting-and-export-integrity: Reporting workspace file-output scope
 
-- [ ] 11.1 Write failing test `test_datev_export_uses_the_maintained_artifact_lifecycle` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "DATEV export uses the maintained artifact lifecycle"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 11.2 Implement the specified behavior for "DATEV export uses the maintained artifact lifecycle" to pass 11.1, using the typed owner in `design.md`.
-- [ ] 11.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 11.4 Write failing test `test_preview_only_report_has_no_file_export` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "Preview-only report has no file export"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 11.5 Implement the specified behavior for "Preview-only report has no file export" to pass 11.4, using the typed owner in `design.md`.
-- [ ] 11.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 11.7 Write failing test `test_unsupported_export_format_remains_unavailable` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "Unsupported export format remains unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 11.8 Implement the specified behavior for "Unsupported export format remains unavailable" to pass 11.7, using the typed owner in `design.md`.
-- [ ] 11.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 11.1 Write failing test `test_datev_export_uses_the_maintained_artifact_lifecycle` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "DATEV export uses the maintained artifact lifecycle"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 11.2 Implement the specified behavior for "DATEV export uses the maintained artifact lifecycle" to pass 11.1, using the typed owner in `design.md`.
+- [x] 11.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 11.4 Write failing test `test_preview_only_report_has_no_file_export` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "Preview-only report has no file export"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 11.5 Implement the specified behavior for "Preview-only report has no file export" to pass 11.4, using the typed owner in `design.md`.
+- [x] 11.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 11.7 Write failing test `test_unsupported_export_format_remains_unavailable` in `test/features/accounting/reporting/report_export_lifecycle_test.dart` for scenario "Unsupported export format remains unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 11.8 Implement the specified behavior for "Unsupported export format remains unavailable" to pass 11.7, using the typed owner in `design.md`.
+- [x] 11.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 12. typed-route-workspaces: Report route selections resolve to typed owners
 
