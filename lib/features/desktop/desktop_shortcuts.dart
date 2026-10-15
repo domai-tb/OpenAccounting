@@ -51,7 +51,6 @@ class NativeApiHotkeyBackend implements HotkeyBackend {
       final nativeapi.Shortcut? shortcut = _manager.registerWithOptions(
         nativeapi.ShortcutOptions(
           accelerator: key == '+' ? 'Plus' : key,
-          callback: null,
           description: id,
           scope: nativeapi.ShortcutScope.global,
           enabled: true,
