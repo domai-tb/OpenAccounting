@@ -203,7 +203,7 @@ final dashboardSelectedYearProvider = NotifierProvider<DashboardYearNotifier, in
 /// Callers SHALL show the unavailable state and never substitute totals.
 final dashboardAnnualSummaryProvider = FutureProvider.family<DashboardAnnualKpis?, int>((ref, year) async {
   final useCase = ref.watch(dashboardUseCaseProvider);
-  return useCase.annualSummary(year);
+  return useCase.annualSummary(year) ?? await useCase.annualSummaryFromReporting(year);
 });
 
 /// Historical open-balance snapshots at the selected year end.

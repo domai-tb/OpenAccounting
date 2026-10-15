@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/reporting/accounting_period_summary_service.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_period.dart';
 
@@ -54,10 +55,25 @@ class DashboardUseCase {
 
   DashboardPeriodUnavailable unsupportedPeriod() => unsupportedMonthQuarter();
 
-  /// Annual summary for [year]. Production has no accepted reporting
-  /// workspace yet, so without an injected summary this returns null and
-  /// callers SHALL show the `reporting-prerequisite` unavailable state.
+  /// Test seam: injected accepted annual summaries keyed by year.
   DashboardAnnualKpis? annualSummary(int year) => annualSummaries?[year];
+
+  /// Canonical consumption: maps the reporting service's accepted
+  /// `AccountingPeriodSummary` 1:1 to dashboard KPIs. Unavailable or
+  /// unsupported periods yield null — never a substituted total.
+  Future<DashboardAnnualKpis?> annualSummaryFromReporting(int year) async {
+    final AccountingPeriodSummary? s = (await AccountingPeriodSummaryService(executor).summary(jahr: year)).value;
+    if (s == null) {
+      return null;
+    }
+    return DashboardAnnualKpis(
+      year: s.jahr,
+      incomeCents: s.incomeCents,
+      expenseCents: s.expenseCents,
+      profitCents: s.profitCents,
+      marginPercent: s.marginPercent,
+    );
+  }
 
   bool get hasReportingPrerequisite => annualSummaries != null;
 

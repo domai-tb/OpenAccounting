@@ -174,15 +174,15 @@
 
 ## 10. dashboard: Annual dashboard summary consumes the supported report result
 
-- [ ] 10.1 Write failing test `test_summary_widget_uses_the_canonical_annual_result` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Summary widget uses the canonical annual result"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 10.2 Implement the specified behavior for "Summary widget uses the canonical annual result" to pass 10.1, using the typed owner in `design.md`.
-- [ ] 10.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 10.4 Write failing test `test_summary_dependencies_are_not_approved` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Summary dependencies are not approved"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 10.5 Implement the specified behavior for "Summary dependencies are not approved" to pass 10.4, using the typed owner in `design.md`.
-- [ ] 10.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 10.7 Write failing test `test_unsupported_dashboard_summary_period` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Unsupported dashboard summary period"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 10.8 Implement the specified behavior for "Unsupported dashboard summary period" to pass 10.7, using the typed owner in `design.md`.
-- [ ] 10.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 10.1 Write failing test `test_summary_widget_uses_the_canonical_annual_result` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Summary widget uses the canonical annual result"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 10.2 Implement the specified behavior for "Summary widget uses the canonical annual result" to pass 10.1, using the typed owner in `design.md`.
+- [x] 10.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 10.4 Write failing test `test_summary_dependencies_are_not_approved` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Summary dependencies are not approved"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 10.5 Implement the specified behavior for "Summary dependencies are not approved" to pass 10.4, using the typed owner in `design.md`.
+- [x] 10.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 10.7 Write failing test `test_unsupported_dashboard_summary_period` in `test/features/dashboard/accounting_period_summary_test.dart` for scenario "Unsupported dashboard summary period"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 10.8 Implement the specified behavior for "Unsupported dashboard summary period" to pass 10.7, using the typed owner in `design.md`.
+- [x] 10.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 11. tax-reporting-and-export-integrity: Reporting workspace file-output scope
 
