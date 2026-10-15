@@ -49,7 +49,7 @@ class ReportCatalogUseCase {
           kind: ReportCatalogKind.history,
           route: '/reports?view=history',
           period: '—',
-          availability: ReportAvailability.unavailable,
+          availability: ReportAvailability.available,
         ),
       );
     } else {

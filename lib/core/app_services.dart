@@ -39,6 +39,7 @@ import 'package:openaccounting/features/inventory/stocktake_repository.dart';
 import 'package:openaccounting/features/inventory/stocktake_usecases.dart';
 import 'package:openaccounting/features/accounting/gobd_export_service.dart';
 import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/report_export_history_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
 import 'package:openaccounting/features/documents/beleg_repository.dart';
 import 'package:openaccounting/features/documents/dokumentenpaket_repository.dart';
@@ -164,6 +165,8 @@ class AppServices {
   late final DashboardUseCase dashboard = DashboardUseCase(_db.executor);
 
   late final ReportingWorkspaceUseCase reportingWorkspace = ReportingWorkspaceUseCase(_db.executor);
+
+  late final ReportExportHistoryUseCase reportExportHistory = ReportExportHistoryUseCase(_db.executor);
 
   late final ReportCatalogUseCase reportCatalog = ReportCatalogUseCase(reportingWorkspace);
   late final AssetRegisterUseCases assets = AssetRegisterUseCases(

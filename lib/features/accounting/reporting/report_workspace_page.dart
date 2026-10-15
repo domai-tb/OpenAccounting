@@ -3,15 +3,17 @@ import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/report_export_history_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/report_workspace_result.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 
 class ReportWorkspacePage extends StatefulWidget {
-  const ReportWorkspacePage({required this.uri, required this.workspace, super.key});
+  const ReportWorkspacePage({required this.uri, required this.workspace, required this.history, super.key});
 
   final Uri uri;
   final ReportingWorkspaceUseCase workspace;
+  final ReportExportHistoryUseCase history;
 
   @override
   State<ReportWorkspacePage> createState() => _ReportWorkspacePageState();
@@ -20,6 +22,13 @@ class ReportWorkspacePage extends StatefulWidget {
 class _ReportWorkspacePageState extends State<ReportWorkspacePage> {
   late final ReportCatalogKind? _kind = _kindFor(widget.uri);
   late final Future<ReportWorkspaceResult<ReportWorkspaceValue>> _result = _resolve();
+  late final Future<List<ReportExportHistoryEntry>> _history = widget.history.list();
+
+  bool get _historyRoute =>
+      widget.uri.path == '/reports' &&
+      widget.uri.queryParameters.length == 1 &&
+      widget.uri.queryParameters['view'] == 'history' &&
+      widget.uri.queryParametersAll.values.every((List<String> values) => values.length == 1);
 
   Future<ReportWorkspaceResult<ReportWorkspaceValue>> _resolve() {
     final Map<String, String> query = widget.uri.queryParameters;
@@ -28,10 +37,8 @@ class _ReportWorkspacePageState extends State<ReportWorkspacePage> {
         const ReportWorkspaceResult<ReportWorkspaceValue>.invalidSelection('duplicateRouteParameter'),
       );
     }
-    if (query['view'] == 'history') {
-      return Future<ReportWorkspaceResult<ReportWorkspaceValue>>.value(
-        const ReportWorkspaceResult<ReportWorkspaceValue>.unavailable('ReportExportHistoryUseCase unavailable'),
-      );
+    if (query.containsKey('view')) {
+      return _invalid('invalidReportView');
     }
     final String? report = query['report'];
     final String path = widget.uri.path;
@@ -81,58 +88,82 @@ class _ReportWorkspacePageState extends State<ReportWorkspacePage> {
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    final String title = widget.uri.path == '/taxes' ? l10n.routeTaxes : l10n.routeReports;
+    final String title = _historyRoute
+        ? l10n.reportCatalogHistory
+        : widget.uri.path == '/taxes'
+        ? l10n.routeTaxes
+        : l10n.routeReports;
     return AppPage(
       header: AppPageHeader(title: title, showFilterToolbar: false),
-      child: FutureBuilder<ReportWorkspaceResult<ReportWorkspaceValue>>(
-        future: _result,
-        builder: (BuildContext context, AsyncSnapshot<ReportWorkspaceResult<ReportWorkspaceValue>> snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text(l10n.workspaceUnavailable));
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final ReportWorkspaceResult<ReportWorkspaceValue> result = snapshot.data!;
-          final ReportWorkspaceValue? value = result.value;
-          final String status = switch (result.availability) {
-            ReportAvailability.available => l10n.reportStatusAvailable,
-            ReportAvailability.unavailable => l10n.reportStatusUnavailable,
-            ReportAvailability.invalidSelection => l10n.reportSelectionInvalid,
-          };
-          final List<Widget> children = <Widget>[
-            ListTile(
-              key: ValueKey<String>(
-                result.availability == ReportAvailability.invalidSelection
-                    ? 'report-workspace-invalid'
-                    : 'report-workspace-${_kind?.name ?? 'invalid'}',
-              ),
-              title: Text(_titleFor(l10n, _kind)),
-              subtitle: Text(status),
-            ),
-          ];
-          if (value != null) {
-            children.add(Text('${value.periodStart} – ${value.periodEnd}'));
-            if (value.sourceVersions.isNotEmpty) {
-              children.add(
-                Text(
-                  value.sourceVersions.entries.map((MapEntry<String, String> e) => '${e.key}: ${e.value}').join(', '),
-                ),
-              );
-            }
-          }
-          if (result.reasonCode != null && result.availability != ReportAvailability.invalidSelection) {
-            children.add(Text(result.reasonCode!));
-          }
-          return ListView(
-            key: const ValueKey<String>('report-workspace-result'),
-            padding: const EdgeInsets.all(16),
-            children: children,
-          );
-        },
-      ),
+      child: _historyRoute ? _historyList(l10n) : _reportResult(l10n),
     );
   }
+
+  Widget _historyList(AppLocalizations l10n) => FutureBuilder<List<ReportExportHistoryEntry>>(
+    future: _history,
+    builder: (BuildContext context, AsyncSnapshot<List<ReportExportHistoryEntry>> snapshot) {
+      if (snapshot.hasError) return Center(child: Text(l10n.workspaceUnavailable));
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      final List<ReportExportHistoryEntry> entries = snapshot.data!;
+      return ListView(
+        key: const ValueKey<String>('report-export-history'),
+        padding: const EdgeInsets.all(16),
+        children: entries.isEmpty
+            ? <Widget>[ListTile(title: Text(l10n.emptyEntries))]
+            : entries
+                  .map(
+                    (ReportExportHistoryEntry entry) => ListTile(
+                      key: ValueKey<String>('export-history-row-${entry.id}'),
+                      title: Text(entry.path),
+                      subtitle: Text('${entry.status} · ${entry.periodStart} – ${entry.periodEnd}'),
+                    ),
+                  )
+                  .toList(growable: false),
+      );
+    },
+  );
+
+  Widget _reportResult(AppLocalizations l10n) => FutureBuilder<ReportWorkspaceResult<ReportWorkspaceValue>>(
+    future: _result,
+    builder: (BuildContext context, AsyncSnapshot<ReportWorkspaceResult<ReportWorkspaceValue>> snapshot) {
+      if (snapshot.hasError) return Center(child: Text(l10n.workspaceUnavailable));
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      final ReportWorkspaceResult<ReportWorkspaceValue> result = snapshot.data!;
+      final ReportWorkspaceValue? value = result.value;
+      final String status = switch (result.availability) {
+        ReportAvailability.available => l10n.reportStatusAvailable,
+        ReportAvailability.unavailable => l10n.reportStatusUnavailable,
+        ReportAvailability.invalidSelection => l10n.reportSelectionInvalid,
+      };
+      final List<Widget> children = <Widget>[
+        ListTile(
+          key: ValueKey<String>(
+            result.availability == ReportAvailability.invalidSelection
+                ? 'report-workspace-invalid'
+                : 'report-workspace-${_kind?.name ?? 'invalid'}',
+          ),
+          title: Text(_titleFor(l10n, _kind)),
+          subtitle: Text(status),
+        ),
+      ];
+      if (value != null) {
+        children.add(Text('${value.periodStart} – ${value.periodEnd}'));
+        if (value.sourceVersions.isNotEmpty) {
+          children.add(
+            Text(value.sourceVersions.entries.map((MapEntry<String, String> e) => '${e.key}: ${e.value}').join(', ')),
+          );
+        }
+      }
+      if (result.reasonCode != null && result.availability != ReportAvailability.invalidSelection) {
+        children.add(Text(result.reasonCode!));
+      }
+      return ListView(
+        key: const ValueKey<String>('report-workspace-result'),
+        padding: const EdgeInsets.all(16),
+        children: children,
+      );
+    },
+  );
 
   String _titleFor(AppLocalizations l10n, ReportCatalogKind? kind) => switch (kind) {
     ReportCatalogKind.euer => l10n.reportCatalogEuer,

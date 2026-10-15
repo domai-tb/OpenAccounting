@@ -665,7 +665,11 @@ class TaxesPage extends ConsumerWidget {
         child: Text(l10n.reportStatusUnavailable),
       );
     }
-    return ReportWorkspacePage(uri: uri, workspace: scope.services.reportingWorkspace);
+    return ReportWorkspacePage(
+      uri: uri,
+      workspace: scope.services.reportingWorkspace,
+      history: scope.services.reportExportHistory,
+    );
   }
 }
 
@@ -693,7 +697,11 @@ class ReportsPage extends ConsumerWidget {
         child: Text(l10n.reportStatusUnavailable),
       );
     }
-    return ReportWorkspacePage(uri: uri, workspace: scope.services.reportingWorkspace);
+    return ReportWorkspacePage(
+      uri: uri,
+      workspace: scope.services.reportingWorkspace,
+      history: scope.services.reportExportHistory,
+    );
   }
 }
 
