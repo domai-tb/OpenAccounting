@@ -69,24 +69,24 @@
 
 ## 3. accounting: GuV (Gewinn- und Verlustrechnung)
 
-- [ ] 3.1 Write failing test `test_threshold_exceeded` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Threshold exceeded"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.2 Implement the specified behavior for "Threshold exceeded" to pass 3.1, using the typed owner in `design.md`.
-- [ ] 3.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 3.4 Write failing test `test_guv_computation` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "GuV computation"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.5 Implement the specified behavior for "GuV computation" to pass 3.4, using the typed owner in `design.md`.
-- [ ] 3.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 3.7 Write failing test `test_threshold_not_exceeded` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Threshold not exceeded"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.8 Implement the specified behavior for "Threshold not exceeded" to pass 3.7, using the typed owner in `design.md`.
-- [ ] 3.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 3.10 Write failing test `test_141_warning_follows_notice_effective_date` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "§141 warning follows notice effective date"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.11 Implement the specified behavior for "§141 warning follows notice effective date" to pass 3.10, using the typed owner in `design.md`.
-- [ ] 3.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 3.13 Write failing test `test_141_warning_follows_a_non_calendar_wirtschaftsjahr` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "§141 warning follows a non-calendar Wirtschaftsjahr"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.14 Implement the specified behavior for "§141 warning follows a non-calendar Wirtschaftsjahr" to pass 3.13, using the typed owner in `design.md`.
-- [ ] 3.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 3.16 Write failing test `test_guv_is_unavailable_without_approved_postings` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "GuV is unavailable without approved postings"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 3.17 Implement the specified behavior for "GuV is unavailable without approved postings" to pass 3.16, using the typed owner in `design.md`.
-- [ ] 3.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.1 Write failing test `test_threshold_exceeded` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Threshold exceeded"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.2 Implement the specified behavior for "Threshold exceeded" to pass 3.1, using the typed owner in `design.md`.
+- [x] 3.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.4 Write failing test `test_guv_computation` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "GuV computation"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.5 Implement the specified behavior for "GuV computation" to pass 3.4, using the typed owner in `design.md`.
+- [x] 3.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.7 Write failing test `test_threshold_not_exceeded` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Threshold not exceeded"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.8 Implement the specified behavior for "Threshold not exceeded" to pass 3.7, using the typed owner in `design.md`.
+- [x] 3.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.10 Write failing test `test_141_warning_follows_notice_effective_date` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "§141 warning follows notice effective date"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.11 Implement the specified behavior for "§141 warning follows notice effective date" to pass 3.10, using the typed owner in `design.md`.
+- [x] 3.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.13 Write failing test `test_141_warning_follows_a_non_calendar_wirtschaftsjahr` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "§141 warning follows a non-calendar Wirtschaftsjahr"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.14 Implement the specified behavior for "§141 warning follows a non-calendar Wirtschaftsjahr" to pass 3.13, using the typed owner in `design.md`.
+- [x] 3.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 3.16 Write failing test `test_guv_is_unavailable_without_approved_postings` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "GuV is unavailable without approved postings"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 3.17 Implement the specified behavior for "GuV is unavailable without approved postings" to pass 3.16, using the typed owner in `design.md`.
+- [x] 3.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 4. accounting: ZM (Zusammenfassende Meldung)
 

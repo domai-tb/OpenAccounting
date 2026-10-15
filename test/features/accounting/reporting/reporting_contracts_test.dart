@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/posting_group_service.dart';
+import 'package:openaccounting/features/accounting/reporting/bookkeeping_duty_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/guv_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/ustva_report_use_case.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 
@@ -442,6 +444,169 @@ void main() {
       expect(result.availability, ReportAvailability.unavailable);
       expect(result.reasonCode, contains('YearSpecificMap'));
       expect(result.value, isNull);
+    });
+  });
+
+  group('reporting contracts: GuV workspace', () {
+    late AppDatabase db;
+    late GuvReportUseCase useCase;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      useCase = GuvReportUseCase(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<void> insertKategorie({required int id, required String konto}) async {
+      await db.executor.runInsert(
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, aktiv, mapping_status) '
+        'VALUES (?, ?, ?, ?, 1, ?)',
+        <Object?>[id, 'Kat $id', konto, konto, 'catalog_verified'],
+      );
+    }
+
+    Future<void> insertJournal({
+      required int kategorieId,
+      required String betrag,
+      required String datum,
+      String belegTyp = 'Einnahme',
+    }) async {
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable) VALUES (?, ?, ?, ?, ?, 0)',
+        <Object?>[datum, 'Test $kategorieId', kategorieId, betrag, belegTyp],
+      );
+    }
+
+    test('test_guv_computation', () async {
+      await insertKategorie(id: 941, konto: '4000');
+      await insertKategorie(id: 942, konto: '3000');
+      await insertKategorie(id: 943, konto: '6000');
+      await insertJournal(kategorieId: 941, betrag: '1000.00', datum: '2025-03-01');
+      await insertJournal(kategorieId: 942, betrag: '400.00', datum: '2025-04-01', belegTyp: 'Ausgabe');
+      await insertJournal(kategorieId: 943, betrag: '100.00', datum: '2025-05-01', belegTyp: 'Ausgabe');
+      // Different year must not count.
+      await insertJournal(kategorieId: 941, betrag: '9999.00', datum: '2024-03-01');
+
+      final ReportWorkspaceResult<GuvPreview> result = await useCase.preview(jahr: 2025);
+
+      expect(result.availability, ReportAvailability.available);
+      final GuvPreview preview = result.value!;
+      // Amounts grouped by the accepted account-to-GuV-line mapping.
+      expect(preview.lineAmountCents('roherloese'), 100000);
+      expect(preview.lineAmountCents('materialaufwand'), 40000);
+      expect(preview.lineAmountCents('sonstige_aufwendungen'), 10000);
+      // Records the source/mapping version and exact period.
+      expect(preview.mappingVersion, 'skr03-guv-2025');
+      expect(preview.sourceVersions.keys, contains('balanced-postings'));
+      expect(preview.sourceVersions.keys, contains('invoice-money'));
+      expect(preview.periodStart, '2025-01-01');
+      expect(preview.periodEnd, '2026-01-01');
+    });
+
+    test('test_guv_is_unavailable_without_approved_postings', () async {
+      // Simulate the balanced-posting prerequisite not being approved/installed.
+      await db.executor.runCustom('DROP TABLE settlement_groups', const <Object?>[]);
+
+      final ReportWorkspaceResult<GuvPreview> result = await useCase.preview(jahr: 2025);
+
+      // Unavailable; no raw journal-range estimate is shown.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('source'));
+      expect(result.value, isNull);
+    });
+  });
+
+  group('reporting contracts: §141 bookkeeping duty', () {
+    BookkeepingDutyEvidence evidence({
+      String businessType = 'gewerbebetrieb',
+      String thresholdBasis = 'umsatz',
+      int measuredAmountCents = 80100000,
+      String? noticeDate = '2025-06-15',
+      String? findingDate = '2025-06-15',
+      int wjStartMonth = 1,
+      int wjStartDay = 1,
+    }) {
+      return BookkeepingDutyEvidence(
+        businessType: businessType,
+        thresholdBasis: thresholdBasis,
+        measuredAmountCents: measuredAmountCents,
+        finanzamtFindingDate: findingDate,
+        noticeDate: noticeDate,
+        wirtschaftsjahrStartMonth: wjStartMonth,
+        wirtschaftsjahrStartDay: wjStartDay,
+      );
+    }
+
+    test('test_threshold_exceeded', () async {
+      // Turnover over EUR 800,000 but no verified notice/effective-date evidence.
+      final BookkeepingDutyStatus status = BookkeepingDutyUseCase.evaluate(
+        evidence: evidence(noticeDate: null, findingDate: null),
+        on: '2025-06-30',
+      );
+
+      // The application does not claim §141 duty applies without notice evidence.
+      expect(status.claimDuty, isFalse);
+      expect(status.effectiveDate, isNull);
+      expect(status.reasonCode, contains('Notice'));
+      // A threshold crossing never activates the management GuV preference:
+      // BookkeepingDutyStatus exposes no activation output at all.
+    });
+
+    test('test_threshold_not_exceeded', () async {
+      // Below threshold, unknown-evidence case stays quiet too.
+      final BookkeepingDutyStatus below = BookkeepingDutyUseCase.evaluate(
+        evidence: evidence(measuredAmountCents: 100000),
+        on: '2025-06-30',
+      );
+      final BookkeepingDutyStatus unknown = BookkeepingDutyUseCase.evaluate(
+        evidence: evidence(businessType: 'unknown', noticeDate: null, findingDate: null),
+        on: '2025-06-30',
+      );
+
+      // No §141 duty warning is displayed in either case.
+      expect(below.claimDuty, isFalse);
+      expect(below.effectiveDate, isNull);
+      expect(unknown.claimDuty, isFalse);
+      expect(unknown.effectiveDate, isNull);
+    });
+
+    test('test_141_warning_follows_notice_effective_date', () async {
+      final BookkeepingDutyEvidence verified = evidence();
+      // Calendar Wirtschaftsjahr: duty starts at the next January 1 after the notice.
+      final BookkeepingDutyStatus before = BookkeepingDutyUseCase.evaluate(evidence: verified, on: '2025-12-31');
+      final BookkeepingDutyStatus from = BookkeepingDutyUseCase.evaluate(evidence: verified, on: '2026-01-01');
+
+      // Before the effective date: duty not started.
+      expect(before.claimDuty, isFalse);
+      expect(before.effectiveDate, '2026-01-01');
+      // On/after the effective date: warning with source notice and date.
+      expect(from.claimDuty, isTrue);
+      expect(from.effectiveDate, '2026-01-01');
+      expect(from.noticeDate, '2025-06-15');
+    });
+
+    test('test_141_warning_follows_a_non_calendar_wirtschaftsjahr', () async {
+      // Wirtschaftsjahr 1 April – 31 March; notice received 15 December 2025.
+      final BookkeepingDutyEvidence verified = evidence(
+        wjStartMonth: 4,
+        noticeDate: '2025-12-15',
+        findingDate: '2025-12-15',
+      );
+      final BookkeepingDutyStatus before = BookkeepingDutyUseCase.evaluate(evidence: verified, on: '2026-03-31');
+      final BookkeepingDutyStatus from = BookkeepingDutyUseCase.evaluate(evidence: verified, on: '2026-04-01');
+
+      // Not before 1 April 2026.
+      expect(before.claimDuty, isFalse);
+      expect(before.effectiveDate, '2026-04-01');
+      // From 1 April 2026 the warning shows notice and evidenced boundary.
+      expect(from.claimDuty, isTrue);
+      expect(from.effectiveDate, '2026-04-01');
+      expect(from.noticeDate, '2025-12-15');
+      expect(from.wirtschaftsjahrBoundary, '04-01');
     });
   });
 }
