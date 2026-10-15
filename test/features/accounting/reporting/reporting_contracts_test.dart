@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/posting_group_service.dart';
 import 'package:openaccounting/features/accounting/reporting/bookkeeping_duty_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/datev_export_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/guv_report_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/ustva_report_use_case.dart';
@@ -756,6 +757,221 @@ void main() {
       expect(result.reasonCode, contains('Direction'));
       expect(result.reasonCode, contains('76'));
       expect(result.value, isNull);
+    });
+  });
+
+  group('reporting contracts: DATEV EXTF export', () {
+    late AppDatabase db;
+    late DatevExportUseCase useCase;
+
+    const DatevExportConfig config = DatevExportConfig(
+      sachkontenlaenge: '4',
+      chartCode: '03',
+      buSchluessel: <String, String>{'19': '1'},
+    );
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      useCase = DatevExportUseCase(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<void> insertUnternehmen({String? berater, String? mandant}) async {
+      await db.executor.runInsert(
+        'INSERT INTO unternehmen (id, name, datev_beraternummer, datev_mandantennummer) VALUES (?, ?, ?, ?)',
+        <Object?>[1, 'Testfirma', berater, mandant],
+      );
+    }
+
+    Future<void> insertKonto({required int id, required String datevNr}) async {
+      await db.executor.runInsert('INSERT INTO konten (id, name, datev_kontonummer) VALUES (?, ?, ?)', <Object?>[
+        id,
+        'Konto $id',
+        datevNr,
+      ]);
+    }
+
+    Future<void> insertBalancedPosting({
+      required int id,
+      required int sollKonto,
+      required int habenKonto,
+      String belegNr = 'RE-1',
+      String datum = '2025-07-15',
+    }) async {
+      await db.executor.runInsert(
+        'INSERT INTO journal (id, datum, beschreibung, betrag, beleg_typ, immutable, beleg_nr, '
+        'soll_konto_id, haben_konto_id, ust_satz, source_kind) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)',
+        <Object?>[
+          id,
+          datum,
+          'Testbuchung $id',
+          '1000.00',
+          'Einnahme',
+          belegNr,
+          sollKonto,
+          habenKonto,
+          '19',
+          'invoice_event',
+        ],
+      );
+    }
+
+    test('test_datev_export_generation', () async {
+      await insertUnternehmen(berater: '6512345', mandant: 'M4711');
+      await insertKonto(id: 81, datevNr: '4000');
+      await insertKonto(id: 82, datevNr: '1200');
+      await insertBalancedPosting(id: 1, sollKonto: 81, habenKonto: 82);
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final DatevExportArtifact artifact = result.value!;
+      // v13 structured CSV with header version 700 / category 21.
+      final List<String> header = artifact.csv.split('\r\n').first.split(';');
+      expect(header.sublist(0, 5), <String>['EXTF', '700', '21', 'Buchungsstapel', '13']);
+      // 125 booking-row positions with the specified field mappings.
+      final List<String> row = artifact.csv.split('\r\n')[1].split(';');
+      expect(row, hasLength(125));
+      expect(row[0], '1000,00'); // 001 Umsatz, decimal comma.
+      expect(row[1], 'S'); // 002 side of field 007.
+      expect(row[6], '4000'); // 007 Konto.
+      expect(row[7], '1200'); // 008 Gegenkonto.
+      expect(row[8], '1'); // 009 configured tax key.
+      expect(row[9], '1507'); // 010 Belegdatum TTMM.
+      expect(row[10], 'RE-1'); // 011 Belegfeld 1.
+      expect(row[13], 'Testbuchung 1'); // 014 Buchungstext.
+      expect(artifact.headerVersion, 700);
+      expect(artifact.formatVersion, 13);
+      expect(artifact.bookingRowCount, 1);
+    });
+
+    test('test_datev_account_mapping', () async {
+      await insertUnternehmen(berater: '6512345', mandant: 'M4711');
+      await insertKonto(id: 81, datevNr: '4000');
+      await insertKonto(id: 82, datevNr: '1200');
+      await insertBalancedPosting(id: 1, sollKonto: 81, habenKonto: 82);
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final List<String> row = result.value!.csv.split('\r\n')[1].split(';');
+      // Fields 007/008 use the explicit DATEV account mappings; no global
+      // bank account or fabricated account number appears anywhere.
+      expect(row[6], '4000');
+      expect(row[7], '1200');
+    });
+
+    test('test_datev_metadata', () async {
+      await insertUnternehmen(berater: '6512345', mandant: 'M4711');
+      await insertKonto(id: 81, datevNr: '4000');
+      await insertKonto(id: 82, datevNr: '1200');
+      await insertBalancedPosting(id: 1, sollKonto: 81, habenKonto: 82);
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final List<String> header = result.value!.csv.split('\r\n').first.split(';');
+      expect(header, hasLength(31)); // Official 31-position v13 header.
+      expect(header[10], '6512345'); // 011 Beraternummer.
+      expect(header[11], 'M4711'); // 012 Mandantennummer.
+      expect(header[12], '20250101'); // 013 business year, 1 January start.
+      expect(header[13], '4'); // 014 Sachkontenlänge.
+      expect(header[14], '20250701'); // 015 inclusive month start.
+      expect(header[15], '20250731'); // 016 inclusive month end.
+      expect(header[21], 'EUR'); // 022 currency.
+      expect(header[26], '03'); // 027 configured chart code.
+    });
+
+    test('test_datev_export_with_missing_company_config', () async {
+      // No unternehmen row: Beraternummer/Mandantennummer missing.
+      await insertKonto(id: 81, datevNr: '4000');
+      await insertKonto(id: 82, datevNr: '1200');
+      await insertBalancedPosting(id: 1, sollKonto: 81, habenKonto: 82);
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('missingCompanyConfig'));
+      expect(result.reasonCode, contains('beraternummer'));
+      expect(result.value, isNull);
+    });
+
+    test('test_datev_export_with_missing_source_mapping', () async {
+      await insertUnternehmen(berater: '6512345', mandant: 'M4711');
+      // Candidate posting without explicit DATEV account mapping.
+      await db.executor.runInsert(
+        'INSERT INTO journal (id, datum, beschreibung, betrag, beleg_typ, immutable, beleg_nr, ust_satz, source_kind) '
+        'VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)',
+        <Object?>[9, '2025-07-15', 'Unmapped', '100.00', 'Einnahme', 'RE-9', '19', 'invoice_event'],
+      );
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      // Fails closed with the source ID and field.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('9'));
+      expect(result.reasonCode, contains('Konto'));
+      expect(result.value, isNull);
+    });
+
+    test('test_datev_fixture_matches_the_pinned_interface', () async {
+      await insertUnternehmen(berater: '6512345', mandant: 'M4711');
+      await insertKonto(id: 81, datevNr: '4000');
+      await insertKonto(id: 82, datevNr: '1200');
+      await insertBalancedPosting(id: 1, sollKonto: 81, habenKonto: 82);
+
+      final ReportWorkspaceResult<DatevExportArtifact> result = await useCase.create(
+        month: '2025-07',
+        config: config,
+        generatedAt: DateTime.utc(2026, 1, 1, 12),
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final String csv = result.value!.csv;
+      final List<String> lines = csv.split('\r\n');
+      final List<String> header = lines.first.split(';');
+      final List<String> row = lines[1].split(';');
+      // Pinned interface: every header value and all 125 row positions.
+      expect(header[5], matches(RegExp(r'^\d{17}$'))); // 006 timestamp format.
+      expect(header.sublist(0, 5), <String>['EXTF', '700', '21', 'Buchungsstapel', '13']);
+      expect(header[6], ''); // 007 blank.
+      expect(header[7], 'RE'); // 008.
+      expect(header[8], '');
+      expect(header[9], '');
+      expect(<String>[header[18], header[19], header[20]], <String>['1', '0', '0']);
+      expect(<String>[header[22], header[23], header[24], header[25]], <String>['', '', '', '']);
+      expect(<String>[header[27], header[28], header[29], header[30]], <String>['', '', '', '']);
+      expect(row, hasLength(125));
+      // Unused positions stay blank.
+      expect(<String>[row[2], row[3], row[4], row[5]], <String>['', '', '', '']);
+      expect(row[11], ''); // 012 no due date source.
+      expect(row[19], ''); // 020 no DATEV document link source.
+      // Decimal comma and exactly two cents.
+      expect(row[0], matches(RegExp(r'^\d+,\d{2}$')));
     });
   });
 }

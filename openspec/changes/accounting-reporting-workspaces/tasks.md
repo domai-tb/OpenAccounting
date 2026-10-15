@@ -108,24 +108,24 @@
 
 ## 5. accounting: DATEV EXTF Export
 
-- [ ] 5.1 Write failing test `test_datev_export_generation` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export generation"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.2 Implement the specified behavior for "DATEV export generation" to pass 5.1, using the typed owner in `design.md`.
-- [ ] 5.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 5.4 Write failing test `test_datev_account_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV account mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.5 Implement the specified behavior for "DATEV account mapping" to pass 5.4, using the typed owner in `design.md`.
-- [ ] 5.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 5.7 Write failing test `test_datev_metadata` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV metadata"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.8 Implement the specified behavior for "DATEV metadata" to pass 5.7, using the typed owner in `design.md`.
-- [ ] 5.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 5.10 Write failing test `test_datev_export_with_missing_company_config` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export with missing company config"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.11 Implement the specified behavior for "DATEV export with missing company config" to pass 5.10, using the typed owner in `design.md`.
-- [ ] 5.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 5.13 Write failing test `test_datev_export_with_missing_source_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export with missing source mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.14 Implement the specified behavior for "DATEV export with missing source mapping" to pass 5.13, using the typed owner in `design.md`.
-- [ ] 5.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 5.16 Write failing test `test_datev_fixture_matches_the_pinned_interface` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV fixture matches the pinned interface"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 5.17 Implement the specified behavior for "DATEV fixture matches the pinned interface" to pass 5.16, using the typed owner in `design.md`.
-- [ ] 5.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.1 Write failing test `test_datev_export_generation` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export generation"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.2 Implement the specified behavior for "DATEV export generation" to pass 5.1, using the typed owner in `design.md`.
+- [x] 5.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.4 Write failing test `test_datev_account_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV account mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.5 Implement the specified behavior for "DATEV account mapping" to pass 5.4, using the typed owner in `design.md`.
+- [x] 5.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.7 Write failing test `test_datev_metadata` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV metadata"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.8 Implement the specified behavior for "DATEV metadata" to pass 5.7, using the typed owner in `design.md`.
+- [x] 5.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.10 Write failing test `test_datev_export_with_missing_company_config` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export with missing company config"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.11 Implement the specified behavior for "DATEV export with missing company config" to pass 5.10, using the typed owner in `design.md`.
+- [x] 5.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.13 Write failing test `test_datev_export_with_missing_source_mapping` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV export with missing source mapping"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.14 Implement the specified behavior for "DATEV export with missing source mapping" to pass 5.13, using the typed owner in `design.md`.
+- [x] 5.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 5.16 Write failing test `test_datev_fixture_matches_the_pinned_interface` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "DATEV fixture matches the pinned interface"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 5.17 Implement the specified behavior for "DATEV fixture matches the pinned interface" to pass 5.16, using the typed owner in `design.md`.
+- [x] 5.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 6. accounting-reporting-workspaces: Typed report workspaces expose only supported calculations
 
