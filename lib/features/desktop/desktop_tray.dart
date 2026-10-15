@@ -4,6 +4,7 @@ import 'package:system_tray/system_tray.dart';
 import 'package:window_manager/window_manager.dart';
 
 const List<String> _kMenuLabels = <String>['Fenster anzeigen', 'Daten aktualisieren', 'Nach Updates suchen', 'Beenden'];
+const String appIconAssetPath = 'assets/branding/openaccounting_icon.png';
 
 /// Abstraction over system_tray plugin — injectable for VM tests.
 abstract class TrayBackend {
@@ -160,7 +161,11 @@ class DesktopTrayServiceImpl implements DesktopTrayService {
       return false;
     }
     try {
-      final bool ok = await _tray.initSystemTray(title: 'OpenAccounting', iconPath: '', toolTip: 'OpenAccounting');
+      final bool ok = await _tray.initSystemTray(
+        title: 'OpenAccounting',
+        iconPath: appIconAssetPath,
+        toolTip: 'OpenAccounting',
+      );
       if (!ok) {
         _supported = false;
         return false;

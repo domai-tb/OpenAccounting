@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=OpenAccounting
+GenericName=Accounting
+Comment=Accounting, invoicing and tax reports
+Exec=openaccounting
+TryExec=openaccounting
+Icon=com.domaitb.openaccounting
+Terminal=false
+Type=Application
+Categories=Office;
+StartupNotify=true
+StartupWMClass=com.domaitb.openaccounting

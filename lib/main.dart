@@ -182,6 +182,13 @@ class _PreloadedPrivacyModeNotifier extends PrivacyModeNotifier {
 
 Future<void> _setupWindow() async {
   await windowManager.ensureInitialized();
+  if (Platform.isLinux) {
+    try {
+      await windowManager.setIcon(appIconAssetPath);
+    } catch (_) {
+      // A missing compositor icon should not block app startup.
+    }
+  }
   windowManager.addListener(_windowPersistenceListener);
   const WindowOptions windowOptions = WindowOptions(size: Size(1280, 800), center: true, minimumSize: Size(960, 640));
   if (await _tryRestore(windowOptions)) {
