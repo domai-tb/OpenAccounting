@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/posting_group_service.dart';
 import 'package:openaccounting/features/accounting/reporting/euer_report_use_case.dart';
+import 'package:openaccounting/features/accounting/reporting/ustva_report_use_case.dart';
 import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 
 void main() {
@@ -219,4 +220,259 @@ void main() {
       expect(result.reasonCode, contains('$legacyId'));
     });
   });
+
+  group('reporting contracts: UStVA workspace', () {
+    late AppDatabase db;
+    late UstvaReportUseCase useCase;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      await _ensureUstvaColumns(db);
+      await db.executor.runInsert(
+        'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, aktiv) VALUES (1, ?, ?, ?, 1)',
+        <Object?>['UStVA-Testkategorie', '8401', '4401'],
+      );
+      useCase = UstvaReportUseCase(db.executor);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    Future<void> insertJournal({
+      required String betrag,
+      required String datum,
+      String belegTyp = 'Einnahme',
+      String? ustSatz,
+      String? ustSonderfall,
+      String? marge,
+      String? ustSatz25a,
+    }) async {
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable, ust_satz, ust_sonderfall, marge_25a_brutto, ust_satz_25a) VALUES (?, ?, 1, ?, ?, 0, ?, ?, ?, ?)',
+        <Object?>[datum, 'Test $datum', betrag, belegTyp, ustSatz, ustSonderfall, marge, ustSatz25a],
+      );
+    }
+
+    Future<void> insertVorsteuer({required String betrag, required String faelligkeit, String? sonderfall}) async {
+      await db.executor.runInsert(
+        'INSERT INTO vorsteuer_ansprueche (betrag, faelligkeit, status, ust_sonderfall) VALUES (?, ?, ?, ?)',
+        <Object?>[betrag, faelligkeit, 'offen', sonderfall],
+      );
+    }
+
+    test('test_kz_1_gesamtumsatz_steuerpflichtig', () async {
+      await insertJournal(betrag: '1000.00', datum: '2025-03-10', ustSatz: '19');
+      await insertJournal(betrag: '500.50', datum: '2025-03-15', ustSatz: '19');
+      // Different month must not count.
+      await insertJournal(betrag: '9999.00', datum: '2025-04-01', ustSatz: '19');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 3,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('1'), '1500.50');
+      expect(result.value!.mapVersion, 'de-ustva-2025');
+    });
+
+    test('test_kz_3_umsatzsteuer_19', () async {
+      await insertJournal(betrag: '119.00', datum: '2025-05-05', ustSatz: '19');
+      await insertJournal(betrag: '119.00', datum: '2025-05-12', ustSatz: '19');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 5,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('3'), '38.00');
+    });
+
+    test('test_kz_4_umsatzsteuer_7', () async {
+      await insertJournal(betrag: '107.00', datum: '2025-05-10', ustSatz: '7');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 5,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('4'), '7.00');
+    });
+
+    test('test_kz_18_differenzsteuer_25a', () async {
+      // Margin 119 → tax 119 * 19 / 119 = 19.00 per the accepted map.
+      await insertJournal(betrag: '500.00', datum: '2025-07-10', marge: '119.00', ustSatz25a: '19');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 7,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('18'), '19.00');
+    });
+
+    test('test_kz_61_vorsteuerabzug_ig_erwerb', () async {
+      await insertVorsteuer(betrag: '190.00', faelligkeit: '2025-06-15', sonderfall: 'ig_erwerb');
+      await insertVorsteuer(betrag: '50.00', faelligkeit: '2025-06-16', sonderfall: 'ig_erwerb');
+      await insertVorsteuer(betrag: '100.00', faelligkeit: '2025-06-17');
+      await insertVorsteuer(betrag: '20.00', faelligkeit: '2025-06-18', sonderfall: 'domestic');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 6,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('61'), '240.00');
+      // ig Erwerb excluded from KZ 66.
+      expect(result.value!.kzValue('66'), '120.00');
+    });
+
+    test('test_kz_66_allgemeiner_vorsteuerabzug', () async {
+      await insertVorsteuer(betrag: '190.00', faelligkeit: '2025-06-15', sonderfall: 'ig_erwerb');
+      await insertVorsteuer(betrag: '100.00', faelligkeit: '2025-06-17');
+      await insertVorsteuer(betrag: '20.00', faelligkeit: '2025-06-18', sonderfall: 'domestic');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 6,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      // Domestic claims only; the ig Erwerb claim is not reported here.
+      expect(result.value!.kzValue('66'), '120.00');
+    });
+
+    test('test_kz_89_93_reverse_charge', () async {
+      await insertJournal(betrag: '500.00', datum: '2025-09-10', ustSatz: '19');
+      await insertJournal(betrag: '1000.00', datum: '2025-09-11', ustSatz: '19', ustSonderfall: '13b_abs1');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 9,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final UstvaPreview preview = result.value!;
+      expect(preview.kzValue('89'), '1000.00');
+      expect(preview.kzValue('93'), '190.00');
+      // Reverse charge is not ordinary domestic turnover.
+      expect(preview.kzValue('1'), '500.00');
+    });
+
+    test('test_kz_81_83_differenzbetrag_25a', () async {
+      await insertJournal(betrag: '300.00', datum: '2025-08-05', marge: '119.00', ustSatz25a: '19');
+      await insertJournal(betrag: '300.00', datum: '2025-08-06', marge: '238.00', ustSatz25a: '19');
+      // Negative margin ignored.
+      await insertJournal(betrag: '300.00', datum: '2025-08-07', marge: '-100.00', ustSatz25a: '19');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 8,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      expect(result.value!.kzValue('81'), '357.00');
+      expect(result.value!.kzValue('83'), '57.00');
+    });
+
+    test('test_quarterly_filing', () async {
+      await insertJournal(betrag: '100.00', datum: '2025-01-10', ustSatz: '19');
+      await insertJournal(betrag: '200.00', datum: '2025-02-15', ustSatz: '19');
+      await insertJournal(betrag: '300.00', datum: '2025-03-20', ustSatz: '19');
+      // April is quarter 2 — must not count toward quarter 1.
+      await insertJournal(betrag: '999.00', datum: '2025-04-01', ustSatz: '19');
+
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 1,
+        rhythmus: 'quartal',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final UstvaPreview preview = result.value!;
+      expect(preview.kzValue('1'), '600.00');
+      // Exact three-month window, start-inclusive end-exclusive.
+      expect(preview.periodStart, '2025-01-01');
+      expect(preview.periodEnd, '2025-04-01');
+      // Preview only — no filing artifact or submission status exists here.
+      expect(preview.isFilingArtifact, isFalse);
+    });
+
+    test('test_no_transactions_in_period', () async {
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2025,
+        monatOrQuartal: 12,
+        rhythmus: 'monatlich',
+      );
+
+      expect(result.availability, ReportAvailability.available);
+      final UstvaPreview preview = result.value!;
+      // Accepted map's zero representation on every required key.
+      for (final MapEntry<String, String> e in preview.kz.entries) {
+        expect(e.value, matches(RegExp(r'^-?\d+\.\d{2}$')), reason: 'KZ ${e.key} not zero-formatted');
+      }
+      expect(preview.kzValue('1'), '0.00');
+      expect(preview.kzValue('66'), '0.00');
+      // The preview identifies that the complete period has no eligible events.
+      expect(preview.noEligibleEvents, isTrue);
+    });
+
+    test('test_ustva_year_map_or_source_is_unavailable', () async {
+      final ReportWorkspaceResult<UstvaPreview> result = await useCase.preview(
+        jahr: 2026,
+        monatOrQuartal: 1,
+        rhythmus: 'monatlich',
+      );
+
+      // Missing year-specific map identified; no zeroes emitted as complete.
+      expect(result.availability, ReportAvailability.unavailable);
+      expect(result.reasonCode, contains('YearSpecificMap'));
+      expect(result.value, isNull);
+    });
+  });
+}
+
+Future<void> _ensureUstvaColumns(AppDatabase db) async {
+  final List<Map<String, Object?>> jCols = await db.executor.runSelect('PRAGMA table_info(journal)', const <Object?>[]);
+  final Set<String> jNames = jCols.map((Map<String, Object?> r) => r['name'].toString()).toSet();
+  if (!jNames.contains('ust_satz')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN ust_satz NUMERIC(12,2)');
+  }
+  if (!jNames.contains('ust_sonderfall')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN ust_sonderfall TEXT');
+  }
+  if (!jNames.contains('marge_25a_brutto')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN marge_25a_brutto NUMERIC(12,2)');
+  }
+  if (!jNames.contains('ust_satz_25a')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN ust_satz_25a NUMERIC(12,2)');
+  }
+  if (!jNames.contains('ist_eu_lieferung')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN ist_eu_lieferung INTEGER DEFAULT 0');
+  }
+  if (!jNames.contains('vorsteuer_betrag')) {
+    await db.executor.runCustom('ALTER TABLE journal ADD COLUMN vorsteuer_betrag NUMERIC(12,2)');
+  }
+  final List<Map<String, Object?>> vCols = await db.executor.runSelect(
+    'PRAGMA table_info(vorsteuer_ansprueche)',
+    const <Object?>[],
+  );
+  final Set<String> vNames = vCols.map((Map<String, Object?> r) => r['name'].toString()).toSet();
+  if (!vNames.contains('ust_sonderfall')) {
+    await db.executor.runCustom('ALTER TABLE vorsteuer_ansprueche ADD COLUMN ust_sonderfall TEXT');
+  }
 }

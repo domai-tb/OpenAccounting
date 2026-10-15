@@ -2,28 +2,9 @@ import 'package:drift/drift.dart';
 
 import 'package:openaccounting/features/accounting/euer_entity.dart';
 import 'package:openaccounting/features/accounting/euer_service.dart';
+import 'package:openaccounting/features/accounting/reporting/report_workspace_result.dart';
 
-/// Availability of a report workspace result.
-enum ReportAvailability { available, unavailable, invalidSelection }
-
-/// Typed workspace result: one availability state; when available, the
-/// immutable typed report value. Pages render this and never query tables.
-class ReportWorkspaceResult<T> {
-  const ReportWorkspaceResult.available(T this.value) : availability = ReportAvailability.available, reasonCode = null;
-  const ReportWorkspaceResult.unavailable(this.reasonCode)
-    : availability = ReportAvailability.unavailable,
-      value = null;
-  const ReportWorkspaceResult.invalidSelection(this.reasonCode)
-    : availability = ReportAvailability.invalidSelection,
-      value = null;
-
-  final ReportAvailability availability;
-
-  /// Typed reason code; UI maps it to a localized message.
-  final String? reasonCode;
-
-  final T? value;
-}
+export 'package:openaccounting/features/accounting/reporting/report_workspace_result.dart';
 
 /// Immutable EÜR preview: resolved line amounts plus the recorded form and
 /// source versions.

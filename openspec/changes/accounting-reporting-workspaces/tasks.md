@@ -33,39 +33,39 @@
 
 ## 2. accounting: UStVA (Umsatzsteuer-Voranmeldung)
 
-- [ ] 2.1 Write failing test `test_kz_1_gesamtumsatz_steuerpflichtig` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 1 — Gesamtumsatz steuerpflichtig"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.2 Implement the specified behavior for "KZ 1 — Gesamtumsatz steuerpflichtig" to pass 2.1, using the typed owner in `design.md`.
-- [ ] 2.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.4 Write failing test `test_kz_3_umsatzsteuer_19` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 3 — Umsatzsteuer (19%)"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.5 Implement the specified behavior for "KZ 3 — Umsatzsteuer (19%)" to pass 2.4, using the typed owner in `design.md`.
-- [ ] 2.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.7 Write failing test `test_kz_4_umsatzsteuer_7` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 4 — Umsatzsteuer (7%)"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.8 Implement the specified behavior for "KZ 4 — Umsatzsteuer (7%)" to pass 2.7, using the typed owner in `design.md`.
-- [ ] 2.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.10 Write failing test `test_kz_18_differenzsteuer_25a` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 18 — Differenzsteuer §25a"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.11 Implement the specified behavior for "KZ 18 — Differenzsteuer §25a" to pass 2.10, using the typed owner in `design.md`.
-- [ ] 2.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.13 Write failing test `test_kz_61_vorsteuerabzug_ig_erwerb` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 61 — Vorsteuerabzug ig Erwerb"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.14 Implement the specified behavior for "KZ 61 — Vorsteuerabzug ig Erwerb" to pass 2.13, using the typed owner in `design.md`.
-- [ ] 2.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.16 Write failing test `test_kz_66_allgemeiner_vorsteuerabzug` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 66 — Allgemeiner Vorsteuerabzug"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.17 Implement the specified behavior for "KZ 66 — Allgemeiner Vorsteuerabzug" to pass 2.16, using the typed owner in `design.md`.
-- [ ] 2.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.19 Write failing test `test_kz_89_93_reverse_charge` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 89/93 — Reverse Charge"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.20 Implement the specified behavior for "KZ 89/93 — Reverse Charge" to pass 2.19, using the typed owner in `design.md`.
-- [ ] 2.21 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.22 Write failing test `test_kz_81_83_differenzbetrag_25a` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 81/83 — Differenzbetrag §25a"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.23 Implement the specified behavior for "KZ 81/83 — Differenzbetrag §25a" to pass 2.22, using the typed owner in `design.md`.
-- [ ] 2.24 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.25 Write failing test `test_quarterly_filing` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Quarterly filing"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.26 Implement the specified behavior for "Quarterly filing" to pass 2.25, using the typed owner in `design.md`.
-- [ ] 2.27 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.28 Write failing test `test_no_transactions_in_period` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "No transactions in period"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.29 Implement the specified behavior for "No transactions in period" to pass 2.28, using the typed owner in `design.md`.
-- [ ] 2.30 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
-- [ ] 2.31 Write failing test `test_ustva_year_map_or_source_is_unavailable` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "UStVA year map or source is unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
-- [ ] 2.32 Implement the specified behavior for "UStVA year map or source is unavailable" to pass 2.31, using the typed owner in `design.md`.
-- [ ] 2.33 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.1 Write failing test `test_kz_1_gesamtumsatz_steuerpflichtig` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 1 — Gesamtumsatz steuerpflichtig"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.2 Implement the specified behavior for "KZ 1 — Gesamtumsatz steuerpflichtig" to pass 2.1, using the typed owner in `design.md`.
+- [x] 2.3 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.4 Write failing test `test_kz_3_umsatzsteuer_19` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 3 — Umsatzsteuer (19%)"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.5 Implement the specified behavior for "KZ 3 — Umsatzsteuer (19%)" to pass 2.4, using the typed owner in `design.md`.
+- [x] 2.6 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.7 Write failing test `test_kz_4_umsatzsteuer_7` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 4 — Umsatzsteuer (7%)"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.8 Implement the specified behavior for "KZ 4 — Umsatzsteuer (7%)" to pass 2.7, using the typed owner in `design.md`.
+- [x] 2.9 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.10 Write failing test `test_kz_18_differenzsteuer_25a` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 18 — Differenzsteuer §25a"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.11 Implement the specified behavior for "KZ 18 — Differenzsteuer §25a" to pass 2.10, using the typed owner in `design.md`.
+- [x] 2.12 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.13 Write failing test `test_kz_61_vorsteuerabzug_ig_erwerb` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 61 — Vorsteuerabzug ig Erwerb"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.14 Implement the specified behavior for "KZ 61 — Vorsteuerabzug ig Erwerb" to pass 2.13, using the typed owner in `design.md`.
+- [x] 2.15 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.16 Write failing test `test_kz_66_allgemeiner_vorsteuerabzug` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 66 — Allgemeiner Vorsteuerabzug"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.17 Implement the specified behavior for "KZ 66 — Allgemeiner Vorsteuerabzug" to pass 2.16, using the typed owner in `design.md`.
+- [x] 2.18 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.19 Write failing test `test_kz_89_93_reverse_charge` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 89/93 — Reverse Charge"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.20 Implement the specified behavior for "KZ 89/93 — Reverse Charge" to pass 2.19, using the typed owner in `design.md`.
+- [x] 2.21 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.22 Write failing test `test_kz_81_83_differenzbetrag_25a` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "KZ 81/83 — Differenzbetrag §25a"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.23 Implement the specified behavior for "KZ 81/83 — Differenzbetrag §25a" to pass 2.22, using the typed owner in `design.md`.
+- [x] 2.24 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.25 Write failing test `test_quarterly_filing` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "Quarterly filing"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.26 Implement the specified behavior for "Quarterly filing" to pass 2.25, using the typed owner in `design.md`.
+- [x] 2.27 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.28 Write failing test `test_no_transactions_in_period` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "No transactions in period"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.29 Implement the specified behavior for "No transactions in period" to pass 2.28, using the typed owner in `design.md`.
+- [x] 2.30 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
+- [x] 2.31 Write failing test `test_ustva_year_map_or_source_is_unavailable` in `test/features/accounting/reporting/reporting_contracts_test.dart` for scenario "UStVA year map or source is unavailable"; assert it fails for the expected report, period, source, route, or artifact boundary.
+- [x] 2.32 Implement the specified behavior for "UStVA year map or source is unavailable" to pass 2.31, using the typed owner in `design.md`.
+- [x] 2.33 Refactor the affected route, use case, or export boundary; keep focused and full suites green.
 
 ## 3. accounting: GuV (Gewinn- und Verlustrechnung)
 
