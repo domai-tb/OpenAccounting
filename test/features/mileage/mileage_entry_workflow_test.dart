@@ -94,5 +94,24 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('test_keep_an_unresolved_trip_out_of_accounting', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      await expectLater(
+        () => useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'companyCar'),
+        throwsArgumentError,
+      );
+      await expectLater(() => useCases.postTrip(trip.id), throwsStateError);
+      final MileageTrip kept = (await repo.getById(trip.id))!;
+      expect(kept.state, MileageTripState.unresolved);
+      expect(kept.policyId, isNull);
+      expect(kept.calculatedAmount, isNull);
+      expect(kept.postingEventId, isNull);
+    });
   });
 }

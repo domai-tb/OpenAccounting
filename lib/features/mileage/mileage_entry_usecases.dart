@@ -66,6 +66,12 @@ class MileageEntryUseCases {
     if (raw.trim().isEmpty) throw ArgumentError('$field empty');
   }
 
+  /// Posting stays unavailable until the M2 accounting boundary lands.
+  /// shortcut: fail-closed stub; test doubles arrive with 3.x.
+  Future<void> postTrip(String id) async {
+    throw StateError('posting unavailable');
+  }
+
   /// Approved policy DE-private-business-travel/1: car 30c/km, other motor 20c/km, half-up per trip.
   /// shortcut: vehicle eligibility param only; full facts validated at record time.
   int calculateApprovedAmountCents({required int distanceHundredthsKm, required String vehicleClass}) {
