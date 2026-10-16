@@ -1,36 +1,42 @@
-## Decision: PARTIAL
+## Verification Results
 
-This change is not ready to archive or release. `openspec list --json` reports 78 of 110 implementation tasks complete.
+### Task Completion
 
-### Latest checkpoint: customer ZUGFeRD default editor
+- [ ] All tasks marked `[x]` in `tasks.md`
+- Remaining open tasks: 32 of 110. Prerequisites 1.2 (approved typed tax mapping) and 1.3 (offline validator packaged and demonstrated on Linux, Windows, and macOS) remain blocked; dependent scenario tasks remain open.
 
-- Task 1.4 is complete: the customer form can set and edit the default, and explains that each invoice can still choose another format.
-- `fvm flutter test --dart-define=platform=vm test/features/stammdaten/customer_zugferd_default_form_test.dart test/features/stammdaten/master_data_workspaces_test.dart test/features/stammdaten/kunden_test.dart test/features/rechnungen/invoice_output_format_widget_test.dart`: 44 passed.
-- `fvm flutter analyze`: no issues.
-- `fvm dart format --line-length=120 --set-exit-if-changed` on the changed Dart files: passed; 0 files changed.
-- `openspec validate outgoing-e-invoice-generation --type change --strict --json`: passed, 1/1.
+### TDD Integrity
 
-The latest focused test run used the shared worktree. No clean-worktree aggregate suite was run for this checkpoint.
+- [ ] Every test-plan entry exists as a real test or documented non-executable check
+- [ ] Every test-plan row is green; unimplemented e-invoice and validator scenarios remain red
+- [ ] Full suite passes
+- [ ] Zero skipped, pending, or incomplete tests; the latest run had 73 tests not completed after the test device crashed
+- [ ] No test weakened or deleted without a removed requirement
 
-### Verified locally
+No implementation was attempted for tasks 1.2 or 1.3: the invoice snapshot stores tax rates without tax treatment or exemption reason, and this Linux-only environment cannot demonstrate the required Windows/macOS validator runs. No task or test-plan status was changed.
 
-- Focused changed test set: 242 passed; after correcting the route gate's loading-animation wait, the gate passed separately (4/4).
-- Full `fvm flutter analyze`: no issues.
-- Profile lifecycle suites: 12 passed.
-- Concurrent `createForRechnung` regression: 1 passed.
-- `openspec validate --specs --strict`: 69 passed.
-- `openspec validate outgoing-e-invoice-generation --type change --strict`: valid.
-- `git diff --check`: clean at the time of the check.
-- Invoice-money contract prerequisite is satisfied by archived `invoice-money-contract-completion` (approved; verified 1,434 tests).
-- Finalized customer snapshot storage is migrated and covered by the standalone-export snapshot test (task 1.5).
+### Evidence
 
-Tests that inject `PinnedArtifactBundle(available: true)` prove application-level behavior only. They do not prove compliance validation.
+- Latest full-suite command: `rtk proxy fvm flutter test --dart-define=platform=vm`
+- Result: failed; 1,697 passed, 26 explicit failures, and 73 tests did not complete after the test device crashed. Failures include invoice/tax tests and desktop/runtime failures; this is not an acceptance pass.
+- Latest analyzer: `rtk proxy fvm flutter analyze` → `No issues found!`
+- Focused tests from the prior customer-default checkpoint: 44 passed; prior focused changed-test set: 242 passed. These do not cover the remaining validator and tax-treatment gates.
+- `rtk proxy openspec validate outgoing-e-invoice-generation --type change --json` → structurally valid with four non-blocking long-requirement warnings.
+- `rtk git diff --check` → clean after this verification update.
+- Official source review on 2026-10-16 confirms the pinned XRechnung Bundle 3.0.2 (2026-08-31), ZUGFeRD 2.5.2, KoSIT validator configuration, and veraPDF CLI installation options. This confirms versions, not app packaging or three-platform runtime evidence: [XRechnung bundles](https://xeinkauf.de/xrechnung/versionen-und-bundles/), [KoSIT validator configuration](https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/tag/v2026-08-31), [FeRD ZUGFeRD downloads](https://www.ferd-net.de/en/download-zugferd), [veraPDF installation](https://docs.verapdf.org/install/), [veraPDF CLI validation](https://docs.verapdf.org/cli/validation/).
+- Tax mapping remains unresolved. Invoice positions persist `ust_satz` but no typed VAT treatment or exemption reason. Approved accounting scope includes Kleinunternehmer, §25a margin scheme, and other tax cases, so a numeric rate cannot establish the EN 16931 category. Official guidance says VAT exemption codes do not decide tax treatment: [EC tax category guidance](https://ec.europa.eu/digital-building-blocks/sites/download/attachments/467108974/eInvoicing%20technical%20guidance%20document_v1.pdf?api=v2&modificationDate=1721117125403&version=2), [EC VATEX code list guidance](https://ec.europa.eu/digital-building-blocks/sites/spaces/DIGITAL/pages/467108957/Code%2Blists).
+- Previous full-suite evidence in the prior checkpoint was 1,712 passed and 30 failed on commit `9ed436e`; the current clean `dev` run is recorded above.
 
-### Open gates
+### Review Integrity
 
-- The typed tax-category/exemption mapping remains unapproved (task 1.2).
-- The offline XSD/Schematron and PDF/A-3 validator is not packaged or verified on Linux, Windows, and macOS (task 1.3). The production bundle now defaults to unavailable and fails closed.
-- The customer ZUGFeRD default editor is now available in customer create and edit forms (task 1.4).
-- `ZugferdHybridArtifact` keeps the PDF bytes and CII XML as separate values; it does not embed XML into the PDF. Hybrid-PDF and external-validation scenarios remain red in `test-plan.md`.
+- [x] `review.md` has `VERDICT: APPROVE`
+- [x] Proposal, design, and specs were not changed after that verdict in this cycle
+- [x] No unresolved review findings were introduced; the approved review explicitly keeps tax mapping and cross-platform validation as implementation prerequisites
 
-The last full VM suite on clean commit `9ed436e` failed: 1,712 passed and 30 failed. It predates this checkpoint. No legal, GoBD, device, or cross-platform validation claim is made.
+### Change Delivery
+
+- Delivery state: verification evidence updated on `dev`; no task implementation changes were made. This remains a partial, uncommitted OpenSpec change.
+
+## Overall Decision
+
+DECISION: FAIL
