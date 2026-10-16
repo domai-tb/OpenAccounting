@@ -38,6 +38,7 @@ void main() {
         '/invoices/:id',
         '/receipts',
         '/banking',
+        '/mahnwesen',
         '/contacts',
         '/contacts/new',
         '/contacts/:id',
@@ -56,6 +57,7 @@ void main() {
         '/help',
         '/setup',
         '/inventory',
+        '/recurring',
       ];
       for (final String path in expected) {
         final MasterDataRouteTarget? target = matrix.ownerOf(path);
