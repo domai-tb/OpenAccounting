@@ -1,0 +1,89 @@
+// ignore_for_file: prefer_single_quotes
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
+import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
+import 'package:openaccounting/features/mileage/mileage_entry_usecases.dart';
+
+void main() {
+  group('mileage-entry capture', () {
+    late AppDatabase db;
+    late MileageEntryRepository repo;
+    late MileageEntryUseCases useCases;
+
+    setUp(() async {
+      db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      repo = MileageEntryRepository(db.executor);
+      await repo.ensureTablesForTests();
+      useCases = MileageEntryUseCases(repo);
+    });
+
+    tearDown(() async => db.close());
+
+    test('test_record_a_business_trip', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch München',
+        distanceHundredthsKm: 4525,
+        businessContext: 'Projekt Alpha, Fahrzeug privat',
+      );
+
+      expect(trip.id.isNotEmpty, isTrue);
+      expect(trip.tripDate, '2026-03-14');
+      expect(trip.purpose, 'Kundenbesuch München');
+      expect(trip.distanceHundredthsKm, 4525);
+      expect(trip.state, MileageTripState.unresolved);
+      expect(trip.policyId, isNull);
+      expect(trip.calculatedAmount, isNull);
+      expect(trip.postingEventId, isNull);
+
+      final List<MileageTrip> rows = await repo.listTrips();
+      expect(rows.length, 1);
+      expect(rows.first.id, trip.id);
+    });
+
+    test('test_reject_invalid_trip_facts', () async {
+      await expectLater(
+        () => useCases.recordBusinessTrip(
+          tripDate: '2026-13-40',
+          purpose: '',
+          distanceHundredthsKm: 0,
+          businessContext: '',
+        ),
+        throwsArgumentError,
+      );
+      expect(await repo.listTrips(), isEmpty);
+    });
+
+    test('test_preserve_posted_source_facts', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      await db.executor.runUpdate(
+        "UPDATE mileage_trips SET state = 'posted', posting_event_id = ?, "
+        "policy_id = ?, policy_source = ?, policy_version = ?, "
+        "policy_effective_from = ?, policy_effective_to = ?, "
+        "calculated_amount = ?, calculated_at = ? WHERE id = ?",
+        <Object?>[
+          'evt-1',
+          'test-policy',
+          'test',
+          'v1',
+          '2026-01-01',
+          '2026-12-31',
+          '12.50',
+          '2026-03-14T00:00:00Z',
+          trip.id,
+        ],
+      );
+      await expectLater(() => useCases.editTripFacts(trip.id, purpose: 'Neu'), throwsStateError);
+      final List<MileageTrip> rows = await repo.listTrips();
+      expect(rows.first.purpose, 'Kundenbesuch');
+    });
+  });
+}

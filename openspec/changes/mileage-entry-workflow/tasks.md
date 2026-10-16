@@ -1,14 +1,14 @@
 ## 1. mileage-entry: Capture traceable business mileage
 
-- [ ] 1.1 Write failing test `test_record_a_business_trip` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Record a business trip"; assert it fails for the right reason.
-- [ ] 1.2 Implement the specified behavior for "Record a business trip" to pass 1.1.
-- [ ] 1.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 1.4 Write failing test `test_reject_invalid_trip_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject invalid trip facts"; assert it fails for the right reason.
-- [ ] 1.5 Implement the specified behavior for "Reject invalid trip facts" to pass 1.4.
-- [ ] 1.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 1.7 Write failing test `test_preserve_posted_source_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Preserve posted source facts"; assert it fails for the right reason.
-- [ ] 1.8 Implement the specified behavior for "Preserve posted source facts" to pass 1.7.
-- [ ] 1.9 Refactor the affected code; keep the focused and full suites green.
+- [x] 1.1 Write failing test `test_record_a_business_trip` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Record a business trip"; assert it fails for the right reason.
+- [x] 1.2 Implement the specified behavior for "Record a business trip" to pass 1.1.
+- [x] 1.3 Refactor the affected code; keep the focused and full suites green.
+- [x] 1.4 Write failing test `test_reject_invalid_trip_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject invalid trip facts"; assert it fails for the right reason.
+- [x] 1.5 Implement the specified behavior for "Reject invalid trip facts" to pass 1.4.
+- [x] 1.6 Refactor the affected code; keep the focused and full suites green.
+- [x] 1.7 Write failing test `test_preserve_posted_source_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Preserve posted source facts"; assert it fails for the right reason.
+- [x] 1.8 Implement the specified behavior for "Preserve posted source facts" to pass 1.7.
+- [x] 1.9 Refactor the affected code; keep the focused and full suites green.
 
 ## 2. mileage-entry: Mileage amounts require an approved effective policy
 
