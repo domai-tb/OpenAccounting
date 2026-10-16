@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -408,5 +410,10 @@ void main() {
   });
 }
 
-RechnungenUseCases _useCases(AppDatabase db) =>
-    RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+RechnungenUseCases _useCases(AppDatabase db) {
+  final Directory profile = Directory.systemTemp.createTempSync('invoice-money-fixture-');
+  addTearDown(() {
+    if (profile.existsSync()) profile.deleteSync(recursive: true);
+  });
+  return RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: profile.path)));
+}

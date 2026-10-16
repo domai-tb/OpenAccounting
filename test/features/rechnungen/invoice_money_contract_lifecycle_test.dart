@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -37,12 +39,22 @@ Future<List<Object?>> _counterValues(AppDatabase database) async {
 }
 
 void main() {
+  late Directory fixtureProfile;
+  setUp(() {
+    fixtureProfile = Directory.systemTemp.createTempSync('rechnungen-fixture-');
+  });
+  tearDown(() {
+    if (fixtureProfile.existsSync()) fixtureProfile.deleteSync(recursive: true);
+  });
+
   test('test_generic_correction_creation_fails_before_side_effects', () async {
     final db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
-    final dataSource = RechnungenDataSource(db.executor);
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
+    final dataSource = RechnungenDataSource(db.executor, profileDir: fixtureProfile.path);
     final beforeInvoices = await _count(db, 'rechnungen');
     final beforePositions = await _count(db, 'rechnungspositionen');
     final beforeCounters = await _counterValues(db);
@@ -83,7 +95,9 @@ void main() {
     );
     final int articleId = (articleRows.single['id']! as num).toInt();
     final beforeStock = articleRows.single['bestand'];
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
       kundeId: customerId,
@@ -137,7 +151,9 @@ void main() {
     addTearDown(db.close);
     await db.ensureOpen();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final sourceDraft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const <RechnungPositionItem>[
@@ -193,7 +209,9 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'AU-YY####', naechste_nummer = 1 WHERE typ = 'auftrag'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final offer = await useCases.createDokument(
       typ: 'angebot',
       datum: '2026-08-30',
@@ -221,7 +239,7 @@ void main() {
     final AppDatabase db = AppDatabase.createTestDatabase();
     addTearDown(db.close);
     await db.ensureOpen();
-    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor);
+    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor, profileDir: fixtureProfile.path);
     final int beforeInvoices = await _count(db, 'rechnungen');
     final int beforePositions = await _count(db, 'rechnungspositionen');
     final List<Object?> beforeCounters = await _counterValues(db);
@@ -247,7 +265,7 @@ void main() {
     addTearDown(db.close);
     await db.ensureOpen();
     await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
-    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor);
+    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor, profileDir: fixtureProfile.path);
     final RechnungenUseCases useCases = RechnungenUseCases(RechnungenRepository(dataSource));
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
@@ -276,7 +294,9 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final RechnungenUseCases useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final RechnungenUseCases useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const <RechnungPositionItem>[
@@ -319,7 +339,7 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
-    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor);
+    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor, profileDir: fixtureProfile.path);
     final RechnungenUseCases useCases = RechnungenUseCases(RechnungenRepository(dataSource));
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',

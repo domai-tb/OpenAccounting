@@ -1769,13 +1769,6 @@ WHERE id = ? AND ist_entwurf = 1
       if (!allowed.containsKey(srcTyp)) {
         throw StateError('Unbekannter Dokumenttyp');
       }
-      // Lifecycle guard at the transactional boundary: only finalized
-      // sources may be converted. Drafts stay editable instead.
-      final Object? srcEntwurf = src['ist_entwurf'];
-      final bool srcIstEntwurf = srcEntwurf is num ? srcEntwurf != 0 : srcEntwurf == 1 || srcEntwurf == '1';
-      if (srcIstEntwurf) {
-        throw StateError('Nur finalisierte Dokumente können konvertiert werden');
-      }
       if (!allowed[srcTyp]!.contains(zielTyp)) {
         throw StateError(
           'Lieferschein kann nicht in Angebot konvertiert werden'.contains('Lieferschein') &&

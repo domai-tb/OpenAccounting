@@ -119,7 +119,7 @@ void main() {
     await uc.stornoRechnung(rechnungId: fin.id, grund: 'Grund');
     await expectLater(
       uc.stornoRechnung(rechnungId: fin.id, grund: 'Erneut'),
-      throwsA(isA<StateError>().having((error) => error.message, 'message', contains('nicht zulässig'))),
+      throwsA(isA<StateError>().having((error) => error.message, 'message', contains('bereits storniert'))),
     );
   });
 
@@ -162,7 +162,13 @@ void main() {
     );
     await expectLater(
       uc.stornoRechnung(rechnungId: draft.id, grund: 'Grund'),
-      throwsA(isA<StateError>().having((error) => error.message, 'message', contains('nicht zulässig'))),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('nur finalisierte Dokumente können storniert werden'),
+        ),
+      ),
     );
   });
 

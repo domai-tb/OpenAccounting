@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
@@ -8,6 +9,14 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
 void main() {
+  late Directory fixtureProfile;
+  setUp(() {
+    fixtureProfile = Directory.systemTemp.createTempSync('rechnungen-fixture-');
+  });
+  tearDown(() {
+    if (fixtureProfile.existsSync()) fixtureProfile.deleteSync(recursive: true);
+  });
+
   test('finalizes a draft invoice with a year-based number and preserves positions', () async {
     // Arrange
     final database = AppDatabase.createTestDatabase();
@@ -18,7 +27,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const <RechnungPositionItem>[
@@ -49,7 +60,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const <RechnungPositionItem>[
@@ -93,7 +106,9 @@ void main() {
       "VALUES ('RE-250100', 'rechnung', 'offen', '2025-12-31', 0, 'netto', ?)",
       <Object?>[rangeId],
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-01-01',
       positionen: const <RechnungPositionItem>[
@@ -123,7 +138,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY', naechste_nummer = 7 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-01-15',
       positionen: const <RechnungPositionItem>[
@@ -162,7 +179,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-02-01',
       positionen: const <RechnungPositionItem>[
@@ -231,7 +250,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-02-02',
       positionen: const <RechnungPositionItem>[
@@ -276,7 +297,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-03-01',
       positionen: const <RechnungPositionItem>[
@@ -364,7 +387,9 @@ void main() {
     await database.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-03-02',
       positionen: const <RechnungPositionItem>[
@@ -413,7 +438,9 @@ void main() {
       "VALUES ('RE-250100', 'rechnung', 'offen', '2025-12-31', 0, 'netto', ?)",
       <Object?>[rangeId],
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-02-01',
       positionen: const <RechnungPositionItem>[
@@ -447,7 +474,9 @@ void main() {
       "VALUES ('RE-260001', 'rechnung', 'offen', '2026-01-01', 0, 'netto', ?)",
       <Object?>[rangeRows.single['id']],
     );
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2025-12-31',
       positionen: const <RechnungPositionItem>[
@@ -474,7 +503,9 @@ void main() {
         'UPDATE nummernkreise SET format = ?, naechste_nummer = 7 WHERE typ = ?',
         <Object?>[format, 'rechnung_ausgang'],
       );
-      final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+      final useCases = RechnungenUseCases(
+        RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+      );
       final draft = await useCases.createDraftRechnung(
         datum: '2026-01-15',
         positionen: const <RechnungPositionItem>[
@@ -503,7 +534,9 @@ void main() {
     await database.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
 
     await database.executor.runCustom("UPDATE nummernkreise SET aktiv = 0 WHERE typ = 'rechnung_ausgang'");
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-01-15',
       positionen: const <RechnungPositionItem>[
@@ -536,7 +569,9 @@ void main() {
 CREATE TRIGGER fail_rechnung_finalization BEFORE UPDATE OF rechnungsnummer ON rechnungen
 WHEN OLD.ist_entwurf = 1 BEGIN SELECT RAISE(ABORT, 'forced finalization failure'); END
 ''');
-    final useCases = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(database.executor)));
+    final useCases = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(database.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await useCases.createDraftRechnung(
       datum: '2026-01-15',
       positionen: const <RechnungPositionItem>[

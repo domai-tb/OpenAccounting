@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
@@ -7,6 +9,14 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
 void main() {
+  late Directory fixtureProfile;
+  setUp(() {
+    fixtureProfile = Directory.systemTemp.createTempSync('rechnungen-fixture-');
+  });
+  tearDown(() {
+    if (fixtureProfile.existsSync()) fixtureProfile.deleteSync(recursive: true);
+  });
+
   test('netto mode position totals', () {
     final preview = VorschauService.calculate(
       eingabemodus: 'netto',
@@ -76,7 +86,9 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       positionen: const [RechnungPositionItem(bezeichnung: 'A', menge: 2, einzelpreis: 100, gesamt: 200)],
@@ -104,7 +116,9 @@ void main() {
     await db.executor.runCustom(
       "UPDATE nummernkreise SET format = 'RE-YY####', naechste_nummer = 1 WHERE typ = 'rechnung_ausgang'",
     );
-    final uc = RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor)));
+    final uc = RechnungenUseCases(
+      RechnungenRepository(RechnungenDataSource(db.executor, profileDir: fixtureProfile.path)),
+    );
     final draft = await uc.createDraftRechnung(
       datum: '2026-08-30',
       eingabemodus: 'brutto',

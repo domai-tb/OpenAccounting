@@ -7,12 +7,12 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/setup-onboarding-integrity/spec.md → Skip and Finish leave setup with durable state | Finish reaches the dashboard | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_1_1_finish_reaches_the_dashboard | 🔴 red |
-| specs/setup-onboarding-integrity/spec.md → Skip and Finish leave setup with durable state | Skip follows its documented policy | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_1_2_skip_follows_its_documented_policy | 🔴 red |
-| specs/setup-onboarding-integrity/spec.md → Setup writes an atomic, accounting-safe opening state | Opening cash agrees across sources | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_2_1_opening_cash_agrees_across_sources | 🔴 red |
-| specs/setup-onboarding-integrity/spec.md → Setup writes an atomic, accounting-safe opening state | Intermediate failure rolls back | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_2_2_intermediate_failure_rolls_back | 🔴 red |
-| specs/setup-onboarding-integrity/spec.md → First-run concepts are explicit and non-deceptive | Required first-run decisions are visible | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_3_1_required_first_run_decisions_are_visible | 🔴 red |
-| specs/setup-onboarding-integrity/spec.md → First-run concepts are explicit and non-deceptive | Blank identity is handled honestly | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_3_2_blank_identity_is_handled_honestly | 🔴 red |
+| specs/setup-onboarding-integrity/spec.md → Skip and Finish leave setup with durable state | Finish reaches the dashboard | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_1_1_finish_reaches_the_dashboard | 🟢 green |
+| specs/setup-onboarding-integrity/spec.md → Skip and Finish leave setup with durable state | Skip follows its documented policy | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_1_2_skip_follows_its_documented_policy | 🟢 green |
+| specs/setup-onboarding-integrity/spec.md → Setup writes an atomic, accounting-safe opening state | Opening cash agrees across sources | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_2_1_opening_cash_agrees_across_sources | 🟢 green |
+| specs/setup-onboarding-integrity/spec.md → Setup writes an atomic, accounting-safe opening state | Intermediate failure rolls back | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_2_2_intermediate_failure_rolls_back | 🟢 green |
+| specs/setup-onboarding-integrity/spec.md → First-run concepts are explicit and non-deceptive | Required first-run decisions are visible | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_3_1_required_first_run_decisions_are_visible | 🟢 green |
+| specs/setup-onboarding-integrity/spec.md → First-run concepts are explicit and non-deceptive | Blank identity is handled honestly | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_3_2_blank_identity_is_handled_honestly | 🟢 green |
 
 ## Coverage Notes
 

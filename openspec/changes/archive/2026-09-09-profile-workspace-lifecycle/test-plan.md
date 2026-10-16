@@ -7,10 +7,10 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/profile-workspace-lifecycle/spec.md → Profile CRUD changes real profile state | Inactive profile can be deleted | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_1_1_inactive_profile_can_be_deleted | 🔴 red |
-| specs/profile-workspace-lifecycle/spec.md → Profile CRUD changes real profile state | Active/last profile deletion is protected | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_1_2_active_last_profile_deletion_is_protected | 🔴 red |
-| specs/profile-workspace-lifecycle/spec.md → Selection switches the running application coherently | User switches profiles | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_2_1_user_switches_profiles | 🔴 red |
-| specs/profile-workspace-lifecycle/spec.md → Selection switches the running application coherently | Corrupt or unavailable profile is recoverable | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_2_2_corrupt_or_unavailable_profile_is_recoverable | 🔴 red |
+| specs/profile-workspace-lifecycle/spec.md → Profile CRUD changes real profile state | Inactive profile can be deleted | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_1_1_inactive_profile_can_be_deleted | 🟢 green |
+| specs/profile-workspace-lifecycle/spec.md → Profile CRUD changes real profile state | Active/last profile deletion is protected | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_1_2_active_last_profile_deletion_is_protected | 🟢 green |
+| specs/profile-workspace-lifecycle/spec.md → Selection switches the running application coherently | User switches profiles | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_2_1_user_switches_profiles | 🟢 green |
+| specs/profile-workspace-lifecycle/spec.md → Selection switches the running application coherently | Corrupt or unavailable profile is recoverable | test/integration/audit/profile-workspace-lifecycle_test.dart | test_profile_workspace_lifecycle_2_2_corrupt_or_unavailable_profile_is_recoverable | 🟢 green |
 
 ## Coverage Notes
 

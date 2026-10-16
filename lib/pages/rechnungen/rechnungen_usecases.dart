@@ -5,7 +5,7 @@ import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
-/// Supported conversion targets per finalized source type.
+/// Supported conversion targets per source type.
 const Map<String, Set<String>> erlaubteKonvertierungen = <String, Set<String>>{
   'angebot': {'auftrag', 'proforma', 'rechnung'},
   'auftrag': {'lieferschein', 'rechnung'},
@@ -174,7 +174,6 @@ class RechnungenUseCases {
 
   Set<String> konvertierZiele(RechnungItem dokument) {
     if (!correctionActionsAvailable) return const <String>{};
-    if (dokument.istEntwurfDokument) return const <String>{};
     return erlaubteKonvertierungen[dokument.typ.trim().toLowerCase()] ?? const <String>{};
   }
 
@@ -278,10 +277,6 @@ class RechnungenUseCases {
       throw StateError('Stornogrund ist Pflicht');
     }
     _requireCorrectionPrerequisite();
-    final RechnungItem? existing = await repository.findById(rechnungId);
-    if (existing != null && !kannStorno(existing)) {
-      throw StateError('Storno ist für dieses Dokument nicht zulässig');
-    }
     return repository.stornoRechnung(rechnungId: rechnungId, grund: grund.trim());
   }
 

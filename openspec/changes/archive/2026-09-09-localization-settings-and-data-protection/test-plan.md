@@ -7,10 +7,10 @@
 
 | Requirement | Scenario | Test File | Test Name | Initial State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/localization-settings-and-data-protection/spec.md → Settings controls change live persisted application state | Language switch retains context | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_1_1_language_switch_retains_context | 🔴 red |
-| specs/localization-settings-and-data-protection/spec.md → Settings controls change live persisted application state | Theme/privacy changes are durable | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_1_2_theme_privacy_changes_are_durable | 🔴 red |
-| specs/localization-settings-and-data-protection/spec.md → Local-first backup and integrations report real outcomes | A backup can be created and restored | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_2_1_a_backup_can_be_created_and_restored | 🔴 red |
-| specs/localization-settings-and-data-protection/spec.md → Local-first backup and integrations report real outcomes | Integration failure is truthful | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_2_2_integration_failure_is_truthful | 🔴 red |
+| specs/localization-settings-and-data-protection/spec.md → Settings controls change live persisted application state | Language switch retains context | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_1_1_language_switch_retains_context | 🟢 green |
+| specs/localization-settings-and-data-protection/spec.md → Settings controls change live persisted application state | Theme/privacy changes are durable | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_1_2_theme_privacy_changes_are_durable | 🟢 green |
+| specs/localization-settings-and-data-protection/spec.md → Local-first backup and integrations report real outcomes | A backup can be created and restored | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_2_1_a_backup_can_be_created_and_restored | 🟢 green |
+| specs/localization-settings-and-data-protection/spec.md → Local-first backup and integrations report real outcomes | Integration failure is truthful | test/integration/audit/localization-settings-and-data-protection_test.dart | test_localization_settings_and_data_protection_2_2_integration_failure_is_truthful | 🟢 green |
 
 ## Coverage Notes
 

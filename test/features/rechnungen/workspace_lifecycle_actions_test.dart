@@ -205,10 +205,7 @@ void main() {
     await expectLater(useCases.finalizeRechnung(locale: 'de_DE', rechnungId: finalized.id), throwsA(isA<StateError>()));
     await expectLater(useCases.stornoRechnung(rechnungId: draft.id, grund: 'x'), throwsA(isA<StateError>()));
     await expectLater(useCases.createErsatzRechnung(vonRechnungId: finalized.id), throwsA(isA<StateError>()));
-    await expectLater(
-      useCases.konvertiereDokument(quelleId: draft.id, zielTyp: 'rechnung'),
-      throwsA(isA<StateError>()),
-    );
+    await expectLater(useCases.konvertiereDokument(quelleId: draft.id, zielTyp: 'storno'), throwsA(isA<StateError>()));
 
     expect(await _invoiceCount(db), before);
     expect(await _counters(db), counters);
