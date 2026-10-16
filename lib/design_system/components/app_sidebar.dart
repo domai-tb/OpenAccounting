@@ -180,50 +180,57 @@ class _AppSidebarState extends State<AppSidebar> {
       return withFocus;
     }
 
-    return ListView(
+    return Column(
       children: <Widget>[
-        const SizedBox(height: AppSpacing.sm),
-        _header(context),
-        const Divider(),
-        _workspaceSelector(context),
-        const Divider(),
-        if (!widget.isCompact)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-            child: Text(
-              l10n?.sidebarSectionOverview ?? 'ÜBERSICHT',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
+        Expanded(
+          child: ListView(
+            children: <Widget>[
+              const SizedBox(height: AppSpacing.sm),
+              _header(context),
+              const Divider(),
+              _workspaceSelector(context),
+              const Divider(),
+              if (!widget.isCompact)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  child: Text(
+                    l10n?.sidebarSectionOverview ?? 'ÜBERSICHT',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              item(Icons.dashboard, l10n?.sidebarOverview ?? 'Übersicht', '/'),
+              if (!widget.isCompact)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  child: Text(
+                    l10n?.sidebarSectionBusiness ?? 'GESCHÄFT',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              item(Icons.receipt_long, l10n?.sidebarInvoices ?? 'Rechnungen', '/invoices'),
+              item(Icons.receipt, l10n?.sidebarReceipts ?? 'Belege', '/receipts'),
+              item(Icons.account_balance, l10n?.sidebarBanking ?? 'Bank & Zahlungen', '/banking'),
+              item(Icons.markunread_mailbox_outlined, l10n?.sidebarDunning ?? 'Mahnwesen', '/mahnwesen'),
+              item(Icons.contacts, l10n?.sidebarContacts ?? 'Kontakte', '/contacts'),
+              item(Icons.repeat_outlined, l10n?.sidebarRecurring ?? 'Wiederkehrend', '/recurring'),
+              item(Icons.inventory_2_outlined, l10n?.routeInventory ?? 'Inventory', '/inventory'),
+              if (!widget.isCompact)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  child: Text(
+                    l10n?.sidebarSectionTaxes ?? 'STEUERN',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              item(Icons.percent, l10n?.sidebarTaxes ?? 'Steuern', '/taxes'),
+              item(Icons.bar_chart, l10n?.sidebarReports ?? 'Auswertungen', '/reports'),
+              const Divider(),
+              item(Icons.settings, l10n?.sidebarSettings ?? 'Einstellungen', '/settings'),
+              item(Icons.help, l10n?.sidebarHelp ?? 'Hilfe', '/help'),
+            ],
           ),
-        item(Icons.dashboard, l10n?.sidebarOverview ?? 'Übersicht', '/'),
-        if (!widget.isCompact)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-            child: Text(
-              l10n?.sidebarSectionBusiness ?? 'GESCHÄFT',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        item(Icons.receipt_long, l10n?.sidebarInvoices ?? 'Rechnungen', '/invoices'),
-        item(Icons.receipt, l10n?.sidebarReceipts ?? 'Belege', '/receipts'),
-        item(Icons.account_balance, l10n?.sidebarBanking ?? 'Bank & Zahlungen', '/banking'),
-        item(Icons.markunread_mailbox_outlined, l10n?.sidebarDunning ?? 'Mahnwesen', '/mahnwesen'),
-        item(Icons.contacts, l10n?.sidebarContacts ?? 'Kontakte', '/contacts'),
-        item(Icons.repeat_outlined, l10n?.sidebarRecurring ?? 'Wiederkehrend', '/recurring'),
-        item(Icons.inventory_2_outlined, l10n?.routeInventory ?? 'Inventory', '/inventory'),
-        if (!widget.isCompact)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-            child: Text(
-              l10n?.sidebarSectionTaxes ?? 'STEUERN',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        item(Icons.percent, l10n?.sidebarTaxes ?? 'Steuern', '/taxes'),
-        item(Icons.bar_chart, l10n?.sidebarReports ?? 'Auswertungen', '/reports'),
-        const Divider(),
-        item(Icons.settings, l10n?.sidebarSettings ?? 'Einstellungen', '/settings'),
-        item(Icons.help, l10n?.sidebarHelp ?? 'Hilfe', '/help'),
+        ),
+        // Pinned privacy footer per app spec: "● Lokal" indicator at bottom.
         const Divider(),
         _lokalIndicator(context),
       ],
