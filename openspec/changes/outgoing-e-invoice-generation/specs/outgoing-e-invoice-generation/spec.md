@@ -143,12 +143,22 @@ UBL party electronic addresses SHALL come from snapshot fields (persisted master
 - **THEN** the buyer endpoint uses the buyer reference with `0204`
 - **AND** a missing seller `ust_idnr` or a buyer with neither source SHALL fail closed with a localized diagnostic naming the absent field
 
-#### Scenario: Missing payment data fails closed
+### Requirement: XRechnung delivery date
 
-- **GIVEN** the company record carries no IBAN
+The invoice SHALL carry an optional delivery date (`leistungsdatum`, ISO `YYYY-MM-DD`) captured in the draft/edit workspace, persisted on the invoice row, and snapshotted at finalization like other invoice facts. XRechnung UBL SHALL emit it as BT-72 Actual delivery date, verbatim. An absent delivery date SHALL fail closed for XRechnung with a localized diagnostic naming `leistungsdatum`; no date SHALL ever be inferred from the issue date, due date, or creation timestamp. This gate is intentionally XRechnung-only.
+
+#### Scenario: Delivery date is emitted verbatim
+
+- **GIVEN** a finalized snapshot carries a `leistungsdatum` of `2026-03-10`
+- **WHEN** XRechnung UBL is generated
+- **THEN** the XML carries that exact date as BT-72 Actual delivery date
+
+#### Scenario: Missing delivery date fails closed
+
+- **GIVEN** the finalized snapshot carries no `leistungsdatum`
 - **WHEN** XRechnung UBL is requested
-- **THEN** generation SHALL fail closed with a localized diagnostic naming the company IBAN
-- **AND** no fabricated payment-means block SHALL be emitted
+- **THEN** generation SHALL fail closed with a localized diagnostic naming `leistungsdatum`
+- **AND** no date SHALL be inferred from issue, due, or creation timestamps
 
 ### Requirement: E-invoice output follows application boundaries and design
 
