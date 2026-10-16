@@ -27,6 +27,10 @@ void main() {
       expect(EInvoicePinnedVersions.xrechnungVersion, '3.0');
       expect(EInvoicePinnedVersions.xrechnungSyntax, 'UBL 2.1');
       expect(EInvoicePinnedVersions.xrechnungBundleVersion, '3.0.2');
+      expect(EInvoicePinnedVersions.kositValidatorVersion, '1.6.3');
+      expect(EInvoicePinnedVersions.xrechnungConfigVersion, 'v2026-08-31');
+      expect(EInvoicePinnedVersions.cenSchematronVersion, '1.3.16');
+      expect(EInvoicePinnedVersions.xrechnungSchematronVersion, '2.6.0');
 
       const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
       final FinalizationSnapshot snapshot = validSnapshot(

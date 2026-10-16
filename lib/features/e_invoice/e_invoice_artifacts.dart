@@ -27,6 +27,19 @@ class EInvoicePinnedVersions {
 
   /// Human-readable bundle identity shown in UI and release metadata.
   static const String xrechnungBundleLabel = '3.0.2 Summer 2026';
+
+  /// KoSIT validator engine running the configuration (Linux proof pending,
+  /// Windows/macOS blocked per E2; never claim runs without platform evidence).
+  static const String kositValidatorVersion = '1.6.3';
+
+  /// Pinned validator configuration release (commit `b436fc4`).
+  static const String xrechnungConfigVersion = 'v2026-08-31';
+
+  /// CEN Schematron rules used by the configuration.
+  static const String cenSchematronVersion = '1.3.16';
+
+  /// XRechnung Schematron used by the configuration.
+  static const String xrechnungSchematronVersion = '2.6.0';
 }
 
 /// Availability of the offline validation artifacts.
