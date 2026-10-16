@@ -99,7 +99,10 @@ void main() {
       final rechnungId = await createRechnung(kundeId: kundeId, rechnungsnummer: 'RE-SPERR-1');
       final levels = await stufenRepo.list();
       final stufe3 = levels.firstWhere((e) => e.stufe == 3);
-      await mahnungenRepo.create(rechnungId: rechnungId, stufeId: stufe3.id);
+      final mahnung = await mahnungenRepo.create(rechnungId: rechnungId, stufeId: stufe3.id);
+      // The invoice's current level advances only when the transport accepts
+      // the letter (dunning-workflow-integrity "Mail-Versand via SMTP").
+      await mahnungenRepo.markTransportAccepted(mahnung.id, stufeNummer: 3);
       expect(await service.isSperrung(kundeId), isTrue);
       expect(await service.isWarnung(kundeId), isTrue, reason: 'level3 also >= warnung');
       expect(await service.canCreateInvoice(kundeId), isFalse);
