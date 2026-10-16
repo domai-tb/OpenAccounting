@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/app.dart';
+import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/design_system/components/finance_list_surface.dart';
@@ -39,24 +41,28 @@ void main() {
     expect(output, contains('No issues found!'), reason: 'Pinned flutter analyze must emit no diagnostics.\n$output');
   });
 
-  test('test_analyzer_and_integration_test_gates_1_2_new_diagnostics_block_acceptance', () async {
-    final Directory fixture = await Directory.systemTemp.createTemp('openaccounting-analyzer-gate-');
-    addTearDown(() => fixture.delete(recursive: true));
-    final File source = File('${fixture.path}/main.dart');
-    await source.writeAsString('void main() { final unused = 1; }\n');
+  test(
+    'test_analyzer_and_integration_test_gates_1_2_new_diagnostics_block_acceptance',
+    timeout: const Timeout(Duration(minutes: 3)),
+    () async {
+      final Directory fixture = await Directory.systemTemp.createTemp('openaccounting-analyzer-gate-');
+      addTearDown(() => fixture.delete(recursive: true));
+      final File source = File('${fixture.path}/main.dart');
+      await source.writeAsString('void main() { final unused = 1; }\n');
 
-    final ProcessResult result = await Process.run(
-      'fvm',
-      <String>['dart', 'run', 'tool/release_gate.dart', fixture.path],
-      workingDirectory: Directory.current.path,
-      runInShell: true,
-    );
-    final String output = '${result.stdout}\n${result.stderr}';
+      final ProcessResult result = await Process.run(
+        'fvm',
+        <String>['dart', 'run', 'tool/release_gate.dart', fixture.path],
+        workingDirectory: Directory.current.path,
+        runInShell: true,
+      );
+      final String output = '${result.stdout}\n${result.stderr}';
 
-    expect(result.exitCode, isNot(equals(0)), reason: 'A new analyzer diagnostic must block acceptance.\n$output');
-    expect(output, contains('unused_local_variable'), reason: 'The gate must report the diagnostic code.\n$output');
-    expect(output, contains(source.path), reason: 'The gate must report the diagnostic source location.\n$output');
-  });
+      expect(result.exitCode, isNot(equals(0)), reason: 'A new analyzer diagnostic must block acceptance.\n$output');
+      expect(output, contains('unused_local_variable'), reason: 'The gate must report the diagnostic code.\n$output');
+      expect(output, contains(source.path), reason: 'The gate must report the diagnostic source location.\n$output');
+    },
+  );
 
   testWidgets('test_analyzer_and_integration_test_gates_2_1_route_smoke_tests_prove_reachability', (tester) async {
     final AppDatabase db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -78,7 +84,12 @@ void main() {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
-    await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const OpenAccountingApp()));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: AppScope(services: AppServices(db), child: const OpenAccountingApp()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final List<AppRoute> primaryRoutes = AppRoute.values.where((AppRoute route) => route != AppRoute.setup).toList();
@@ -87,6 +98,7 @@ void main() {
       final Finder surface = switch (route) {
         AppRoute.dashboard => find.text('Offene Rechnungen'),
         AppRoute.banking => find.byKey(const ValueKey<String>('bank-import-workflow')),
+        AppRoute.taxes || AppRoute.reports => find.byKey(const ValueKey<String>('report-catalog')),
         AppRoute.settings || AppRoute.help => find.byType(AppPage),
         AppRoute.assets => find.byType(AppPage),
         AppRoute.mahnwesen => find.byType(MahnwesenWorkspacePage),
@@ -107,6 +119,8 @@ void main() {
         );
       }
     }
+    // Drain the settings profile-load timeout timer before the test ends.
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('test_analyzer_and_integration_test_gates_2_2_runtime_provider_errors_fail_tests', (tester) async {
@@ -129,7 +143,12 @@ void main() {
       addTearDown(container.dispose);
       addTearDown(db.close);
 
-      await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const OpenAccountingApp()));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: AppScope(services: AppServices(db), child: const OpenAccountingApp()),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(
