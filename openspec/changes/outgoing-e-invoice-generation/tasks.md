@@ -144,3 +144,15 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 - [x] 11.13 Write failing test for "Legacy finalized invoice defaults to PDF": reopened_legacy_invoice_shows_pdf_without_customer_inference in test/features/rechnungen/invoice_output_format_widget_test.dart (assert it fails for the right reason).
 - [x] 11.14 Implement the required application behavior for "Legacy finalized invoice defaults to PDF" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [x] 11.15 Refactor the related implementation; targeted tests and the full suite stay green.
+
+## 12. XRechnung party endpoints and payment instructions
+
+- [ ] 12.1 Write failing test for "Seller endpoint uses the company VAT identifier": seller_endpoint_uses_vat_id_with_9930 in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
+- [ ] 12.2 Implement the required application behavior for "Seller endpoint uses the company VAT identifier" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [ ] 12.3 Refactor the related implementation; targeted tests and the full suite stay green.
+- [ ] 12.4 Write failing test for "Endpoints fall back without invention": endpoint_fallback_without_invention in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
+- [ ] 12.5 Implement the required application behavior for "Endpoints fall back without invention" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [ ] 12.6 Refactor the related implementation; targeted tests and the full suite stay green.
+- [ ] 12.7 Write failing test for "Missing payment data fails closed": missing_payment_data_fails_closed in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
+- [ ] 12.8 Implement the required application behavior for "Missing payment data fails closed" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [ ] 12.9 Refactor the related implementation; targeted tests and the full suite stay green.

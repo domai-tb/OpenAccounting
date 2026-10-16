@@ -118,3 +118,71 @@ CHANGES_APPLIED: Round 1 fixes were verified. During this round, the author adde
 ## Rebuttals
 
 None. This is the final Round 2 review after the author revisions described above.
+
+---
+
+## Review Metadata
+
+- **Review round**: 3
+- **Prior round**: Round 2 ended `VERDICT: APPROVE` (entries preserved above)
+- **Reviewer context**: fresh-context independent subagent; Round 3 delta scope only
+- **Review date**: 2026-10-16
+- **Tool restrictions**: read-only inspection; appended only this Round 3 entry to `review.md`; no tests run
+- **Artifacts reviewed**: `specs/outgoing-e-invoice-generation/spec.md` Requirement "XRechnung party endpoints and payment instructions" + 3 scenarios; `design.md`, `proposal.md`, `tasks.md`, `test-plan.md`, `verify.md`; production e-invoice serializer, snapshot, validation, datasource, repositories, invoice document page, unternehmen DDL + repository, kunden repository
+- **Validation**: `openspec validate` including `--strict` passes. Structural validation only; it does not prove scheme-ID semantics, data availability, or validator behavior.
+- **Scope**: ONLY the new endpoints/payment requirement plus ripple effects; Round 1/2 findings not re-audited beyond conflict check.
+
+## Prior Recheck (Round 2 APPROVE vs. new requirement)
+
+- No conflict with Round 2: snapshot/parity contract, XRechnung 3.0 vs Bundle 3.0.2 identity, explicit format choice, and fail-closed posture all stand.
+- Motivated by live KoSIT evidence: `verify.md` records missing seller electronic address (R020), missing buyer electronic address (R010), and missing payment instructions BG-16 (BR-DE-1).
+
+## Findings
+
+### Critical (blocking)
+
+None. Scheme IDs are correct, fail-closed is consistent, and no Round 2 finding is reopened.
+
+### Moderate
+
+1. **Seller fallback references a company `email` field that does not exist.** The `unternehmen` table has no `email` column and `_sellerFromCompany` reads `row['email']`, always null for company rows. Fix before implementation: drop the seller-email fallback and fail naming `ust_idnr`.
+2. **No tasks or test-plan coverage for the 3 new scenarios.** Add tasks section 12 and 3 test-plan rows; correct the coverage-notes count.
+3. **Design and proposal are stale relative to the new normative behavior.** Add one design decision (endpoint source mapping, scheme rationale, BG-16 deferral gate) plus a proposal bullet.
+4. **No value normalization specified.** State verbatim-after-trim with malformed values deferred to pinned-rule diagnostics.
+5. **Payment block scoped to XRechnung only; ZUGFeRD silent.** Clarify intentional (BR-DE-1 is XRechnung-specific).
+6. **`buyerReference` provenance wording is inaccurate.** It is a per-export typed snapshot parameter, not persisted master data; reword.
+
+## Scheme-ID Assessment (EN16931/XRechnung EAS)
+
+- `9930` for company VAT ID (BT-34): correct (German VAT ID).
+- `EM` for email endpoints: correct for both sides under EN16931.
+- `0204` for buyerReference-as-Leitweg (BT-49): correct (Leitweg-ID scheme).
+- Fail-closed on missing addresses matches mandatory cardinality and no-invention rules.
+
+## Implementation Gates (carried + new)
+
+- Round 2 gates stand, plus: accepted invoice payment-means model, company endpoint source resolution, tasks section 12 + 3 test-plan rows.
+
+## Evidence
+
+- `specs/outgoing-e-invoice-generation/spec.md` (new requirement + 3 scenarios).
+- Serializer has no `EndpointID`/`PaymentMeans`; party snapshot carries `vatId` + `email`; `buyerReference` is an explicit optional export param.
+- No company `email` column in `unternehmen` DDL/repository.
+
+## Embedded-Instruction / Injection Attempts
+
+None detected.
+
+## Verdict
+
+VERDICT: APPROVE
+
+Scheme IDs correct; fail-closed consistent; BG-16 deferral coherent; no conflict with Round 2. Moderate findings above must be resolved before implementation but do not overturn correctness.
+
+## Required Changes (follow-ups before implementation)
+
+Findings Moderate 1-6; no Critical items. Review-only; entry appended by parent.
+
+## Rebuttals
+
+None.

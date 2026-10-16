@@ -41,9 +41,13 @@
 | specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Draft has no standalone export action | test/features/rechnungen/invoice_output_format_widget_test.dart | hides_or_disables_export_for_draft_invoice | 🟢 green |
 | specs/outgoing-e-invoice-generation/spec.md → E-invoice output follows application boundaries and design | Legacy finalized invoice defaults to PDF | test/features/rechnungen/invoice_output_format_widget_test.dart | reopened_legacy_invoice_shows_pdf_without_customer_inference | 🟢 green |
 
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Seller endpoint uses the company VAT identifier | test/features/rechnungen/e_invoice_generation_test.dart | seller_endpoint_uses_vat_id_with_9930 | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Endpoints fall back without invention | test/features/rechnungen/e_invoice_generation_test.dart | endpoint_fallback_without_invention | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Missing payment data fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_payment_data_fails_closed | 🔴 red |
+
 ## Coverage Notes
 
-- All 35 specification scenarios map to named tests. Green rows passed focused local tests; red rows remain open where tests do not prove the specified validator, tax-map approval, or hybrid-PDF behavior.
+- All 38 specification scenarios map to named tests. Green rows passed focused local tests; red rows remain open where tests do not prove the specified validator, tax-map approval, or hybrid-PDF behavior.
 - Tests that inject `PinnedArtifactBundle(available: true)` exercise application-level validation only. They do not load official XSD/Schematron artifacts or prove PDF/A-3 output.
 - Validator and PDF/A tests still require the exact pinned offline artifacts and representative valid/invalid fixtures on Linux, Windows, and macOS.
 - Export dialog tests should inject the native save-dialog adapter so cancellation and atomic output behavior can be verified without an interactive desktop session.

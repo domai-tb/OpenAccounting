@@ -126,6 +126,30 @@ The detail workspace SHALL allow a finalized ordinary outgoing invoice to be exp
 - **WHEN** the user requests XRechnung export
 - **THEN** localized validation or availability is shown, the save dialog is not opened, and no file or invoice field changes
 
+### Requirement: XRechnung party endpoints and payment instructions
+
+UBL party electronic addresses SHALL come from snapshot fields (persisted master-data captures plus the explicit export `buyerReference`): the seller address (BT-34) uses the company `ust_idnr` with scheme `9930` when present, else fails closed naming `ust_idnr`; the buyer address (BT-49) uses the customer `email` with scheme `EM` when present, else the snapshot `buyerReference` with scheme `0204` (the reference is documented as e.g. Leitweg-ID) when present, else fails closed. Values pass through verbatim after trimming; malformed values are left to pinned-rule diagnostics. No endpoint value SHALL ever be invented or defaulted. Payment instructions (BG-16, BR-DE-1) have no invoice payment-means data model yet; until such a model is accepted, XRechnung generation SHALL fail closed with a localized diagnostic naming the missing payment data instead of emitting fabricated payment means. This payment gate is intentionally XRechnung-only (BR-DE-1 is XRechnung-specific).
+
+#### Scenario: Seller endpoint uses the company VAT identifier
+
+- **GIVEN** a finalized snapshot has a company `ust_idnr` and any email state
+- **WHEN** XRechnung UBL is generated
+- **THEN** the seller `EndpointID` carries the VAT identifier with `schemeID="9930"`
+
+#### Scenario: Endpoints fall back without invention
+
+- **GIVEN** the customer has no `email` but the snapshot has a `buyerReference`
+- **WHEN** XRechnung UBL is generated
+- **THEN** the buyer endpoint uses the buyer reference with `0204`
+- **AND** a missing seller `ust_idnr` or a buyer with neither source SHALL fail closed with a localized diagnostic naming the absent field
+
+#### Scenario: Missing payment data fails closed
+
+- **GIVEN** no accepted invoice payment-means model exists
+- **WHEN** XRechnung UBL is requested
+- **THEN** generation SHALL fail closed with a localized diagnostic naming the missing payment data
+- **AND** no fabricated payment-means block SHALL be emitted
+
 ### Requirement: E-invoice output follows application boundaries and design
 
 The invoice finalization/detail surface SHALL expose a visible per-invoice choice of ZUGFeRD, XRechnung, and PDF, with the customer ZUGFeRD value used only as the default selection. It SHALL show the selected output and its validation/readiness state, plus available export actions; unavailable outputs SHALL explain why. The XRechnung action SHALL use the registered invoice application-scope service and typed repository; the widget MUST NOT issue SQL or construct a data source. New controls, status, errors, and validation SHALL use generated localization, keyboard-accessible interaction, visible focus, responsive layout, and non-color validation cues as defined by `DESIGN.md`.
