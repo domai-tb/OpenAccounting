@@ -71,11 +71,16 @@ void main() {
       final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
 
       final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
-
       expect(result.valid, isTrue);
       expect(result.diagnostics, isEmpty);
       expect(service.readiness(result), EInvoiceReadiness.valid);
       expect(service.readiness(null), EInvoiceReadiness.notValidated);
+      expect(
+        const EInvoiceXmlSerializer()
+            .xrechnungUbl(snapshot)
+            .contains('<cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>'),
+        isTrue,
+      );
     });
 
     test('missing_source_field_reports_localized_diagnostic_without_output', () {

@@ -81,6 +81,8 @@ class EInvoiceXmlSerializer {
     xml.writeln(
       '  <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_${EInvoicePinnedVersions.xrechnungVersion}</cbc:CustomizationID>',
     );
+    // BT-23 business process for XRechnung (PEPPOL-EN16931-R001).
+    xml.writeln('  <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>');
     xml.writeln('  <cbc:ID>${_escape(snapshot.documentNumber)}</cbc:ID>');
     xml.writeln('  <cbc:IssueDate>${_escape(snapshot.issueDate)}</cbc:IssueDate>');
     xml.writeln('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
