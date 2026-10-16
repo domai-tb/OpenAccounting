@@ -101,6 +101,44 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
     );
   }
 
+  Future<void> storeCalculation({
+    required String id,
+    required String policyId,
+    required String policySource,
+    required String policyVersion,
+    required String policyFrom,
+    required String policyTo,
+    required String amount,
+    required String calculatedAt,
+  }) async {
+    await executor.runUpdate(
+      'UPDATE mileage_trips SET state = ?, policy_id = ?, policy_source = ?, policy_version = ?, '
+      'policy_effective_from = ?, policy_effective_to = ?, calculated_amount = ?, calculated_at = ?, '
+      'updated_at = ? WHERE id = ? AND state = ?',
+      <Object?>[
+        'calculated',
+        policyId,
+        policySource,
+        policyVersion,
+        policyFrom,
+        policyTo,
+        amount,
+        calculatedAt,
+        DateTime.now().toUtc().toIso8601String(),
+        id,
+        'unresolved',
+      ],
+    );
+  }
+
+  Future<void> storePosting({required String id, required String eventId}) async {
+    await executor.runUpdate(
+      'UPDATE mileage_trips SET state = ?, posting_event_id = ?, updated_at = ? '
+      'WHERE id = ? AND state = ?',
+      <Object?>['posted', eventId, DateTime.now().toUtc().toIso8601String(), id, 'calculated'],
+    );
+  }
+
   MileageTrip _fromRow(Map<String, Object?> r) {
     return MileageTrip(
       id: '${r['id']}',

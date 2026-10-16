@@ -131,5 +131,33 @@ void main() {
       expect(kept.state, MileageTripState.unresolved);
       expect(kept.calculatedAmount, isNull);
     });
+
+    test('test_post_a_confirmed_resolved_mileage_expense', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      await useCases.applyApprovedCalculation(trip.id, 'car');
+      final _RecordingPort port = _RecordingPort();
+      final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
+      final String eventId = await wired.postTripWithPort(trip.id);
+      expect(eventId.isNotEmpty, isTrue);
+      expect(port.calls, 1);
+      final MileageTrip kept = (await repo.getById(trip.id))!;
+      expect(kept.postingEventId, eventId);
+      expect(kept.state, MileageTripState.posted);
+    });
   });
+}
+
+class _RecordingPort implements MileagePostingPort {
+  int calls = 0;
+
+  @override
+  Future<String> postExpense(MileageTrip trip) async {
+    calls++;
+    return 'evt-${trip.id}';
+  }
 }

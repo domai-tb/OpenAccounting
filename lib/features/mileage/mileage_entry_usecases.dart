@@ -3,12 +3,19 @@ import 'dart:math';
 import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
 
+/// Posting boundary port — production M2 implementation arrives later.
+/// Test doubles prove the exactly-once contract first.
+abstract class MileagePostingPort {
+  Future<String> postExpense(MileageTrip trip);
+}
+
 /// Mileage use-cases — capture only, fail-closed until accepted policy/posting.
 /// Never reuses EKS 0.10 rate; unresolved stays out of totals.
 class MileageEntryUseCases {
-  MileageEntryUseCases(this.repo);
+  MileageEntryUseCases(this.repo, {this.postingPort});
 
   final MileageEntryRepository repo;
+  final MileagePostingPort? postingPort;
 
   Future<MileageTrip> recordBusinessTrip({
     required String tripDate,
@@ -70,6 +77,44 @@ class MileageEntryUseCases {
   /// shortcut: fail-closed stub; test doubles arrive with 3.x.
   Future<void> postTrip(String id) async {
     throw StateError('posting unavailable');
+  }
+
+  /// M1 persistence: atomically store the approved snapshot on unresolved-to-calculated.
+  Future<MileageTrip> applyApprovedCalculation(String id, String vehicleClass) async {
+    final MileageTrip? current = await repo.getById(id);
+    if (current == null) throw StateError('not found');
+    if (current.state != MileageTripState.unresolved) throw StateError('not unresolved');
+    final int cents = calculateApprovedAmountCents(
+      distanceHundredthsKm: current.distanceHundredthsKm,
+      vehicleClass: vehicleClass,
+    );
+    final String now = DateTime.now().toUtc().toIso8601String();
+    await repo.storeCalculation(
+      id: id,
+      policyId: 'DE-private-business-travel/1',
+      policySource: 'EStH-R4.12-LStH-A25',
+      policyVersion: '1',
+      policyFrom: '2025-01-01',
+      policyTo: '2026-12-31',
+      amount: (cents / 100).toStringAsFixed(2),
+      calculatedAt: now,
+    );
+    return (await repo.getById(id))!;
+  }
+
+  /// 3.x wiring: exactly-once posting through the injected port.
+  /// Identical retries return the stored event without calling the port again.
+  Future<String> postTripWithPort(String id) async {
+    final MileageTrip? current = await repo.getById(id);
+    if (current == null) throw StateError('not found');
+    if (current.postingEventId != null) return current.postingEventId!;
+    if (current.state != MileageTripState.calculated) throw StateError('not calculated');
+    final MileagePostingPort? port = postingPort;
+    if (port == null) throw StateError('posting unavailable');
+    final String eventId = await port.postExpense(current);
+    if (eventId.trim().isEmpty) throw StateError('empty event');
+    await repo.storePosting(id: id, eventId: eventId);
+    return eventId;
   }
 
   /// Approved policy DE-private-business-travel/1: car 30c/km, other motor 20c/km, half-up per trip.
