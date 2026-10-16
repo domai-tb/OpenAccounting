@@ -130,3 +130,55 @@ CHANGES_APPLIED: n/a
 ## Rebuttals — Round 3
 
 None.
+
+---
+
+## Review Metadata — Round 4
+
+- **Review round**: 4
+- **Prior round**: Round 3 returned `REVISE` with one required change (close DB lifecycle against invalid initial states and direct correction-row mutation/deletion; enforce posted replacement invariant); rechecked below
+- **Reviewer context**: fresh-context independent Anvil reviewer; did not author the current revisions
+- **Revision reviewed**: current working-tree `mileage-entry-workflow` change (Table Definitions reconciled to 55-name v19 with mileage at v13 plus v22-to-v23 trigger scenario; 24/24 tasks marked [x]; 8 scoped tests claimed green via test doubles)
+- **Artifacts reviewed**: proposal, design, db and mileage-entry delta specs, tasks, test-plan, rounds one through three, maintained db spec, `lib/core/db/migrations.dart` (mileage DDL, v13 path, `currentVersion = 22`, no v23 migration yet), `lib/features/mileage/*`, `test/features/mileage/*`
+- **Validation evidence**: `openspec validate` passes including `--strict`. Structural validation only; it establishes no semantic completeness. No tests were run by this reviewer; the 8-green claim is taken from test-plan/task marks, not verified.
+
+### Prior Required Changes Rechecked
+
+1. **Round 3 lifecycle closure — addressed at contract level.** Trip INSERTs must begin `unresolved` with null snapshot/posting and later-state inserts are rejected. Correction INSERTs must begin `draft` with null application fields; updates allowed only from `draft` to `draft`/`applied`/`cancelled`; applied/cancelled rows reject all UPDATEs and all correction rows reject DELETEs. `posted → corrected` requires a matching `applied` replace correction plus a replacement trip already `posted` with non-empty posting reference, committed in one transaction. Terminal trip rows reject all further UPDATEs and DELETEs. Enforcement is assigned to migration v23 after verified v22. No v23 trigger DDL exists in code yet — disclosed deferral, see Moderate 5.
+
+### Findings — Round 4
+
+#### 🔴 Critical (blocking)
+
+None.
+
+#### 🟡 Moderate (non-blocking)
+
+1. **Stale inventory numbers survive in prose.** Proposal Capabilities/Impact and design Context/Migration still say "six feature-owned tables" (39+1+6 = 46, not 55) and cite a "46-name inventory". The normative Table Definitions (55 names, 16 feature-owned, mileage at v13) is consistent between delta and maintained spec. Fix prose to 55-name v19 so inventory owners are not asked to accept a wrong number.
+2. **`editTripFacts` contradicts the calculated-demotion rule.** Spec requires editing a `calculated` trip to return it to `unresolved` and clear the snapshot; code rejects every non-`unresolved` edit and its signature omits `businessContext`. Align the demotion path or narrow the spec.
+3. **Calculation code encodes a policy the specs refuse to select.** `applyApprovedCalculation`/`calculateApprovedAmountCents` hardcode policy ID `DE-private-business-travel/1`, source, version, dates, and 30c/20c rates while proposal/design/specs state no rate, share, or rounding rule is selected and snapshots require an accepted policy. Contained today (no UI wires it, posting port null by default), but shipping it enables calculation without an accepted policy. Remove, or mark explicitly test-only pending the accepted policy.
+4. **Test schema diverges from migration DDL; enforcement untested.** `ensureTablesForTests` omits the policy/posting coherence CHECKs and the correction partial unique index, and no test covers triggers, correction drafts, or DELETE bans. v23 must add executor-level trigger tests against the real DDL.
+5. **Unguarded-table window until v23.** The v13/fresh-schema paths create both mileage tables today with CHECKs only — a direct INSERT of a `posted` trip with complete fields satisfies the CHECKs — and no runtime gate flag exists in code despite "migration remains disabled" prose. Triggers close this at v23. Ensure v23 lands (and table creation is actually gated) before any production mileage rows exist.
+
+### 📌 Suggestions — Round 4
+
+- Use real UUIDs for trip/correction IDs (current `microseconds-random` string is unique-ish, not a UUID as specified).
+- `postTripWithPort` calls the port before `storePosting` with no shared transaction; the accepted boundary's idempotency key (`mileage_trip` + trip UUID) must own exactly-once across crashes.
+- Specify v23 trigger OLD-state/ordering semantics for the atomic draft→applied plus source→corrected transition (source reads as `posted` pre-commit).
+- Add draft-creation code/tests for "Prepare a replacement correction" when the accepted correction operation lands.
+
+## Embedded-Instruction / Injection Attempts — Round 4
+
+None detected in reviewed artifacts.
+
+## Verdict — Round 4
+
+VERDICT: APPROVE
+
+Follow-ups above are non-blocking: the Round 3 lifecycle is semantically closed at the contract level with versioned enforcement (v23), inventory reconciled to 55/v19, EKS separation kept, and posting fail-closed behind unaccepted contracts with idempotent retry.
+
+CHANGES_APPLIED: no (review-only round)
+
+## Rebuttals — Round 4
+
+None.

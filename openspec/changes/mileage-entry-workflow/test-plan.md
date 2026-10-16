@@ -14,6 +14,8 @@
 | specs/specs/mileage-entry/spec.md → Post resolved mileage through the accounting boundary | Post a confirmed resolved mileage expense | test/features/mileage/mileage_entry_workflow_test.dart | test_post_a_confirmed_resolved_mileage_expense | 🟢 green |
 | specs/specs/mileage-entry/spec.md → Post resolved mileage through the accounting boundary | Reject duplicate or incomplete posting | test/features/mileage/mileage_entry_workflow_test.dart | test_reject_duplicate_or_incomplete_posting | 🟢 green |
 
+| specs/specs/mileage-entry/spec.md → Capture traceable business mileage | Editing a calculated trip invalidates its calculation | test/features/mileage/mileage_entry_workflow_test.dart | test_editing_calculated_trip_invalidates_calculation | 🟢 green |
+
 ## Coverage Notes
 
 - Every scenario is mapped once to a named executable test; all rows start red.

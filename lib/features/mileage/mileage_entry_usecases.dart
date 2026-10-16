@@ -45,17 +45,45 @@ class MileageEntryUseCases {
     return trip;
   }
 
-  Future<MileageTrip> editTripFacts(String id, {String? purpose, String? tripDate, int? distanceHundredthsKm}) async {
+  Future<MileageTrip> editTripFacts(
+    String id, {
+    String? purpose,
+    String? tripDate,
+    int? distanceHundredthsKm,
+    String? businessContext,
+  }) async {
     final MileageTrip? current = await repo.getById(id);
     if (current == null) throw StateError('not found');
-    if (current.state != MileageTripState.unresolved) throw StateError('posted immutable');
+    if (current.state == MileageTripState.posted ||
+        current.state == MileageTripState.corrected ||
+        current.state == MileageTripState.voided) {
+      throw StateError('posted immutable');
+    }
     final String nextPurpose = purpose ?? current.purpose;
     final String nextDate = tripDate ?? current.tripDate;
     final int nextDist = distanceHundredthsKm ?? current.distanceHundredthsKm;
+    final String nextContext = businessContext ?? current.businessContext;
     _requireDate(nextDate);
     _requireText(nextPurpose, 'purpose');
+    _requireText(nextContext, 'businessContext');
     if (nextDist < 1 || nextDist > 999999999999) throw ArgumentError('distance out of range');
-    await repo.updateUnresolvedFacts(id: id, purpose: nextPurpose.trim(), tripDate: nextDate, dist: nextDist);
+    if (current.state == MileageTripState.calculated) {
+      await repo.demoteCalculatedToUnresolved(
+        id: id,
+        purpose: nextPurpose.trim(),
+        tripDate: nextDate,
+        dist: nextDist,
+        businessContext: nextContext.trim(),
+      );
+    } else {
+      await repo.updateUnresolvedFacts(
+        id: id,
+        purpose: nextPurpose.trim(),
+        tripDate: nextDate,
+        dist: nextDist,
+        businessContext: nextContext.trim(),
+      );
+    }
     return (await repo.getById(id))!;
   }
 

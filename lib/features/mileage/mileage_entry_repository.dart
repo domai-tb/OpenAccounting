@@ -93,11 +93,37 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
     required String purpose,
     required String tripDate,
     required int dist,
+    required String businessContext,
   }) async {
     await executor.runUpdate(
-      'UPDATE mileage_trips SET purpose = ?, trip_date = ?, distance_hundredths_km = ?, '
+      'UPDATE mileage_trips SET purpose = ?, trip_date = ?, distance_hundredths_km = ?, business_context = ?, '
       'updated_at = ? WHERE id = ? AND state = ?',
-      <Object?>[purpose, tripDate, dist, DateTime.now().toUtc().toIso8601String(), id, 'unresolved'],
+      <Object?>[purpose, tripDate, dist, businessContext, DateTime.now().toUtc().toIso8601String(), id, 'unresolved'],
+    );
+  }
+
+  Future<void> demoteCalculatedToUnresolved({
+    required String id,
+    required String purpose,
+    required String tripDate,
+    required int dist,
+    required String businessContext,
+  }) async {
+    await executor.runUpdate(
+      'UPDATE mileage_trips SET purpose = ?, trip_date = ?, distance_hundredths_km = ?, business_context = ?, '
+      'state = ?, policy_id = NULL, policy_source = NULL, policy_version = NULL, policy_effective_from = NULL, '
+      'policy_effective_to = NULL, calculated_amount = NULL, calculated_at = NULL, updated_at = ? '
+      'WHERE id = ? AND state = ?',
+      <Object?>[
+        purpose,
+        tripDate,
+        dist,
+        businessContext,
+        'unresolved',
+        DateTime.now().toUtc().toIso8601String(),
+        id,
+        'calculated',
+      ],
     );
   }
 

@@ -91,81 +91,142 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 
 ### Requirement: Table Definitions
 
-The application database SHALL maintain one auditable inventory of 46 known application-table names, partitioned as 39 pre-existing base tables, one shared database-health table, and six feature-owned tables. The 39 pre-existing base tables SHALL be `unternehmen`, `kunden`, `lieferanten`, `artikel`, `journal`, `rechnungen`, `rechnungspositionen`, `kategorien`, `konten`, `nummernkreise`, `ust_saetze`, `tagesabschluesse`, `belege`, `mahnungen`, `mahnstufen`, `mahnwesen_einstellungen`, `forderungen`, `bank_transaktionen`, `bank_templates`, `bank_imports`, `kunden_belege`, `kunden_lieferadressen`, `artikel_gruppen`, `rechnungsvorlagen`, `buchungsvorlagen`, `anlageverzeichnis`, `dokumentenpakete`, `dokumentenpaket_belege`, `ustva_exporte`, `euer_exporte`, `eks_exporte`, `datev_export_log`, `eu_laender`, `eks_einstellungen`, `vorsteuer_ansprueche`, `schnellbuchungen`, `auto_filter_regeln`, `import_mapping_vorlagen`, and `inventarbewegungen`. The shared database-health table SHALL be `feature_table_state`, required in addition to those base tables at schema version 9 or later. The six feature-owned tables SHALL be `forderung_zahlungen`, `buchungsvorlagen_occurrences`, `rechnungsvorlagen_occurrences`, `mileage_trips`, `mileage_trip_corrections`, and `category_mapping_history`. SQLite internal objects whose names begin with `sqlite_` are excluded. Each inventory entry SHALL record its owner, schema-version rule or lazy-state rule, creation path, and presence rule. Every table SHALL match its accepted owning schema; an undeclared application table, required table absent at its required version, or invalid table schema SHALL fail schema health. Migrations and feature initialization SHALL NOT silently drop, recreate, or replace data-bearing tables.
+The application database SHALL maintain an auditable inventory of 55 known application-table names for supported schema version 19. The 39 legacy base tables SHALL remain: unternehmen, kunden, lieferanten, artikel, journal, rechnungen, rechnungspositionen, kategorien, konten, nummernkreise, ust_saetze, tagesabschluesse, belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen, and inventarbewegungen. The additional 16 names are feature-owned: feature_table_state; forderung_zahlungen; buchungsvorlagen_occurrences; rechnungsvorlagen_occurrences; mileage_trips; mileage_trip_corrections; category_mapping_history; master_data_import_templates; anlage_afa_jahreswerte; inventuren; inventur_positionen; settlement_groups; settlement_allocations; statutory_timing_rules; dokument_email_templates; and dokument_email_versuche. SQLite internal objects whose names begin with sqlite_ are excluded. A fresh v19 profile SHALL contain 51 application tables; the two recurring occurrence tables and two optional document-email tables MAY be absent until initialized.
 
-The 39 base tables SHALL be created by fresh-schema construction or declared versioned migrations. `inventarbewegungen` is owned by inventory; `feature_table_state` is owned by the database health contract. The feature-owned tables SHALL have these owners and presence rules: `forderung_zahlungen` is owned by receivable payments and required at and after its accepted migration version; `buchungsvorlagen_occurrences` is owned by recurring bookings and `rechnungsvorlagen_occurrences` by recurring invoices, each created only by its feature initializer after the marker permits initialization; `mileage_trips` and `mileage_trip_corrections` are owned by mileage entry and required at and after schema version 9; and `category_mapping_history` is owned by accounting catalog provenance and required at and after schema version 10. If migration ordering changes, the category migration SHALL use the next sequential version after the accepted v9 migration. The two mileage tables are created together in the coordinated migration; they are migration-required and SHALL NOT use lazy-table markers.
+Migration-required tables SHALL use these minimum versions: forderung_zahlungen at v8; category_mapping_history at v9; feature_table_state, mileage_trips, and mileage_trip_corrections at v13; master_data_import_templates at v16; anlage_afa_jahreswerte at v17; inventuren and inventur_positionen at v18; and settlement_groups, settlement_allocations, and statutory_timing_rules at v19. The two recurring occurrence tables SHALL be governed by feature_table_state starting at v13. `dokument_email_templates` and `dokument_email_versuche` are optional lazy tables with no schema-version requirement; when present, they SHALL match their declared schemas. The template columns are `typ`, `betreff`, `text`, and `aktualisiert_am`. The attempt columns are `id`, `dokument_id`, `dokument_typ`, `empfaenger`, `ergebnis`, `mahnung_id`, `idempotenz_schluessel`, `artefakt_ids`, `erstellt_am`, `abgeschlossen_am`, and `fehler_kategorie`.
 
-`feature_table_state` SHALL have `table_name TEXT PRIMARY KEY` constrained to `buchungsvorlagen_occurrences` or `rechnungsvorlagen_occurrences`, and `state TEXT NOT NULL` constrained to `never_initialized`, `initialized`, or `unknown`. It SHALL contain exactly one durable state row for each lazy occurrence table. Fresh database creation SHALL create both rows with `never_initialized`. When migrating an existing profile, a lazy table that exists with its declared schema SHALL be marked `initialized`; an absent lazy table SHALL be marked `unknown` because prior use cannot be disproved without historical state. Lazy feature initialization SHALL create its table and transition its state from `never_initialized` to `initialized` in the same transaction. It SHALL NOT create a table while its marker is `unknown`. State/table mismatches SHALL fail schema health. An `unknown` state may become `never_initialized` only after an explicit integrity reconciliation verifies that the feature was never initialized; it may become `initialized` only after a verified table is restored or its prior data is otherwise verified.
+At a version before a table's required migration version, its absence SHALL NOT make that older schema unhealthy. A profile at version N SHALL require all 39 legacy tables and every migration-required table through N with its declared schema. Each occurrence table SHALL be present with marker state `initialized` or absent with state `never_initialized`; absent with state `unknown`, missing marker rows, and state/table mismatches SHALL fail health. Optional document-email tables MAY be absent; when present, malformed schemas SHALL fail health. Any undeclared application table SHALL fail health. A profile below a later migration version MAY be complete for its recorded schema version; its archive SHALL NOT claim to have checked tables that are still version-pending. Any table with a typed relationship to a selected customer that is not included in the reviewed disclosure projection SHALL make that customer's archive incomplete. Every feature adding a table SHALL update this inventory before migration or lazy creation is implemented.
 
-`forderung_zahlungen` SHALL be required at and after the schema version declared by its accepted migration. Before any startup repair or migration that could recreate this table, schema health SHALL compare its presence with `PRAGMA user_version`. If the profile is already at or beyond the required version and the table is absent, initialization SHALL stop before repair, preserve the original database, and mark the profile unavailable for complete export. Recovery SHALL require restoring a verified backup or an explicitly verified manual repair; an empty replacement SHALL NOT be created automatically. Before that migration version, the table is not yet required.
+Before v8, forderung_zahlungen MAY be absent or in its accepted legacy v7 shape; the normal v7-to-v8 migration SHALL create it when absent. At v8 or later, absence is an integrity failure: startup SHALL detect it before any repair or migration that could recreate it, preserve the original database, stop profile initialization, and leave complete export unavailable until verified recovery. It SHALL NOT create an empty replacement. A present repairable payment table MAY use the accepted transactional row-preserving repair path; failed verification SHALL leave its rows and schema unchanged.
 
-A complete version-10 inventory SHALL be valid only when all 39 pre-existing base tables and `feature_table_state` exist with declared schemas, `forderung_zahlungen` exists at or after version 8, both mileage tables exist at or after version 9, `category_mapping_history` exists at or after version 10, and each lazy occurrence table is present with state `initialized` or absent with state `never_initialized`. An absent lazy table with state `unknown`, a missing required marker row, any other state/table mismatch, an unknown application table, or a missing required table SHALL prevent a complete inventory. Before version 10, older profiles may be valid for their own version but SHALL NOT be reported as complete version-10 exports. Every feature specification that adds a table SHALL update this inventory before migration or lazy creation is implemented.
+The v13 feature_table_state table SHALL contain exactly one durable row for each recurring occurrence table, constrained to those two names and states `never_initialized`, `initialized`, or `unknown`. Fresh v13+ profiles SHALL seed both rows as `never_initialized`. The v12-to-v13 migration SHALL mark a valid existing occurrence table `initialized` and an absent table `unknown`; absence alone SHALL NOT imply `never_initialized`. Feature initialization SHALL create a table and transition its marker in one transaction, and SHALL NOT create an `unknown` table. Unknown may become `never_initialized` only after explicit integrity reconciliation verifies the feature was never initialized; it may become `initialized` only after a verified table is restored or its prior data otherwise verified.
 
-The mileage version-9 migration SHALL NOT be enabled until both `profile-data-portability` and `customer-data-disclosure-export` accept the same 46-name inventory and version-aware presence rules, including both mileage tables at v9 and category history at v10. If either export encounters a profile containing a table while its accepted inventory omits that table, it SHALL mark the result incomplete and SHALL NOT publish or claim a complete export. These exporters SHALL NOT create, repair, or remove mileage tables.
+The mileage version-13 tables SHALL NOT be treated as complete-export eligible until both `profile-data-portability` and `customer-data-disclosure-export` accept the same 55-name v19 inventory and version-aware presence rules, including both mileage tables at v13. If either export encounters a profile containing a table while its accepted inventory omits that table, it SHALL mark the result incomplete and SHALL NOT publish or claim a complete export. These exporters SHALL NOT create, repair, or remove mileage tables. Lifecycle triggers enforcing unresolved-only trip INSERTs, draft-only correction INSERTs, correction transitions, final-row immutability with no DELETEs, and replacement-posted atomicity SHALL be installed by migration v23 (following verified current version 22); if another migration lands first, the triggers SHALL use the next sequential version.
 
 #### Scenario: All Tables Created on Fresh Install
 
-GIVEN the app creates a fresh database at the supported schema version
-WHEN schema creation completes
-THEN all 39 pre-existing base tables and the required shared health table SHALL exist with their declared columns and constraints
-AND `feature_table_state` SHALL contain `never_initialized` rows for both lazy occurrence tables
-AND `forderung_zahlungen`, `mileage_trips`, `mileage_trip_corrections`, and `category_mapping_history` SHALL exist at their required schema versions
-AND neither lazy occurrence table SHALL exist until its feature is initialized
+- **GIVEN** the application creates a fresh profile at a supported schema version
+- **WHEN** schema creation completes
+- **THEN** all 39 legacy tables and every migration-required table through that schema version SHALL exist with declared schemas
+- **AND** the recurring occurrence markers SHALL be seeded as `never_initialized`
+- **AND** the two occurrence tables and two optional document-email tables SHALL be absent until their owning features initialize them
+
+#### Scenario: Pre-v13 profile is valid before the coordinated feature migration
+
+- **GIVEN** a profile at schema version 12 has the legacy tables, a valid forderung_zahlungen table, and category_mapping_history
+- **AND** feature_table_state and both mileage tables are absent
+- **WHEN** schema health is checked before migration
+- **THEN** those not-yet-required v13 tables SHALL NOT make the version-12 profile unhealthy
+- **AND** the profile SHALL remain ineligible for an export complete at the current runtime schema until normal sequential migrations succeed
+
+#### Scenario: Pre-v9 profile is valid before later feature migrations
+
+- **GIVEN** a profile at schema version 8 has the legacy tables and a valid forderung_zahlungen table
+- **AND** category_mapping_history, feature_table_state, mileage_trips, and mileage_trip_corrections are absent
+- **WHEN** schema health is checked before migration
+- **THEN** those not-yet-required tables SHALL NOT make the version-8 profile unhealthy
+- **AND** the profile SHALL remain ineligible for an export complete at the current runtime schema until normal sequential migrations succeed
+
+#### Scenario: Missing v7 payment table is created by the v7-to-v8 migration
+
+- **GIVEN** a profile below schema version 8 has no forderung_zahlungen table
+- **WHEN** the normal v7-to-v8 migration runs
+- **THEN** it SHALL create and verify forderung_zahlungen in its migration transaction
+- **AND** it SHALL preserve all other profile rows and increment user_version only after successful verification
+
+#### Scenario: Missing payment table at v8 or later preserves the incomplete signal
+
+- **GIVEN** PRAGMA user_version is 8 or greater and forderung_zahlungen is absent
+- **WHEN** startup health checks run before any current-version repair or later migration
+- **THEN** profile initialization SHALL stop before repair and leave the profile unavailable for complete export
+- **AND** the original database SHALL remain unchanged with the table absent
+- **AND** no empty replacement table SHALL be created automatically
+
+#### Scenario: Current payment table repair preserves existing rows
+
+- **GIVEN** a profile at v8 or later has forderung_zahlungen present but is missing a repairable column or required constraint
+- **WHEN** the accepted feature repair runs
+- **THEN** repair SHALL be transactional and preserve every existing payment row and value
+- **AND** schema health SHALL pass only after the declared columns and constraints are verified
+
+#### Scenario: V12-to-v13 migration adds shared markers and mileage tables
+
+- **GIVEN** a valid profile is at schema version 12 with forderung_zahlungen and category_mapping_history present
+- **WHEN** the next sequential migration runs
+- **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v13 transaction
+- **AND** it SHALL mark existing valid occurrence tables `initialized` and absent occurrence tables `unknown`
+- **AND** it SHALL increment user_version to 13 only after successful verification
+
+#### Scenario: V8-to-v9 migration adds shared markers and mileage tables
+
+- **GIVEN** a valid profile is at schema version 8 with forderung_zahlungen present
+- **WHEN** the next sequential migration runs
+- **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v9 transaction
+- **AND** it SHALL mark existing valid lazy occurrence tables initialized and absent lazy tables unknown
+- **AND** it SHALL increment user_version to 9 only after successful verification
+
+#### Scenario: V9 migration adds category history
+
+- **GIVEN** a valid profile is at schema version 8
+- **WHEN** the accounting-catalog-provenance v9 migration runs
+- **THEN** it SHALL create and verify category_mapping_history at schema version 9
+- **AND** schema health SHALL require the table at version 9 or later
+
+#### Scenario: Unknown lazy-table state is not repaired by initialization
+
+- **GIVEN** a recurring occurrence table is absent and its marker state is `unknown`
+- **WHEN** its feature is opened or initialized
+- **THEN** the feature SHALL remain unavailable pending explicit integrity reconciliation
+- **AND** no empty replacement table SHALL be created
 
 #### Scenario: Table Count Verification
 
-GIVEN a migration runs against an existing database
-WHEN the migration completes
-THEN its application-table set SHALL equal the 39 pre-existing base tables, the shared health table when required, all migration-required feature tables at their required versions, and only those lazy tables whose state is `initialized`
-AND no existing table SHALL be silently dropped or recreated
-AND all table-state pairs SHALL satisfy their declared presence rules
+- **GIVEN** a migration runs against an existing profile
+- **WHEN** the migration completes
+- **THEN** its application-table set SHALL equal the required inventory for that schema version plus only initialized lazy tables
+- **AND** no existing table SHALL be silently dropped or recreated
+- **AND** all occurrence-table marker pairs SHALL satisfy their declared presence rules
+
+#### Scenario: Version-aware table count verification
+
+GIVEN a supported database is upgraded through schema v18
+WHEN its declared table set is checked
+THEN the v18 base registry SHALL contain exactly 41 tables
+AND no table SHALL be silently dropped or created outside the version-specific inventory.
+
+#### Scenario: Unknown or malformed application tables fail schema health
+
+- **GIVEN** a required table is absent at its required schema version, a declared schema is invalid, or an undeclared application table is present
+- **WHEN** schema health is checked
+- **THEN** the database SHALL be marked unhealthy before an exporter can claim completeness
+- **AND** no migration or feature initializer SHALL silently replace data-bearing tables
 
 #### Scenario: Missing Table Detection
 
-GIVEN a migration should create a new table
-WHEN the CREATE TABLE statement or schema verification fails
-THEN the migration SHALL roll back
-AND the schema version SHALL NOT be incremented
+- **GIVEN** a sequential migration is creating a required application table and its `CREATE TABLE` step fails
+- **WHEN** the migration transaction rolls back
+- **THEN** the migration SHALL leave no partial table or schema change
+- **AND** `PRAGMA user_version` SHALL remain at the pre-migration version
 
-#### Scenario: Existing profile migration records lazy-table uncertainty
+#### Scenario: Present document-email tables match their declared schema
 
-- **GIVEN** an existing profile is migrated to the schema version that introduces `feature_table_state`
-- **WHEN** the marker rows are initialized
-- **THEN** each lazy table already present with its declared schema SHALL be marked `initialized`
-- **AND** each absent lazy table SHALL be marked `unknown`
-
-#### Scenario: Lazy feature initialization updates the marker transactionally
-
-- **GIVEN** a lazy occurrence table has marker state `never_initialized`
-- **WHEN** its owning feature initializes the table
-- **THEN** table creation and marker transition to `initialized` SHALL commit in one transaction
-- **AND** a failed creation SHALL leave the marker and schema unchanged
-
-#### Scenario: Unknown lazy state is not recreated automatically
-
-- **GIVEN** a lazy occurrence table has marker state `unknown` and the table is absent
-- **WHEN** the owning feature initializes
-- **THEN** it SHALL fail closed without creating an empty table or changing the marker
-
-#### Scenario: Missing payment table is checked before startup repair
-
-- **GIVEN** `PRAGMA user_version` is at or beyond the accepted `forderung_zahlungen` migration version and that table is absent
-- **WHEN** database startup health checks run
-- **THEN** the check SHALL fail before any automatic repair can create the table
-- **AND** the original database SHALL be preserved and the profile SHALL remain unavailable for a complete export
+- **GIVEN** either optional document-email table is present
+- **WHEN** schema health is checked
+- **THEN** all of its declared columns SHALL be present
+- **AND** malformed document-email tables SHALL prevent a complete export
 
 #### Scenario: Missing mileage tables are checked at their required version
 
-- **GIVEN** `PRAGMA user_version` is at or beyond version 9 and either mileage table is absent or has an invalid schema
+- **GIVEN** `PRAGMA user_version` is at or beyond version 13 and either mileage table is absent or has an invalid schema
 - **WHEN** database startup health checks run
 - **THEN** the profile SHALL fail schema health before any repair can create or replace the table
 - **AND** the original database and all remaining mileage data SHALL be preserved
 
-#### Scenario: Block mileage migration until export inventories include its tables
+#### Scenario: Block mileage completeness until export inventories include its tables
 
 - **GIVEN** either owning portability or customer-export inventory omits `mileage_trips` or `mileage_trip_corrections`
-- **WHEN** the version-9 mileage migration is considered
-- **THEN** the mileage migration SHALL remain disabled until both inventories accept the 46-name contract
+- **WHEN** mileage completeness is considered
+- **THEN** mileage tables SHALL remain ineligible for complete export until both inventories accept the 55-name contract
 
 #### Scenario: Keep exports incomplete for undeclared mileage tables
 
@@ -173,3 +234,10 @@ AND the schema version SHALL NOT be incremented
 - **WHEN** the export is validated
 - **THEN** the export SHALL be marked incomplete and SHALL NOT publish or claim a complete result
 - **AND** the exporter SHALL NOT create, repair, or remove either mileage table
+
+#### Scenario: v22-to-v23 migration installs mileage lifecycle triggers
+
+- **GIVEN** a valid profile at schema version 22 with both mileage tables present
+- **WHEN** the next sequential migration runs
+- **THEN** it SHALL create and verify triggers rejecting non-unresolved trip INSERTs, non-draft correction INSERTs, invalid correction transitions, any DELETE of correction rows, and terminal trip updates without a matching applied correction
+- **AND** it SHALL preserve all existing rows and increment `PRAGMA user_version` only after successful verification

@@ -132,6 +132,22 @@ void main() {
       expect(kept.calculatedAmount, isNull);
     });
 
+    test('test_editing_calculated_trip_invalidates_calculation', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      await useCases.applyApprovedCalculation(trip.id, 'car');
+      final MileageTrip edited = await useCases.editTripFacts(trip.id, purpose: 'Neuer Zweck');
+      expect(edited.state, MileageTripState.unresolved);
+      expect(edited.purpose, 'Neuer Zweck');
+      expect(edited.policyId, isNull);
+      expect(edited.calculatedAmount, isNull);
+      expect(edited.postingEventId, isNull);
+    });
+
     test('test_post_a_confirmed_resolved_mileage_expense', () async {
       final MileageTrip trip = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',
