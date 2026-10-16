@@ -145,9 +145,9 @@ UBL party electronic addresses SHALL come from snapshot fields (persisted master
 
 #### Scenario: Missing payment data fails closed
 
-- **GIVEN** no accepted invoice payment-means model exists
+- **GIVEN** the company record carries no IBAN
 - **WHEN** XRechnung UBL is requested
-- **THEN** generation SHALL fail closed with a localized diagnostic naming the missing payment data
+- **THEN** generation SHALL fail closed with a localized diagnostic naming the company IBAN
 - **AND** no fabricated payment-means block SHALL be emitted
 
 ### Requirement: E-invoice output follows application boundaries and design

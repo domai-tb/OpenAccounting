@@ -258,3 +258,43 @@ All 6 Round 3 Moderate follow-ups correctly applied; no new contradictions.
 ## Rebuttals
 
 None.
+
+---
+
+## Review Metadata
+
+- **Review round**: 5
+- **Prior round**: Round 4 ended `VERDICT: APPROVE` (entries preserved above)
+- **Reviewer context**: fresh-context independent subagent; Round 5 payment-delta scope only
+- **Review date**: 2026-10-16
+- **Tool restrictions**: read-only inspection; appended only this Round 5 entry to `review.md`; no tests run
+- **Artifacts reviewed**: payment sourcing paragraph + scenarios; design Decision 11; proposal bullet; verify KoSIT evidence; tasks 12.7-12.9; snapshot/builder/UBL/validation/fixture/tests
+- **Validation**: structural `openspec validate` passes (structural only). No tests run by reviewer.
+- **Scope**: ONLY the payment delta and ripple effects.
+
+## Prior Recheck
+
+- No Round 1/2 finding reopened. No-invention posture retained (verbatim trim, blank means null). XRechnung-only gate retained.
+
+## Findings
+
+### Critical (blocking)
+
+None. BT-81 58 + BG-17 correct for German SEPA transfer; company-IBAN sourcing legitimate (pre-existing `unternehmen.iban` column); fail-closed genuine.
+
+### Moderate (follow-ups before archive)
+
+1. **Spec scenario contradicts its own requirement.** Scenario "Missing payment data fails closed" still reads no-model/no-block while the requirement paragraph mandates the 58/BG-17 block. Rewrite GIVEN/THEN around absent IBAN.
+2. **Design Decision 11 and proposal bullet still say "defer".** One-line sync each to company-`iban` sourcing.
+3. **No test asserts the positive emit path.** Add one scenario + test for 58 plus payee account equals IBAN.
+4. **Company IBAN has no user-facing write path.** Settings form edits only name; normalize map drops iban. Add iban to normalize map plus a settings IBAN field (reuse konten IBAN validation) or document the source.
+
+## Verdict
+
+VERDICT: APPROVE
+
+Payment delta correct; Moderate 1-4 must be resolved before archive.
+
+## Rebuttals
+
+None.

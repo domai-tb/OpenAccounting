@@ -10,6 +10,7 @@ import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/tokens/spacing.dart';
+import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/pages/stammdaten/artikel_repository.dart';
 import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
@@ -741,12 +742,14 @@ class CompanySettingsView extends ConsumerStatefulWidget {
 class _CompanySettingsViewState extends ConsumerState<CompanySettingsView> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _name = TextEditingController();
+  final TextEditingController _iban = TextEditingController();
   bool _saving = false;
   int _reloadToken = 0;
 
   @override
   void dispose() {
     _name.dispose();
+    _iban.dispose();
     super.dispose();
   }
 
@@ -779,6 +782,9 @@ class _CompanySettingsViewState extends ConsumerState<CompanySettingsView> {
           if (_name.text.isEmpty && (company.name?.isNotEmpty ?? false)) {
             _name.text = company.name!;
           }
+          if (_iban.text.isEmpty && (company.iban?.isNotEmpty ?? false)) {
+            _iban.text = company.iban!;
+          }
           if (company.name == null || company.name!.trim().isEmpty || company.name == 'Meine Firma') {
             return AppCard(
               child: Column(
@@ -809,6 +815,16 @@ class _CompanySettingsViewState extends ConsumerState<CompanySettingsView> {
             validator: (String? value) => value == null || value.trim().isEmpty ? l10n.formRequiredField : null,
           ),
           const SizedBox(height: AppSpacing.xxl),
+          TextFormField(
+            controller: _iban,
+            decoration: InputDecoration(labelText: l10n.formIban),
+            validator: (String? value) {
+              final String trimmed = (value ?? '').trim();
+              if (trimmed.isEmpty) return null;
+              return SetupRepository.isValidIban(trimmed) ? null : l10n.setupInvalidIban;
+            },
+          ),
+          const SizedBox(height: AppSpacing.xxl),
           Row(
             children: <Widget>[
               const Spacer(),
@@ -819,7 +835,10 @@ class _CompanySettingsViewState extends ConsumerState<CompanySettingsView> {
                         if (!(_formKey.currentState?.validate() ?? false)) return;
                         setState(() => _saving = true);
                         try {
-                          await services.companySettings.update(<String, dynamic>{'name': _name.text.trim()});
+                          await services.companySettings.update(<String, dynamic>{
+                            'name': _name.text.trim(),
+                            'iban': _iban.text.trim(),
+                          });
                           if (context.mounted) setState(() => _reloadToken++);
                         } catch (error) {
                           if (context.mounted) {

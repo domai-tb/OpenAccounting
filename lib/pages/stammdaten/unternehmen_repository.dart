@@ -28,6 +28,7 @@ class Unternehmen {
   String? get bundesland => data['bundesland'] as String?;
   String? get steuernummer => data['steuernummer'] as String?;
   String? get ustIdNr => data['ust_idnr'] as String?;
+  String? get iban => data['iban'] as String?;
   String? get wIdnr => data['w_idnr'] as String?;
   String? get berufsbezeichnung => data['berufsbezeichnung'] as String?;
   String? get bezeichnungDesGewerbes => data['bezeichnung_des_gewerbes'] as String?;
@@ -413,6 +414,8 @@ class UnternehmenRepository {
       'steuernummer': 'steuernummer',
       'ustIdNr': 'ust_idnr',
       'ust_idnr': 'ust_idnr',
+      'iban': 'iban',
+      'IBAN': 'iban',
       'wIdnr': 'w_idnr',
       'w_idnr': 'w_idnr',
       'berufsbezeichnung': 'berufsbezeichnung',

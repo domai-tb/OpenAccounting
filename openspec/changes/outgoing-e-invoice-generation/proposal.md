@@ -13,7 +13,7 @@ The existing contracts distinguish two behaviors: a customer with `zugferd_aktiv
 - Validate XML against pinned, locally packaged official XSD/Schematron artifacts and validate the hybrid PDF/A-3b packaging before reporting success or writing a user-requested export.
 - Reject incomplete or inconsistent source data with localized field-level diagnostics. Failed ZUGFeRD generation rolls back finalization and leaves no numbered invoice or partial file.
 - Keep XRechnung export behind the typed application-scope invoice service/repository and a native save-file dialog. It does not change the finalized invoice.
-- Emit XRechnung party endpoints from master-data captures plus the export buyer reference (seller VAT/9930, buyer email/EM else buyerReference/0204), failing closed without invention; defer BG-16 payment means until an accepted payment model exists
+- Emit XRechnung party endpoints from master-data captures plus the export buyer reference (seller VAT/9930, buyer email/EM else buyerReference/0204), failing closed without invention; source BG-16 payment means from the company IBAN (absent IBAN fails closed)
 - Persist the selected per-invoice output format atomically with finalization so the detail workspace can restore the choice after the invoice is reopened. Legacy finalized invoices with no saved choice resolve to PDF, independent of current customer defaults.
 - Update the maintained PDF/customer requirements and `docs/01-rechnungen.md` to distinguish the hybrid and standalone formats, supported releases, validation behavior, explicit output selection, and XRechnung export. Replace blanket mandatory-field claims with conditions tied to applicable legal or pinned format rules.
 

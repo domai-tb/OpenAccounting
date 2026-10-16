@@ -219,6 +219,15 @@ void main() {
       expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
     });
 
+    test('emits_payment_means_with_company_iban', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
+
+      final String ubl = serializer.xrechnungUbl(snapshot);
+      expect(ubl.contains('<cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>'), isTrue);
+      expect(ubl.contains('<cbc:ID>DE89370400440532013000</cbc:ID>'), isTrue);
+    });
+
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {
       final List<Map<String, Object?>> positions = <Map<String, Object?>>[
         <String, Object?>{
