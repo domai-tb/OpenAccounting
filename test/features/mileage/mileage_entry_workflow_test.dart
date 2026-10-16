@@ -113,5 +113,23 @@ void main() {
       expect(kept.calculatedAmount, isNull);
       expect(kept.postingEventId, isNull);
     });
+
+    test('test_do_not_treat_the_eks_allowance_as_the_general_deduction', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      const int eksAllowance = (1000 * 10) ~/ 100;
+      expect(eksAllowance, 100);
+      expect(
+        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'car'),
+        isNot(eksAllowance),
+      );
+      final MileageTrip kept = (await repo.getById(trip.id))!;
+      expect(kept.state, MileageTripState.unresolved);
+      expect(kept.calculatedAmount, isNull);
+    });
   });
 }
