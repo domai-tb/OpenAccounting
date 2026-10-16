@@ -186,3 +186,75 @@ Findings Moderate 1-6; no Critical items. Review-only; entry appended by parent.
 ## Rebuttals
 
 None.
+
+---
+
+## Review Metadata
+
+- **Review round**: 4
+- **Prior round**: Round 3 ended `VERDICT: APPROVE` with 6 Moderate follow-ups required before implementation (entries preserved above)
+- **Reviewer context**: fresh-context independent subagent; Round 4 follow-up-verification scope only
+- **Review date**: 2026-10-16
+- **Tool restrictions**: read-only inspection; appended only this Round 4 entry to `review.md`; no tests run
+- **Artifacts reviewed**: endpoints/payment requirement + 3 scenarios; `tasks.md` section 12; `test-plan.md` new rows + coverage notes; `design.md` Decision 11; `proposal.md` What-Changes bullet
+- **Validation**: structural `openspec validate` passes. Structural validation only.
+- **Scope**: ONLY whether the 6 Round 3 Moderate follow-ups were correctly applied.
+
+## Follow-up Disposition (Round 3 Moderate 1-6)
+
+- **Moderate 1 — seller fallback dropped: applied.** Seller BT-34 from company `ust_idnr`/9930, else fails closed naming `ust_idnr`.
+- **Moderate 2 — tasks + test-plan coverage: applied.** Section 12.1-12.9 present, all unchecked; 3 new red test-plan rows; coverage notes corrected to 38.
+- **Moderate 3 — design + proposal currency: applied.** Decision 11 states mapping, rationale, deferral; proposal bullet matches.
+- **Moderate 4 — value normalization: applied.** Verbatim after trimming; malformed deferred to pinned-rule diagnostics.
+- **Moderate 5 — XRechnung-only payment gate: applied.** Stated in spec and design.
+- **Moderate 6 — buyerReference provenance: applied.** Reworded to snapshot fields.
+
+## Findings
+
+Non-blocking nits only: design numbering `11.` before `10.`; fallback scenario title buyer-only; proposal bullet wording.
+
+## Verdict
+
+VERDICT: APPROVE
+
+All 6 Round 3 Moderate follow-ups correctly applied; no new contradictions.
+
+## Rebuttals
+
+None.
+
+---
+
+## Review Metadata
+
+- **Review round**: 4
+- **Prior round**: Round 3 ended `VERDICT: APPROVE` with 6 Moderate follow-ups required before implementation (entries preserved above)
+- **Reviewer context**: fresh-context independent subagent; Round 4 follow-up-verification scope only
+- **Review date**: 2026-10-16
+- **Tool restrictions**: read-only inspection; appended only this Round 4 entry to `review.md`; no tests run
+- **Artifacts reviewed**: endpoints/payment requirement + 3 scenarios; `tasks.md` section 12; `test-plan.md` new rows + coverage notes; `design.md` Decision 11; `proposal.md` What-Changes bullet
+- **Validation**: structural `openspec validate` passes. Structural validation only.
+- **Scope**: ONLY whether the 6 Round 3 Moderate follow-ups were correctly applied.
+
+## Follow-up Disposition (Round 3 Moderate 1-6)
+
+- **Moderate 1 — seller fallback dropped: applied.** Seller BT-34 from company `ust_idnr`/9930, else fails closed naming `ust_idnr`.
+- **Moderate 2 — tasks + test-plan coverage: applied.** Section 12.1-12.9 present, all unchecked; 3 new red test-plan rows; coverage notes corrected to 38.
+- **Moderate 3 — design + proposal currency: applied.** Decision 11 states mapping, rationale, deferral; proposal bullet matches.
+- **Moderate 4 — value normalization: applied.** Verbatim after trimming; malformed deferred to pinned-rule diagnostics.
+- **Moderate 5 — XRechnung-only payment gate: applied.** Stated in spec and design.
+- **Moderate 6 — buyerReference provenance: applied.** Reworded to snapshot fields.
+
+## Findings
+
+Non-blocking nits only: design numbering `11.` before `10.`; fallback scenario title buyer-only; proposal bullet wording.
+
+## Verdict
+
+VERDICT: APPROVE
+
+All 6 Round 3 Moderate follow-ups correctly applied; no new contradictions.
+
+## Rebuttals
+
+None.

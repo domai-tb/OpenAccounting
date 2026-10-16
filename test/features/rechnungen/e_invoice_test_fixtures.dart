@@ -21,6 +21,7 @@ Map<String, Object?> validCompany() => <String, Object?>{
   'ort': 'Berlin',
   'land': 'DE',
   'steuernummer': '13/123/12345',
+  'ust_idnr': 'DE123456789',
 };
 
 Map<String, Object?> validCustomer() => <String, Object?>{
@@ -71,8 +72,8 @@ Future<AppDatabase> openEInvoiceDatabase() async {
   await db.ensureOpen();
   await db.kategorienRepository.create(bezeichnung: 'Fixture-Kategorie');
   await db.executor.runInsert(
-    'INSERT INTO unternehmen (name, strasse, plz, ort, land, steuernummer) VALUES (?, ?, ?, ?, ?, ?)',
-    const <Object?>['Muster GmbH', 'Musterstraße 1', '10115', 'Berlin', 'DE', '13/123/12345'],
+    'INSERT INTO unternehmen (name, strasse, plz, ort, land, steuernummer, ust_idnr) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    const <Object?>['Muster GmbH', 'Musterstraße 1', '10115', 'Berlin', 'DE', '13/123/12345', 'DE123456789'],
   );
   return db;
 }

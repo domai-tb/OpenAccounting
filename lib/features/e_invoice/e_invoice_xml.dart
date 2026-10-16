@@ -215,6 +215,11 @@ class EInvoiceXmlSerializer {
   void _ublParty(StringBuffer xml, {required String tag, required EInvoicePartySnapshot party}) {
     xml.writeln('  <cac:$tag>');
     xml.writeln('    <cac:Party>');
+    if (party.endpointId != null && party.endpointScheme != null) {
+      xml.writeln(
+        '      <cbc:EndpointID schemeID="${party.endpointScheme}">${_escape(party.endpointId!)}</cbc:EndpointID>',
+      );
+    }
     xml.writeln('      <cac:PartyName><cbc:Name>${_escape(party.company ?? party.name)}</cbc:Name></cac:PartyName>');
     xml.writeln('      <cac:PostalAddress>');
     xml.writeln('        <cbc:StreetName>${_escape(party.street ?? '')}</cbc:StreetName>');

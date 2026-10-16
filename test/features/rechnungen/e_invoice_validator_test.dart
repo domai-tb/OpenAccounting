@@ -85,7 +85,9 @@ void main() {
 
     test('missing_source_field_reports_localized_diagnostic_without_output', () {
       const EInvoiceService service = eInvoiceTestService;
-      final Map<String, Object?> company = validCompany()..remove('steuernummer');
+      final Map<String, Object?> company = validCompany()
+        ..remove('steuernummer')
+        ..remove('ust_idnr');
       final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
         documentNumber: 'RE-2026-0001',
         outputFormat: EInvoiceOutputFormat.zugferd,

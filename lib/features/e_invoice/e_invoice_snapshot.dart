@@ -35,6 +35,8 @@ class EInvoicePartySnapshot {
     this.taxNumber,
     this.vatId,
     this.email,
+    this.endpointId,
+    this.endpointScheme,
   });
 
   final String name;
@@ -46,6 +48,11 @@ class EInvoicePartySnapshot {
   final String? taxNumber;
   final String? vatId;
   final String? email;
+
+  /// Resolved electronic address for XRechnung (BT-34/BT-49), or null when
+  /// no approved source exists. Never invented; validation fails closed.
+  final String? endpointId;
+  final String? endpointScheme;
 }
 
 /// Immutable line with canonical cent amounts and explicit classification.
@@ -205,7 +212,7 @@ class EInvoiceSnapshotBuilder {
       issueDate: issueDate,
       currency: 'EUR',
       seller: _sellerFromCompany(companyRow),
-      buyer: _buyerFromCustomer(customerRow),
+      buyer: _buyerFromCustomer(customerRow, buyerReference: buyerReference),
       lines: List<EInvoiceLineSnapshot>.unmodifiable(lines),
       netCents: preview.netCents,
       taxCents: preview.taxCents,
@@ -431,6 +438,7 @@ class EInvoiceSnapshotBuilder {
             row['strasse']?.toString().trim(),
             row['hausnummer']?.toString().trim(),
           ].where((part) => part != null && part.isNotEmpty).join(' ');
+    final String? vatId = _text(row['ust_idnr']) ?? _text(row['ust_id']);
     return EInvoicePartySnapshot(
       name: row['name']?.toString().trim() ?? '',
       street: street,
@@ -438,18 +446,22 @@ class EInvoiceSnapshotBuilder {
       city: _text(row['ort']),
       country: _text(row['land']),
       taxNumber: _text(row['steuernummer']),
-      vatId: _text(row['ust_idnr']) ?? _text(row['ust_id']),
+      vatId: vatId,
       email: _text(row['email']),
+      endpointId: vatId,
+      endpointScheme: vatId == null ? null : '9930',
     );
   }
 
-  EInvoicePartySnapshot _buyerFromCustomer(Map<String, Object?> row) {
+  EInvoicePartySnapshot _buyerFromCustomer(Map<String, Object?> row, {String? buyerReference}) {
     final String? street = row['strasse']?.toString().trim().isEmpty ?? true
         ? null
         : [
             row['strasse']?.toString().trim(),
             row['hausnummer']?.toString().trim(),
           ].where((part) => part != null && part.isNotEmpty).join(' ');
+    final String? email = _text(row['email']);
+    final String? reference = buyerReference?.trim().isEmpty ?? true ? null : buyerReference!.trim();
     return EInvoicePartySnapshot(
       name: row['name']?.toString().trim() ?? '',
       company: _text(row['firma']),
@@ -458,7 +470,9 @@ class EInvoiceSnapshotBuilder {
       city: _text(row['ort']),
       country: _text(row['land']),
       vatId: _text(row['ust_idnr']),
-      email: _text(row['email']),
+      email: email,
+      endpointId: email ?? reference,
+      endpointScheme: email != null ? 'EM' : (reference == null ? null : '0204'),
     );
   }
 

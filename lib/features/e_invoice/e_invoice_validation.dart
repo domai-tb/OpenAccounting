@@ -42,7 +42,7 @@ class EInvoiceValidator {
 
   EInvoiceValidationResult validate(FinalizationSnapshot snapshot, EInvoiceOutputFormat format) {
     final List<EInvoiceDiagnostic> findings = <EInvoiceDiagnostic>[];
-    _checkParties(snapshot, findings);
+    _checkParties(snapshot, findings, format);
     _checkDocument(snapshot, findings, format);
     _checkTotals(snapshot, findings);
     _checkCurrency(snapshot, findings);
@@ -50,7 +50,7 @@ class EInvoiceValidator {
     return EInvoiceValidationResult.invalid(List<EInvoiceDiagnostic>.unmodifiable(findings));
   }
 
-  void _checkParties(FinalizationSnapshot snapshot, List<EInvoiceDiagnostic> findings) {
+  void _checkParties(FinalizationSnapshot snapshot, List<EInvoiceDiagnostic> findings, EInvoiceOutputFormat format) {
     _requiredText(snapshot.seller.name, 'seller.name', findings, route: 'stammdaten');
     _requiredText(snapshot.seller.street, 'seller.street', findings, route: 'stammdaten');
     _requiredText(snapshot.seller.postalCode, 'seller.postalCode', findings, route: 'stammdaten');
@@ -73,6 +73,28 @@ class EInvoiceValidator {
     _requiredText(snapshot.buyer.postalCode, 'buyer.postalCode', findings, route: 'rechnungen');
     _requiredText(snapshot.buyer.city, 'buyer.city', findings, route: 'rechnungen');
     _requiredText(snapshot.buyer.country, 'buyer.country', findings, route: 'rechnungen');
+    if (format == EInvoiceOutputFormat.xrechnung) {
+      if (_blank(snapshot.seller.endpointId)) {
+        findings.add(
+          const EInvoiceDiagnostic(
+            ruleId: 'seller.endpoint',
+            messageDe: 'Elektronische Adresse des Ausstellers fehlt (USt-IdNr. erforderlich)',
+            messageEn: 'Seller electronic address is missing (VAT ID required)',
+            route: 'stammdaten',
+          ),
+        );
+      }
+      if (_blank(snapshot.buyer.endpointId)) {
+        findings.add(
+          const EInvoiceDiagnostic(
+            ruleId: 'buyer.endpoint',
+            messageDe: 'Elektronische Adresse des Käufers fehlt (E-Mail oder Käuferreferenz erforderlich)',
+            messageEn: 'Buyer electronic address is missing (email or buyer reference required)',
+            route: 'rechnungen',
+          ),
+        );
+      }
+    }
   }
 
   void _checkDocument(FinalizationSnapshot snapshot, List<EInvoiceDiagnostic> findings, EInvoiceOutputFormat format) {

@@ -148,6 +148,56 @@ void main() {
       expect(ubl.contains('<cbc:TaxExemptionReason>Steuerfrei nach § 19 UStG</cbc:TaxExemptionReason>'), isTrue);
     });
 
+    test('seller_endpoint_uses_vat_id_with_9930', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
+
+      expect(snapshot.seller.endpointId, 'DE123456789');
+      expect(snapshot.seller.endpointScheme, '9930');
+      final String ubl = serializer.xrechnungUbl(snapshot);
+      expect(ubl.contains('<cbc:EndpointID schemeID="9930">DE123456789</cbc:EndpointID>'), isTrue);
+    });
+
+    test('endpoint_fallback_without_invention', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final Map<String, Object?> customer = validCustomer()..['email'] = 'kunde@example.de';
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: customer,
+        posRows: standardPositions(),
+        preview: standardTotals(),
+        eingabemodus: 'netto',
+        buyerReference: 'LEITWEG-123',
+      );
+
+      expect(snapshot.buyer.endpointId, 'kunde@example.de');
+      expect(snapshot.buyer.endpointScheme, 'EM');
+      expect(
+        serializer.xrechnungUbl(snapshot).contains('<cbc:EndpointID schemeID="EM">kunde@example.de</cbc:EndpointID>'),
+        isTrue,
+      );
+
+      const EInvoiceService service = eInvoiceTestService;
+      final Map<String, Object?> noIdCompany = validCompany()..remove('ust_idnr');
+      final FinalizationSnapshot noSellerEndpoint = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: noIdCompany,
+        customerRow: validCustomer(),
+        posRows: standardPositions(),
+        preview: standardTotals(),
+        eingabemodus: 'netto',
+        buyerReference: 'LEITWEG-123',
+      );
+      final EInvoiceValidationResult result = service.validate(noSellerEndpoint, EInvoiceOutputFormat.xrechnung);
+      expect(result.valid, isFalse);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('seller.endpoint'));
+    });
+
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {
       final List<Map<String, Object?>> positions = <Map<String, Object?>>[
         <String, Object?>{
