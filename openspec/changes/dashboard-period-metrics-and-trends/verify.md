@@ -10,15 +10,16 @@
 - [x] Every test-plan row maps to an executable test.
 - [x] Every test-plan row is green.
 - [ ] Full suite passes.
-- [ ] All tests completed; 74 tests did not complete after the test device crashed. The runner did not provide a separate skipped-test count.
+- [x] Full suite ran to completion on `b969770` (1,755 passed, 22 failed); no device crash observed in this run.
 - [x] No dashboard test was weakened or removed.
 
 ### Evidence
 
-- Full VM suite on code commit `d09ab8b`: `rtk proxy env FVM_CACHE_PATH=/tmp/oa-fvm-cache-clean FVM_USE_GIT_CACHE=false FLUTTER_SUPPRESS_ANALYTICS=true fvm flutter test --no-pub --dart-define=platform=vm` → exit 1 on Flutter 3.47.2 / Dart 3.13.2; 1,696 passed, 27 explicit failures, and 74 tests did not complete after the test device crashed.
-- Dashboard focused suite on the same code commit: `rtk proxy fvm flutter test --dart-define=platform=vm test/features/dashboard` → 63 passed, exit 0.
-- Static analysis on the same code commit: `rtk proxy fvm flutter analyze` → `No issues found!`.
-- Full-suite failures include invoice finalization, invoice-money correction availability, X11 `BadAccess` crashes, timed-out analyzer integration gates, and `/taxes` missing `FinanceListSurface`; none reported a dashboard failure.
+- Full VM suite on code commit `b969770`: `fvm flutter test --no-pub --dart-define=platform=vm` → exit 1 on Flutter 3.47.2; 1,755 passed, 22 explicit failures.
+- Dashboard focused suite on the same code commit: `fvm flutter test --dart-define=platform=vm test/features/dashboard` → 63 passed, exit 0.
+- Static analysis on the same code commit: `fvm flutter analyze` → `No issues found!` (scoped dashboard analyze also clean; `dart format` clean).
+- Full-suite failures observed include `test_every_canonical_route_has_a_useful_surface` (master_data_routes) and inventory_stocktake migration tests (`test_all_tables_created_on_fresh_install`, `test_named_inventory_table_migration`, `test_table_count_verification`) plus 18 more; prior runs also reported invoice finalization, invoice-money correction, X11 `BadAccess`, analyzer timeouts, and `/taxes` surface gaps. No dashboard failure appeared in the observed output.
+- Prior evidence on `d09ab8b` (1,696 passed, 27 failures, 74 incomplete after device crash) is superseded by this run.
 - Structural validation: `rtk proxy openspec validate dashboard-period-metrics-and-trends --type change --json` → passed with two long-requirement warnings. `--strict` exits 1 on those warnings. No planning artifacts changed since the approved review.
 - `rtk git diff --check` → clean after this verification update.
 
