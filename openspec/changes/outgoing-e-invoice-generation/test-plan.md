@@ -48,9 +48,11 @@
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Delivery date is emitted verbatim | test/features/rechnungen/e_invoice_generation_test.dart | delivery_date_emitted_verbatim | 🔴 red |
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Missing delivery date fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_delivery_date_fails_closed | 🔴 red |
 
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Invoice persists and captures the delivery date | test/features/rechnungen/workspace_lifecycle_actions_test.dart | persists_optional_leistungsdatum_through_workspace | 🔴 red |
+
 ## Coverage Notes
 
-- All 38 specification scenarios map to named tests. Green rows passed focused local tests; red rows remain open where tests do not prove the specified validator, tax-map approval, or hybrid-PDF behavior.
+- All 40 specification scenarios map to named tests. Green rows passed focused local tests; red rows remain open where tests do not prove the specified validator, tax-map approval, or hybrid-PDF behavior.
 - Tests that inject `PinnedArtifactBundle(available: true)` exercise application-level validation only. They do not load official XSD/Schematron artifacts or prove PDF/A-3 output.
 - Validator and PDF/A tests still require the exact pinned offline artifacts and representative valid/invalid fixtures on Linux, Windows, and macOS.
 - Export dialog tests should inject the native save-dialog adapter so cancellation and atomic output behavior can be verified without an interactive desktop session.

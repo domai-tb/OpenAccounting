@@ -145,7 +145,7 @@ UBL party electronic addresses SHALL come from snapshot fields (persisted master
 
 ### Requirement: XRechnung delivery date
 
-The invoice SHALL carry an optional delivery date (`leistungsdatum`, ISO `YYYY-MM-DD`) captured in the draft/edit workspace, persisted on the invoice row, and snapshotted at finalization like other invoice facts. XRechnung UBL SHALL emit it as BT-72 Actual delivery date, verbatim. An absent delivery date SHALL fail closed for XRechnung with a localized diagnostic naming `leistungsdatum`; no date SHALL ever be inferred from the issue date, due date, or creation timestamp. This gate is intentionally XRechnung-only.
+The invoice SHALL carry an optional delivery date (`leistungsdatum`, ISO `YYYY-MM-DD`) captured in the draft/edit workspace, persisted on the invoice row, and snapshotted at finalization like other invoice facts. XRechnung UBL SHALL emit it as BT-72 Actual delivery date, verbatim after trimming; malformed values are left to pinned-rule diagnostics. An absent delivery date SHALL fail closed for XRechnung with a localized diagnostic naming `leistungsdatum`; no date SHALL ever be inferred from the issue date, due date, or creation timestamp. This gate is intentionally XRechnung-only.
 
 #### Scenario: Delivery date is emitted verbatim
 

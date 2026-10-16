@@ -165,6 +165,6 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 - [ ] 13.4 Write failing test for "Missing delivery date fails closed": missing_delivery_date_fails_closed in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
 - [ ] 13.5 Implement the required application behavior for "Missing delivery date fails closed" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [ ] 13.6 Refactor the related implementation; targeted tests and the full suite stay green.
-- [ ] 13.7 Write failing test for invoice `leistungsdatum` persistence and workspace capture in the owning invoice tests (assert it fails for the right reason).
+- [ ] 13.7 Write failing test for invoice `leistungsdatum` persistence and workspace capture: persists_optional_leistungsdatum_through_workspace in test/features/rechnungen/workspace_lifecycle_actions_test.dart (assert it fails for the right reason).
 - [ ] 13.8 Implement the invoice `leistungsdatum` column, snapshot capture, and workspace field to pass 13.7.
 - [ ] 13.9 Refactor the related implementation; targeted tests and the full suite stay green.

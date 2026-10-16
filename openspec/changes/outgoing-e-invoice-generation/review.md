@@ -298,3 +298,48 @@ Payment delta correct; Moderate 1-4 must be resolved before archive.
 ## Rebuttals
 
 None.
+
+---
+
+## Review Metadata
+
+- **Review round**: 6
+- **Prior round**: Round 5 ended `VERDICT: APPROVE` (payment delta; entries preserved above)
+- **Reviewer context**: fresh-context independent subagent; Round 6 delivery-date delta scope only
+- **Review date**: 2026-10-16
+- **Tool restrictions**: read-only inspection; appended only this Round 6 entry to `review.md`; no tests run
+- **Artifacts reviewed**: Requirement "XRechnung delivery date" + 2 scenarios; `tasks.md` section 13; `test-plan.md` rows; `design.md`, `proposal.md`, `verify.md`
+- **Validation**: structural `openspec validate` passes (structural only). No tests run by reviewer.
+- **Scope**: ONLY the delivery-date delta and ripple effects.
+
+## Prior Recheck
+
+- No conflict with Rounds 2-5. Motivated by live KoSIT evidence (BR-DE-TMP-32 info-level delivery note).
+
+## Findings
+
+### Critical (blocking)
+
+None. BT-72 correct for a single delivery date; fail-closed consistent.
+
+### Moderate (follow-ups before implementation)
+
+1. **Design and proposal stale.** Add design Decision 12 plus proposal bullet.
+2. **Coverage notes undercount.** Correct 38 to 40 scenarios.
+3. **Tasks 13.7-13.8 scope honesty.** Record owning-invoice coordination; give 13.7 concrete test identity; add test-plan row for persistence/capture.
+4. **BT-72-only vs BG-14 undecided.** Decide single-date-only scope vs period path in design.
+5. **Strictness delta unrecorded.** State gate is stricter than pinned info-level rule.
+
+### Minor
+
+- Restate verbatim-after-trim plus ISO shape convention.
+
+## Verdict
+
+VERDICT: APPROVE
+
+Delivery-date delta correct and consistent. Moderate 1-5 must be resolved before implementation.
+
+## Rebuttals
+
+None.
