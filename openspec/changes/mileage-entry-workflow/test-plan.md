@@ -12,7 +12,7 @@
 | specs/specs/mileage-entry/spec.md → Mileage amounts require an approved effective policy | Keep an unresolved trip out of accounting | test/features/mileage/mileage_entry_workflow_test.dart | test_keep_an_unresolved_trip_out_of_accounting | 🟢 green |
 | specs/specs/mileage-entry/spec.md → Mileage amounts require an approved effective policy | Do not treat the EKS allowance as the general deduction | test/features/mileage/mileage_entry_workflow_test.dart | test_do_not_treat_the_eks_allowance_as_the_general_deduction | 🟢 green |
 | specs/specs/mileage-entry/spec.md → Post resolved mileage through the accounting boundary | Post a confirmed resolved mileage expense | test/features/mileage/mileage_entry_workflow_test.dart | test_post_a_confirmed_resolved_mileage_expense | 🟢 green |
-| specs/specs/mileage-entry/spec.md → Post resolved mileage through the accounting boundary | Reject duplicate or incomplete posting | test/features/mileage/mileage_entry_workflow_test.dart | test_reject_duplicate_or_incomplete_posting | 🔴 red |
+| specs/specs/mileage-entry/spec.md → Post resolved mileage through the accounting boundary | Reject duplicate or incomplete posting | test/features/mileage/mileage_entry_workflow_test.dart | test_reject_duplicate_or_incomplete_posting | 🟢 green |
 
 ## Coverage Notes
 

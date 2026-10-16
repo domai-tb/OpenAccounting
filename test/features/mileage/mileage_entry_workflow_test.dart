@@ -149,6 +149,30 @@ void main() {
       expect(kept.postingEventId, eventId);
       expect(kept.state, MileageTripState.posted);
     });
+
+    test('test_reject_duplicate_or_incomplete_posting', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+      );
+      await useCases.applyApprovedCalculation(trip.id, 'car');
+      final _RecordingPort port = _RecordingPort();
+      final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
+      final String first = await wired.postTripWithPort(trip.id);
+      final String second = await wired.postTripWithPort(trip.id);
+      expect(second, first);
+      expect(port.calls, 1);
+
+      final MileageTrip bare = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-15',
+        purpose: 'Ohne Kalkulation',
+        distanceHundredthsKm: 500,
+        businessContext: 'Projekt',
+      );
+      await expectLater(() => wired.postTripWithPort(bare.id), throwsStateError);
+    });
   });
 }
 

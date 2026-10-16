@@ -27,9 +27,9 @@
 - [x] 3.1 Write failing test `test_post_a_confirmed_resolved_mileage_expense` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Post a confirmed resolved mileage expense"; assert it fails for the right reason.
 - [x] 3.2 Implement the specified behavior for "Post a confirmed resolved mileage expense" to pass 3.1.
 - [x] 3.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 3.4 Write failing test `test_reject_duplicate_or_incomplete_posting` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject duplicate or incomplete posting"; assert it fails for the right reason.
-- [ ] 3.5 Implement the specified behavior for "Reject duplicate or incomplete posting" to pass 3.4.
-- [ ] 3.6 Refactor the affected code; keep the focused and full suites green.
+- [x] 3.4 Write failing test `test_reject_duplicate_or_incomplete_posting` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject duplicate or incomplete posting"; assert it fails for the right reason.
+- [x] 3.5 Implement the specified behavior for "Reject duplicate or incomplete posting" to pass 3.4.
+- [x] 3.6 Refactor the affected code; keep the focused and full suites green.
 
 ## Implementation Notes
 
