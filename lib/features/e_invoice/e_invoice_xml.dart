@@ -90,6 +90,17 @@ class EInvoiceXmlSerializer {
     xml.writeln('  <cbc:BuyerReference>${_escape(snapshot.buyerReference ?? '')}</cbc:BuyerReference>');
     _ublParty(xml, tag: 'AccountingSupplierParty', party: snapshot.seller);
     _ublParty(xml, tag: 'AccountingCustomerParty', party: snapshot.buyer);
+    final String? payeeIban = snapshot.seller.iban;
+    if (payeeIban != null && payeeIban.isNotEmpty) {
+      // BT-81 58 SEPA transfer with BG-17 credit transfer account.
+      // Absent IBAN emits no block; validation fails closed instead.
+      xml.writeln('  <cac:PaymentMeans>');
+      xml.writeln('    <cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>');
+      xml.writeln('    <cac:PayeeFinancialAccount>');
+      xml.writeln('      <cbc:ID>${_escape(payeeIban)}</cbc:ID>');
+      xml.writeln('    </cac:PayeeFinancialAccount>');
+      xml.writeln('  </cac:PaymentMeans>');
+    }
     xml.writeln('  <cac:TaxTotal>');
     xml.writeln('    <cbc:TaxAmount currencyID="${snapshot.currency}">${_cents(snapshot.taxCents)}</cbc:TaxAmount>');
     for (final _TaxGroup group in _groupByRate(snapshot)) {

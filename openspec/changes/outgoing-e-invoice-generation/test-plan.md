@@ -43,7 +43,7 @@
 
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Seller endpoint uses the company VAT identifier | test/features/rechnungen/e_invoice_generation_test.dart | seller_endpoint_uses_vat_id_with_9930 | 🟢 green |
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Endpoints fall back without invention | test/features/rechnungen/e_invoice_generation_test.dart | endpoint_fallback_without_invention | 🟢 green |
-| specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Missing payment data fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_payment_data_fails_closed | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Missing payment data fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_payment_data_fails_closed | 🟢 green |
 
 ## Coverage Notes
 

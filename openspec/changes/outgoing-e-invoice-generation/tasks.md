@@ -153,6 +153,6 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 - [x] 12.4 Write failing test for "Endpoints fall back without invention": endpoint_fallback_without_invention in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
 - [x] 12.5 Implement the required application behavior for "Endpoints fall back without invention" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [x] 12.6 Refactor the related implementation; targeted tests and the full suite stay green.
-- [ ] 12.7 Write failing test for "Missing payment data fails closed": missing_payment_data_fails_closed in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
-- [ ] 12.8 Implement the required application behavior for "Missing payment data fails closed" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [ ] 12.9 Refactor the related implementation; targeted tests and the full suite stay green.
+- [x] 12.7 Write failing test for "Missing payment data fails closed": missing_payment_data_fails_closed in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
+- [x] 12.8 Implement the required application behavior for "Missing payment data fails closed" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [x] 12.9 Refactor the related implementation; targeted tests and the full suite stay green.

@@ -35,6 +35,7 @@ class EInvoicePartySnapshot {
     this.taxNumber,
     this.vatId,
     this.email,
+    this.iban,
     this.endpointId,
     this.endpointScheme,
   });
@@ -48,6 +49,10 @@ class EInvoicePartySnapshot {
   final String? taxNumber;
   final String? vatId;
   final String? email;
+
+  /// Company IBAN for XRechnung payment means (BG-16/BG-17), or null when
+  /// the company record carries none. Never invented.
+  final String? iban;
 
   /// Resolved electronic address for XRechnung (BT-34/BT-49), or null when
   /// no approved source exists. Never invented; validation fails closed.
@@ -448,6 +453,7 @@ class EInvoiceSnapshotBuilder {
       taxNumber: _text(row['steuernummer']),
       vatId: vatId,
       email: _text(row['email']),
+      iban: _text(row['iban']),
       endpointId: vatId,
       endpointScheme: vatId == null ? null : '9930',
     );

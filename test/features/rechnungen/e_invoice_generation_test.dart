@@ -198,6 +198,27 @@ void main() {
       expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('seller.endpoint'));
     });
 
+    test('missing_payment_data_fails_closed', () {
+      const EInvoiceService service = eInvoiceTestService;
+      final Map<String, Object?> company = validCompany()..remove('iban');
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: company,
+        customerRow: validCustomer(),
+        posRows: standardPositions(),
+        preview: standardTotals(),
+        eingabemodus: 'netto',
+        buyerReference: 'LEITWEG-123',
+      );
+
+      final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
+      expect(result.valid, isFalse);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('seller.payment'));
+      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+    });
+
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {
       final List<Map<String, Object?>> positions = <Map<String, Object?>>[
         <String, Object?>{

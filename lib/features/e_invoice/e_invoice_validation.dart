@@ -94,6 +94,16 @@ class EInvoiceValidator {
           ),
         );
       }
+      if (_blank(snapshot.seller.iban)) {
+        findings.add(
+          const EInvoiceDiagnostic(
+            ruleId: 'seller.payment',
+            messageDe: 'Zahlungsdaten fehlen (IBAN des Ausstellers erforderlich)',
+            messageEn: 'Payment data is missing (seller IBAN required)',
+            route: 'stammdaten',
+          ),
+        );
+      }
     }
   }
 
