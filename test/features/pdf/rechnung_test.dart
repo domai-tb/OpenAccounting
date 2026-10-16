@@ -257,7 +257,11 @@ void main() {
   });
 
   test('test_gross_mode_storno_snapshot_renders_signed_source_line_amounts', () async {
-    final AppDatabase db = AppDatabase.createTestDatabase();
+    final Directory profileDir = await Directory.systemTemp.createTemp('rechnung-storno-pdf-test-');
+    addTearDown(() async {
+      if (profileDir.existsSync()) await profileDir.delete(recursive: true);
+    });
+    final AppDatabase db = AppDatabase.createTestDatabase(profileDir: profileDir.path);
     addTearDown(db.close);
     await db.ensureOpen();
     await db.kategorienRepository.create(bezeichnung: 'PDF-Kategorie');
@@ -265,7 +269,7 @@ void main() {
       "UPDATE nummernkreise SET format = 'ST-YY####', naechste_nummer = 1 WHERE typ = 'stornorechnung'",
     );
 
-    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor);
+    final RechnungenDataSource dataSource = RechnungenDataSource(db.executor, profileDir: db.profileDir);
     final RechnungenUseCases useCases = RechnungenUseCases(RechnungenRepository(dataSource));
     final draft = await useCases.createDraftRechnung(
       datum: '2026-10-12',
