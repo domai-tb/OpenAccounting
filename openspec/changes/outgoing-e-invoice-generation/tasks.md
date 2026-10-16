@@ -84,9 +84,9 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 
 ## 7. Tax categories are explicitly classified
 
-- [ ] 7.1 Write failing test for "Explicit tax classification is serialized": serializes_approved_typed_tax_category_and_exemption_reason in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
-- [ ] 7.2 Implement the required application behavior for "Explicit tax classification is serialized" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [ ] 7.3 Refactor the related implementation; targeted tests and the full suite stay green.
+- [x] 7.1 Write failing test for "Explicit tax classification is serialized": serializes_approved_typed_tax_category_and_exemption_reason in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
+- [x] 7.2 Implement the required application behavior for "Explicit tax classification is serialized" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [x] 7.3 Refactor the related implementation; targeted tests and the full suite stay green.
 - [x] 7.4 Write failing test for "Tax category mapping is unavailable": unresolved_tax_mapping_fails_without_inference_or_output in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
 - [x] 7.5 Implement the required application behavior for "Tax category mapping is unavailable" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [x] 7.6 Refactor the related implementation; targeted tests and the full suite stay green.

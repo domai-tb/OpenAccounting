@@ -1,15 +1,25 @@
 /// Approved typed tax classification for structured e-invoice output.
 ///
-/// Initial supported scope (ordinary domestic invoices): standard-rated lines
-/// at exactly 19.00 % or 7.00 % map to EN 16931 category `S`. Every other
-/// treatment (zero rate, exemption, reverse charge, intra-community supply,
-/// margin scheme) has no approved mapping yet and fails closed with a typed
-/// diagnostic instead of being inferred from the percentage. Extending the
-/// scope requires an explicit map entry reviewed with the owning tax
-/// capability; never add rate-only guesses here.
+/// Initial approved scope (E1 table): standard-rated lines at exactly 19.00 %
+/// or 7.00 % map to EN 16931 category `S`; legally zero-rated maps to `Z`;
+/// domestic exempt (incl. Kleinunternehmer §19 and §25a margin scheme) maps
+/// to `E` with a precise statutory reason; supplier-side reverse charge maps
+/// to `AE` with `VATEX-EU-AE`. Intra-community supplies (`K`) and exports
+/// (`G`) remain out of scope and fail closed. Extending the scope requires an
+/// explicit map entry reviewed with the owning tax capability; never add
+/// rate-only guesses here.
 enum EInvoiceTaxCategory {
   /// Standard-rated sale.
-  standard('S');
+  standard('S'),
+
+  /// Legally zero-rated sale (0 %, no exemption reason).
+  zeroRated('Z'),
+
+  /// Exempt sale (0 % with precise statutory reason text).
+  exempt('E'),
+
+  /// Supplier-side reverse charge (0 % with VATEX reason).
+  reverseCharge('AE');
 
   const EInvoiceTaxCategory(this.code);
 

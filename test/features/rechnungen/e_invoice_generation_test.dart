@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_tax_classification.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 
@@ -92,6 +93,59 @@ void main() {
       final String ubl = serializer.xrechnungUbl(snapshot);
       expect(ubl.contains('<cbc:ID>S</cbc:ID>'), isTrue);
       expect(ubl.contains('<cbc:Percent>19.00</cbc:Percent>'), isTrue);
+    });
+
+    test('serializes_exempt_tax_category_with_statutory_reason', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      const FinalizationSnapshot exempt = FinalizationSnapshot(
+        documentNumber: 'RE-2026-0002',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        currency: 'EUR',
+        seller: EInvoicePartySnapshot(
+          name: 'Muster GmbH',
+          street: 'Musterstraße 1',
+          postalCode: '10115',
+          city: 'Berlin',
+          country: 'DE',
+          taxNumber: '13/123/12345',
+        ),
+        buyer: EInvoicePartySnapshot(
+          name: 'Kunde GmbH',
+          street: 'Kundenweg 5',
+          postalCode: '20095',
+          city: 'Hamburg',
+          country: 'DE',
+        ),
+        lines: <EInvoiceLineSnapshot>[
+          EInvoiceLineSnapshot(
+            position: 0,
+            description: 'Beratung',
+            quantityText: '1',
+            unitPriceText: '100.0000',
+            unitPriceIsGross: false,
+            netCents: 10000,
+            taxCents: 0,
+            grossCents: 10000,
+            taxRateHundredths: 0,
+            classification: EInvoiceLineClassification(
+              category: EInvoiceTaxCategory.exempt,
+              exemptionReason: 'Steuerfrei nach § 19 UStG',
+            ),
+          ),
+        ],
+        netCents: 10000,
+        taxCents: 0,
+        grossCents: 10000,
+        buyerReference: 'LEITWEG-123',
+      );
+
+      final String cii = serializer.zugferdCii(exempt);
+      expect(cii.contains('<ram:CategoryCode>E</ram:CategoryCode>'), isTrue);
+      expect(cii.contains('<ram:ExemptionReason>Steuerfrei nach § 19 UStG</ram:ExemptionReason>'), isTrue);
+      final String ubl = serializer.xrechnungUbl(exempt);
+      expect(ubl.contains('<cbc:ID>E</cbc:ID>'), isTrue);
+      expect(ubl.contains('<cbc:TaxExemptionReason>Steuerfrei nach § 19 UStG</cbc:TaxExemptionReason>'), isTrue);
     });
 
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {
