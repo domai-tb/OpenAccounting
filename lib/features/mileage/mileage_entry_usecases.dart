@@ -65,4 +65,19 @@ class MileageEntryUseCases {
   void _requireText(String raw, String field) {
     if (raw.trim().isEmpty) throw ArgumentError('$field empty');
   }
+
+  /// Approved policy DE-private-business-travel/1: car 30c/km, other motor 20c/km, half-up per trip.
+  /// shortcut: vehicle eligibility param only; full facts validated at record time.
+  int calculateApprovedAmountCents({required int distanceHundredthsKm, required String vehicleClass}) {
+    if (distanceHundredthsKm < 1 || distanceHundredthsKm > 999999999999) throw ArgumentError('distance out of range');
+    final int rate;
+    if (vehicleClass == 'car') {
+      rate = 30;
+    } else if (vehicleClass == 'otherMotor') {
+      rate = 20;
+    } else {
+      throw ArgumentError('unsupported vehicle');
+    }
+    return (distanceHundredthsKm * rate + 50) ~/ 100;
+  }
 }

@@ -85,5 +85,14 @@ void main() {
       final List<MileageTrip> rows = await repo.listTrips();
       expect(rows.first.purpose, 'Kundenbesuch');
     });
+
+    test('test_calculate_from_an_approved_policy', () {
+      expect(useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4525, vehicleClass: 'car'), 1358);
+      expect(useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'otherMotor'), 200);
+      expect(
+        () => useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'companyCar'),
+        throwsArgumentError,
+      );
+    });
   });
 }

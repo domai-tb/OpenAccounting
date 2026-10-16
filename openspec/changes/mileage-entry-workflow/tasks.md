@@ -12,9 +12,9 @@
 
 ## 2. mileage-entry: Mileage amounts require an approved effective policy
 
-- [ ] 2.1 Write failing test `test_calculate_from_an_approved_policy` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Calculate from an approved policy"; assert it fails for the right reason.
-- [ ] 2.2 Implement the specified behavior for "Calculate from an approved policy" to pass 2.1.
-- [ ] 2.3 Refactor the affected code; keep the focused and full suites green.
+- [x] 2.1 Write failing test `test_calculate_from_an_approved_policy` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Calculate from an approved policy"; assert it fails for the right reason.
+- [x] 2.2 Implement the specified behavior for "Calculate from an approved policy" to pass 2.1.
+- [x] 2.3 Refactor the affected code; keep the focused and full suites green.
 - [ ] 2.4 Write failing test `test_keep_an_unresolved_trip_out_of_accounting` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Keep an unresolved trip out of accounting"; assert it fails for the right reason.
 - [ ] 2.5 Implement the specified behavior for "Keep an unresolved trip out of accounting" to pass 2.4.
 - [ ] 2.6 Refactor the affected code; keep the focused and full suites green.
