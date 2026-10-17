@@ -427,7 +427,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         rabattBetrag: rabattBetrag,
       );
       await transaction.runUpdate(
-        'UPDATE rechnungen SET datum = ?, leistungsdatum = COALESCE(NULLIF(?, ""), leistungsdatum), eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, '
+        "UPDATE rechnungen SET datum = ?, leistungsdatum = COALESCE(NULLIF(?, ''), leistungsdatum), eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, "
         'brutto_betrag = ?, rabatt_prozent = ?, rabatt_betrag = ?, '
         'kunde_id = COALESCE(?, kunde_id), lieferadresse_id = COALESCE(?, lieferadresse_id) '
         'WHERE id = ? AND ist_entwurf = 1',
