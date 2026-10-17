@@ -41,7 +41,6 @@ void main() {
       final FinalizationSnapshot snapshot = validSnapshot(
         buyerReference: 'LEITWEG-123',
         format: EInvoiceOutputFormat.xrechnung,
-        deliveryDate: '2026-03-10',
       );
       final int netBefore = snapshot.netCents;
 
