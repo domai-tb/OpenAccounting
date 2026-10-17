@@ -45,8 +45,8 @@
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Endpoints fall back without invention | test/features/rechnungen/e_invoice_generation_test.dart | endpoint_fallback_without_invention | 🟢 green |
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung party endpoints and payment instructions | Missing payment data fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_payment_data_fails_closed | 🟢 green |
 
-| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Delivery date is emitted verbatim | test/features/rechnungen/e_invoice_generation_test.dart | delivery_date_emitted_verbatim | 🔴 red |
-| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Missing delivery date fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_delivery_date_fails_closed | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Delivery date is emitted verbatim | test/features/rechnungen/e_invoice_generation_test.dart | delivery_date_emitted_verbatim | 🟢 green |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Missing delivery date fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_delivery_date_fails_closed | 🟢 green |
 
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Invoice persists and captures the delivery date | test/features/rechnungen/workspace_lifecycle_actions_test.dart | persists_optional_leistungsdatum_through_workspace | 🔴 red |
 

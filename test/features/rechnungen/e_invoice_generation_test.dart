@@ -41,6 +41,7 @@ void main() {
       final FinalizationSnapshot snapshot = validSnapshot(
         buyerReference: 'LEITWEG-123',
         format: EInvoiceOutputFormat.xrechnung,
+        deliveryDate: '2026-03-10',
       );
       final int netBefore = snapshot.netCents;
 
@@ -226,6 +227,42 @@ void main() {
       final String ubl = serializer.xrechnungUbl(snapshot);
       expect(ubl.contains('<cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>'), isTrue);
       expect(ubl.contains('<cbc:ID>DE89370400440532013000</cbc:ID>'), isTrue);
+    });
+
+    test('delivery_date_emitted_verbatim', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final FinalizationSnapshot base = validSnapshot(buyerReference: 'LEITWEG-123');
+
+      final FinalizationSnapshot snapshot = FinalizationSnapshot(
+        documentNumber: base.documentNumber,
+        outputFormat: base.outputFormat,
+        issueDate: base.issueDate,
+        currency: base.currency,
+        seller: base.seller,
+        buyer: base.buyer,
+        lines: base.lines,
+        netCents: base.netCents,
+        taxCents: base.taxCents,
+        grossCents: base.grossCents,
+        buyerReference: base.buyerReference,
+        deliveryDate: '2026-03-10',
+      );
+
+      expect(
+        serializer.xrechnungUbl(snapshot).contains('<cbc:ActualDeliveryDate>2026-03-10</cbc:ActualDeliveryDate>'),
+        isTrue,
+      );
+    });
+
+    test('missing_delivery_date_fails_closed', () {
+      const EInvoiceService service = eInvoiceTestService;
+      final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123', deliveryDate: null);
+
+      expect(snapshot.deliveryDate, isNull);
+      final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
+      expect(result.valid, isFalse);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('invoice.deliveryDate'));
+      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
     });
 
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {

@@ -50,7 +50,11 @@ List<Map<String, Object?>> standardPositions() => <Map<String, Object?>>[
 EInvoiceCanonicalTotals standardTotals() =>
     const EInvoiceCanonicalTotals(netCents: 20000, taxCents: 3800, grossCents: 23800);
 
-FinalizationSnapshot validSnapshot({String? buyerReference, EInvoiceOutputFormat format = EInvoiceOutputFormat.pdf}) {
+FinalizationSnapshot validSnapshot({
+  String? buyerReference,
+  EInvoiceOutputFormat format = EInvoiceOutputFormat.pdf,
+  String? deliveryDate = '2026-03-10',
+}) {
   return const EInvoiceSnapshotBuilder().buildFinalization(
     documentNumber: 'RE-2026-0001',
     outputFormat: format,
@@ -61,6 +65,7 @@ FinalizationSnapshot validSnapshot({String? buyerReference, EInvoiceOutputFormat
     preview: standardTotals(),
     eingabemodus: 'netto',
     buyerReference: buyerReference,
+    deliveryDate: deliveryDate,
   );
 }
 

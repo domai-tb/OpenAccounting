@@ -104,6 +104,16 @@ class EInvoiceValidator {
           ),
         );
       }
+      if (_blank(snapshot.deliveryDate)) {
+        findings.add(
+          const EInvoiceDiagnostic(
+            ruleId: 'invoice.deliveryDate',
+            messageDe: 'Lieferdatum fehlt (Leistungsdatum erforderlich)',
+            messageEn: 'Delivery date is missing (leistungsdatum required)',
+            route: 'rechnungen',
+          ),
+        );
+      }
     }
   }
 

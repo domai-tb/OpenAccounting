@@ -609,6 +609,7 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   lieferant_id INTEGER REFERENCES lieferanten(id),
   datum TEXT NOT NULL,
   faelligkeit TEXT,
+  leistungsdatum TEXT,
   netto_betrag NUMERIC(12,2) DEFAULT 0,
   brutto_betrag NUMERIC(12,2) DEFAULT 0,
   ust_betrag NUMERIC(12,2) DEFAULT 0,

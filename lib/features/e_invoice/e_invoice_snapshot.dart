@@ -112,6 +112,7 @@ class FinalizationSnapshot {
     required this.taxCents,
     required this.grossCents,
     this.buyerReference,
+    this.deliveryDate,
   });
 
   final String documentNumber;
@@ -133,6 +134,10 @@ class FinalizationSnapshot {
   /// Explicit buyer reference (e.g. Leitweg-ID) supplied for XRechnung
   /// export. Null means absent; serializers must not invent one.
   final String? buyerReference;
+
+  /// Optional delivery date (ISO YYYY-MM-DD) for XRechnung BT-72.
+  /// Null means absent; serializers must not infer one from other dates.
+  final String? deliveryDate;
 }
 
 /// Canonical totals owned by the accepted invoice-money calculator.
@@ -166,6 +171,7 @@ class EInvoiceSnapshotBuilder {
     required EInvoiceCanonicalTotals preview,
     required String eingabemodus,
     String? buyerReference,
+    String? deliveryDate,
     num? documentDiscountPercent,
     num? documentDiscountAmount,
   }) {
@@ -223,6 +229,7 @@ class EInvoiceSnapshotBuilder {
       taxCents: preview.taxCents,
       grossCents: preview.grossCents,
       buyerReference: buyerReference?.trim().isEmpty ?? true ? null : buyerReference!.trim(),
+      deliveryDate: deliveryDate?.trim().isEmpty ?? true ? null : deliveryDate!.trim(),
     );
   }
 

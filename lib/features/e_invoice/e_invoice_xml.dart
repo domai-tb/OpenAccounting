@@ -88,6 +88,10 @@ class EInvoiceXmlSerializer {
     xml.writeln('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
     xml.writeln('  <cbc:DocumentCurrencyCode>${snapshot.currency}</cbc:DocumentCurrencyCode>');
     xml.writeln('  <cbc:BuyerReference>${_escape(snapshot.buyerReference ?? '')}</cbc:BuyerReference>');
+    final String? deliveryDate = snapshot.deliveryDate;
+    if (deliveryDate != null && deliveryDate.isNotEmpty) {
+      xml.writeln('  <cbc:ActualDeliveryDate>${_escape(deliveryDate)}</cbc:ActualDeliveryDate>');
+    }
     _ublParty(xml, tag: 'AccountingSupplierParty', party: snapshot.seller);
     _ublParty(xml, tag: 'AccountingCustomerParty', party: snapshot.buyer);
     final String? payeeIban = snapshot.seller.iban;

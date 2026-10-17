@@ -163,6 +163,7 @@ class RechnungenDataSource {
         definition: "TEXT CHECK (ausgabeformat IS NULL OR ausgabeformat IN ('pdf', 'zugferd', 'xrechnung'))",
       ),
       (table: 'rechnungen', name: 'kunde_snapshot', definition: 'TEXT'),
+      (table: 'rechnungen', name: 'leistungsdatum', definition: 'TEXT'),
       (table: 'rechnungen', name: 'fremd_rechnungsnummer', definition: 'TEXT'),
       (table: 'rechnungspositionen', name: 'rabatt_prozent', definition: 'NUMERIC(12,2) DEFAULT 0'),
     ];
@@ -190,6 +191,7 @@ class RechnungenDataSource {
     int? lieferantId,
     int? belegId,
     String? faelligkeit,
+    String? leistungsdatum,
     String? fremdRechnungsnummer,
     int? lieferadresseId,
     num? rabattProzent,
@@ -210,6 +212,7 @@ class RechnungenDataSource {
         lieferantId: lieferantId,
         belegId: belegId,
         faelligkeit: faelligkeit,
+        leistungsdatum: leistungsdatum,
         fremdRechnungsnummer: fremdRechnungsnummer,
         lieferadresseId: lieferadresseId,
         rabattProzent: rabattProzent,
@@ -237,6 +240,7 @@ class RechnungenDataSource {
     int? lieferantId,
     int? belegId,
     String? faelligkeit,
+    String? leistungsdatum,
     String? fremdRechnungsnummer,
     int? lieferadresseId,
     num? rabattProzent,
@@ -273,8 +277,8 @@ class RechnungenDataSource {
     );
     final int invoiceId = await transaction.runInsert(
       '''
-INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id, lieferadresse_id, faelligkeit, fremd_rechnungsnummer, beleg_id)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO rechnungen (rechnungsnummer, typ, status, datum, ist_entwurf, eingabemodus, netto_betrag, brutto_betrag, ust_betrag, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id, lieferadresse_id, faelligkeit, leistungsdatum, fremd_rechnungsnummer, beleg_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ''',
       <Object?>[
         null,
@@ -292,6 +296,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         lieferantId,
         lieferadresseId,
         faelligkeit,
+        leistungsdatum,
         fremdRechnungsnummer,
         belegId,
       ],
@@ -393,6 +398,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     required int rechnungId,
     required String datum,
     required List<RechnungPositionItem> positionen,
+    String? leistungsdatum,
     String? eingabemodus,
     int? kundeId,
     int? lieferadresseId,
@@ -421,12 +427,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         rabattBetrag: rabattBetrag,
       );
       await transaction.runUpdate(
-        'UPDATE rechnungen SET datum = ?, eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, '
+        'UPDATE rechnungen SET datum = ?, leistungsdatum = COALESCE(NULLIF(?, ""), leistungsdatum), eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, '
         'brutto_betrag = ?, rabatt_prozent = ?, rabatt_betrag = ?, '
         'kunde_id = COALESCE(?, kunde_id), lieferadresse_id = COALESCE(?, lieferadresse_id) '
         'WHERE id = ? AND ist_entwurf = 1',
         <Object?>[
           datum,
+          leistungsdatum,
           mode,
           preview.nettoBetragString,
           preview.ustBetragString,
@@ -1049,6 +1056,7 @@ WHERE id = ? AND ist_entwurf = 1
         grossCents: preview.bruttoCents,
       ),
       eingabemodus: eingabemodus,
+      deliveryDate: invoice['leistungsdatum']?.toString(),
       documentDiscountPercent: rabattProzent == 0 ? null : rabattProzent,
       documentDiscountAmount: rabattBetrag == 0 ? null : rabattBetrag,
     );
@@ -1977,6 +1985,7 @@ ORDER BY position, id''',
       ),
       eingabemodus: invoice['eingabemodus']?.toString() ?? 'netto',
       buyerReference: buyerReference,
+      deliveryDate: invoice['leistungsdatum']?.toString(),
       documentDiscountPercent: rabattProzent == 0 ? null : rabattProzent,
       documentDiscountAmount: rabattBetrag == 0 ? null : rabattBetrag,
     );

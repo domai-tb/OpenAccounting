@@ -766,6 +766,7 @@ CREATE TABLE IF NOT EXISTS inventarbewegungen (
     await executor.runCustom('''
 INSERT INTO rechnungen (
   id, rechnungsnummer, typ, status, ist_entwurf, eingabemodus, kunde_id, lieferant_id, datum, faelligkeit,
+  leistungsdatum,
   netto_betrag, brutto_betrag, ust_betrag, skonto_prozent, skonto_faelligkeit,
   notiz, unternehmen_id, nummernkreis_id, storno_von,
   absender_snapshot, ausgegeben_am, mahnstufe_aktuell
@@ -775,6 +776,7 @@ SELECT
   CASE WHEN ${expression('status', "'entwurf'")} = 'entwurf' THEN 1 ELSE 0 END,
   'netto',
   ${expression('kunde_id')}, ${expression('lieferant_id')}, ${expression('datum')}, ${expression('faelligkeit')},
+  ${expression('leistungsdatum')},
   ${expression('netto_betrag', '0')}, ${expression('brutto_betrag', '0')}, ${expression('ust_betrag', '0')},
   ${expression('skonto_prozent', '0')}, ${expression('skonto_faelligkeit')}, ${expression('notiz')},
   ${expression('unternehmen_id')}, ${expression('nummernkreis_id')}, ${expression('storno_von')},
@@ -1866,6 +1868,7 @@ CREATE TABLE rechnungen (
   lieferant_id INTEGER REFERENCES lieferanten(id),
   datum TEXT NOT NULL,
   faelligkeit TEXT,
+  leistungsdatum TEXT,
   netto_betrag NUMERIC(12,2) DEFAULT 0,
   brutto_betrag NUMERIC(12,2) DEFAULT 0,
   ust_betrag NUMERIC(12,2) DEFAULT 0,
