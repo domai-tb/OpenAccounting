@@ -38,6 +38,7 @@ void main() {
       final int invoiceId = await createEInvoiceDraft(
         RechnungenDataSource(db.executor, profileDir: profileDir.path),
         kundeId: customerId,
+        leistungsdatum: '2026-03-10',
       );
       await useCases.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE');
       return invoiceId;

@@ -110,9 +110,15 @@ Future<int> addEInvoiceCustomer(
 }
 
 /// Creates a draft with one standard-rated line (2 x 100 netto, 19 %).
-Future<int> createEInvoiceDraft(RechnungenDataSource ds, {int? kundeId, List<RechnungPositionItem>? positionen}) async {
+Future<int> createEInvoiceDraft(
+  RechnungenDataSource ds, {
+  int? kundeId,
+  List<RechnungPositionItem>? positionen,
+  String? leistungsdatum,
+}) async {
   return ds.createDraftRechnung(
     datum: '2026-03-15',
+    leistungsdatum: leistungsdatum,
     kundeId: kundeId,
     positionen:
         positionen ??
