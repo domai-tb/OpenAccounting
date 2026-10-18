@@ -59,5 +59,9 @@ These unit checks cover the standalone calculator slice and do not change the st
 | test/features/cashbook/account_date_balance_test.dart | returns unavailable when the opening event is also presented as a cash movement | 🟢 passed |
 | test/features/cashbook/account_date_balance_test.dart | returns unavailable for incomplete history, unbalanced cash, or duplicate posting identity | 🟢 passed |
 | test/features/cashbook/account_date_balance_test.dart | carries account currency, rejects mixed currencies, and refuses integer-cent overflow | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | scopes opening cardinality to the requested account in a multi-account batch | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | rejects unsupported or malformed cashbook currency codes | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | accepts the exact JSON-safe cent limit and rejects 2^53 plus one | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | returns unavailable when individually safe amounts exceed the JSON-safe aggregate | 🟢 passed |
 
-The suite verifies exact integer minor units under the app's two-decimal convention. It carries the account currency without conversion, accepts a matching non-EUR currency, and fails closed when movement currency differs. All six tests passed in the focused rerun after the currency-contract correction.
+The suite verifies exact integer cents under the app's two-decimal convention. It carries the account currency without conversion, accepts only the explicit supported two-decimal ISO currency set, rejects unsupported/malformed codes and mismatches, scopes opening evidence to the requested account, and fails closed when a source value or aggregate exceeds JSON's exact integer range. All ten tests passed in the focused rerun after the reviewer corrections.

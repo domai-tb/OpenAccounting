@@ -9,6 +9,7 @@ enum CashbookBalanceUnavailableReason {
   openingBalanceUnverified,
   openingCorroborationConflict,
   historyCoverageIncomplete,
+  invalidCurrency,
   currencyMismatch,
   invalidCashMovement,
   duplicateCashMovement,
@@ -198,8 +199,43 @@ class CashbookBalanceResult {
 class CashbookBalanceCalculator {
   const CashbookBalanceCalculator();
 
-  static final BigInt _minimumCents = BigInt.from(-9223372036854775807) - BigInt.one;
-  static final BigInt _maximumCents = BigInt.from(9223372036854775807);
+  static final BigInt _minimumCents = BigInt.from(-9007199254740991);
+  static final BigInt _maximumCents = BigInt.from(9007199254740991);
+  static const Set<String> _supportedTwoDecimalCurrencyCodes = <String>{
+    'AED',
+    'ARS',
+    'AUD',
+    'BRL',
+    'CAD',
+    'CHF',
+    'CNY',
+    'CZK',
+    'DKK',
+    'EUR',
+    'GBP',
+    'HKD',
+    'HUF',
+    'IDR',
+    'ILS',
+    'INR',
+    'MXN',
+    'MYR',
+    'NOK',
+    'NZD',
+    'PHP',
+    'PLN',
+    'RON',
+    'RUB',
+    'SAR',
+    'SEK',
+    'SGD',
+    'THB',
+    'TRY',
+    'TWD',
+    'UAH',
+    'USD',
+    'ZAR',
+  };
 
   CashbookBalanceResult calculate(CashbookBalanceRequest request, CashbookBalanceEvidence evidence) {
     final DateTime asOfDate = _endOfLocalDay(request.asOfDate);
@@ -220,24 +256,34 @@ class CashbookBalanceCalculator {
     if (request.companyId.trim().isEmpty || request.accountId.trim().isEmpty) {
       return unavailable(CashbookBalanceUnavailableReason.invalidSelection);
     }
-    if (request.currencyCode.trim().isEmpty) {
-      return unavailable(CashbookBalanceUnavailableReason.invalidSelection);
+    if (!_supportedTwoDecimalCurrencyCodes.contains(request.currencyCode)) {
+      return unavailable(CashbookBalanceUnavailableReason.invalidCurrency);
     }
     if (!evidence.openingSourceAvailable) {
       return unavailable(CashbookBalanceUnavailableReason.openingSourceUnavailable);
     }
-    if (evidence.openingBalances.isEmpty) {
+    final List<CashbookOpeningBalance> matchingOpenings = evidence.openingBalances
+        .where(
+          (CashbookOpeningBalance opening) =>
+              opening.companyId == request.companyId && opening.accountId == request.accountId,
+        )
+        .toList(growable: false);
+    if (matchingOpenings.isEmpty) {
       return unavailable(CashbookBalanceUnavailableReason.openingBalanceMissing);
     }
-    if (evidence.openingBalances.length != 1) {
-      for (final CashbookOpeningBalance opening in evidence.openingBalances) {
-        if (opening.sourceReference.trim().isNotEmpty) sourceReferences.add(opening.sourceReference);
+    if (matchingOpenings.length != 1) {
+      for (final CashbookOpeningBalance opening in matchingOpenings) {
+        if (opening.sourceReference.trim().isNotEmpty) {
+          sourceReferences.add(opening.sourceReference);
+        }
       }
       return unavailable(CashbookBalanceUnavailableReason.openingBalanceAmbiguous);
     }
 
-    final CashbookOpeningBalance opening = evidence.openingBalances.single;
-    if (!opening.verified) return unavailable(CashbookBalanceUnavailableReason.openingBalanceUnverified);
+    final CashbookOpeningBalance opening = matchingOpenings.single;
+    if (!opening.verified) {
+      return unavailable(CashbookBalanceUnavailableReason.openingBalanceUnverified);
+    }
     if (!opening.identityUnambiguous || opening.identity.trim().isEmpty) {
       return unavailable(CashbookBalanceUnavailableReason.openingBalanceAmbiguous);
     }
@@ -250,6 +296,9 @@ class CashbookBalanceCalculator {
     }
     if (opening.effectiveAt.isAfter(asOfDate)) {
       return unavailable(CashbookBalanceUnavailableReason.openingBalanceMissing);
+    }
+    if (!_supportedTwoDecimalCurrencyCodes.contains(opening.currencyCode)) {
+      return unavailable(CashbookBalanceUnavailableReason.invalidCurrency);
     }
     if (opening.currencyCode != request.currencyCode) {
       return unavailable(CashbookBalanceUnavailableReason.currencyMismatch);
@@ -285,9 +334,15 @@ class CashbookBalanceCalculator {
     final Set<String> postingGroupIds = <String>{};
 
     for (final CashbookMovementEvidence movement in candidates) {
-      if (movement.effectiveAt != null && movement.effectiveAt!.isAfter(asOfDate)) continue;
-      if (movement.companyId != null && movement.companyId != request.companyId) continue;
-      if (movement.accountId != null && movement.accountId != request.accountId) continue;
+      if (movement.effectiveAt != null && movement.effectiveAt!.isAfter(asOfDate)) {
+        continue;
+      }
+      if (movement.companyId != null && movement.companyId != request.companyId) {
+        continue;
+      }
+      if (movement.accountId != null && movement.accountId != request.accountId) {
+        continue;
+      }
       if (movement.companyId == null || movement.accountId == null || movement.effectiveAt == null) {
         return unavailable(CashbookBalanceUnavailableReason.invalidCashMovement);
       }
@@ -319,7 +374,14 @@ class CashbookBalanceCalculator {
         }
         return unavailable(CashbookBalanceUnavailableReason.duplicateCashMovement);
       }
-      if (movement.currencyCode != request.currencyCode) {
+      final String? movementCurrencyCode = movement.currencyCode;
+      if (movementCurrencyCode == null || !_supportedTwoDecimalCurrencyCodes.contains(movementCurrencyCode)) {
+        if (movement.sourceReference != null && movement.sourceReference!.trim().isNotEmpty) {
+          sourceReferences.add(movement.sourceReference!);
+        }
+        return unavailable(CashbookBalanceUnavailableReason.invalidCurrency);
+      }
+      if (movementCurrencyCode != request.currencyCode) {
         if (movement.sourceReference != null && movement.sourceReference!.trim().isNotEmpty) {
           sourceReferences.add(movement.sourceReference!);
         }

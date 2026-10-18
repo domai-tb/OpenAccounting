@@ -242,12 +242,208 @@ void main() {
       expect(overflow.balanceCents, isNull);
       expect(overflow.unavailableReason, CashbookBalanceUnavailableReason.balanceOverflow);
     });
+
+    test('scopes opening cardinality to the requested account in a multi-account batch', () {
+      final CashbookBalanceResult result = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[
+            _opening(identity: 'other-account', accountId: 'cash-2', balanceCents: 9000),
+            _opening(identity: 'target-account', balanceCents: 2500),
+          ],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+
+      expect(result.complete, isTrue);
+      expect(result.balanceCents, 2500);
+      expect(result.sourceReferences, <String>['opening:target-account']);
+    });
+
+    test('rejects unsupported or malformed cashbook currency codes', () {
+      final CashbookBalanceEvidence validEvidence = CashbookBalanceEvidence(
+        openingSourceAvailable: true,
+        historyCoverageComplete: true,
+        openingBalances: <CashbookOpeningBalance>[_opening()],
+        movements: const <CashbookMovementEvidence>[],
+      );
+      final CashbookBalanceResult lowercaseRequest = calculator.calculate(
+        CashbookBalanceRequest(
+          companyId: 'company-1',
+          accountId: 'cash-1',
+          asOfDate: DateTime(2026, 1, 31),
+          currencyCode: 'eur',
+        ),
+        validEvidence,
+      );
+      final CashbookBalanceResult malformedOpening = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(currencyCode: 'EU')],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+      final CashbookBalanceResult malformedMovement = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening()],
+          movements: <CashbookMovementEvidence>[_movement(currencyCode: 'EUR1')],
+        ),
+      );
+      final CashbookBalanceResult unsupportedRequest = calculator.calculate(
+        CashbookBalanceRequest(
+          companyId: 'company-1',
+          accountId: 'cash-1',
+          asOfDate: DateTime(2026, 1, 31),
+          currencyCode: 'ZZZ',
+        ),
+        validEvidence,
+      );
+      final CashbookBalanceResult unsupportedOpening = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(currencyCode: 'ZZZ')],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+      final CashbookBalanceResult unsupportedMovement = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening()],
+          movements: <CashbookMovementEvidence>[_movement(currencyCode: 'XAU')],
+        ),
+      );
+      final CashbookBalanceResult unsupportedThreeDecimalCurrency = calculator.calculate(
+        CashbookBalanceRequest(
+          companyId: 'company-1',
+          accountId: 'cash-1',
+          asOfDate: DateTime(2026, 1, 31),
+          currencyCode: 'KWD',
+        ),
+        validEvidence,
+      );
+      final CashbookBalanceResult unsupportedZeroDecimalCurrency = calculator.calculate(
+        CashbookBalanceRequest(
+          companyId: 'company-1',
+          accountId: 'cash-1',
+          asOfDate: DateTime(2026, 1, 31),
+          currencyCode: 'JPY',
+        ),
+        validEvidence,
+      );
+
+      for (final CashbookBalanceResult result in <CashbookBalanceResult>[
+        lowercaseRequest,
+        malformedOpening,
+        malformedMovement,
+        unsupportedRequest,
+        unsupportedOpening,
+        unsupportedMovement,
+        unsupportedThreeDecimalCurrency,
+        unsupportedZeroDecimalCurrency,
+      ]) {
+        expect(result.complete, isFalse);
+        expect(result.balanceCents, isNull);
+        expect(result.unavailableReason, CashbookBalanceUnavailableReason.invalidCurrency);
+      }
+    });
+
+    test('accepts the exact JSON-safe cent limit and rejects 2^53 plus one', () {
+      final CashbookBalanceResult maximumSupported = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: 9_007_199_254_740_991)],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+      final CashbookBalanceResult minimumSupported = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: -9_007_199_254_740_991)],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+      final CashbookBalanceResult unsafeInteger = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: int.parse('9007199254740993'))],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+      final CashbookBalanceResult unsafeNegativeInteger = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: int.parse('-9007199254740993'))],
+          movements: const <CashbookMovementEvidence>[],
+        ),
+      );
+
+      expect(maximumSupported.complete, isTrue);
+      expect(maximumSupported.balanceCents, 9_007_199_254_740_991);
+      expect(minimumSupported.complete, isTrue);
+      expect(minimumSupported.balanceCents, -9_007_199_254_740_991);
+      expect(unsafeInteger.complete, isFalse);
+      expect(unsafeInteger.balanceCents, isNull);
+      expect(unsafeInteger.unavailableReason, CashbookBalanceUnavailableReason.balanceOverflow);
+      expect(unsafeNegativeInteger.complete, isFalse);
+      expect(unsafeNegativeInteger.balanceCents, isNull);
+      expect(unsafeNegativeInteger.unavailableReason, CashbookBalanceUnavailableReason.balanceOverflow);
+    });
+
+    test('returns unavailable when individually safe amounts exceed the JSON-safe aggregate', () {
+      final CashbookBalanceResult positiveAggregateOverflow = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: 9_007_199_254_740_991)],
+          movements: <CashbookMovementEvidence>[_movement(postingGroupId: 'positive-overflow', amountCents: 1)],
+        ),
+      );
+      final CashbookBalanceResult negativeAggregateOverflow = calculator.calculate(
+        request,
+        CashbookBalanceEvidence(
+          openingSourceAvailable: true,
+          historyCoverageComplete: true,
+          openingBalances: <CashbookOpeningBalance>[_opening(balanceCents: -9_007_199_254_740_991)],
+          movements: <CashbookMovementEvidence>[_movement(postingGroupId: 'negative-overflow', amountCents: -1)],
+        ),
+      );
+
+      for (final CashbookBalanceResult result in <CashbookBalanceResult>[
+        positiveAggregateOverflow,
+        negativeAggregateOverflow,
+      ]) {
+        expect(result.complete, isFalse);
+        expect(result.balanceCents, isNull);
+        expect(result.unavailableReason, CashbookBalanceUnavailableReason.balanceOverflow);
+      }
+    });
   });
 }
 
 CashbookOpeningBalance _opening({
   String identity = 'setup-1',
   int balanceCents = 10000,
+  String accountId = 'cash-1',
   String currencyCode = 'EUR',
   bool verified = true,
   int? corroboratingSaldoCents,
@@ -255,7 +451,7 @@ CashbookOpeningBalance _opening({
   return CashbookOpeningBalance(
     identity: identity,
     companyId: 'company-1',
-    accountId: 'cash-1',
+    accountId: accountId,
     effectiveAt: DateTime(2026),
     balanceCents: balanceCents,
     currencyCode: currencyCode,
