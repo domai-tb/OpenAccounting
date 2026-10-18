@@ -1,6 +1,15 @@
 # Verification Record — Mileage Policy and Database Contract
 
-## Current revision status (2026-10-18)
+## Current implementation checkpoint (2026-10-18)
+
+- **Scope:** Replaced timestamp/random trip IDs with UUIDv4 and strengthened `test_record_a_business_trip` to verify the UUID format and exact persisted integer distance. No distance conversion or rounding was added.
+- **Red evidence:** Before the fix, the focused test failed because the generated ID was `1792347538129862-1436408645`, which was not a UUID.
+- **Focused test:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart` → 9 passed, exit 0. Flutter required an elevated local VM-test run because the sandbox denied its temporary localhost socket.
+- **Scoped analysis:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter analyze lib/features/mileage test/features/mileage` → no issues, exit 0.
+- **Formatting:** `fvm dart format --line-length=120` reported 0 changed files; the command then exited nonzero because Dart telemetry could not update `/home/ubuntu/.dart-tool/dart-flutter-telemetry-session.json` on the read-only filesystem.
+- **Scope limit:** This checkpoint does not verify structured eligibility fields, policy calculation, migration, posting, corrections, exports, or the rest of the 45-row matrix.
+
+## Specification sync snapshot before implementation (2026-10-18)
 
 - **Scope:** Synced the approved mileage database requirement into the maintained DB spec; corrected the false v8-to-v9 mileage-table claim in the active delta, removed its duplicate scenario, updated the related test-plan/task wording, and recorded this evidence. No DDL, application code, or tests were changed.
 - **Source-backed table version:** At base `3fbc911d2e0e8ceb7fa76d6ed8bd65c75b253d5b`, `MigrationRunner.currentVersion` is 22 (`lib/core/db/migrations.dart:18`). The upgrade loop calls `_migrateTo(v)` for each next version and sets `user_version` only after verification (`:241-270`). The v9 step calls `_migrateCategoryProvenance` (`:378-385`); the v13 step calls `_migrateProfilePortabilityTables` (`:420-423`), whose DDL creates `feature_table_state`, `mileage_trips`, `mileage_trip_corrections`, and the active-correction index (`:462-469`). Fresh schema creation also calls that helper (`:295-320`, especially `:308`). Thus the mileage-table migration boundary is v12→v13; v8→v9 remains the separate category-history migration.
@@ -22,4 +31,4 @@ These results predate this revision and were not rerun:
 
 ## Current decision
 
-**DECISION: NOT READY — the DB contract sync is complete, but a fresh independent review and both inventory owners' agreement are required before implementation.** Planned tests and structural checks do not prove runtime behavior.
+**DECISION: PARTIAL — the UUID4 identity checkpoint is implemented and verified. The broader mileage feature, v23 lifecycle migration, account mapping, posting, correction, export, and remaining scenario coverage are still in progress.**

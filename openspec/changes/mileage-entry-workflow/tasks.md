@@ -6,7 +6,11 @@ The prior contract's 24 implementation tasks were marked complete before this re
 
 ## Revised-contract tests — all open
 
-Do not implement dependent application code until a separate fresh independent review approves the revised contract. The 36 missing scenario rows are planned, not passing. Separately, the existing policy test needs contract-specific assertions before it can establish the revised policy requirement; that extension is not a missing scenario row.
+Implementation proceeds under the user's direct 2026-10-18 authorization despite the stale Round 5 review gate. Keep the review and inventory tasks open until their requirements are resolved with evidence. The 36 missing scenario rows remain planned unless their named tests pass. Separately, the existing policy test needs contract-specific assertions before it can establish the revised policy requirement; that extension is not a missing scenario row.
+
+### Completed bounded implementation checkpoints
+
+- [x] Generate stable UUIDv4 trip IDs and verify persisted identity plus exact integer distance in `test_record_a_business_trip` (2026-10-18 focused run; see `verify.md`).
 
 ### `mileage-entry` tests (7 missing scenarios; 1 existing-test assertion task)
 

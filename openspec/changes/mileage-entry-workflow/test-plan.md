@@ -1,10 +1,10 @@
 # Mileage Entry Workflow Test Plan
 
-This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 total) to one named test target each. The nine named mileage tests already exist and were reported passing against the earlier contract; they have not been rerun against this revised contract, and their coverage of the new structured eligibility policy is not established. The other 36 tests are missing and remain planned. No missing test is reported as passing.
+This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 total) to one named test target each. The nine existing mileage tests were rerun on 2026-10-18; only the capture-identity and exact-distance assertions described below are verified for the revised contract. Coverage of the structured eligibility policy and the other 44 rows remains incomplete. The other 36 named tests are still missing and remain planned. No missing test is reported as passing.
 
 | Spec | Scenario | Test file | Test name | Evidence status |
 |---|---|---|---|---|
-| `specs/mileage-entry/spec.md` | Record a business trip | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_record_a_business_trip` | Exists; prior-contract run only, revised contract not verified |
+| `specs/mileage-entry/spec.md` | Record a business trip | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_record_a_business_trip` | Partial — focused suite passed 9/9 on 2026-10-18; UUIDv4 persistence and exact `distance_hundredths_km` are verified, but structured eligibility fields remain unverified |
 | `specs/mileage-entry/spec.md` | Reject invalid trip facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_reject_invalid_trip_facts` | Exists; prior-contract run only, revised contract not verified |
 | `specs/mileage-entry/spec.md` | Use the form with keyboard and supported locales | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_mileage_form_is_keyboard_operable_and_localized` | MISSING — planned, not run |
 | `specs/mileage-entry/spec.md` | Preserve posted source facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_preserve_posted_source_facts` | Exists; prior-contract run only, revised contract not verified |
