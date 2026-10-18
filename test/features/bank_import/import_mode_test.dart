@@ -54,6 +54,26 @@ void main() {
       return (rows.single['c']! as num).toInt();
     }
 
+    test('bank-import selector keeps bank and cash accounts but excludes Sachkonto', () async {
+      final int bankId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Explicit bank account', 'Bank'],
+      );
+      final int cashId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Explicit cash account', 'Kasse'],
+      );
+      final int ledgerId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Accounting Sachkonto', 'Sachkonto'],
+      );
+
+      final List<Map<String, Object?>> accounts = await service.loadBankImportAccounts();
+      final Set<int> ids = <int>{for (final Map<String, Object?> row in accounts) (row['id']! as num).toInt()};
+      expect(ids, containsAll(<int>{kontoId, bankId, cashId}));
+      expect(ids, isNot(contains(ledgerId)));
+    });
+
     test('test_automatic_mode', () async {
       await modes.setMode(BankImportMode.automatic);
       final int journalId = await addJournal();

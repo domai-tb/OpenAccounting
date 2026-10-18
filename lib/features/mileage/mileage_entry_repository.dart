@@ -1,11 +1,17 @@
 import 'package:drift/drift.dart';
 
+import 'package:openaccounting/features/accounting/posting_group_service.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 
 /// Mileage repository — raw SQL via drift executor, no codegen.
 /// shortcut: migration disabled until portability/export accept inventory, tests call ensureTablesForTests only.
-class MileageEntryRepository {
+class MileageEntryRepository implements MileagePostingPort {
   MileageEntryRepository(this.executor);
+
+  @override
+  Future<String> postExpense(MileageTrip trip) {
+    return PostingGroupService(executor).postMileage(trip: trip);
+  }
 
   final QueryExecutor executor;
 
@@ -180,14 +186,6 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
         id,
         'unresolved',
       ],
-    );
-  }
-
-  Future<void> storePosting({required String id, required String eventId}) async {
-    await executor.runUpdate(
-      'UPDATE mileage_trips SET state = ?, posting_event_id = ?, updated_at = ? '
-      'WHERE id = ? AND state = ?',
-      <Object?>['posted', eventId, DateTime.now().toUtc().toIso8601String(), id, 'calculated'],
     );
   }
 

@@ -163,8 +163,37 @@ class ProfileExportService {
     'rechnungsvorlagen_occurrences',
     'mileage_trips',
     'mileage_trip_corrections',
+    'mileage_posting_account_mapping',
+    'mileage_posting_period_closures',
     'anlage_afa_jahreswerte',
+    'master_data_import_templates',
+    'inventuren',
+    'inventur_positionen',
+    'settlement_groups',
+    'settlement_allocations',
+    'statutory_timing_rules',
+    'dokument_email_templates',
+    'dokument_email_versuche',
   ];
+
+  static const Map<String, int> _featureTableVersions = <String, int>{
+    'forderung_zahlungen': 8,
+    'category_mapping_history': 9,
+    'feature_table_state': 13,
+    'buchungsvorlagen_occurrences': 13,
+    'rechnungsvorlagen_occurrences': 13,
+    'mileage_trips': 13,
+    'mileage_trip_corrections': 13,
+    'master_data_import_templates': 16,
+    'anlage_afa_jahreswerte': 17,
+    'inventuren': 18,
+    'inventur_positionen': 18,
+    'settlement_groups': 19,
+    'settlement_allocations': 19,
+    'statutory_timing_rules': 19,
+    'mileage_posting_account_mapping': 25,
+    'mileage_posting_period_closures': 25,
+  };
 
   /// Columns that are never serialized. Values are reported only as
   /// `omitted_secret` exclusions identified by record ID and field.
@@ -240,12 +269,15 @@ class ProfileExportService {
       );
     }
 
+    final List<String> featureTables = _featureTables
+        .where((String table) => health.schemaVersion >= (_featureTableVersions[table] ?? 0))
+        .toList(growable: false);
     final List<ProfileExportExclusion> exclusions = <ProfileExportExclusion>[];
     final List<Map<String, Object?>> omittedFields = <Map<String, Object?>>[];
     final List<_EvidenceFile> evidence = <_EvidenceFile>[];
     final Map<String, int> counts = <String, int>{};
     final Map<String, String> recordPayloads = <String, String>{};
-    for (final String table in <String>[...AppDatabase.allTableNames, ..._featureTables]) {
+    for (final String table in <String>[...AppDatabase.allTableNames, ...featureTables]) {
       final _ExportTable snapshot = tables[table]!;
       counts[table] = snapshot.rows.length;
       if (!snapshot.present) {
@@ -309,7 +341,7 @@ class ProfileExportService {
       'complete': complete,
       'record_counts': counts,
       'table_presence': <String, Object?>{
-        for (final String table in <String>[...AppDatabase.allTableNames, ..._featureTables])
+        for (final String table in <String>[...AppDatabase.allTableNames, ...featureTables])
           table: <String, Object?>{
             'present': tables[table]!.present,
             if (_markerState(tables, table) != null) 'state': _markerState(tables, table),
@@ -658,6 +690,7 @@ class ProfileExportService {
       ];
       tables[table] = _ExportTable(columns: columns, rows: rows, present: true);
     }
+    _assertExportInventoryComplete(actual, tables);
     return tables;
   }
 
@@ -684,7 +717,19 @@ class ProfileExportService {
         present: true,
       );
     }
+    _assertExportInventoryComplete(actual, tables);
     return tables;
+  }
+
+  void _assertExportInventoryComplete(Set<String> actual, Map<String, _ExportTable> tables) {
+    final Set<String> declared = <String>{...AppDatabase.allTableNames, ..._featureTables};
+    final List<String> unhandledRecognized = <String>[
+      for (final String table in actual)
+        if (declared.contains(table) && tables[table]?.present != true) table,
+    ]..sort();
+    if (unhandledRecognized.isNotEmpty) {
+      throw StateError('Profile-Export hat keine Record-Inventare für Tabellen: ${unhandledRecognized.join(', ')}');
+    }
   }
 
   Future<List<String>> _pragmaColumns(String table) async {

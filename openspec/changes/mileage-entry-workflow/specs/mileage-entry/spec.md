@@ -54,20 +54,49 @@ For an eligible trip with `trip_kind = business_trip`, `vehicle_source = private
 - **WHEN** a general business mileage amount is requested
 - **THEN** the general mileage amount remains unresolved unless a separate accepted general policy applies
 
-### Requirement: Post resolved mileage only through the accepted accounting boundary
+### Requirement: Explicit mileage posting role mapping
 
-A mileage record SHALL become a business expense only after the user confirms a policy-resolved amount, a valid travel-expense/private-contribution account mapping exists, and the fiscal period containing the trip date is open. Posting SHALL use one canonical accounting command and source identity `(mileage_trip, trip UUID)`. It SHALL debit the mapped travel-expense account and credit the mapped private-contribution account, with no cash or VAT leg. Posting the accounting event, trip state, and returned opaque posting-event ID SHALL commit in one SQLite transaction. A retry with the same payload SHALL return the existing event; a conflicting payload SHALL fail without creating another event. The trip SHALL retain the returned opaque posting-event ID, unique across mileage rows. Reports SHALL include mileage only through the canonical accounting source.
+Before a mileage trip may post, the profile SHALL have one durable, explicitly user-configured mapping for each role: travel expense and private contribution. Each role SHALL pair one ledger account ID from `konten` whose `kontoart = 'Sachkonto'` with one reporting category ID from `kategorien`. The travel-expense category SHALL be active, have `art = 'Ausgabe'`, map to EÜR line 71, have an active SKR account mapping, and have mapping status `catalog_verified` or `user_confirmed`. The private-contribution category SHALL be active, map to EÜR line 107, have an active SKR account mapping, and have mapping status `catalog_verified` or `user_confirmed`. The user SHALL explicitly review the two account/category pairs together. The bank-account domain SHALL support `Sachkonto` as a non-bank ledger-account type with nullable banking fields; existing bank and cash account types and rows SHALL be preserved. Bank and cash account types MUST NOT be selected for either mileage role.
+
+The mapping SHALL be editable in a mileage-posting settings form and scoped to the current profile. The settings and account CRUD forms SHALL expose the `Sachkonto` type explicitly, while bank-specific account pickers SHALL exclude Sachkonten. Saving a mapping and posting a trip SHALL each revalidate that both selected account rows still have `kontoart = 'Sachkonto'`; an account-type change after configuration SHALL therefore fail closed at posting. The system SHALL NOT infer either role from IDs, account numbers, labels, free text, category order, or EKS mappings, and SHALL NOT fall back to a first active account/category. A missing mapping, inactive category, non-Sachkonto account, or untrusted category mapping SHALL make posting unavailable while retaining the trip's calculated state and amount. A mapping change SHALL affect future posts only; every committed posting SHALL preserve the exact account/category IDs and resolved mapping values used in immutable per-leg journal snapshots: role, category ID/label/art/EÜR line/SKR mappings, mapping status, source reference/version, and mapping-history ID. EÜR and journal-derived reports SHALL use these snapshots and SHALL NOT re-read mutable category mappings for a posted mileage leg.
+
+#### Scenario: Require explicit reviewed mileage roles
+- **GIVEN** no complete, reviewed travel-expense and private-contribution account/category mapping exists
+- **WHEN** a calculated mileage trip is posted
+- **THEN** posting is unavailable, the trip remains calculated without a posting reference, and no journal or report total changes
+
+#### Scenario: Reject an unsafe mileage role mapping
+- **GIVEN** either configured category is inactive, unmapped, or not `catalog_verified` or `user_confirmed`, or either selected account is not a `Sachkonto`
+- **WHEN** a calculated mileage trip is posted
+- **THEN** posting fails closed before any journal group is created
+
+### Requirement: Atomic mileage expense posting
+
+A mileage record SHALL become a business expense only after the user confirms a policy-resolved amount, both configured account/category role pairs are valid, and the fiscal period containing the trip date is open. Posting SHALL use one canonical accounting command and source identity `(mileage_trip, trip UUID)`. It SHALL create exactly two balanced journal legs: debit the configured travel-expense account/category and credit the configured private-contribution account/category. It SHALL create no bank, cash, or VAT leg and SHALL NOT create an input-VAT claim. Posting the accounting event, trip state, and returned opaque posting-event ID SHALL commit in one SQLite transaction. A retry with the same payload SHALL return the existing event; a retry with changed trip facts, amount, policy snapshot, or mapped roles SHALL fail without creating another event. The trip SHALL retain the returned opaque posting-event ID, unique across mileage rows. The unique `(mileage_trip, trip UUID)` source and stored posting-event ID identify exactly one reportable two-leg group. EÜR SHALL include an in-period posted trip once by trip date in both legacy and settlement-based modes, despite the generic `source_kind IS NULL` filter and without adding a settlement allocation: its debit SHALL appear once under snapshotted EÜR line 71, and its private-contribution credit SHALL appear once under snapshotted line 107 without being treated as operating income or profit. Neither leg SHALL also enter generic journal or settlement totals. A missing, duplicate, unbalanced, malformed, or snapshot-incomplete group SHALL make the EÜR result unavailable/incomplete rather than partially counted. Correction treatment remains with the accepted atomic correction contract.
 
 #### Scenario: Post a confirmed resolved mileage expense
-- **GIVEN** policy version 1 resolves the eligible trip, the required accounts are mapped, the trip date is in an open period, and the canonical posting boundary supports the mileage source identity
+- **GIVEN** policy version 1 resolves the eligible trip, both reviewed account/category role pairs are configured, the trip date is in an open period, and the canonical posting boundary supports the mileage source identity
 - **AND** the trip has no prior posting
 - **WHEN** the user confirms posting
 - **THEN** exactly one expense is created with a debit to travel expense and a credit to private contribution, without cash or VAT legs, using source type `mileage_trip` and source ID equal to the trip UUID
 - **AND** its accounting date is the trip date
+- **AND** the two legs use their configured account/category pairs, with no bank, cash, or VAT leg
 - **AND** the returned posting-event ID is stored on the trip and reports include the expense through the canonical source
 
+#### Scenario: Include a mileage posting exactly once in EÜR
+- **GIVEN** a posted trip has exactly one balanced two-leg group under `(mileage_trip, trip UUID)` with a matching `posting_event_id` and complete snapshots
+- **WHEN** EÜR is generated for the trip date in either legacy or settlement-based mode
+- **THEN** the debit is included exactly once under its snapshotted EÜR line 71
+- **AND** the private-contribution credit is represented once under snapshotted line 107 but is excluded from operating income and profit
+- **AND** neither leg is also included through generic journal or settlement processing
+
+#### Scenario: Fail closed for an incomplete mileage report group
+- **GIVEN** an in-period mileage trip has a missing, duplicate, unbalanced, or snapshot-incomplete posting group
+- **WHEN** EÜR is generated
+- **THEN** the result is unavailable or incomplete and does not partially count either leg
+
 #### Scenario: Keep posting unavailable while a prerequisite is missing
-- **GIVEN** the policy, required mapping, or accepted accounting posting contract is unavailable
+- **GIVEN** the policy, either explicit role mapping, or accepted accounting posting contract is unavailable
 - **WHEN** the user opens or invokes mileage actions
 - **THEN** posting is unavailable, the trip remains unresolved or calculated without a posting reference, and no accounting or report total changes
 

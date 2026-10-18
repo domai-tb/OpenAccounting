@@ -162,6 +162,11 @@ class EuerService {
       }
     } // settlementTotals == null → legacy invoice-date totals above.
 
+    final _MileageEuerTotals mileage = await _mileageTotalsForYear(jahr);
+    zeilen[71] = money.add(zeilen[71] ?? '0.00', money.fromCents(mileage.expenseCents));
+    zeilen[107] = money.add(zeilen[107] ?? '0.00', money.fromCents(mileage.contributionCents));
+    ausgaben += mileage.expenseCents;
+
     // Zeile 33 — AfA from the asset-register schedule owner, not journal.
     // The canonical schedule is the sole AfA source. Legacy rows fail closed
     // until their inputs are explicitly mapped to the maintained contract.
@@ -337,6 +342,7 @@ class EuerService {
       'afa_assets': afaAssetRefs,
       'settlement_basis': settlementTotals != null,
       'statutory_rules': statutoryRules,
+      'mileage_sources': mileage.reportSnapshots,
       'resolved': <Object?>[
         for (final _ResolvedMapping m in resolved)
           <String, Object?>{
@@ -378,6 +384,189 @@ class EuerService {
 
   /// Settlement totals when settlement groups attribute amounts to [jahr];
   /// null keeps the legacy invoice-date path (no settlement data yet).
+  /// Mileage postings have no cash settlement date. Their once-only EÜR
+  /// recognition is tied to trip_date in both report modes, using only the
+  /// immutable v25 per-leg category snapshots.
+  Future<_MileageEuerTotals> _mileageTotalsForYear(int jahr) async {
+    final String start = '${jahr.toString().padLeft(4, '0')}-01-01';
+    final String end = '${(jahr + 1).toString().padLeft(4, '0')}-01-01';
+    final List<Map<String, Object?>> trips = await executor.runSelect(
+      'SELECT id, trip_date, state FROM mileage_trips WHERE trip_date >= ? AND trip_date < ? ORDER BY trip_date, id',
+      <Object?>[start, end],
+    );
+    final List<Map<String, Object?>> journalSources = await executor.runSelect(
+      'SELECT DISTINCT source_id FROM journal WHERE source_kind = ? AND datum >= ? AND datum < ? ORDER BY source_id',
+      <Object?>['mileage_trip', start, end],
+    );
+    if (journalSources.any(
+      (Map<String, Object?> row) => row['source_id'] == null || row['source_id'].toString().trim().isEmpty,
+    )) {
+      throw const EuerException('EÜR blockiert: Mileage-Journalquelle ohne Fahrten-UUID');
+    }
+    final Set<String> sourceIds = <String>{
+      for (final Map<String, Object?> trip in trips)
+        if (trip['state'] == 'posted') trip['id'].toString(),
+      for (final Map<String, Object?> source in journalSources) source['source_id'].toString(),
+    };
+    var expensesCents = 0;
+    var contributionCents = 0;
+    final List<Map<String, Object?>> reportSnapshots = <Map<String, Object?>>[];
+    for (final String tripId in sourceIds) {
+      final List<Map<String, Object?>> tripRows = await executor.runSelect(
+        'SELECT id, trip_date, state, posting_event_id, calculated_amount FROM mileage_trips WHERE id = ? LIMIT 1',
+        <Object?>[tripId],
+      );
+      if (tripRows.isEmpty) throw EuerException('EÜR blockiert: Mileage-Quelle $tripId hat keine Fahrt');
+      final Map<String, Object?> trip = tripRows.single;
+      final String tripDate = trip['trip_date']?.toString() ?? '';
+      if (trip['state'] != 'posted' || (trip['posting_event_id']?.toString().trim().isNotEmpty ?? false) == false) {
+        throw EuerException('EÜR blockiert: Mileage-Quelle $tripId ist nicht atomar gebucht');
+      }
+      if (tripDate.compareTo(start) < 0 || tripDate.compareTo(end) >= 0) {
+        throw EuerException('EÜR blockiert: Mileage-Journalquelle $tripId liegt außerhalb des Fahrtdatums');
+      }
+      final List<Map<String, Object?>> legs = await executor.runSelect(
+        'SELECT id, datum, kategorie_id, betrag, beleg_typ, konto_id, soll, haben, soll_konto_id, haben_konto_id, '
+        'gruppe_id, legacy_unverified, immutable, source_kind, source_id, mileage_role_snapshot, '
+        'mileage_kategorie_id_snapshot, mileage_kategorie_name_snapshot, mileage_kategorie_art_snapshot, '
+        'mileage_euer_zeile_snapshot, mileage_kategorie_skr03_snapshot, mileage_kategorie_skr04_snapshot, '
+        'mileage_mapping_status_snapshot, mileage_mapping_source_reference_snapshot, '
+        'mileage_mapping_source_version_snapshot, mileage_mapping_history_id_snapshot '
+        'FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', tripId],
+      );
+      if (legs.length != 2) {
+        throw EuerException('EÜR blockiert: Mileage-Quelle $tripId hat keine vollständige Zweiergruppe');
+      }
+      final String eventId = trip['posting_event_id'].toString();
+      final int rootId = ((legs.first['gruppe_id'] as num?) ?? 0).toInt();
+      if (rootId <= 0) {
+        throw EuerException('EÜR blockiert: Mileage-Quelle $tripId hat keinen vollständigen Snapshot');
+      }
+      final Map<String, Map<String, Object?>> byRole = <String, Map<String, Object?>>{};
+      var debitCents = 0;
+      var creditCents = 0;
+      final int expectedTripCents = _mileageEurCents(trip['calculated_amount'], tripId);
+      for (final Map<String, Object?> leg in legs) {
+        final int id = (leg['id'] as num?)?.toInt() ?? 0;
+        final int groupId = (leg['gruppe_id'] as num?)?.toInt() ?? 0;
+        final String role = leg['mileage_role_snapshot']?.toString() ?? '';
+        final int rowDebit = money.toCents(money.formatBetrag((leg['soll'] ?? 0).toString()));
+        final int rowCredit = money.toCents(money.formatBetrag((leg['haben'] ?? 0).toString()));
+        if (id <= 0 ||
+            groupId != rootId ||
+            (id == rootId) != (groupId == id) ||
+            leg['datum'] != tripDate ||
+            leg['beleg_typ'] != 'Ausgabe' ||
+            leg['source_kind'] != 'mileage_trip' ||
+            leg['source_id'] != tripId ||
+            (leg['immutable'] as num?)?.toInt() != 1 ||
+            (leg['legacy_unverified'] as num?)?.toInt() != 0 ||
+            rowDebit < 0 ||
+            rowCredit < 0 ||
+            (rowDebit == 0) == (rowCredit == 0) ||
+            byRole.containsKey(role) ||
+            (role != 'travel_expense' && role != 'private_contribution') ||
+            !_mileageSnapshotIsComplete(leg)) {
+          throw EuerException(
+            'EÜR blockiert: Mileage-Quelle $tripId enthält einen fehlerhaften oder veränderlichen Snapshot',
+          );
+        }
+        byRole[role] = leg;
+        debitCents += rowDebit;
+        creditCents += rowCredit;
+      }
+      final Map<String, Object?>? expense = byRole['travel_expense'];
+      final Map<String, Object?>? contribution = byRole['private_contribution'];
+      if (expense == null ||
+          contribution == null ||
+          (expense['id'] as num?)?.toInt() != rootId ||
+          debitCents != expectedTripCents ||
+          creditCents != expectedTripCents ||
+          money.toCents(money.formatBetrag((expense['soll'] ?? 0).toString())) != expectedTripCents ||
+          money.toCents(money.formatBetrag((expense['haben'] ?? 0).toString())) != 0 ||
+          money.toCents(money.formatBetrag((contribution['soll'] ?? 0).toString())) != 0 ||
+          money.toCents(money.formatBetrag((contribution['haben'] ?? 0).toString())) != expectedTripCents ||
+          (expense['soll_konto_id'] as num?)?.toInt() != (expense['konto_id'] as num?)?.toInt() ||
+          expense['haben_konto_id'] != null ||
+          (contribution['haben_konto_id'] as num?)?.toInt() != (contribution['konto_id'] as num?)?.toInt() ||
+          contribution['soll_konto_id'] != null ||
+          (expense['mileage_euer_zeile_snapshot'] as num?)?.toInt() != 71 ||
+          (contribution['mileage_euer_zeile_snapshot'] as num?)?.toInt() != 107 ||
+          money.toCents(money.formatBetrag((expense['betrag'] ?? 0).toString())) != expectedTripCents ||
+          money.toCents(money.formatBetrag((contribution['betrag'] ?? 0).toString())) != -expectedTripCents) {
+        throw EuerException('EÜR blockiert: Mileage-Quelle $tripId ist unvollständig oder unausgeglichen');
+      }
+      final List<Map<String, Object?>> settlements = await executor.runSelect(
+        'SELECT id FROM settlement_groups WHERE source_kind = ? AND source_id = ? LIMIT 1',
+        <Object?>['mileage_trip', tripId],
+      );
+      if (settlements.isNotEmpty) {
+        throw EuerException('EÜR blockiert: Mileage-Quelle $tripId wurde zusätzlich als Zahlung erfasst');
+      }
+      expensesCents += expectedTripCents;
+      contributionCents += expectedTripCents;
+      final List<Map<String, Object?>> legSnapshots = <Map<String, Object?>>[
+        for (final Map<String, Object?> leg in <Map<String, Object?>>[expense, contribution])
+          <String, Object?>{
+            'journal_id': leg['id'],
+            'role': leg['mileage_role_snapshot'],
+            'category_id': leg['mileage_kategorie_id_snapshot'],
+            'category_label': leg['mileage_kategorie_name_snapshot'],
+            'category_art': leg['mileage_kategorie_art_snapshot'],
+            'euer_line': leg['mileage_euer_zeile_snapshot'],
+            'konto_skr03': leg['mileage_kategorie_skr03_snapshot'],
+            'konto_skr04': leg['mileage_kategorie_skr04_snapshot'],
+            'mapping_status': leg['mileage_mapping_status_snapshot'],
+            'mapping_source_reference': leg['mileage_mapping_source_reference_snapshot'],
+            'mapping_source_version': leg['mileage_mapping_source_version_snapshot'],
+            'mapping_history_id': leg['mileage_mapping_history_id_snapshot'],
+          },
+      ];
+      reportSnapshots.add(<String, Object?>{
+        'trip_id': tripId,
+        'trip_date': tripDate,
+        'event_id': eventId,
+        'amount_cents': expectedTripCents,
+        'legs': legSnapshots,
+      });
+    }
+    return _MileageEuerTotals(
+      expenseCents: expensesCents,
+      contributionCents: contributionCents,
+      reportSnapshots: reportSnapshots,
+    );
+  }
+
+  int _mileageEurCents(Object? raw, String tripId) {
+    try {
+      final String value = raw?.toString().trim() ?? '';
+      if (!RegExp(r'^[0-9]+(?:[.][0-9]{1,2})?$').hasMatch(value)) {
+        throw const FormatException();
+      }
+      return money.toCents(value);
+    } catch (error) {
+      throw EuerException('EÜR blockiert: Mileage-Betrag für $tripId ist ungültig', error);
+    }
+  }
+
+  bool _mileageSnapshotIsComplete(Map<String, Object?> leg) {
+    final String role = leg['mileage_role_snapshot']?.toString() ?? '';
+    final String expectedArt = role == 'travel_expense' ? 'ausgabe' : 'einnahme';
+    final int expectedLine = role == 'travel_expense' ? 71 : 107;
+    return (leg['konto_id'] as num?)?.toInt() != null &&
+        (leg['kategorie_id'] as num?)?.toInt() != null &&
+        (leg['kategorie_id'] as num?)?.toInt() == (leg['mileage_kategorie_id_snapshot'] as num?)?.toInt() &&
+        (leg['mileage_kategorie_name_snapshot']?.toString().trim().isNotEmpty ?? false) &&
+        leg['mileage_kategorie_art_snapshot']?.toString().trim().toLowerCase() == expectedArt &&
+        (leg['mileage_euer_zeile_snapshot'] as num?)?.toInt() == expectedLine &&
+        (leg['mileage_mapping_status_snapshot'] == 'catalog_verified' ||
+            leg['mileage_mapping_status_snapshot'] == 'user_confirmed') &&
+        ((leg['mileage_mapping_history_id_snapshot'] as num?)?.toInt() ?? 0) > 0 &&
+        ((leg['mileage_kategorie_skr03_snapshot']?.toString().trim().isNotEmpty ?? false) ||
+            (leg['mileage_kategorie_skr04_snapshot']?.toString().trim().isNotEmpty ?? false));
+  }
+
   Future<EurSettlementTotals?> _settlementTotalsOrNull(int jahr) async {
     if (!await EurSettlementReader.hasSettlementData(executor, jahr)) {
       return null;
@@ -540,6 +729,18 @@ FixedAsset _toFixedAsset(Map<String, Object?> row) {
 }
 
 /// One journal row resolved to an eligible category mapping for EÜR output.
+class _MileageEuerTotals {
+  const _MileageEuerTotals({
+    required this.expenseCents,
+    required this.contributionCents,
+    required this.reportSnapshots,
+  });
+
+  final int expenseCents;
+  final int contributionCents;
+  final List<Map<String, Object?>> reportSnapshots;
+}
+
 class _ResolvedMapping {
   const _ResolvedMapping({
     required this.journalId,

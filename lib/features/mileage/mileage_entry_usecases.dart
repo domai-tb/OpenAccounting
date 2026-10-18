@@ -3,19 +3,13 @@ import 'dart:math';
 import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
 
-/// Posting boundary port — production M2 implementation arrives later.
-/// Test doubles prove the exactly-once contract first.
-abstract class MileagePostingPort {
-  Future<String> postExpense(MileageTrip trip);
-}
-
-/// Mileage use-cases — capture only, fail-closed until accepted policy/posting.
-/// Never reuses EKS 0.10 rate; unresolved stays out of totals.
+/// Mileage use-cases validate trip facts and policy snapshots before delegating posting.
+/// The accounting posting service owns the atomic journal/trip transition. EKS remains separate.
 class MileageEntryUseCases {
-  MileageEntryUseCases(this.repo, {this.postingPort});
+  MileageEntryUseCases(this.repo, {MileagePostingPort? postingPort}) : postingPort = postingPort ?? repo;
 
   final MileageEntryRepository repo;
-  final MileagePostingPort? postingPort;
+  final MileagePostingPort postingPort;
 
   Future<MileageTrip> recordBusinessTrip({
     required String tripDate,
@@ -122,7 +116,7 @@ class MileageEntryUseCases {
   /// Posting stays unavailable until the M2 accounting boundary lands.
   /// shortcut: fail-closed stub; test doubles arrive with 3.x.
   Future<void> postTrip(String id) async {
-    throw StateError('posting unavailable');
+    await postTripWithPort(id);
   }
 
   /// Stores a policy snapshot only for trips that meet the active application policy.
@@ -193,16 +187,18 @@ class MileageEntryUseCases {
   Future<String> postTripWithPort(String id) async {
     final MileageTrip? current = await repo.getById(id);
     if (current == null) throw StateError('not found');
-    if (current.postingEventId != null) return current.postingEventId!;
-    if (current.state != MileageTripState.calculated) throw StateError('not calculated');
+    final bool postedReplay = current.state == MileageTripState.posted && current.postingEventId != null;
+    if (!postedReplay && (current.state != MileageTripState.calculated || current.postingEventId != null)) {
+      throw StateError('not calculated');
+    }
     if (!_hasApprovedCalculationSnapshot(current)) {
       throw StateError('mileage calculation is not eligible for posting');
     }
-    final MileagePostingPort? port = postingPort;
-    if (port == null) throw StateError('posting unavailable');
-    final String eventId = await port.postExpense(current);
+    final String eventId = await postingPort.postExpense(current);
     if (eventId.trim().isEmpty) throw StateError('empty event');
-    await repo.storePosting(id: id, eventId: eventId);
+    if (postedReplay && current.postingEventId != eventId) {
+      throw StateError('conflicting mileage posting retry');
+    }
     return eventId;
   }
 

@@ -45,6 +45,84 @@ Future<void> _pumpSection(WidgetTester tester, ProfileDataSection section) async
 
 void main() {
   group('Profile data portability export', () {
+    test('profile archive includes every present supported table', () async {
+      final AppDatabase db = await _openProfile('profile_export_complete_inventory_');
+      await db.executor.runCustom('''
+CREATE TABLE dokument_email_templates (
+  typ TEXT PRIMARY KEY,
+  betreff TEXT NOT NULL,
+  text TEXT NOT NULL,
+  aktualisiert_am TEXT NOT NULL
+)''');
+      await db.executor.runCustom('''
+CREATE TABLE dokument_email_versuche (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dokument_id INTEGER NOT NULL,
+  dokument_typ TEXT NOT NULL,
+  empfaenger TEXT NOT NULL,
+  ergebnis TEXT NOT NULL DEFAULT 'submitting',
+  mahnung_id INTEGER,
+  idempotenz_schluessel TEXT NOT NULL UNIQUE,
+  artefakt_ids TEXT NOT NULL DEFAULT '[]',
+  erstellt_am TEXT NOT NULL,
+  abgeschlossen_am TEXT,
+  fehler_kategorie TEXT
+)''');
+      await db.executor.runInsert(
+        'INSERT INTO dokument_email_templates (typ, betreff, text, aktualisiert_am) VALUES (?, ?, ?, ?)',
+        const <Object?>['rechnung', 'Rechnung', 'Guten Tag', '2026-10-18T12:00:00Z'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO dokument_email_versuche '
+        '(dokument_id, dokument_typ, empfaenger, ergebnis, idempotenz_schluessel, artefakt_ids, erstellt_am) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        const <Object?>[
+          1,
+          'rechnung',
+          'kunde@example.invalid',
+          'accepted',
+          'email-attempt-1',
+          '[]',
+          '2026-10-18T12:00:00Z',
+        ],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO mileage_posting_period_closures (closed_from, closed_through, closed_at) VALUES (?, ?, ?)',
+        const <Object?>['2026-01-01', '2026-01-31', '2026-10-18T12:00:00Z'],
+      );
+
+      final Set<String> actualTables = await _exportTableNames(db);
+      final Directory outDir = await Directory.systemTemp.createTemp('profile_export_complete_inventory_out_');
+      addTearDown(() async {
+        if (outDir.existsSync()) {
+          await outDir.delete(recursive: true);
+        }
+      });
+      final String destination = p.join(outDir.path, 'profil_export.zip');
+      final ProfileExportService service = ProfileExportService(
+        executor: db.executor,
+        profileDir: db.profileDir!,
+        profileLabel: 'Muster GmbH',
+      );
+      final ProfileExportResult result = await service.exportProfile(destinationPath: destination);
+
+      expect(result.status, ProfileExportStatus.complete);
+      final List<String> entries = await service.listEntries(destination);
+      final Set<String> exportedTables = <String>{
+        for (final String entry in entries)
+          if (entry.startsWith('records/') && entry.endsWith('.jsonl'))
+            entry.substring('records/'.length, entry.length - '.jsonl'.length),
+      };
+      expect(exportedTables, actualTables);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      final Map<String, Object?> counts = Map<String, Object?>.from(manifest['record_counts']! as Map);
+      expect((counts['mileage_posting_period_closures']! as num).toInt(), 1);
+      final String closuresJsonl = utf8.decode(
+        await service.readEntry(destination, 'records/mileage_posting_period_closures.jsonl'),
+      );
+      expect(closuresJsonl, contains('2026-01-01'));
+    });
+
     test('test_profile_data_portability_012_export_a_populated_profile', () async {
       final Directory profileDir = await Directory.systemTemp.createTemp('profile_export_012_');
       addTearDown(() async {
@@ -109,6 +187,7 @@ void main() {
       expect((counts['unternehmen']! as num).toInt(), greaterThanOrEqualTo(1));
       expect((counts['kunden']! as num).toInt(), greaterThanOrEqualTo(1));
       expect((counts['belege']! as num).toInt(), greaterThanOrEqualTo(1));
+      expect((counts['mileage_posting_account_mapping']! as num).toInt(), 0);
       final List<Object?> evidence = List<Object?>.from(manifest['evidence']! as List);
       expect(evidence, hasLength(2));
       for (final Object? entry in evidence) {
@@ -121,6 +200,7 @@ void main() {
       expect(entries, contains('manifest.json'));
       expect(entries, contains('records/unternehmen.jsonl'));
       expect(entries, contains('records/belege.jsonl'));
+      expect(entries, contains('records/mileage_posting_account_mapping.jsonl'));
       final String unternehmenJsonl = utf8.decode(await service.readEntry(destination, 'records/unternehmen.jsonl'));
       expect(unternehmenJsonl, contains('Muster GmbH'));
       expect(unternehmenJsonl, isNot(contains('backup_extern_pfad')));

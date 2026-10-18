@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 
 /// Posting boundary for balanced, source-linked journal groups.
 ///
@@ -30,6 +34,7 @@ class PostingSource {
   static const String invoiceEvent = 'invoice_event';
   static const String bankTransaction = 'bank_transaction';
   static const String cashPayment = 'cash_payment';
+  static const String mileageTrip = 'mileage_trip';
 }
 
 /// One balanced journal leg in integer cents.
@@ -146,6 +151,12 @@ class PostingGroupService {
   static const Set<String> _eligibleMapping = <String>{'catalog_verified', 'user_confirmed'};
 
   /// Idempotent DDL for the posting boundary (mirrors migration v19).
+
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  );
+
   Future<void> ensureSchema() async {
     await _addColumnIfMissing('journal', 'source_kind', 'TEXT');
     await _addColumnIfMissing('journal', 'source_id', 'TEXT');
@@ -172,6 +183,146 @@ class PostingGroupService {
   /// mirrored supplier pair supplied by the caller). Amounts are integer
   /// cents from the approved money contract; no split residual is computed
   /// here. Missing accounts or tax mappings fail before commit.
+
+  /// Replaces both profile-local mileage role mappings as one reviewed change.
+  /// A role is never inferred from a seeded category or account.
+  Future<void> configureMileagePostingRoles({
+    required int travelExpenseKontoId,
+    required int travelExpenseKategorieId,
+    required int privateContributionKontoId,
+    required int privateContributionKategorieId,
+  }) async {
+    await _requireMileagePostingSchema(executor);
+    final TransactionExecutor tx = executor.beginTransaction();
+    await tx.ensureOpen(_PostingTxUser());
+    try {
+      await tx.runCustom('DELETE FROM mileage_posting_account_mapping');
+      final String reviewedAt = DateTime.now().toUtc().toIso8601String();
+      await tx.runInsert(
+        'INSERT INTO mileage_posting_account_mapping (role, konto_id, kategorie_id, reviewed_at) VALUES (?, ?, ?, ?)',
+        <Object?>['travel_expense', travelExpenseKontoId, travelExpenseKategorieId, reviewedAt],
+      );
+      await tx.runInsert(
+        'INSERT INTO mileage_posting_account_mapping (role, konto_id, kategorie_id, reviewed_at) VALUES (?, ?, ?, ?)',
+        <Object?>['private_contribution', privateContributionKontoId, privateContributionKategorieId, reviewedAt],
+      );
+      await _loadMileagePostingRoles(tx);
+      await tx.send();
+    } catch (error, stackTrace) {
+      try {
+        await tx.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      Error.throwWithStackTrace(error is PostingException ? error : PostingException(error.toString()), stackTrace);
+    }
+  }
+
+  /// Posts one calculated trip as an expense debit and private-contribution
+  /// credit. Journal legs, mapping snapshots, and trip state share one
+  /// transaction. No bank, cash, settlement, or input-VAT row is created.
+  Future<String> postMileage({required MileageTrip trip}) async {
+    final String cleanTripId = trip.id.trim();
+    if (!_uuidPattern.hasMatch(cleanTripId)) {
+      throw const PostingException('Fahrten-ID muss eine UUID sein');
+    }
+    await _requireMileagePostingSchema(executor);
+
+    final Map<String, Object?> requestedFacts = _mileageTripEntityFacts(trip);
+    final TransactionExecutor tx = executor.beginTransaction();
+    await tx.ensureOpen(_PostingTxUser());
+    try {
+      final Map<String, Object?>? tripRow = await _mileageTripRow(tx, cleanTripId);
+      if (tripRow == null) throw const PostingException('Fahrt nicht gefunden');
+      final Map<String, Object?> tripFacts = _validatedMileageTripFacts(tripRow);
+      if (jsonEncode(requestedFacts) != jsonEncode(tripFacts)) {
+        throw const PostingException('Mileage-Wiederholung hat einen abweichenden Fahrtsnapshot');
+      }
+      final List<Map<String, Object?>> existing = await _mileageJournalRows(tx, cleanTripId);
+      if (existing.isNotEmpty || tripRow['state'] == 'posted') {
+        final Map<String, _MileagePostingRoleSnapshot> roles = await _loadMileagePostingRoles(tx);
+        final String eventId = await _verifyMileageReplay(tripRow, existing, cleanTripId, roles);
+        await tx.send();
+        return eventId;
+      }
+      if (tripRow['state'] != 'calculated' || tripRow['posting_event_id'] != null) {
+        throw const PostingException('Nur berechnete und noch nicht gebuchte Fahrten können gebucht werden');
+      }
+
+      await _requireMileagePeriodOpen(tx, tripRow['trip_date'].toString());
+      final Map<String, _MileagePostingRoleSnapshot> roles = await _loadMileagePostingRoles(tx);
+      final int amountCents = _mileageAmountCents(tripRow['calculated_amount']);
+      if (amountCents <= 0) throw const PostingException('Fahrtbetrag muss mindestens einen Cent betragen');
+      final String eventId = _newMileageEventId();
+      final String description = 'Fahrt: ${tripRow['purpose']}';
+      final _MileagePostingRoleSnapshot expense = roles['travel_expense']!;
+      final _MileagePostingRoleSnapshot contribution = roles['private_contribution']!;
+
+      final int expenseId = await _insertLeg(
+        tx,
+        datum: tripRow['trip_date'].toString(),
+        beschreibung: description,
+        kategorieId: expense.kategorieId,
+        art: 'Ausgabe',
+        betragCents: amountCents,
+        debitCents: amountCents,
+        creditCents: 0,
+        kontoId: expense.kontoId,
+        sollKontoId: expense.kontoId,
+        habenKontoId: null,
+        sourceKind: PostingSource.mileageTrip,
+        sourceId: cleanTripId,
+      );
+      final int contributionId = await _insertLeg(
+        tx,
+        datum: tripRow['trip_date'].toString(),
+        beschreibung: description,
+        kategorieId: contribution.kategorieId,
+        art: 'Ausgabe',
+        betragCents: -amountCents,
+        debitCents: 0,
+        creditCents: amountCents,
+        kontoId: contribution.kontoId,
+        sollKontoId: null,
+        habenKontoId: contribution.kontoId,
+        sourceKind: PostingSource.mileageTrip,
+        sourceId: cleanTripId,
+      );
+      await _writeMileageLegSnapshot(tx, journalId: expenseId, role: expense);
+      await _writeMileageLegSnapshot(tx, journalId: contributionId, role: contribution);
+      await _sealLegs(tx, <int>[expenseId, contributionId], expenseId);
+      final int changed = await tx.runUpdate(
+        'UPDATE mileage_trips SET state = ?, posting_event_id = ?, updated_at = ? '
+        'WHERE id = ? AND state = ? AND posting_event_id IS NULL',
+        <Object?>['posted', eventId, DateTime.now().toUtc().toIso8601String(), cleanTripId, 'calculated'],
+      );
+      if (changed != 1) throw const PostingException('Fahrt wurde parallel geändert; Buchung bitte erneut prüfen');
+      await tx.send();
+      return eventId;
+    } catch (error, stackTrace) {
+      try {
+        await tx.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      if (_isUniqueViolation(error)) {
+        final Map<String, Object?>? racedTrip = await _mileageTripRow(executor, cleanTripId);
+        if (racedTrip != null) {
+          final Map<String, Object?> racedFacts = _validatedMileageTripFacts(racedTrip);
+          if (jsonEncode(requestedFacts) != jsonEncode(racedFacts)) {
+            throw const PostingException('Mileage-Wiederholung hat einen abweichenden Fahrtsnapshot');
+          }
+          final List<Map<String, Object?>> racedRows = await _mileageJournalRows(executor, cleanTripId);
+          if (racedRows.isNotEmpty || racedTrip['state'] == 'posted') {
+            final Map<String, _MileagePostingRoleSnapshot> roles = await _loadMileagePostingRoles(executor);
+            return _verifyMileageReplay(racedTrip, racedRows, cleanTripId, roles);
+          }
+        }
+      }
+      Error.throwWithStackTrace(error is PostingException ? error : PostingException(error.toString()), stackTrace);
+    }
+  }
+
   Future<PostingGroupSummary> postInvoice({
     required String eventId,
     required String datum,
@@ -1066,6 +1217,379 @@ class PostingGroupService {
     ];
   }
 
+  Future<void> _requireMileagePostingSchema(QueryExecutor query) async {
+    try {
+      final List<Map<String, Object?>> mappingColumns = await query.runSelect(
+        'PRAGMA table_info(mileage_posting_account_mapping)',
+        const <Object?>[],
+      );
+      final Set<String> mappingNames = <String>{
+        for (final Map<String, Object?> row in mappingColumns) row['name'].toString(),
+      };
+      const Set<String> mappingRequired = <String>{'role', 'konto_id', 'kategorie_id', 'reviewed_at'};
+      if (!mappingRequired.every(mappingNames.contains)) {
+        throw const PostingException('Mileage-Kontenzuordnung fehlt; Schema v25 ist erforderlich');
+      }
+      final List<Map<String, Object?>> journalColumns = await query.runSelect(
+        'PRAGMA table_info(journal)',
+        const <Object?>[],
+      );
+      final Set<String> journalNames = <String>{
+        for (final Map<String, Object?> row in journalColumns) row['name'].toString(),
+      };
+      const Set<String> snapshots = <String>{
+        'mileage_role_snapshot',
+        'mileage_kategorie_id_snapshot',
+        'mileage_kategorie_name_snapshot',
+        'mileage_kategorie_art_snapshot',
+        'mileage_euer_zeile_snapshot',
+        'mileage_kategorie_skr03_snapshot',
+        'mileage_kategorie_skr04_snapshot',
+        'mileage_mapping_status_snapshot',
+        'mileage_mapping_source_reference_snapshot',
+        'mileage_mapping_source_version_snapshot',
+        'mileage_mapping_history_id_snapshot',
+      };
+      if (!snapshots.every(journalNames.contains)) {
+        throw const PostingException('Mileage-Journal-Snapshots fehlen; Schema v25 ist erforderlich');
+      }
+      final List<Map<String, Object?>> periodColumns = await query.runSelect(
+        'PRAGMA table_info(mileage_posting_period_closures)',
+        const <Object?>[],
+      );
+      const Set<String> periodRequired = <String>{'id', 'closed_from', 'closed_through', 'closed_at'};
+      if (!periodRequired.every(
+        (String column) => periodColumns.any((Map<String, Object?> row) => row['name'] == column),
+      )) {
+        throw const PostingException('Mileage-Zeitraumssperren fehlen; Schema v25 ist erforderlich');
+      }
+    } on PostingException {
+      rethrow;
+    } catch (error) {
+      throw PostingException('Mileage-Buchungsschema ist nicht verfügbar: $error');
+    }
+  }
+
+  Future<Map<String, Object?>?> _mileageTripRow(QueryExecutor query, String tripId) async {
+    final List<Map<String, Object?>> rows = await query.runSelect(
+      'SELECT id, trip_date, purpose, business_context, distance_hundredths_km, trip_kind, vehicle_source, '
+      'vehicle_class, state, policy_id, policy_source, policy_version, policy_effective_from, policy_effective_to, '
+      'calculated_amount, calculated_at, posting_event_id, created_at FROM mileage_trips WHERE id = ? LIMIT 1',
+      <Object?>[tripId],
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<void> _requireMileagePeriodOpen(QueryExecutor query, String tripDate) async {
+    final List<Map<String, Object?>> closures = await query.runSelect(
+      'SELECT id FROM mileage_posting_period_closures WHERE closed_from <= ? AND closed_through >= ? LIMIT 1',
+      <Object?>[tripDate, tripDate],
+    );
+    if (closures.isNotEmpty) {
+      throw const PostingException('Der Zeitraum des Fahrtdatums ist abgeschlossen');
+    }
+  }
+
+  Future<List<Map<String, Object?>>> _mileageJournalRows(QueryExecutor query, String tripId) {
+    return query.runSelect(
+      'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, soll, haben, '
+      'soll_konto_id, haben_konto_id, gruppe_id, legacy_unverified, immutable, source_kind, source_id, '
+      'mileage_role_snapshot, mileage_kategorie_id_snapshot, mileage_kategorie_name_snapshot, '
+      'mileage_kategorie_art_snapshot, mileage_euer_zeile_snapshot, mileage_kategorie_skr03_snapshot, '
+      'mileage_kategorie_skr04_snapshot, '
+      'mileage_mapping_status_snapshot, mileage_mapping_source_reference_snapshot, '
+      'mileage_mapping_source_version_snapshot, mileage_mapping_history_id_snapshot '
+      'FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+      <Object?>[PostingSource.mileageTrip, tripId],
+    );
+  }
+
+  Map<String, Object?> _mileageTripEntityFacts(MileageTrip trip) => <String, Object?>{
+    'id': trip.id,
+    'trip_date': trip.tripDate,
+    'purpose': trip.purpose,
+    'business_context': trip.businessContext,
+    'distance_hundredths_km': trip.distanceHundredthsKm,
+    'trip_kind': mileageTripKindStorageValue(trip.tripKind),
+    'vehicle_source': mileageVehicleSourceStorageValue(trip.vehicleSource),
+    'vehicle_class': mileageVehicleClassStorageValue(trip.vehicleClass),
+    'policy_id': trip.policyId,
+    'policy_source': trip.policySource,
+    'policy_version': trip.policyVersion,
+    'policy_effective_from': trip.policyEffectiveFrom,
+    'policy_effective_to': trip.policyEffectiveTo,
+    'calculated_amount_cents': _mileageAmountCents(trip.calculatedAmount),
+    'calculated_at': trip.calculatedAt,
+    'created_at': trip.createdAt,
+  };
+
+  Map<String, Object?> _validatedMileageTripFacts(Map<String, Object?> trip) {
+    final String tripId = trip['id']?.toString() ?? '';
+    final String tripDate = trip['trip_date']?.toString() ?? '';
+    _requireDate(tripDate);
+    if (!_uuidPattern.hasMatch(tripId) ||
+        tripDate.compareTo('2025-01-01') < 0 ||
+        tripDate.compareTo('2026-12-31') > 0 ||
+        (trip['purpose']?.toString().trim().isEmpty ?? true) ||
+        (trip['business_context']?.toString().trim().isEmpty ?? true) ||
+        trip['trip_kind'] != 'business_trip' ||
+        trip['vehicle_source'] != 'private' ||
+        (trip['vehicle_class'] != 'kraftwagen' && trip['vehicle_class'] != 'other_motor_vehicle') ||
+        trip['policy_id'] != 'DE-private-business-travel/1' ||
+        trip['policy_source'] != 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71' ||
+        trip['policy_version'] != '1' ||
+        trip['policy_effective_from'] != '2025-01-01' ||
+        trip['policy_effective_to'] != '2026-12-31' ||
+        (trip['calculated_at']?.toString().trim().isEmpty ?? true) ||
+        DateTime.tryParse(trip['calculated_at'].toString()) == null) {
+      throw const PostingException('Fahrt oder Berechnungssnapshot ist nicht buchungsfähig');
+    }
+    final int distance = (trip['distance_hundredths_km'] as num?)?.toInt() ?? 0;
+    if (distance < 1 || distance > 999999999999) {
+      throw const PostingException('Fahrtdistanz ist außerhalb des zulässigen Bereichs');
+    }
+    final int amountCents = _mileageAmountCents(trip['calculated_amount']);
+    final int rate = trip['vehicle_class'] == 'kraftwagen' ? 30 : 20;
+    final int expectedCents = (distance * rate + 50) ~/ 100;
+    if (amountCents <= 0 || amountCents != expectedCents) {
+      throw const PostingException('Fahrtbetrag entspricht nicht der freigegebenen Berechnung');
+    }
+    return <String, Object?>{
+      'id': tripId,
+      'trip_date': tripDate,
+      'purpose': trip['purpose'].toString(),
+      'business_context': trip['business_context'].toString(),
+      'distance_hundredths_km': distance,
+      'trip_kind': trip['trip_kind'].toString(),
+      'vehicle_source': trip['vehicle_source'].toString(),
+      'vehicle_class': trip['vehicle_class'].toString(),
+      'policy_id': trip['policy_id'].toString(),
+      'policy_source': trip['policy_source'].toString(),
+      'policy_version': trip['policy_version'].toString(),
+      'policy_effective_from': trip['policy_effective_from'].toString(),
+      'policy_effective_to': trip['policy_effective_to'].toString(),
+      'calculated_amount_cents': amountCents,
+      'calculated_at': trip['calculated_at'].toString(),
+      'created_at': trip['created_at']?.toString(),
+    };
+  }
+
+  int _mileageAmountCents(Object? raw) {
+    final String value = raw?.toString().trim() ?? '';
+    final Match? match = RegExp(r'^([0-9]+)(?:[.]([0-9]{1,2}))?$').firstMatch(value);
+    if (match == null) throw const PostingException('Fahrtbetrag ist kein gültiger Eurobetrag');
+    final int euros = int.tryParse(match.group(1)!) ?? -1;
+    final int cents = int.tryParse((match.group(2) ?? '').padRight(2, '0')) ?? -1;
+    if (euros < 0 || cents < 0) throw const PostingException('Fahrtbetrag ist kein gültiger Eurobetrag');
+    return euros * 100 + cents;
+  }
+
+  Future<Map<String, _MileagePostingRoleSnapshot>> _loadMileagePostingRoles(QueryExecutor query) async {
+    final List<Map<String, Object?>> rows = await query.runSelect(
+      'SELECT m.role, m.konto_id, m.kategorie_id, m.reviewed_at, a.kontoart, k.bezeichnung, k.art, '
+      'k.euer_zeile, k.aktiv, k.konto_skr03, k.konto_skr04, k.mapping_status, k.catalog_source_reference, '
+      'k.catalog_source_version, h.id AS mapping_history_id FROM mileage_posting_account_mapping m '
+      'JOIN konten a ON a.id = m.konto_id JOIN kategorien k ON k.id = m.kategorie_id '
+      'LEFT JOIN category_mapping_history h ON h.id = (SELECT MAX(h2.id) FROM category_mapping_history h2 '
+      'WHERE h2.kategorie_id = k.id) ORDER BY m.role',
+      const <Object?>[],
+    );
+    if (rows.length != 2) {
+      throw const PostingException('Reisekosten- und Privateinlagekonto müssen ausdrücklich geprüft werden');
+    }
+    final Map<String, _MileagePostingRoleSnapshot> roles = <String, _MileagePostingRoleSnapshot>{};
+    for (final Map<String, Object?> row in rows) {
+      final String role = row['role']?.toString() ?? '';
+      final int expectedLine = role == 'travel_expense' ? 71 : 107;
+      final String expectedArt = role == 'travel_expense' ? 'ausgabe' : 'einnahme';
+      final int? kontoId = (row['konto_id'] as num?)?.toInt();
+      final int? kategorieId = (row['kategorie_id'] as num?)?.toInt();
+      final int? euerLine = (row['euer_zeile'] as num?)?.toInt();
+      final String status = row['mapping_status']?.toString() ?? '';
+      final String? skr03 = row['konto_skr03']?.toString().trim();
+      final String? skr04 = row['konto_skr04']?.toString().trim();
+      final String? quelle = row['catalog_source_reference']?.toString().trim();
+      final String? version = row['catalog_source_version']?.toString().trim();
+      final int? historyId = (row['mapping_history_id'] as num?)?.toInt();
+      final String reviewedAt = row['reviewed_at']?.toString().trim() ?? '';
+      if ((role != 'travel_expense' && role != 'private_contribution') ||
+          kontoId == null ||
+          kategorieId == null ||
+          roles.containsKey(role) ||
+          row['kontoart'] != 'Sachkonto' ||
+          row['aktiv'] == null ||
+          (row['aktiv']! as num).toInt() != 1 ||
+          row['art']?.toString().trim().toLowerCase() != expectedArt ||
+          euerLine != expectedLine ||
+          !_eligibleMapping.contains(status) ||
+          ((skr03 ?? '').isEmpty && (skr04 ?? '').isEmpty) ||
+          historyId == null ||
+          historyId <= 0 ||
+          reviewedAt.isEmpty ||
+          DateTime.tryParse(reviewedAt) == null ||
+          (status == 'catalog_verified' && ((quelle ?? '').isEmpty || (version ?? '').isEmpty)) ||
+          (row['bezeichnung']?.toString().trim().isEmpty ?? true)) {
+        throw PostingException('Die geprüfte Zuordnung für ${role.isEmpty ? 'Mileage' : role} ist ungültig');
+      }
+      roles[role] = _MileagePostingRoleSnapshot(
+        role: role,
+        kontoId: kontoId,
+        kategorieId: kategorieId,
+        categoryLabel: row['bezeichnung'].toString(),
+        categoryArt: row['art'].toString(),
+        euerLine: euerLine,
+        kontoSkr03: skr03,
+        kontoSkr04: skr04,
+        mappingStatus: status,
+        mappingSourceReference: quelle?.isEmpty == true ? null : quelle,
+        mappingSourceVersion: version?.isEmpty == true ? null : version,
+        mappingHistoryId: historyId,
+      );
+    }
+    if (!roles.containsKey('travel_expense') || !roles.containsKey('private_contribution')) {
+      throw const PostingException('Reisekosten- und Privateinlagekonto müssen ausdrücklich geprüft werden');
+    }
+    return roles;
+  }
+
+  Future<void> _writeMileageLegSnapshot(
+    TransactionExecutor tx, {
+    required int journalId,
+    required _MileagePostingRoleSnapshot role,
+  }) async {
+    final int changed = await tx.runUpdate(
+      'UPDATE journal SET mileage_role_snapshot = ?, mileage_kategorie_id_snapshot = ?, '
+      'mileage_kategorie_name_snapshot = ?, mileage_kategorie_art_snapshot = ?, mileage_euer_zeile_snapshot = ?, '
+      'mileage_kategorie_skr03_snapshot = ?, mileage_kategorie_skr04_snapshot = ?, '
+      'mileage_mapping_status_snapshot = ?, '
+      'mileage_mapping_source_reference_snapshot = ?, mileage_mapping_source_version_snapshot = ?, '
+      'mileage_mapping_history_id_snapshot = ? WHERE id = ?',
+      <Object?>[
+        role.role,
+        role.kategorieId,
+        role.categoryLabel,
+        role.categoryArt,
+        role.euerLine,
+        role.kontoSkr03,
+        role.kontoSkr04,
+        role.mappingStatus,
+        role.mappingSourceReference,
+        role.mappingSourceVersion,
+        role.mappingHistoryId,
+        journalId,
+      ],
+    );
+    if (changed != 1) throw PostingException('Mileage-Snapshot für Journal $journalId fehlt');
+  }
+
+  Future<String> _verifyMileageReplay(
+    Map<String, Object?> trip,
+    List<Map<String, Object?>> rows,
+    String tripId,
+    Map<String, _MileagePostingRoleSnapshot> roles,
+  ) async {
+    if (trip['state'] != 'posted' || rows.length != 2) {
+      throw const PostingException('Widersprüchliche oder unvollständige Mileage-Wiederholung');
+    }
+    final String eventId = trip['posting_event_id']?.toString() ?? '';
+    if (!_uuidPattern.hasMatch(eventId) ||
+        rows.any(
+          (Map<String, Object?> row) =>
+              row['source_kind'] != PostingSource.mileageTrip ||
+              row['source_id'] != tripId ||
+              row['immutable'] == null ||
+              (row['immutable']! as num).toInt() != 1 ||
+              (row['legacy_unverified'] as num?)?.toInt() != 0 ||
+              row['datum'] != trip['trip_date'] ||
+              row['beleg_typ'] != 'Ausgabe',
+        )) {
+      throw const PostingException('Widersprüchliche Mileage-Buchungsgruppe');
+    }
+    final int rootId = ((rows.first['gruppe_id'] as num?) ?? 0).toInt();
+    final Map<String, Map<String, Object?>> byRole = <String, Map<String, Object?>>{};
+    final int amountCents = _mileageAmountCents(trip['calculated_amount']);
+    var debit = 0;
+    var credit = 0;
+    for (final Map<String, Object?> row in rows) {
+      final int journalId = (row['id'] as num?)?.toInt() ?? 0;
+      final int? groupId = (row['gruppe_id'] as num?)?.toInt();
+      final String role = row['mileage_role_snapshot']?.toString() ?? '';
+      if (journalId <= 0 ||
+          groupId != rootId ||
+          rootId <= 0 ||
+          (journalId == rootId) != (groupId == journalId) ||
+          byRole.containsKey(role) ||
+          (role != 'travel_expense' && role != 'private_contribution') ||
+          roles[role] == null ||
+          !_mileageRowMatchesRole(row, roles[role]!)) {
+        throw const PostingException('Mileage-Buchungsgruppe ist nicht atomar oder nicht eindeutig');
+      }
+      byRole[role] = row;
+      final int rowDebit = money.toCents(money.formatBetrag((row['soll'] ?? 0).toString()));
+      final int rowCredit = money.toCents(money.formatBetrag((row['haben'] ?? 0).toString()));
+      debit += rowDebit;
+      credit += rowCredit;
+      if (rowDebit < 0 || rowCredit < 0 || (rowDebit == 0) == (rowCredit == 0)) {
+        throw const PostingException('Mileage-Journalzeile braucht genau eine Buchungsseite');
+      }
+      if (role == 'travel_expense') {
+        if (rowDebit != amountCents ||
+            rowCredit != 0 ||
+            (row['soll_konto_id'] as num?)?.toInt() != (row['konto_id'] as num?)?.toInt() ||
+            row['haben_konto_id'] != null ||
+            (row['betrag'] == null || money.toCents(money.formatBetrag(row['betrag'].toString())) != amountCents) ||
+            (row['mileage_euer_zeile_snapshot'] as num?)?.toInt() != 71) {
+          throw const PostingException('Mileage-Aufwandszeile ist nicht als Soll der Zeile 71 gebucht');
+        }
+      } else if (rowDebit != 0 ||
+          rowCredit != amountCents ||
+          (row['haben_konto_id'] as num?)?.toInt() != (row['konto_id'] as num?)?.toInt() ||
+          row['soll_konto_id'] != null ||
+          (row['betrag'] == null || money.toCents(money.formatBetrag(row['betrag'].toString())) != -amountCents) ||
+          (row['mileage_euer_zeile_snapshot'] as num?)?.toInt() != 107) {
+        throw const PostingException('Mileage-Privateinlage ist nicht als Haben der Zeile 107 gebucht');
+      }
+    }
+    if (byRole.length != 2 ||
+        rootId != ((byRole['travel_expense']?['id'] as num?)?.toInt() ?? 0) ||
+        debit != amountCents ||
+        credit != amountCents) {
+      throw const PostingException('Mileage-Buchungsgruppe ist nicht ausgeglichen');
+    }
+    return eventId;
+  }
+
+  bool _mileageRowMatchesRole(Map<String, Object?> row, _MileagePostingRoleSnapshot role) {
+    bool sameNullableText(String column, String? expected) => row[column]?.toString() == expected;
+    return row['mileage_role_snapshot'] == role.role &&
+        (row['konto_id'] as num?)?.toInt() == role.kontoId &&
+        (row['kategorie_id'] as num?)?.toInt() == role.kategorieId &&
+        (row['mileage_kategorie_id_snapshot'] as num?)?.toInt() == role.kategorieId &&
+        row['mileage_kategorie_name_snapshot']?.toString() == role.categoryLabel &&
+        row['mileage_kategorie_art_snapshot']?.toString() == role.categoryArt &&
+        (row['mileage_euer_zeile_snapshot'] as num?)?.toInt() == role.euerLine &&
+        sameNullableText('mileage_kategorie_skr03_snapshot', role.kontoSkr03) &&
+        sameNullableText('mileage_kategorie_skr04_snapshot', role.kontoSkr04) &&
+        row['mileage_mapping_status_snapshot'] == role.mappingStatus &&
+        sameNullableText('mileage_mapping_source_reference_snapshot', role.mappingSourceReference) &&
+        sameNullableText('mileage_mapping_source_version_snapshot', role.mappingSourceVersion) &&
+        (row['mileage_mapping_history_id_snapshot'] as num?)?.toInt() == role.mappingHistoryId &&
+        _eligibleMapping.contains(role.mappingStatus) &&
+        role.categoryLabel.trim().isNotEmpty &&
+        role.categoryArt.trim().toLowerCase() == (role.role == 'travel_expense' ? 'ausgabe' : 'einnahme') &&
+        role.euerLine == (role.role == 'travel_expense' ? 71 : 107) &&
+        (role.kontoSkr03?.trim().isNotEmpty == true || role.kontoSkr04?.trim().isNotEmpty == true);
+  }
+
+  static String _newMileageEventId() {
+    final Random random = Random.secure();
+    final List<int> bytes = List<int>.generate(16, (_) => random.nextInt(256), growable: false);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final String hex = bytes.map((int value) => value.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
+
   Future<int?> _issueKategorie(int? journalId) async {
     if (journalId == null) {
       return null;
@@ -1216,6 +1740,36 @@ class PostingGroupService {
     final String message = error.toString().toUpperCase();
     return message.contains('UNIQUE') || message.contains('CONSTRAINT');
   }
+}
+
+class _MileagePostingRoleSnapshot {
+  const _MileagePostingRoleSnapshot({
+    required this.role,
+    required this.kontoId,
+    required this.kategorieId,
+    required this.categoryLabel,
+    required this.categoryArt,
+    required this.euerLine,
+    required this.kontoSkr03,
+    required this.kontoSkr04,
+    required this.mappingStatus,
+    required this.mappingSourceReference,
+    required this.mappingSourceVersion,
+    required this.mappingHistoryId,
+  });
+
+  final String role;
+  final int kontoId;
+  final int kategorieId;
+  final String categoryLabel;
+  final String categoryArt;
+  final int? euerLine;
+  final String? kontoSkr03;
+  final String? kontoSkr04;
+  final String mappingStatus;
+  final String? mappingSourceReference;
+  final String? mappingSourceVersion;
+  final int mappingHistoryId;
 }
 
 class _ResolvedAllocation {

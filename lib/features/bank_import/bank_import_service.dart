@@ -45,6 +45,15 @@ class BankImportService {
     return merged;
   }
 
+  /// Lists accounts eligible for bank-import selection. Accounting-only
+  /// Sachkonten are deliberately excluded from this bank-specific workspace.
+  Future<List<Map<String, Object?>>> loadBankImportAccounts() {
+    return executor.runSelect(
+      "SELECT id, name, iban, waehrung FROM konten WHERE COALESCE(kontoart, '') <> 'Sachkonto' ORDER BY name, id",
+      const <Object?>[],
+    );
+  }
+
   // ── Dedup ──────────────────────────────────────────────────────────
 
   /// SHA-256 hex of Datum|Betrag|Partner|Verwendungszweck.

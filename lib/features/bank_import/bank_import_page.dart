@@ -289,10 +289,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     }
 
     try {
-      accountRows = await _db.executor.runSelect(
-        'SELECT id, name, iban, waehrung FROM konten ORDER BY name, id',
-        const <Object?>[],
-      );
+      accountRows = await _service.loadBankImportAccounts();
     } catch (error, stackTrace) {
       debugPrint('bank_import accounts failed: $error\n$stackTrace');
       dataError = _l10n.dataLoadError;

@@ -2,9 +2,9 @@
 
 Feature map §35 asks for dated business-mileage records containing purpose, distance, business context, and eventually an amount used by accounting and reports. The existing EKS B6_5 rule uses `journal.km_anzahl × 0.10` for a Jobcenter travel allowance; that EKS-specific amount does not define the general mileage policy in this change. Legacy `journal.km_anzahl` values are not trip records and SHALL NOT be backfilled.
 
-The mileage tables are required from schema v13. The current proposal for v23 adds structured eligibility facts and lifecycle enforcement to those existing tables. No part of this design asserts that the current runtime has v23 enforcement or the accepted posting integration.
+The mileage tables are required from schema v13. Structured eligibility and lifecycle enforcement are already present through schema v24. The v25 migration adds explicit role mappings, a date-range period-closure table, and nullable mileage-only journal snapshots; it preserves existing rows and introduces no default mapping or closed period.
 
-The change's proposed table contract is 55 known application-table names at v19: 39 legacy tables plus 16 feature-managed tables, including `feature_table_state`. The `profile-data-portability` and `customer-data-disclosure-export` changes are archived, but their maintained inventory requirements still conflict: one declares 46 names at v13 and the other 55 names at v19. This mismatch remains open. Mileage migration work and complete-export claims stay blocked until the maintained requirements agree on one inventory and version-aware presence rules.
+The reconciled inventory has 55 known application-table names through v19: 39 legacy tables plus 16 feature-managed tables, including `feature_table_state`. Schema v25 adds `mileage_posting_account_mapping` and `mileage_posting_period_closures` as names 56 and 57. All maintained inventory contracts SHALL use these counts and version-aware rules: a v24 profile may omit both tables; v25 and later profiles require both schemas, while role rows may be absent and the empty closure table means all trip dates are open. A fresh v25 profile has 53 application tables when the two lazy occurrence tables and two optional document-email tables are absent. Profile export includes both tables; customer export schema-checks them without projecting them.
 
 ## Goals / Non-Goals
 
@@ -14,7 +14,7 @@ The change's proposed table contract is 55 known application-table names at v19:
 - Apply one explicit, source-backed policy version to eligible private-vehicle business trips, with an auditable calculation snapshot.
 - Leave unsupported or ineligible trips unresolved and outside accounting and report totals.
 - Preserve posted source facts and define traceable replacement and undo requests.
-- Post confirmed mileage as a mapped travel expense against private contribution, with no cash or VAT leg.
+- Post confirmed mileage as an explicitly mapped travel expense against private contribution, with no bank, cash, or VAT leg.
 
 **Non-Goals:**
 
@@ -53,13 +53,30 @@ The source rules inform the reference rates but have different legal scopes: ESt
 
 ### Keep the database migration additive and gated by the inventory owners
 
-The current v22 baseline already has the v13 mileage tables. The v23 proposal adds the structured fields above and installs lifecycle triggers; it must not recreate or replace existing tables. It also preserves the v13 migration history, the `forderung_zahlungen` pre-repair check, existing shared lazy-table markers, and the trigger requirements for unresolved-only trip inserts, draft-only correction inserts, correction transitions, immutable terminal rows, and posted replacements.
+The live schema is v24 and already has the v13 mileage tables and v23/v24 eligibility and lifecycle enforcement. The v25 migration adds `mileage_posting_account_mapping`, `mileage_posting_period_closures`, and 11 nullable mileage-only journal mapping snapshot columns. It must preserve existing rows and journal data, must not recreate existing tables, must not seed an account/category mapping, and must leave the closure table empty so all periods start open. Schema health and both export inventories recognize these additions only at v25 and later.
 
-Do not claim the v23 migration or complete mileage exports are ready while the inventory dependency remains mismatched. Both owning changes must explicitly accept the same 55-name v19 inventory and version-aware presence rules before that gate closes. This change does not edit their artifacts.
+Round 6 independently approved the contract for the aligned 55-name v19 / 57-name v25 inventory and its version-aware presence rules. The mapping table may exist without either role row; posting remains unavailable until a user configures and reviews both role pairs and the trip date is outside every explicitly closed inclusive range.
+
+### Configure the two posting roles explicitly
+
+The role mapping SHALL pair a user-selected ledger account ID and a reporting category ID for each role:
+
+| Role | Journal side | Category requirement |
+|---|---|---|
+| Travel expense | Debit | Active expense category (`art = Ausgabe`) mapped to EÜR line 71, whose mapping status is `catalog_verified` or `user_confirmed` and whose active SKR mapping is present |
+| Private contribution | Credit | Active category mapped to EÜR line 107 whose mapping status is `catalog_verified` or `user_confirmed` and whose active SKR mapping is present |
+
+The mapping is profile-local, durable, explicitly reviewed, and editable through a dedicated mileage-posting settings form. The v25 `mileage_posting_account_mapping` table stores at most one row for each role (`travel_expense`, `private_contribution`), each with non-null foreign keys to existing `konten` and `kategorien` rows and a required review timestamp. Posting requires both rows. It stores no seeded IDs and SHALL NOT choose a first active account/category or infer a role from an account number, category name, free text, or EKS section.
+
+The live repository and the pre-revision `stammdaten` contract treat `konten` as bank accounts, while the table itself has an unconstrained `kontoart TEXT`, nullable banking fields, and journal foreign keys. This proposal extends the maintained account contract with `kontoart = 'Sachkonto'` and requires its CRUD UI to let a user create/select Sachkonten without bank details. Existing bank and cash types and rows remain unchanged. The mileage role picker SHALL include only `Sachkonto` rows; bank-import, bank-balance, and other bank-specific account pickers SHALL exclude Sachkonten while preserving existing behavior for all other rows. The user explicitly assigns a Sachkonto to each role; no new chart numbers or fixed account numbers are introduced. The mapping table's migration remains gated on independent review and reconciliation of the shared inventory contract.
+
+Changing the mapping affects future posts only. The v25 journal columns SHALL snapshot, on each mileage leg, its role, category label and ID, category `art`, EÜR line, SKR mappings, mapping status, source reference/version, and mapping-history ID. Account IDs and account SKR values use the existing journal account fields/snapshots. EÜR SHALL read these stored values and SHALL NOT join current `kategorien` rows for mileage legs. If either role is absent, its category is inactive, it is not a `Sachkonto`, or its category mapping is untrusted, posting fails closed and leaves the trip calculated without an event or report effect.
 
 ### Post only through the canonical accounting boundary
 
-A confirmed calculated trip may post only when the travel-expense and private-contribution accounts are mapped, the accounting period containing the trip date is open, and the canonical posting command can atomically store the event and trip state. The event debits the mapped travel-expense account and credits the mapped private-contribution account. It creates no cash or VAT leg. Its source identity is `(mileage_trip, trip UUID)`. A same-payload retry returns the existing event; a conflicting payload fails. Store the returned opaque event ID on the trip, and include mileage in reports only through the canonical accounting source.
+A confirmed calculated trip may post only when both configured role pairs pass validation, the trip date is outside every row in `mileage_posting_period_closures`, and the canonical posting command can atomically store exactly two balanced journal legs and the trip state/reference. A closure row has canonical inclusive `closed_from`/`closed_through` dates and a non-empty closure timestamp; an empty table leaves every date open. The event debits the mapped travel-expense account/category and credits the mapped private-contribution account/category. It creates no bank, cash, or VAT leg. Its source identity is `(mileage_trip, trip UUID)`. A same-payload retry returns the existing event; a retry with changed trip facts, amount, policy snapshot, or mapped roles fails without another event. Posting the journal group and changing the trip from `calculated` to `posted` with its opaque event ID is one SQLite transaction. The unique `(source_kind, source_id)` identity and `mileage_trips.posting_event_id` identify one reportable group.
+
+EÜR SHALL add a mileage-specific source path in both its legacy and settlement-based generation modes, because the current generic query excludes non-null `source_kind` and settlement allocations do not represent this private-vehicle use entry. For an in-period `posted` trip, it SHALL read exactly one two-leg group by `(mileage_trip, trip UUID)`, require the stored event ID to match the trip, and use the trip date as the report date. It SHALL include the travel-expense debit exactly once under its snapshotted EÜR line 71 and represent the private-contribution credit exactly once under snapshotted line 107 without treating it as operating income or profit. It SHALL not also process these legs through generic journal or settlement paths. A missing, duplicate, unbalanced, malformed, or snapshot-incomplete mileage group makes that EÜR result unavailable/incomplete rather than partially counted. Category edits after posting cannot change a previously posted leg's EÜR line, label, SKR mapping, or provenance.
 
 ### Preserve posted facts; correct through linked accounting operations
 
@@ -78,25 +95,22 @@ Provide a `Neue Fahrt` primary action and a searchable, filterable trip table wi
 
 ## Migration Plan
 
-1. Keep the current v13 tables intact. After the inventory owners resolve their contract mismatch, add the structured eligibility columns and lifecycle triggers in the next sequential migration (v23 on the verified v22 baseline, or the next version if another migration lands first). Initialize legacy eligibility facts as `unknown`, preserve all rows, and increment the schema version only after verifying columns, indexes, and triggers.
+1. Treat the v13 mileage tables and v23/v24 eligibility/lifecycle migrations as live. The v25 migration SHALL add both mapping/closure tables and 11 nullable journal snapshot columns without converting account rows, seeding role pairs, closing any date range, or changing prior postings; profile health/export inventories SHALL recognize these additions only from v25 onward.
 2. Require new captures to retain explicit structured trip and vehicle facts; no legacy `journal.km_anzahl` backfill is allowed.
 3. Calculate only from policy v1 and only for the eligible combinations above. Keep unsupported trips unresolved.
-4. Keep posting unavailable until the mapped, trip-date, open-period, atomic posting boundary is wired. The posted journal event has the travel-expense/private-contribution legs only.
+4. Keep posting unavailable until both explicit account/category role pairs, the v25 inclusive date-range closure guard, and the atomic posting boundary are wired. The posted journal event has exactly the travel-expense/private-contribution legs.
 5. Keep correction execution unavailable until its accepted atomic reversal/replacement operation is wired.
 
 ## Dependency Ledger
 
 | Dependency | Baseline evidence | Status | Gate |
 |---|---|---|---|
-| `profile-data-portability` inventory | Archived change declares 46 application-table names through v13; its maintained inventory requirement remains in conflict. | **Open; conflicts with customer export.** | Owner must align the maintained requirement to the common 55-name v19 inventory and mileage presence rules. |
-| `customer-data-disclosure-export` inventory | Archived change declares 55 application-table names through v19; its maintained inventory requirement remains in conflict. | **Open; conflicts with portability.** | Owner must align the maintained requirement to the same common 55-name v19 inventory and mileage presence rules. |
-| Inherited maintained `db` migration scenario | `V8-to-v9 migration adds shared markers and mileage tables` conflicts with the same requirement's minimum-version rule that makes mileage tables required at v13. | **Open; not edited in this scoped revision.** | The shared-spec owner must reconcile the version before migration behavior is implemented or tested. |
-| Mileage schema v23 | Current baseline is v22; current mileage tables are required from v13. | **Not implemented in this revision; contract independently approved at `d6d441c`.** | Inventory owners must align the maintained requirements, and the shared DB version conflict must be resolved before migration work. |
-| Mileage posting integration | Account mapping and atomic canonical posting wiring are still required. | **Open.** | Debit travel expense, credit private contribution, no cash/VAT leg; trip date in an open period; source idempotency key `(mileage_trip, trip UUID)`. |
+| `profile-data-portability` inventory | Round 6 approved the 55-name v19 baseline and two v25 additions. | **Contract approved; implementation evidence pending final review.** | Preserve 55 known names through v19 and 57 through v25; export all present supported rows, and report undeclared tables as incomplete. |
+| `customer-data-disclosure-export` inventory | Round 6 approved the shared versioned inventory and customer-scoped omission rules. | **Contract approved; implementation evidence pending final review.** | Schema-check mapping and closure tables from v25 without projecting them into customer exports; their absence alone is version-pending before v25. |
+| Inherited maintained `db` migration scenario | The earlier duplicate v8-to-v9 mileage-table wording is absent; v9 category history and v12-to-v13 mileage tables use separate boundaries. | **Resolved by the maintained DB correction.** | V25 adds role mapping, inclusive date-range closures, and immutable journal snapshots; v24 profiles remain valid without them. |
+| Mileage schema v25 | Live baseline was v24; lifecycle enforcement was already present. | **Implemented; independent implementation review pending.** | Preserve existing rows, add the two v25 tables and 11 canonical nullable snapshot columns, and leave both role rows and closure ranges empty by default. |
+| Mileage posting integration | Existing journal FKs support `konten`/`kategorien`; `kontoart` is unconstrained text and bank-detail fields are nullable. | **Core backend implemented; UI/configuration remains the next slice.** | Configure both role rows explicitly; reject dates inside a closed inclusive range; atomically post two non-bank/non-cash, non-VAT legs under `(mileage_trip, trip UUID)`, and preserve existing account rows/types and bank-specific filtering. |
 
 ## Open Questions
 
-- Which existing accepted posting service and account-selection contract will supply the travel-expense and private-contribution mapping?
 - Which accepted correction operation will provide atomic reversal/replacement and report-period treatment?
-- When will both inventory owners reconcile the 46-name/v13 versus 55-name/v19 mismatch?
-- When will the shared `db` owner reconcile the inherited v8-to-v9 mileage migration scenario with the v13 minimum-version rule?

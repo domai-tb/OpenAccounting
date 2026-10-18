@@ -33,7 +33,7 @@ void main() {
         const <Object?>[],
       );
       expect(triggers, hasLength(16));
-      expect(await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(), 24);
+      expect(await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(), 25);
     });
 
     test('v22 migration demotes unknown calculated facts and preserves posted facts', () async {
@@ -108,7 +108,7 @@ INSERT INTO mileage_trips (
       expect(migratedCalculated['calculated_amount'], isNull);
       expect(migratedCalculated['calculated_at'], isNull);
       expect(migratedCalculated['posting_event_id'], isNull);
-      expect(await runner.getUserVersion(), 24);
+      expect(await runner.getUserVersion(), 25);
     });
 
     test('v23 correction demotes unknown calculations and refreshes snapshot guards', () async {
@@ -175,7 +175,254 @@ INSERT INTO mileage_trips (
       ]) {
         expect(triggerSql, contains('NEW.$field IS NULL'));
       }
-      expect(await runner.getUserVersion(), 24);
+      expect(await runner.getUserVersion(), 25);
+    });
+
+    test('v24 upgrade adds mileage mapping snapshots and preserves existing ledger rows', () async {
+      final int accountId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Existing Sachkonto', 'Sachkonto'],
+      );
+      final int categoryId = await db.executor.runInsert(
+        'INSERT INTO kategorien (bezeichnung, euer_zeile) VALUES (?, ?)',
+        const <Object?>['Existing legacy category', 12],
+      );
+      final int journalId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable) '
+        'VALUES (?, ?, ?, ?, ?, 0)',
+        <Object?>['2025-01-02', 'Existing legacy journal row', categoryId, '10.00', 'Einnahme'],
+      );
+      await db.executor.runCustom('''
+INSERT INTO mileage_trips (
+  id, trip_date, purpose, business_context, trip_kind, vehicle_source, vehicle_class,
+  distance_hundredths_km, state, created_at, updated_at
+) VALUES (
+  'v24-existing-trip', '2025-01-03', 'Existing trip', 'Existing project',
+  'business_trip', 'private', 'kraftwagen', 1000, 'unresolved',
+  '2025-01-03T12:00:00Z', '2025-01-03T12:00:00Z'
+)''');
+
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
+      await db.executor.runCustom('DROP TABLE mileage_posting_account_mapping');
+      await db.executor.runCustom('DROP TABLE IF EXISTS mileage_posting_period_closures');
+      const List<String> v25Columns = <String>[
+        'mileage_role_snapshot',
+        'mileage_kategorie_id_snapshot',
+        'mileage_kategorie_name_snapshot',
+        'mileage_kategorie_art_snapshot',
+        'mileage_euer_zeile_snapshot',
+        'mileage_kategorie_skr03_snapshot',
+        'mileage_kategorie_skr04_snapshot',
+        'mileage_mapping_status_snapshot',
+        'mileage_mapping_source_reference_snapshot',
+        'mileage_mapping_source_version_snapshot',
+        'mileage_mapping_history_id_snapshot',
+      ];
+      const Set<String> previousPrototypeColumns = <String>{
+        'mileage_event_id_snapshot',
+        'mileage_payload_snapshot',
+        'mileage_account_id_snapshot',
+        'mileage_category_id_snapshot',
+        'mileage_category_label_snapshot',
+        'mileage_category_art_snapshot',
+        'mileage_euer_line_snapshot',
+        'mileage_konto_skr03_snapshot',
+        'mileage_konto_skr04_snapshot',
+        'mileage_mapping_reviewed_at_snapshot',
+      };
+      final List<Map<String, Object?>> existingJournalColumns = await db.executor.runSelect(
+        'PRAGMA table_info(journal)',
+        const <Object?>[],
+      );
+      final Set<String> existingJournalColumnNames = <String>{
+        for (final Map<String, Object?> row in existingJournalColumns) row['name'].toString(),
+      };
+      for (final String column in <String>{...v25Columns, ...previousPrototypeColumns}) {
+        if (existingJournalColumnNames.contains(column)) {
+          await db.executor.runCustom('ALTER TABLE journal DROP COLUMN $column');
+        }
+      }
+      await db.executor.runCustom('PRAGMA user_version = 24');
+
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      expect(await runner.run(createSchema: () async {}), isTrue);
+      expect(await runner.getUserVersion(), 25);
+
+      final List<Map<String, Object?>> accountRows = await db.executor.runSelect(
+        'SELECT id, name, kontoart FROM konten WHERE id = ?',
+        <Object?>[accountId],
+      );
+      expect(accountRows.single, <String, Object?>{
+        'id': accountId,
+        'name': 'Existing Sachkonto',
+        'kontoart': 'Sachkonto',
+      });
+      final List<Map<String, Object?>> journalRows = await db.executor.runSelect(
+        'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ FROM journal WHERE id = ?',
+        <Object?>[journalId],
+      );
+      expect(journalRows.single['datum'], '2025-01-02');
+      expect(journalRows.single['beschreibung'], 'Existing legacy journal row');
+      expect(journalRows.single['kategorie_id'], categoryId);
+      expect(journalRows.single['betrag'], 10.0);
+      expect(journalRows.single['beleg_typ'], 'Einnahme');
+      final List<Map<String, Object?>> tripRows = await db.executor.runSelect(
+        'SELECT id, state, purpose FROM mileage_trips WHERE id = ?',
+        const <Object?>['v24-existing-trip'],
+      );
+      expect(tripRows.single, <String, Object?>{
+        'id': 'v24-existing-trip',
+        'state': 'unresolved',
+        'purpose': 'Existing trip',
+      });
+
+      final List<Map<String, Object?>> mappingTable = await db.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mileage_posting_account_mapping'",
+        const <Object?>[],
+      );
+      expect(mappingTable, hasLength(1));
+      final List<Map<String, Object?>> mappingRows = await db.executor.runSelect(
+        'SELECT role FROM mileage_posting_account_mapping',
+        const <Object?>[],
+      );
+      expect(mappingRows, isEmpty);
+      final List<Map<String, Object?>> journalColumns = await db.executor.runSelect(
+        'PRAGMA table_info(journal)',
+        const <Object?>[],
+      );
+      final Set<String> journalColumnNames = <String>{
+        for (final Map<String, Object?> row in journalColumns) row['name'].toString(),
+      };
+      expect(journalColumnNames, containsAll(v25Columns));
+      expect(
+        journalColumnNames.intersection(<String>{
+          'mileage_event_id_snapshot',
+          'mileage_payload_snapshot',
+          'mileage_account_id_snapshot',
+          'mileage_category_id_snapshot',
+          'mileage_category_label_snapshot',
+          'mileage_category_art_snapshot',
+          'mileage_euer_line_snapshot',
+          'mileage_konto_skr03_snapshot',
+          'mileage_konto_skr04_snapshot',
+          'mileage_mapping_reviewed_at_snapshot',
+        }),
+        isEmpty,
+      );
+      final List<Map<String, Object?>> closureColumns = await db.executor.runSelect(
+        'PRAGMA table_info(mileage_posting_period_closures)',
+        const <Object?>[],
+      );
+      expect(<String>{
+        for (final Map<String, Object?> row in closureColumns) row['name'].toString(),
+      }, containsAll(<String>{'id', 'closed_from', 'closed_through', 'closed_at'}));
+      final List<Map<String, Object?>> closureRows = await db.executor.runSelect(
+        'SELECT COUNT(*) AS row_count FROM mileage_posting_period_closures',
+        const <Object?>[],
+      );
+      expect((closureRows.single['row_count']! as num).toInt(), 0);
+    });
+
+    test('current v25 repair replaces an old permissive correction trigger', () async {
+      await db.executor.runCustom('DROP TRIGGER trg_mileage_correction_update_guard');
+      await db.executor.runCustom('''
+CREATE TRIGGER trg_mileage_correction_update_guard
+BEFORE UPDATE ON mileage_trip_corrections
+WHEN 0
+BEGIN
+  SELECT RAISE(ABORT, 'old correction guard');
+END''');
+
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      expect(await runner.run(createSchema: () async {}), isTrue);
+
+      final List<Map<String, Object?>> triggers = await db.executor.runSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_update_guard'",
+        const <Object?>[],
+      );
+      expect(triggers, hasLength(1));
+      expect(triggers.single['sql'].toString().toLowerCase(), contains("or new.state = 'applied'"));
+    });
+
+    test('current v25 startup fails closed when required mileage configuration tables are missing', () async {
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      final List<Object> startupErrors = <Object>[];
+      final List<String> recreatedTables = <String>[];
+      final int accountId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Configured mileage account', 'Sachkonto'],
+      );
+      final int categoryId = await db.executor.runInsert(
+        'INSERT INTO kategorien (bezeichnung) VALUES (?)',
+        const <Object?>['Configured mileage category'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO mileage_posting_account_mapping (role, konto_id, kategorie_id, reviewed_at) VALUES (?, ?, ?, ?)',
+        <Object?>['travel_expense', accountId, categoryId, '2026-10-18T12:00:00Z'],
+      );
+
+      for (final String table in const <String>['mileage_posting_period_closures', 'mileage_posting_account_mapping']) {
+        await db.executor.runCustom('DROP TABLE IF EXISTS $table');
+        try {
+          await runner.run(createSchema: () async {});
+        } catch (error) {
+          startupErrors.add(error);
+        }
+        final List<Map<String, Object?>> rows = await db.executor.runSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          <Object?>[table],
+        );
+        if (rows.isNotEmpty) recreatedTables.add(table);
+      }
+
+      expect(startupErrors, hasLength(2));
+      expect(startupErrors.every((Object error) => error is StateError), isTrue);
+      expect(recreatedTables, isEmpty, reason: 'A missing v25 config table must remain missing after failed startup');
+    });
+
+    test('schema health requires non-null mapping role fields and role uniqueness', () async {
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      for (final String nullableColumn in const <String>['konto_id', 'kategorie_id', 'reviewed_at']) {
+        await db.executor.runCustom('DROP TABLE mileage_posting_account_mapping');
+        final String kontoNotNull = nullableColumn == 'konto_id' ? '' : 'NOT NULL';
+        final String kategorieNotNull = nullableColumn == 'kategorie_id' ? '' : 'NOT NULL';
+        final String reviewedNotNull = nullableColumn == 'reviewed_at' ? '' : 'NOT NULL';
+        await db.executor.runCustom('''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER $kontoNotNull REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER $kategorieNotNull REFERENCES kategorien(id) ON DELETE RESTRICT,
+  reviewed_at TEXT $reviewedNotNull CHECK (trim(reviewed_at) <> '')
+)''');
+        final SchemaHealthReport health = await runner.inspectSchemaHealth();
+        expect(
+          health.malformedTables,
+          contains('mileage_posting_account_mapping'),
+          reason: '$nullableColumn must be NOT NULL',
+        );
+      }
+
+      await db.executor.runCustom('DROP TABLE mileage_posting_account_mapping');
+      await db.executor.runCustom('''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''');
+      final SchemaHealthReport nonUniqueRole = await runner.inspectSchemaHealth();
+      expect(nonUniqueRole.malformedTables, contains('mileage_posting_account_mapping'));
+
+      await db.executor.runCustom('DROP TABLE mileage_posting_account_mapping');
+      await db.executor.runCustom('''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''');
+      final SchemaHealthReport missingCategoryForeignKey = await runner.inspectSchemaHealth();
+      expect(missingCategoryForeignKey.malformedTables, contains('mileage_posting_account_mapping'));
     });
 
     test('calculation trigger rejects each null snapshot field', () async {
@@ -219,7 +466,7 @@ INSERT INTO mileage_trips (
       }
     });
 
-    test('database rejects ineligible calculation and ungated void transition', () async {
+    test('database rejects ineligible calculation and fake posting event', () async {
       await db.executor.runCustom('''
 INSERT INTO mileage_trips (
   id, trip_date, purpose, business_context, trip_kind, vehicle_source, vehicle_class,
@@ -254,13 +501,23 @@ UPDATE mileage_trips SET state = 'calculated', policy_id = 'DE-private-business-
   policy_version = '1', policy_effective_from = '2025-01-01', policy_effective_to = '2026-12-31',
   calculated_amount = 3.00, calculated_at = '2026-03-14T12:00:00Z'
 WHERE id = 'mileage-test-trip' ''');
-      await db.executor.runCustom(
-        "UPDATE mileage_trips SET state = 'posted', posting_event_id = 'mileage-event' WHERE id = 'mileage-test-trip'",
+      await expectLater(
+        () => db.executor.runCustom(
+          "UPDATE mileage_trips SET state = 'posted', posting_event_id = 'de305d54-75b4-431b-adb2-eb6b9e546014' WHERE id = 'mileage-test-trip'",
+        ),
+        throwsA(isA<Exception>()),
       );
       await expectLater(
         () => db.executor.runCustom("UPDATE mileage_trips SET state = 'voided' WHERE id = 'mileage-test-trip'"),
         throwsA(isA<Exception>()),
       );
+      final List<Map<String, Object?>> calculated = await db.executor.runSelect(
+        'SELECT state, purpose, posting_event_id FROM mileage_trips WHERE id = ?',
+        const <Object?>['mileage-test-trip'],
+      );
+      expect(calculated.single['state'], 'calculated');
+      expect(calculated.single['purpose'], 'Fahrt');
+      expect(calculated.single['posting_event_id'], isNull);
     });
   });
 }

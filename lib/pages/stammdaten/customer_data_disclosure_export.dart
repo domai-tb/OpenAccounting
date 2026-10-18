@@ -127,7 +127,7 @@ class CustomerDisclosureResult {
 /// (payment table at v8, category history at v9, shared markers and mileage
 /// tables at v13); the supported export schema is [MigrationRunner.currentVersion].
 class CustomerDisclosureInventory {
-  /// The 39 legacy tables and 16 feature-owned tables in the v19 inventory.
+  /// The v19 inventory remains 55 names; mileage posting adds two names at v25.
   static const Set<String> knownTableNames = <String>{
     ...AppDatabase.allTableNames,
     'feature_table_state',
@@ -136,6 +136,8 @@ class CustomerDisclosureInventory {
     'rechnungsvorlagen_occurrences',
     'mileage_trips',
     'mileage_trip_corrections',
+    'mileage_posting_account_mapping',
+    'mileage_posting_period_closures',
     'category_mapping_history',
     'master_data_import_templates',
     'anlage_afa_jahreswerte',
@@ -150,6 +152,8 @@ class CustomerDisclosureInventory {
     'feature_table_state': 13,
     'mileage_trips': 13,
     'mileage_trip_corrections': 13,
+    'mileage_posting_account_mapping': 25,
+    'mileage_posting_period_closures': 25,
     'master_data_import_templates': 16,
     'anlage_afa_jahreswerte': 17,
     'inventuren': 18,
@@ -176,6 +180,8 @@ class CustomerDisclosureInventory {
     'feature_table_state',
     'mileage_trips',
     'mileage_trip_corrections',
+    'mileage_posting_account_mapping',
+    'mileage_posting_period_closures',
     'category_mapping_history',
   };
 
@@ -432,7 +438,30 @@ class CustomerDisclosureInventory {
         if (evidence.$1 == table) evidence.$2,
     };
     columns.removeAll(lazyPayloadColumns[table] ?? const <String>{});
-    if (table == 'journal' && schemaVersion < 19) columns.remove('legacy_unverified');
+    if (table == 'journal' && schemaVersion < 19) {
+      columns.remove('legacy_unverified');
+    }
+    if (table == 'mileage_posting_account_mapping' && schemaVersion >= 25) {
+      columns.addAll(<String>{'role', 'konto_id', 'kategorie_id', 'reviewed_at'});
+    }
+    if (table == 'mileage_posting_period_closures' && schemaVersion >= 25) {
+      columns.addAll(<String>{'id', 'closed_from', 'closed_through', 'closed_at'});
+    }
+    if (table == 'journal' && schemaVersion >= 25) {
+      columns.addAll(<String>{
+        'mileage_role_snapshot',
+        'mileage_kategorie_id_snapshot',
+        'mileage_kategorie_name_snapshot',
+        'mileage_kategorie_art_snapshot',
+        'mileage_euer_zeile_snapshot',
+        'mileage_kategorie_skr03_snapshot',
+        'mileage_kategorie_skr04_snapshot',
+        'mileage_mapping_status_snapshot',
+        'mileage_mapping_source_reference_snapshot',
+        'mileage_mapping_source_version_snapshot',
+        'mileage_mapping_history_id_snapshot',
+      });
+    }
     return columns;
   }
 
@@ -811,11 +840,32 @@ class CustomerDataDisclosureExportService {
         for (final Map<String, Object?> row in schemaColumns) row['name']! as String,
       ];
       final sqlite.ResultSet result = snapshot.select('SELECT * FROM "$table"');
+      final bool mileageSchemaTable =
+          table == 'mileage_posting_account_mapping' || table == 'mileage_posting_period_closures';
+      final String? createSql = mileageSchemaTable
+          ? snapshot
+                .select("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '$table'")
+                .first['sql']
+                ?.toString()
+          : null;
+      final List<Map<String, Object?>> foreignKeys = table == 'mileage_posting_account_mapping'
+          ? <Map<String, Object?>>[
+              for (final sqlite.Row row in snapshot.select('PRAGMA foreign_key_list("$table")'))
+                <String, Object?>{
+                  'table': row['table'],
+                  'from': row['from'],
+                  'to': row['to'],
+                  'on_delete': row['on_delete'],
+                },
+            ]
+          : const <Map<String, Object?>>[];
       tables[table] = _SnapTable(
         columns: columns,
         schemaColumns: schemaColumns,
         hasUniqueAttemptKey:
             table == 'dokument_email_versuche' && _hasUniqueColumnIndex(snapshot, table, 'idempotenz_schluessel'),
+        createSql: createSql,
+        foreignKeys: foreignKeys,
         rows: <Map<String, Object?>>[
           for (final sqlite.Row row in result)
             <String, Object?>{for (final String column in result.columnNames) column: _jsonSafe(row[column])},
@@ -929,12 +979,16 @@ class _SnapTable {
     required this.rows,
     required this.present,
     this.hasUniqueAttemptKey = false,
+    this.createSql,
+    this.foreignKeys = const <Map<String, Object?>>[],
   });
   final List<String> columns;
   final List<Map<String, Object?>> schemaColumns;
   final List<Map<String, Object?>> rows;
   final bool present;
   final bool hasUniqueAttemptKey;
+  final String? createSql;
+  final List<Map<String, Object?>> foreignKeys;
 }
 
 class _CustomerSnapshot {
@@ -1005,7 +1059,11 @@ class _DisclosureCollector {
   /// Records one exclusion per failing table; never creates or repairs.
   void checkSchemaHealth(_CustomerSnapshot snapshot) {
     _validateLazyMarkerInventory(snapshot);
-    final Set<String> unknown = snapshot.actualTables.difference(CustomerDisclosureInventory.knownTableNames);
+    final Set<String> knownTables = <String>{...CustomerDisclosureInventory.knownTableNames};
+    final Set<String> unknown = <String>{
+      for (final String table in snapshot.actualTables)
+        if (!knownTables.contains(table)) table,
+    };
     for (final String table in unknown.toList()..sort()) {
       tableHealth[table] = 'unknown';
       _fail('unknown_table', recordType: table, field: 'table');
@@ -1069,6 +1127,26 @@ class _DisclosureCollector {
         _fail('malformed_schema', recordType: table, field: 'table');
         continue;
       }
+      if (snapshot.userVersion >= 25 && present) {
+        final _SnapTable tableSnapshot = snapshot.tables[table]!;
+        final bool mileageConstraintsValid = switch (table) {
+          'mileage_posting_account_mapping' => MigrationRunner.hasMileagePostingMappingSchema(
+            tableSql: tableSnapshot.createSql ?? '',
+            columns: tableSnapshot.schemaColumns,
+            foreignKeys: tableSnapshot.foreignKeys,
+          ),
+          'mileage_posting_period_closures' => MigrationRunner.hasMileagePostingPeriodClosureSchema(
+            tableSql: tableSnapshot.createSql ?? '',
+            columns: tableSnapshot.schemaColumns,
+          ),
+          _ => true,
+        };
+        if (!mileageConstraintsValid) {
+          tableHealth[table] = 'malformed';
+          _fail('malformed_schema', recordType: table, field: 'table');
+          continue;
+        }
+      }
       if (!AppDatabase.allTableNames.contains(table)) {
         // Feature-owned, migration-required table at or past its version.
         if (!present) {
@@ -1129,14 +1207,20 @@ class _DisclosureCollector {
   String _lazyHealth(_CustomerSnapshot snapshot, String table, bool present) {
     final _SnapTable? markers = snapshot.tables['feature_table_state'];
     if (markers == null || !markers.present) {
-      if (snapshot.userVersion < 13) return 'version_pending';
+      if (snapshot.userVersion < 13) {
+        return 'version_pending';
+      }
       _fail('missing_table', recordType: 'feature_table_state', field: 'table');
       return 'missing';
     }
-    if (snapshot.userVersion >= 13 && !_lazyMarkerInventoryValid) return 'unknown';
+    if (snapshot.userVersion >= 13 && !_lazyMarkerInventoryValid) {
+      return 'unknown';
+    }
     String? state;
     for (final Map<String, Object?> row in markers.rows) {
-      if (row['table_name']?.toString() == table) state = row['state']?.toString();
+      if (row['table_name']?.toString() == table) {
+        state = row['state']?.toString();
+      }
     }
     if (state == null) {
       _fail('unknown_state', recordType: table, field: 'state');
@@ -1161,7 +1245,9 @@ class _DisclosureCollector {
   void traverse(_CustomerSnapshot snapshot) {
     final Set<int> addressIds = <int>{};
     for (final Map<String, Object?> row in snapshot.rowsOf('kunden_lieferadressen')) {
-      if (row['kunde_id'] == customerId && row['id'] is int) addressIds.add(row['id']! as int);
+      if (row['kunde_id'] == customerId && row['id'] is int) {
+        addressIds.add(row['id']! as int);
+      }
     }
 
     final Set<int> invoiceIds = <int>{};
@@ -1183,7 +1269,9 @@ class _DisclosureCollector {
       if (!owned) {
         for (final int invoiceId in invoiceIds) {
           final Map<String, Object?>? invoice = _byId(snapshot.rowsOf('rechnungen'), invoiceId);
-          if (invoice != null && invoice['vorlage_id'] == vorlageId) owned = true;
+          if (invoice != null && invoice['vorlage_id'] == vorlageId) {
+            owned = true;
+          }
         }
       }
       if (!owned) continue;
@@ -1191,7 +1279,9 @@ class _DisclosureCollector {
         _fail('conflicting_identity', recordType: 'rechnungsvorlagen', recordId: vorlageId, field: 'kunde_id');
         continue;
       }
-      if (!_verifyTemplateSource(snapshot, row, addressIds, invoiceIds)) continue;
+      if (!_verifyTemplateSource(snapshot, row, addressIds, invoiceIds)) {
+        continue;
+      }
       templateIds.add(vorlageId);
     }
     // Invoices generated from or sourced by owned templates still require a
@@ -1466,7 +1556,9 @@ class _DisclosureCollector {
     for (int cursor = 0; cursor < invalidQueue.length; cursor++) {
       final int invalidId = invalidQueue[cursor];
       for (final int candidateId in neighbors[invalidId] ?? const <int>{}) {
-        if (!invoiceIds.contains(candidateId) || excluded.contains(candidateId)) continue;
+        if (!invoiceIds.contains(candidateId) || excluded.contains(candidateId)) {
+          continue;
+        }
         final Map<String, Object?> candidate = byId[candidateId]!;
         final String? dependentField = CustomerDisclosureInventory.invoiceLineageColumns
             .where((String column) => candidate[column] == invalidId)
@@ -1627,7 +1719,9 @@ class _DisclosureCollector {
       if (!allowlist.contains(column)) {
         // Unknown columns are never serialized; a non-empty value whose scope
         // cannot be proven outside this disclosure makes the result incomplete.
-        if (_hasValue(value)) _noteOmitted(table, recordId, column, 'unclassified_field');
+        if (_hasValue(value)) {
+          _noteOmitted(table, recordId, column, 'unclassified_field');
+        }
         continue;
       }
       if (table == 'rechnungen' &&

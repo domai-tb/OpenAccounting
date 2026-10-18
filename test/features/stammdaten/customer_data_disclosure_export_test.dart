@@ -801,6 +801,7 @@ void main() {
       expect(result.status, CustomerDisclosureExportStatus.incomplete);
       final Map<String, Object?> manifest = await service.readManifest(destination);
       expect((manifest['table_health']! as Map)['rechnungsvorlagen_occurrences'], 'unknown');
+      expect((manifest['table_health']! as Map)['mileage_posting_account_mapping'], 'ok');
       final List<Object?> exclusions = List<Object?>.from(manifest['exclusions']! as List);
       expect(
         exclusions.where((Object? e) => (e! as Map)['record_type'] == 'rechnungsvorlagen_occurrences'),
@@ -859,6 +860,82 @@ void main() {
         const <Object?>[],
       );
       expect(tables, isEmpty, reason: 'No empty replacement table is created');
+    });
+
+    test('v25 disclosure health rejects malformed mileage mapping and closure constraints', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_mileage_schema_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Kunde AG');
+      final List<({String table, String sql})> malformedSchemas = <({String table, String sql})>[
+        (
+          table: 'mileage_posting_account_mapping',
+          sql: '''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''',
+        ),
+        (
+          table: 'mileage_posting_account_mapping',
+          sql: '''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''',
+        ),
+        (
+          table: 'mileage_posting_account_mapping',
+          sql: '''
+CREATE TABLE mileage_posting_account_mapping (
+  role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution', 'unsupported')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''',
+        ),
+        (
+          table: 'mileage_posting_period_closures',
+          sql: '''
+CREATE TABLE mileage_posting_period_closures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  closed_from TEXT NOT NULL,
+  closed_through TEXT NOT NULL CHECK (strftime('%Y-%m-%d', closed_through) IS closed_through),
+  closed_at TEXT NOT NULL CHECK (trim(closed_at) <> ''),
+  CHECK (closed_from <= closed_through)
+)''',
+        ),
+        (
+          table: 'mileage_posting_period_closures',
+          sql: '''
+CREATE TABLE mileage_posting_period_closures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  closed_from TEXT NOT NULL CHECK (strftime('%Y-%m-%d', closed_from) IS closed_from),
+  closed_through TEXT NOT NULL CHECK (strftime('%Y-%m-%d', closed_through) IS closed_through),
+  closed_at TEXT NOT NULL CHECK (trim(closed_at) <> '')
+)''',
+        ),
+      ];
+      final List<String?> observedHealth = <String?>[];
+      for (var index = 0; index < malformedSchemas.length; index++) {
+        final ({String table, String sql}) fixture = malformedSchemas[index];
+        await env.db.executor.runCustom('DROP TABLE ${fixture.table}');
+        await env.db.executor.runCustom(fixture.sql);
+        final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+        final String destination = p.join(env.outDir.path, 'schema-$index.zip');
+        final CustomerDisclosureResult result = await service.exportCustomer(
+          customerId: customerId,
+          destinationPath: destination,
+        );
+        final Map<String, Object?> manifest = await service.readManifest(destination);
+        observedHealth.add((manifest['table_health']! as Map)[fixture.table]?.toString());
+        expect(result.status, isNot(CustomerDisclosureExportStatus.complete));
+      }
+      expect(observedHealth, everyElement('malformed'));
     });
 
     test('test_customer_data_disclosure_export_016_mileage_and_category_tables_remain_outside_custo', () async {
@@ -1493,8 +1570,12 @@ void main() {
       addTearDown(() async {
         await firstDb.close();
         await secondDb.close();
-        if (firstProfileDir.existsSync()) await firstProfileDir.delete(recursive: true);
-        if (secondProfileDir.existsSync()) await secondProfileDir.delete(recursive: true);
+        if (firstProfileDir.existsSync()) {
+          await firstProfileDir.delete(recursive: true);
+        }
+        if (secondProfileDir.existsSync()) {
+          await secondProfileDir.delete(recursive: true);
+        }
         if (outDir.existsSync()) await outDir.delete(recursive: true);
       });
       await firstDb.ensureOpen();

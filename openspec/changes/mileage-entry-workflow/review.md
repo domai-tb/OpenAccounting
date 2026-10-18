@@ -194,3 +194,31 @@ None.
 - **Finding addressed:** proposal, design, and the DB delta scenario described archived change directories as active. This follow-up updates those status references and records that the maintained inventory requirements still conflict. It does not change the approved policy contract or remove migration/export gates.
 - **Dependency gates remain open:** the archived `profile-data-portability` and `customer-data-disclosure-export` proposals declare 46 names/v13 and 55 names/v19 respectively, while their maintained inventory requirements still conflict. The maintained `db` requirement also has a v8-to-v9 mileage-table scenario alongside its v13 minimum. Migration and complete-export readiness remain blocked until the inventory and shared-spec owners reconcile those contracts.
 - **Approval boundary:** Round 5 approves the spec contract at the reviewed revision; it does not approve implementation or close the inventory and migration-version dependencies. The wording-only follow-up preserves the reviewed policy and gates.
+
+---
+
+## Independent Contract Review — Round 6
+
+- **Reviewer:** `review_mileage_account_contract`
+- **Reviewed on:** 2026-10-18
+- **Reviewed revision:** on-disk mileage contract/spec diff based on baseline HEAD `335056f0533ea7d6a38f8e0d624bb9a6e1308594`. The only later commits are unrelated e-invoice commits `81948b3` and its parent `335056f`; mileage contract paths were unchanged.
+- **Scope:** proposal/design, mileage and DB delta specs, new EÜR and Sachkonto delta specs, and maintained DB, Einkommen, Stammdaten, profile-portability, and customer-disclosure specs.
+- **Findings resolved:** v24-to-v25 migration and version-aware inventory; exactly-once EÜR inclusion using immutable mapping snapshots; explicit Sachkonto filtering and no defaults; eligible-trip/policy/rounding requirements; balanced two-leg posting without cash or VAT; atomic UUID-based posting and correction contracts; and reconciliation of the captured runtime-red result.
+- **Required changes:** none after the prior `REVISE` findings were repaired.
+
+## Verdict — Round 6
+
+VERDICT: APPROVE
+
+CHANGES_APPLIED: yes
+
+**Approval boundary:** This approval covers the contract and affected specs only. It does not review or approve the later v25 migration, posting, EÜR implementation, bank selector code, or mileage UI/configuration route. Those implementation paths require their own evidence and independent review.
+
+## Implementation review (2026-10-18)
+
+- **Verdict:** `APPROVE` for the reviewed v25 mileage core implementation.
+- **Reviewed base revision:** `81948b3ca3e90d9372f7f964527cc77c55f74ff8` on `dev`.
+- **Focused runtime evidence:** `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter test --dart-define=platform=vm test/db/mileage_lifecycle_migration_test.dart test/features/stammdaten/customer_data_disclosure_export_test.dart test/features/accounting/euer_test.dart` passed **68/68 tests**.
+- **Scoped analyzer:** `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter analyze lib/core/db/migrations.dart lib/pages/stammdaten/customer_data_disclosure_export.dart test/db/mileage_lifecycle_migration_test.dart test/features/stammdaten/customer_data_disclosure_export_test.dart test/features/accounting/euer_test.dart` reported **no issues**.
+- **Structural checks:** `openspec validate mileage-entry-workflow --type change --strict --json` passed **1/1**; `openspec validate --specs --strict --json` passed **72/72**; `git diff --check` was clean.
+- **Approval boundary:** This approval covers only the reviewed v25 migration, posting/EÜR core, schema/export integration, and bank-import account filter. It does not approve the full mileage feature, account/mapping UI or `/banking?view=mileage` route, the remaining policy-boundary matrix, or accounting reversal/replacement corrections. Those tasks remain open.

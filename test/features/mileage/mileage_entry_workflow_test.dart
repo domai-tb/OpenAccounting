@@ -2,6 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/accounting/posting_group_service.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_usecases.dart';
@@ -19,8 +20,52 @@ void main() {
       await repo.ensureTablesForTests();
       useCases = MileageEntryUseCases(repo);
     });
-
     tearDown(() async => db.close());
+
+    Future<int> insertCategory({required String label, required String art, required int euerLine}) async {
+      final int categoryId = await db.executor.runInsert(
+        'INSERT INTO kategorien (bezeichnung, art, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, '
+        'catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+        <Object?>[label, art, '700$euerLine', '400$euerLine', euerLine, 'catalog_verified', 'TEST-MILEAGE', '1'],
+      );
+      await db.executor.runInsert(
+        'INSERT INTO category_mapping_history (kategorie_id, geaendert_am, aktion, vorher_mapping_json, '
+        'nachher_mapping_json, katalog_quelle, katalog_version) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          categoryId,
+          DateTime.now().toUtc().toIso8601String(),
+          'catalog_import',
+          null,
+          '{"mapping_status":"catalog_verified","euer_zeile":$euerLine}',
+          'TEST-MILEAGE',
+          '1',
+        ],
+      );
+      return categoryId;
+    }
+
+    Future<void> configureMileagePostingRoles() async {
+      final int expenseKontoId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Mileage travel expense', 'Sachkonto'],
+      );
+      final int contributionKontoId = await db.executor.runInsert(
+        'INSERT INTO konten (name, kontoart) VALUES (?, ?)',
+        const <Object?>['Mileage private contribution', 'Sachkonto'],
+      );
+      final int expenseCategoryId = await insertCategory(label: 'Mileage expense', art: 'ausgabe', euerLine: 71);
+      final int contributionCategoryId = await insertCategory(
+        label: 'Mileage private contribution',
+        art: 'einnahme',
+        euerLine: 107,
+      );
+      await PostingGroupService(db.executor).configureMileagePostingRoles(
+        travelExpenseKontoId: expenseKontoId,
+        travelExpenseKategorieId: expenseCategoryId,
+        privateContributionKontoId: contributionKontoId,
+        privateContributionKategorieId: contributionCategoryId,
+      );
+    }
 
     test('test_record_a_business_trip', () async {
       final MileageTrip trip = await useCases.recordBusinessTrip(
@@ -81,8 +126,8 @@ void main() {
         vehicleClass: MileageVehicleClass.kraftwagen,
       );
       await useCases.calculateTrip(trip.id);
-      final MileageEntryUseCases postingUseCases = MileageEntryUseCases(repo, postingPort: _RecordingPort());
-      await postingUseCases.postTripWithPort(trip.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(trip.id);
       await expectLater(() => useCases.editTripFacts(trip.id, purpose: 'Neu'), throwsStateError);
       final List<MileageTrip> rows = await repo.listTrips();
       expect(rows.first.purpose, 'Kundenbesuch');
@@ -294,8 +339,6 @@ void main() {
       );
       await expectLater(() => untrustedUseCases.postTripWithPort('untrusted-policy-trip'), throwsStateError);
       expect(postingPort.calls, 0);
-      expect(ineligibleRepository.storePostingCalls, 0);
-      expect(untrustedRepository.storePostingCalls, 0);
     });
 
     test('test_post_a_confirmed_resolved_mileage_expense', () async {
@@ -309,17 +352,65 @@ void main() {
         vehicleClass: MileageVehicleClass.kraftwagen,
       );
       await useCases.calculateTrip(trip.id);
-      final _RecordingPort port = _RecordingPort();
-      final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
-      final String eventId = await wired.postTripWithPort(trip.id);
-      expect(eventId.isNotEmpty, isTrue);
-      expect(port.calls, 1);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(trip.id);
       final MileageTrip kept = (await repo.getById(trip.id))!;
-      expect(kept.postingEventId, eventId);
+      expect(kept.postingEventId, isNotEmpty);
       expect(kept.state, MileageTripState.posted);
     });
 
-    test('test_reject_duplicate_or_incomplete_posting', () async {
+    test('test_production_posting_commits_journal_and_trip_reference', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(trip.id);
+      await configureMileagePostingRoles();
+
+      await useCases.postTrip(trip.id);
+
+      final MileageTrip posted = (await repo.getById(trip.id))!;
+      expect(posted.state, MileageTripState.posted);
+      expect(posted.postingEventId, isNotNull);
+      final List<Map<String, Object?>> legs = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', trip.id],
+      );
+      expect(legs, hasLength(2));
+    });
+
+    test('test_production_posting_retry_returns_existing_group', () async {
+      final MileageTrip trip = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(trip.id);
+      await configureMileagePostingRoles();
+
+      await useCases.postTrip(trip.id);
+      final String firstEventId = (await repo.getById(trip.id))!.postingEventId!;
+      await useCases.postTrip(trip.id);
+
+      final MileageTrip replayed = (await repo.getById(trip.id))!;
+      expect(replayed.postingEventId, firstEventId);
+      final List<Map<String, Object?>> legs = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', trip.id],
+      );
+      expect(legs, hasLength(2));
+    });
+
+    test('test_fake_posting_port_rejects_an_incomplete_trip', () async {
       final MileageTrip trip = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',
         purpose: 'Kundenbesuch',
@@ -332,9 +423,8 @@ void main() {
       await useCases.calculateTrip(trip.id);
       final _RecordingPort port = _RecordingPort();
       final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
-      final String first = await wired.postTripWithPort(trip.id);
-      final String second = await wired.postTripWithPort(trip.id);
-      expect(second, first);
+      final String eventId = await wired.postTripWithPort(trip.id);
+      expect(eventId, isNotEmpty);
       expect(port.calls, 1);
 
       final MileageTrip bare = await useCases.recordBusinessTrip(
@@ -347,6 +437,7 @@ void main() {
         vehicleClass: MileageVehicleClass.kraftwagen,
       );
       await expectLater(() => wired.postTripWithPort(bare.id), throwsStateError);
+      expect(port.calls, 1);
     });
   });
 }
@@ -365,13 +456,7 @@ class _FixedMileageRepository extends MileageEntryRepository {
   _FixedMileageRepository(MileageEntryRepository delegate, this.trip) : super(delegate.executor);
 
   final MileageTrip trip;
-  int storePostingCalls = 0;
 
   @override
   Future<MileageTrip?> getById(String id) async => id == trip.id ? trip : null;
-
-  @override
-  Future<void> storePosting({required String id, required String eventId}) async {
-    storePostingCalls++;
-  }
 }

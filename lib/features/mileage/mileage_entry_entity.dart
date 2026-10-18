@@ -100,3 +100,7 @@ class MileageTrip {
     );
   }
 }
+
+abstract class MileagePostingPort {
+  Future<String> postExpense(MileageTrip trip);
+}

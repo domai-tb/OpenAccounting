@@ -117,13 +117,6 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 - **WHEN** the database trigger evaluates the insert
 - **THEN** it rejects the insert and creates no row
 
-#### Scenario: Gate mileage migration until export inventories agree
-- **GIVEN** the archived `profile-data-portability` change declares 46 names at v13 and the archived `customer-data-disclosure-export` change declares 55 names at v19, while their maintained inventory requirements still conflict
-- **WHEN** the mileage migration release gate is evaluated
-- **THEN** the v23 mileage migration remains blocked until both inventory owners accept the same 55-name v19 inventory and version-aware presence rules
-- **AND** no migration or export may claim mileage completeness from the conflicting inventories
-- **AND** the existing profile and mileage rows remain unchanged while the inventory dependency is open
-
 #### Scenario: Roll back failed mileage migration
 - **GIVEN** mileage table or index creation or schema verification fails during migration
 - **WHEN** the migration aborts
@@ -170,11 +163,52 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 - **WHEN** a direct SQL UPDATE attempts to skip or reverse a lifecycle state
 - **THEN** a database trigger rejects the transition and preserves the row
 
+### Requirement: Mileage posting account-role configuration
+
+The database SHALL persist one optional mapping row per mileage role in `mileage_posting_account_mapping`, introduced at schema v25 after the live v24 baseline. `role TEXT PRIMARY KEY NOT NULL` SHALL be constrained to `travel_expense` or `private_contribution`; each row SHALL have non-null `konto_id` and `kategorie_id` foreign keys to `konten(id)` and `kategorien(id)` with `ON DELETE RESTRICT`, and non-empty `reviewed_at TEXT`. The table SHALL contain no defaults or seeded IDs. Posting remains unavailable until both role rows are explicitly configured and reviewed. Both accounts SHALL be revalidated as `kontoart = 'Sachkonto'` when the mapping is saved and posting is executed. The travel-expense category SHALL be active, `art = 'Ausgabe'`, map to EÜR line 71, have an active SKR mapping, and have trusted mapping status `catalog_verified` or `user_confirmed`. The private-contribution category SHALL be active, map to EÜR line 107, have an active SKR mapping, and have trusted mapping status. The table is absent/version-pending before v25; its schema is required from v25, while zero, one, or two role rows are valid schema states.
+
+#### Scenario: Fresh profile has no default mileage role mapping
+- **GIVEN** a fresh profile has no explicitly reviewed mileage posting roles
+- **WHEN** the database is initialized at schema v25
+- **THEN** `mileage_posting_account_mapping` exists with no configuration row
+- **AND** no mileage expense or private-contribution account/category is inferred
+
+#### Scenario: Version-24 profile does not require mileage role configuration
+- **GIVEN** a healthy profile at schema version 24 without `mileage_posting_account_mapping`
+- **WHEN** schema health is checked
+- **THEN** the profile remains valid for its recorded schema version and the table is version-pending
+
+#### Scenario: Version-25 profile requires mapping schema but not mapping values
+- **GIVEN** a profile at schema version 25 with a valid but empty `mileage_posting_account_mapping`
+- **WHEN** schema health is checked
+- **THEN** the profile remains valid and mileage posting remains unavailable until both roles are configured and reviewed
+- **AND** a missing or malformed mapping table fails health without automatic repair
+
+### Requirement: Mileage journal mapping snapshots
+
+Schema v25 SHALL add nullable journal columns `mileage_role_snapshot TEXT`, `mileage_kategorie_id_snapshot INTEGER`, `mileage_kategorie_name_snapshot TEXT`, `mileage_kategorie_art_snapshot TEXT`, `mileage_euer_zeile_snapshot INTEGER`, `mileage_kategorie_skr03_snapshot TEXT`, `mileage_kategorie_skr04_snapshot TEXT`, `mileage_mapping_status_snapshot TEXT`, `mileage_mapping_source_reference_snapshot TEXT`, `mileage_mapping_source_version_snapshot TEXT`, and `mileage_mapping_history_id_snapshot INTEGER`. They SHALL remain null for non-mileage rows. Each `mileage_trip` journal leg SHALL persist a complete snapshot of its role and the category mapping values used when posting; account IDs and account SKR snapshots SHALL use the existing journal fields. Posting SHALL write both legs, snapshots, trip state, and posting reference in one transaction. The snapshots SHALL be immutable and report generation SHALL use them instead of mutable category/mapping-history joins.
+
+#### Scenario: Keep a v24 profile healthy without mapping configuration
+- **GIVEN** a valid schema-v24 profile does not contain `mileage_posting_account_mapping`
+- **WHEN** schema health is checked
+- **THEN** the mapping table is version-pending and the profile remains healthy
+
+#### Scenario: Require v25 mapping schema while allowing no configured roles
+- **GIVEN** a valid schema-v25 profile has an empty `mileage_posting_account_mapping`
+- **WHEN** schema health is checked
+- **THEN** the profile remains healthy and mileage posting remains unavailable until both roles are configured and reviewed
+
+#### Scenario: Snapshot each mileage role mapping in the journal group
+- **GIVEN** a user-reviewed mapping has trusted, active categories
+- **WHEN** the two-leg mileage posting commits
+- **THEN** each journal leg stores its role and exact category mapping values atomically with the trip reference
+- **AND** later category edits do not alter the historical report mapping
+
 ### Requirement: Table Definitions
 
-The application database SHALL maintain an auditable inventory of 55 known application-table names for supported schema version 19. The 39 legacy base tables SHALL remain: unternehmen, kunden, lieferanten, artikel, journal, rechnungen, rechnungspositionen, kategorien, konten, nummernkreise, ust_saetze, tagesabschluesse, belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen, and inventarbewegungen. The additional 16 names are feature-owned: feature_table_state; forderung_zahlungen; buchungsvorlagen_occurrences; rechnungsvorlagen_occurrences; mileage_trips; mileage_trip_corrections; category_mapping_history; master_data_import_templates; anlage_afa_jahreswerte; inventuren; inventur_positionen; settlement_groups; settlement_allocations; statutory_timing_rules; dokument_email_templates; and dokument_email_versuche. SQLite internal objects whose names begin with sqlite_ are excluded. A fresh v19 profile SHALL contain 51 application tables; the two recurring occurrence tables and two optional document-email tables MAY be absent until initialized.
+The application database SHALL maintain an auditable inventory of 55 known application-table names through supported schema version 19 and 57 known names through schema version 25. The 39 legacy base tables SHALL remain: unternehmen, kunden, lieferanten, artikel, journal, rechnungen, rechnungspositionen, kategorien, konten, nummernkreise, ust_saetze, tagesabschluesse, belege, mahnungen, mahnstufen, mahnwesen_einstellungen, forderungen, bank_transaktionen, bank_templates, bank_imports, kunden_belege, kunden_lieferadressen, artikel_gruppen, rechnungsvorlagen, buchungsvorlagen, anlageverzeichnis, dokumentenpakete, dokumentenpaket_belege, ustva_exporte, euer_exporte, eks_exporte, datev_export_log, eu_laender, eks_einstellungen, vorsteuer_ansprueche, schnellbuchungen, auto_filter_regeln, import_mapping_vorlagen, and inventarbewegungen. The 16 feature-owned names through v19 are: feature_table_state; forderung_zahlungen; buchungsvorlagen_occurrences; rechnungsvorlagen_occurrences; mileage_trips; mileage_trip_corrections; category_mapping_history; master_data_import_templates; anlage_afa_jahreswerte; inventuren; inventur_positionen; settlement_groups; settlement_allocations; statutory_timing_rules; dokument_email_templates; and dokument_email_versuche. The v25 feature-owned additions are `mileage_posting_account_mapping` and `mileage_posting_period_closures`. SQLite internal objects whose names begin with sqlite_ are excluded. A fresh v19 profile SHALL contain 51 application tables; a fresh v25 profile SHALL contain 53 when the two recurring occurrence tables and two optional document-email tables are absent. Those four lazy/optional tables MAY be absent until initialized.
 
-Migration-required tables SHALL use these minimum versions: forderung_zahlungen at v8; category_mapping_history at v9; feature_table_state, mileage_trips, and mileage_trip_corrections at v13; master_data_import_templates at v16; anlage_afa_jahreswerte at v17; inventuren and inventur_positionen at v18; and settlement_groups, settlement_allocations, and statutory_timing_rules at v19. The two recurring occurrence tables SHALL be governed by feature_table_state starting at v13. `dokument_email_templates` and `dokument_email_versuche` are optional lazy tables with no schema-version requirement; when present, they SHALL match their declared schemas. The template columns are `typ`, `betreff`, `text`, and `aktualisiert_am`. The attempt columns are `id`, `dokument_id`, `dokument_typ`, `empfaenger`, `ergebnis`, `mahnung_id`, `idempotenz_schluessel`, `artefakt_ids`, `erstellt_am`, `abgeschlossen_am`, and `fehler_kategorie`.
+Migration-required tables SHALL use these minimum versions: forderung_zahlungen at v8; category_mapping_history at v9; feature_table_state, mileage_trips, and mileage_trip_corrections at v13; master_data_import_templates at v16; anlage_afa_jahreswerte at v17; inventuren and inventur_positionen at v18; settlement_groups, settlement_allocations, and statutory_timing_rules at v19; and `mileage_posting_account_mapping` and `mileage_posting_period_closures` at v25. The two recurring occurrence tables SHALL be governed by feature_table_state starting at v13. `dokument_email_templates` and `dokument_email_versuche` are optional lazy tables with no schema-version requirement; when present, they SHALL match their declared schemas. The template columns are `typ`, `betreff`, `text`, and `aktualisiert_am`. The attempt columns are `id`, `dokument_id`, `dokument_typ`, `empfaenger`, `ergebnis`, `mahnung_id`, `idempotenz_schluessel`, `artefakt_ids`, `erstellt_am`, `abgeschlossen_am`, and `fehler_kategorie`.
 
 At a version before a table's required migration version, its absence SHALL NOT make that older schema unhealthy. A profile at version N SHALL require all 39 legacy tables and every migration-required table through N with its declared schema. Each occurrence table SHALL be present with marker state `initialized` or absent with state `never_initialized`; absent with state `unknown`, missing marker rows, and state/table mismatches SHALL fail health. Optional document-email tables MAY be absent; when present, malformed schemas SHALL fail health. Any undeclared application table SHALL fail health. A profile below a later migration version MAY be complete for its recorded schema version; its archive SHALL NOT claim to have checked tables that are still version-pending. Any table with a typed relationship to a selected customer that is not included in the reviewed disclosure projection SHALL make that customer's archive incomplete. Every feature adding a table SHALL update this inventory before migration or lazy creation is implemented.
 
@@ -182,7 +216,20 @@ Before v8, forderung_zahlungen MAY be absent or in its accepted legacy v7 shape;
 
 The v13 feature_table_state table SHALL contain exactly one durable row for each recurring occurrence table, constrained to those two names and states `never_initialized`, `initialized`, or `unknown`. Fresh v13+ profiles SHALL seed both rows as `never_initialized`. The v12-to-v13 migration SHALL mark a valid existing occurrence table `initialized` and an absent table `unknown`; absence alone SHALL NOT imply `never_initialized`. Feature initialization SHALL create a table and transition its marker in one transaction, and SHALL NOT create an `unknown` table. Unknown may become `never_initialized` only after explicit integrity reconciliation verifies the feature was never initialized; it may become `initialized` only after a verified table is restored or its prior data otherwise verified.
 
-The mileage version-13 tables SHALL NOT be treated as complete-export eligible until both `profile-data-portability` and `customer-data-disclosure-export` accept the same 55-name v19 inventory and version-aware presence rules, including both mileage tables at v13. If either export encounters a profile containing a table while its accepted inventory omits that table, it SHALL mark the result incomplete and SHALL NOT publish or claim a complete export. These exporters SHALL NOT create, repair, or remove mileage tables. Lifecycle triggers enforcing unresolved-only trip INSERTs, draft-only correction INSERTs, correction transitions, final-row immutability with no DELETEs, and replacement-posted atomicity SHALL be installed by migration v23 (following verified current version 22); if another migration lands first, the triggers SHALL use the next sequential version. The v23 migration SHALL remain blocked until both inventory owners accept the common inventory and version-aware presence rules.
+The mileage tables SHALL remain in the 55-name inventory through v19, and `mileage_posting_account_mapping` and `mileage_posting_period_closures` SHALL be names 56 and 57 at v25. Profile portability and customer-disclosure schema-health checks SHALL apply the same minimum-version rules: absence of either table is valid before v25; absence or malformed schema at v25 or later is an integrity failure. Zero, one, or two mapping rows and zero closure rows are valid initial states. The profile exporter SHALL include every row from both tables; the customer-disclosure exporter SHALL schema-check them but SHALL NOT project them without an approved customer relationship. Exporters SHALL NOT create, repair, or remove these tables. The live schema baseline is v24; v25 adds both tables and the canonical mileage-only journal mapping snapshot columns without altering existing account, category, or journal rows.
+
+#### Scenario: Version-24 profile is valid before the mileage mapping migration
+- **GIVEN** a healthy profile at schema version 24 with the 55-name v19 baseline and all tables required through v24
+- **AND** both `mileage_posting_account_mapping` and `mileage_posting_period_closures` are absent
+- **WHEN** schema health and profile portability are checked
+- **THEN** the profile remains valid for its recorded version and the table is reported as version-pending
+
+#### Scenario: Version-25 profile requires mileage mapping schema but no mapping row
+- **GIVEN** a profile at schema version 25 with both mileage posting tables present and structurally valid but empty
+- **WHEN** schema health and profile portability are checked
+- **THEN** the profile is complete for its recorded version
+- **AND** mileage posting remains unavailable until a user configures and reviews both roles
+- **AND** a missing or malformed mileage posting table fails schema health without automatic repair
 
 #### Scenario: All Tables Created on Fresh Install
 
@@ -304,11 +351,12 @@ AND no table SHALL be silently dropped or created outside the version-specific i
 - **THEN** the profile SHALL fail schema health before any repair can create or replace the table
 - **AND** the original database and all remaining mileage data SHALL be preserved
 
-#### Scenario: Block mileage completeness until export inventories include its tables
-
-- **GIVEN** either owning portability or customer-export inventory omits `mileage_trips` or `mileage_trip_corrections`
-- **WHEN** mileage completeness is considered
-- **THEN** mileage tables SHALL remain ineligible for complete export until both inventories accept the 55-name contract
+#### Scenario: Check mileage tables through the common versioned inventory
+- **GIVEN** a v25 profile is checked by profile portability and customer disclosure export
+- **WHEN** migration-required tables are compared with the common inventory
+- **THEN** both mileage tables are required from v13 and the mapping table is required from v25
+- **AND** the profile export includes its configured mapping row while the customer export checks but does not project it
+- **AND** an empty mapping table is valid profile configuration
 
 #### Scenario: Keep exports incomplete for undeclared mileage tables
 
@@ -805,7 +853,7 @@ The scoped exporter SHALL read one consistent profile-local snapshot and travers
 
 ### Requirement: Customer export completeness uses an accepted table inventory
 
-The customer exporter SHALL validate the active profile against the exact 55-name application-table inventory and version-aware presence rules in this change's modified `Table Definitions` requirement before reporting completeness. A complete export SHALL require every migration-required table at or after its declared version through the profile's recorded schema version; a table introduced by a later migration SHALL remain version-pending and SHALL NOT make an earlier supported profile incomplete. Each lazy occurrence table is valid only when present with state `initialized` or absent with state `never_initialized`; a lazy table absent with state `unknown`, a missing required table, a state/table mismatch, a malformed declared schema, or an undeclared application table SHALL make the archive incomplete. The exporter SHALL NOT create or repair tables. At v7 and earlier, a missing `forderung_zahlungen` table is created by the normal v7-to-v8 migration; at v8 or later, startup SHALL detect its absence before any repair that could recreate it, preserve the missing-table signal, and keep the profile unavailable for complete export until verified recovery. `mileage_trips`, `mileage_trip_corrections`, `category_mapping_history`, `master_data_import_templates`, `anlage_afa_jahreswerte`, and the inventory/settlement tables SHALL be included in schema-health checks at their required versions but SHALL NOT be projected unless a customer relationship is explicitly reviewed. Their omission SHALL not by itself make a customer-scoped archive incomplete. `feature_table_state` rows SHALL be used for schema health only and SHALL NOT be included in the customer payload. The manifest SHALL identify the failing table by table name and condition, without exposing database paths.
+The customer exporter SHALL validate the active profile against the versioned Table Definitions inventory (55 known names through v19 and 57 through v25) and presence rules in this change's modified `Table Definitions` requirement before reporting completeness. A complete export SHALL require every migration-required table at or after its declared version through the profile's recorded schema version; a table introduced by a later migration SHALL remain version-pending and SHALL NOT make an earlier supported profile incomplete. Each lazy occurrence table is valid only when present with state `initialized` or absent with state `never_initialized`; a lazy table absent with state `unknown`, a missing required table, a state/table mismatch, a malformed declared schema, or an undeclared application table SHALL make the archive incomplete. The exporter SHALL NOT create or repair tables. At v7 and earlier, a missing `forderung_zahlungen` table is created by the normal v7-to-v8 migration; at v8 or later, startup SHALL detect its absence before any repair that could recreate it, preserve the missing-table signal, and keep the profile unavailable for complete export until verified recovery. `mileage_trips`, `mileage_trip_corrections`, `category_mapping_history`, `master_data_import_templates`, `anlage_afa_jahreswerte`, `mileage_posting_account_mapping`, `mileage_posting_period_closures` from v25, and the inventory/settlement tables SHALL be included in schema-health checks at their required versions but SHALL NOT be projected unless a customer relationship is explicitly reviewed. Their omission SHALL not by itself make a customer-scoped archive incomplete. `feature_table_state` rows SHALL be used for schema health only and SHALL NOT be included in the customer payload. The manifest SHALL identify the failing table by table name and condition, without exposing database paths.
 
 #### Scenario: Unlisted customer-linked table prevents a complete export
 

@@ -439,12 +439,20 @@ Each category MAY have eks_kategorie (VARCHAR, nullable). When set, journal entr
 
 ### Requirement: Konten — CRUD
 
-The system SHALL provide CRUD for bank accounts (Konten). Each account MUST have id, bezeichnung, iban (nullable), bic (nullable), kontoart (ENUM: Girokonto, Sparkonto, Kreditkarte, Paypal, Sonstiges), anbieter (VARCHAR), kennung (VARCHAR), and datev_kontonummer (VARCHAR(8), nullable). IBAN MUST be nullable for non-IBAN accounts (PayPal, Kreditkarte). A partial unique index prevents duplicate IBANs when not null.
+The system SHALL provide CRUD for bank accounts (Konten). Each account MUST have id, bezeichnung, iban (nullable), bic (nullable), kontoart, anbieter (VARCHAR), kennung (VARCHAR), and datev_kontonummer (VARCHAR(8), nullable). Existing bank-account types (`Bank`, `Girokonto`, `Sparkonto`, `Kreditkarte`, `Paypal`, and `Sonstiges`) and existing rows MUST remain unchanged. `Kasse` remains a cash-account type. The domain SHALL also support `Sachkonto` as an explicitly selected non-bank ledger account; a Sachkonto MUST allow null banking fields. Bank-specific workflows and selectors MUST exclude Sachkonten and preserve existing handling of all other account types and rows. A partial unique index prevents duplicate IBANs when not null.
+
+Creating or selecting a Sachkonto MUST be explicit; the system SHALL NOT infer a Sachkonto role from an account name, number, or missing banking details. Mileage posting settings MAY assign an explicitly reviewed Sachkonto to the travel-expense role and another explicitly reviewed Sachkonto to the private-contribution role. Existing account rows MUST NOT be converted or assigned a mileage role by migration or default.
 
 #### Scenario: PayPal account without IBAN
 - GIVEN a user creates a Konto with kontoart = "Paypal"
 - WHEN iban is left NULL and the account is saved
 - THEN the account is persisted without IBAN validation
+
+#### Scenario: Sachkonto without bank details
+- GIVEN a user explicitly creates a Konto with kontoart = "Sachkonto"
+- WHEN IBAN and BIC are left NULL
+- THEN the account is persisted as a ledger account without bank-field validation
+- AND bank-specific account selectors do not offer it
 
 #### Scenario: Duplicate IBAN rejected
 - GIVEN an existing Girokonto has iban = "DE89370400440532013000"

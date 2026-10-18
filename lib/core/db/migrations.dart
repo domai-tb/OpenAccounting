@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 24;
+  static const int currentVersion = 25;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -66,6 +66,21 @@ class MigrationRunner {
         malformedTables.add(table);
       }
     }
+    if (version >= 25) {
+      if (actualTables.contains('mileage_posting_account_mapping') && !await _hasMileagePostingMappingConstraints()) {
+        malformedTables.add('mileage_posting_account_mapping');
+      }
+      if (actualTables.contains('mileage_posting_period_closures') &&
+          !await _hasMileagePostingPeriodClosureConstraints()) {
+        malformedTables.add('mileage_posting_period_closures');
+      }
+      if (actualTables.contains('journal') && !await _hasMileagePostingJournalSnapshots()) {
+        malformedTables.add('journal');
+      }
+      if (actualTables.contains('mileage_trips') && !await _hasMileageTripPostingGuard()) {
+        malformedTables.add('mileage_trips');
+      }
+    }
     malformedTables.sort();
     final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
     final bool healthy =
@@ -87,7 +102,9 @@ class MigrationRunner {
 
   Future<({bool healthy, bool complete})> _inspectLazyOccurrenceTables(int version, Set<String> actualTables) async {
     if (version < currentVersion) return (healthy: true, complete: false);
-    if (!actualTables.contains('feature_table_state')) return (healthy: false, complete: false);
+    if (!actualTables.contains('feature_table_state')) {
+      return (healthy: false, complete: false);
+    }
     final List<Map<String, Object?>> rows = await executor.runSelect(
       'SELECT table_name, state FROM feature_table_state ORDER BY table_name',
       const <Object?>[],
@@ -107,7 +124,9 @@ class MigrationRunner {
       final bool neverInitialized = state == 'never_initialized' && !exists;
       final bool initialized = state == 'initialized' && exists;
       final bool unknown = state == 'unknown' && !exists;
-      if (!(neverInitialized || initialized || unknown)) return (healthy: false, complete: false);
+      if (!(neverInitialized || initialized || unknown)) {
+        return (healthy: false, complete: false);
+      }
       if (unknown) complete = false;
     }
     return (healthy: true, complete: complete);
@@ -127,7 +146,9 @@ class MigrationRunner {
       if (_optionalSchemaTables.contains(table)) {
         final bool uniqueAttemptKey =
             table == 'dokument_email_versuche' && await _hasUniqueColumnIndex(table, 'idempotenz_schluessel');
-        if (!hasDeclaredOptionalSchema(table, columns, hasUniqueAttemptKey: uniqueAttemptKey)) return false;
+        if (!hasDeclaredOptionalSchema(table, columns, hasUniqueAttemptKey: uniqueAttemptKey)) {
+          return false;
+        }
       } else if (!hasDeclaredSchemaColumns(table, names) || !hasDeclaredRelationshipIdTypes(table, columns)) {
         return false;
       }
@@ -148,11 +169,100 @@ class MigrationRunner {
     return requiredColumns.every(availableColumns.contains);
   }
 
+  static bool hasMileagePostingMappingSchema({
+    required String tableSql,
+    required List<Map<String, Object?>> columns,
+    required List<Map<String, Object?>> foreignKeys,
+  }) {
+    const Map<String, String> requiredTypes = <String, String>{
+      'role': 'TEXT',
+      'konto_id': 'INTEGER',
+      'kategorie_id': 'INTEGER',
+      'reviewed_at': 'TEXT',
+    };
+    for (final MapEntry<String, String> required in requiredTypes.entries) {
+      final Iterable<Map<String, Object?>> found = columns.where(
+        (Map<String, Object?> column) => column['name'] == required.key,
+      );
+      if (found.length != 1 ||
+          found.single['type'].toString().toUpperCase() != required.value ||
+          _asInt(found.single['notnull']) != 1) {
+        return false;
+      }
+    }
+    final Map<String, Object?>? role = columns.cast<Map<String, Object?>?>().firstWhere(
+      (Map<String, Object?>? column) => column?['name'] == 'role',
+      orElse: () => null,
+    );
+    if (role == null || _asInt(role['pk']) != 1) return false;
+
+    final String normalizedSql = tableSql.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    if (!RegExp(
+          r"check\s*\(\s*role\s+in\s*\(\s*'travel_expense'\s*,\s*'private_contribution'\s*\)\s*\)",
+          caseSensitive: false,
+        ).hasMatch(normalizedSql) ||
+        !RegExp(
+          r"check\s*\(\s*trim\s*\(\s*reviewed_at\s*\)\s*<>\s*''\s*\)",
+          caseSensitive: false,
+        ).hasMatch(normalizedSql)) {
+      return false;
+    }
+
+    bool hasRestrictedForeignKey(String table, String from) => foreignKeys.any(
+      (Map<String, Object?> row) =>
+          row['table'] == table &&
+          row['from'] == from &&
+          row['to'] == 'id' &&
+          row['on_delete'].toString().toUpperCase() == 'RESTRICT',
+    );
+    return foreignKeys.length == 2 &&
+        hasRestrictedForeignKey('konten', 'konto_id') &&
+        hasRestrictedForeignKey('kategorien', 'kategorie_id');
+  }
+
+  static bool hasMileagePostingPeriodClosureSchema({
+    required String tableSql,
+    required List<Map<String, Object?>> columns,
+  }) {
+    const Map<String, String> requiredTypes = <String, String>{
+      'id': 'INTEGER',
+      'closed_from': 'TEXT',
+      'closed_through': 'TEXT',
+      'closed_at': 'TEXT',
+    };
+    for (final MapEntry<String, String> required in requiredTypes.entries) {
+      final Iterable<Map<String, Object?>> found = columns.where(
+        (Map<String, Object?> column) => column['name'] == required.key,
+      );
+      if (found.length != 1 || found.single['type'].toString().toUpperCase() != required.value) {
+        return false;
+      }
+      if (required.key != 'id' && _asInt(found.single['notnull']) != 1) {
+        return false;
+      }
+    }
+    final Map<String, Object?>? id = columns.cast<Map<String, Object?>?>().firstWhere(
+      (Map<String, Object?>? column) => column?['name'] == 'id',
+      orElse: () => null,
+    );
+    if (id == null || _asInt(id['pk']) != 1) {
+      return false;
+    }
+
+    final String normalizedSql = tableSql.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    return normalizedSql.contains("strftime('%y-%m-%d', closed_from) is closed_from") &&
+        normalizedSql.contains("strftime('%y-%m-%d', closed_through) is closed_through") &&
+        normalizedSql.contains("trim(closed_at) <> ''") &&
+        normalizedSql.contains('closed_from <= closed_through');
+  }
+
   static bool hasDeclaredRelationshipIdTypes(String table, List<Map<String, Object?>> columns) {
     final Set<String> relationshipColumns = _declaredRelationshipIdColumns[table] ?? const <String>{};
     for (final Map<String, Object?> column in columns) {
       if (!relationshipColumns.contains(column['name'])) continue;
-      if (!(column['type']?.toString().toUpperCase().contains('INT') ?? false)) return false;
+      if (!(column['type']?.toString().toUpperCase().contains('INT') ?? false)) {
+        return false;
+      }
     }
     return true;
   }
@@ -163,14 +273,24 @@ class MigrationRunner {
     bool hasUniqueAttemptKey = false,
   }) {
     final Map<String, String>? expectedTypes = _optionalSchemaColumnTypes[table];
-    if (expectedTypes == null) return false;
+    if (expectedTypes == null) {
+      return false;
+    }
     final List<Map<String, Object?>> actual = columns.toList(growable: false);
-    if (actual.length != expectedTypes.length) return false;
+    if (actual.length != expectedTypes.length) {
+      return false;
+    }
     for (final Map<String, Object?> column in actual) {
       final String name = column['name']?.toString() ?? '';
-      if (expectedTypes[name] != column['type']?.toString().toUpperCase()) return false;
-      if (_asInt(column['notnull']) != (_optionalSchemaNotNull[table]!.contains(name) ? 1 : 0)) return false;
-      if (_asInt(column['pk']) != (_optionalSchemaPrimaryKey[table] == name ? 1 : 0)) return false;
+      if (expectedTypes[name] != column['type']?.toString().toUpperCase()) {
+        return false;
+      }
+      if (_asInt(column['notnull']) != (_optionalSchemaNotNull[table]!.contains(name) ? 1 : 0)) {
+        return false;
+      }
+      if (_asInt(column['pk']) != (_optionalSchemaPrimaryKey[table] == name ? 1 : 0)) {
+        return false;
+      }
     }
     return table != 'dokument_email_versuche' || hasUniqueAttemptKey;
   }
@@ -221,9 +341,11 @@ class MigrationRunner {
 
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
+      await _verifyMileagePostingTablesPresent();
       if (await _receivableFeatureNeedsRepair() ||
           await _postingSchemaNeedsRepair() ||
-          await _mileageLifecycleNeedsRepair()) {
+          await _mileageLifecycleNeedsRepair() ||
+          await _mileagePostingNeedsRepair()) {
         await _repairCurrentFeature(afterFeatureSchemaDdl);
         return true;
       }
@@ -314,6 +436,7 @@ class MigrationRunner {
       await _migrateAssetRegister();
       await _migrateStocktake();
       await _migratePostingGroups();
+      await _migrateMileagePosting();
       await _migrateAccountHolder();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
@@ -466,6 +589,9 @@ class MigrationRunner {
     if (version == 24) {
       await _migrateMileageLifecycleV24();
     }
+    if (version == 25) {
+      await _migrateMileagePosting();
+    }
   }
 
   Future<void> _migrateMileageLifecycle() async {
@@ -523,6 +649,7 @@ WHERE state = 'calculated'
   )
 ''');
 
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
     for (final String trigger in _mileageLifecycleTriggersSql) {
       await executor.runCustom(trigger);
     }
@@ -537,6 +664,153 @@ WHERE state = 'calculated'
     );
     await executor.runCustom(calculationGuard);
     await _verifyMileageLifecycleSchema();
+  }
+
+  Future<void> _migrateMileagePosting() async {
+    final List<Map<String, Object?>> prerequisites = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+      "('konten', 'kategorien', 'journal', 'mileage_trips')",
+      const <Object?>[],
+    );
+    if (prerequisites.length != 4) {
+      throw StateError('Mileage-Buchungen benötigen Konten, Kategorien, Journal und Fahrten');
+    }
+
+    await executor.runCustom(_mileagePostingAccountMappingTableSql);
+    await executor.runCustom(_mileagePostingPeriodClosuresTableSql);
+    const Map<String, String> journalSnapshotColumns = <String, String>{
+      'mileage_role_snapshot': 'TEXT',
+      'mileage_kategorie_id_snapshot': 'INTEGER',
+      'mileage_kategorie_name_snapshot': 'TEXT',
+      'mileage_kategorie_art_snapshot': 'TEXT',
+      'mileage_euer_zeile_snapshot': 'INTEGER',
+      'mileage_kategorie_skr03_snapshot': 'TEXT',
+      'mileage_kategorie_skr04_snapshot': 'TEXT',
+      'mileage_mapping_status_snapshot': 'TEXT',
+      'mileage_mapping_source_reference_snapshot': 'TEXT',
+      'mileage_mapping_source_version_snapshot': 'TEXT',
+      'mileage_mapping_history_id_snapshot': 'INTEGER',
+    };
+    for (final MapEntry<String, String> column in journalSnapshotColumns.entries) {
+      await _addColumnIfMissing('journal', column.key, column.value);
+    }
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
+    await executor.runCustom(
+      _mileageLifecycleTriggersSql.singleWhere(
+        (String trigger) => trigger.contains('CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_posting_guard'),
+      ),
+    );
+    await _verifyMileagePostingSchema();
+  }
+
+  Future<void> _verifyMileagePostingSchema() async {
+    if (!await _hasMileagePostingMappingConstraints() || !await _hasMileagePostingPeriodClosureConstraints()) {
+      throw StateError('Mileage-Kontenzuordnung konnte nicht verifiziert werden');
+    }
+    if (!await _hasMileagePostingJournalSnapshots() || !await _hasMileageTripPostingGuard()) {
+      throw StateError('Mileage-Journal-Snapshots konnten nicht verifiziert werden');
+    }
+  }
+
+  Future<void> _verifyMileagePostingTablesPresent() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN "
+      "('mileage_posting_account_mapping', 'mileage_posting_period_closures')",
+      const <Object?>[],
+    );
+    final Set<String> present = <String>{for (final Map<String, Object?> row in rows) row['name'].toString()};
+    const Set<String> required = <String>{'mileage_posting_account_mapping', 'mileage_posting_period_closures'};
+    final List<String> missing = required.difference(present).toList()..sort();
+    if (missing.isNotEmpty) {
+      throw StateError('Mileage-Buchungsschema nicht verfügbar; fehlende Tabellen: ${missing.join(', ')}');
+    }
+  }
+
+  Future<bool> _hasMileagePostingMappingConstraints() async {
+    final List<Map<String, Object?>> tableRows = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mileage_posting_account_mapping'",
+      const <Object?>[],
+    );
+    if (tableRows.length != 1) return false;
+
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(mileage_posting_account_mapping)',
+      const <Object?>[],
+    );
+    final List<Map<String, Object?>> foreignKeys = await executor.runSelect(
+      'PRAGMA foreign_key_list(mileage_posting_account_mapping)',
+      const <Object?>[],
+    );
+    return hasMileagePostingMappingSchema(
+      tableSql: tableRows.single['sql']?.toString() ?? '',
+      columns: columns,
+      foreignKeys: foreignKeys,
+    );
+  }
+
+  Future<bool> _hasMileagePostingJournalSnapshots() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(journal)',
+      const <Object?>[],
+    );
+    const Map<String, String> requiredTypes = <String, String>{
+      'mileage_role_snapshot': 'TEXT',
+      'mileage_kategorie_id_snapshot': 'INTEGER',
+      'mileage_kategorie_name_snapshot': 'TEXT',
+      'mileage_kategorie_art_snapshot': 'TEXT',
+      'mileage_euer_zeile_snapshot': 'INTEGER',
+      'mileage_kategorie_skr03_snapshot': 'TEXT',
+      'mileage_kategorie_skr04_snapshot': 'TEXT',
+      'mileage_mapping_status_snapshot': 'TEXT',
+      'mileage_mapping_source_reference_snapshot': 'TEXT',
+      'mileage_mapping_source_version_snapshot': 'TEXT',
+      'mileage_mapping_history_id_snapshot': 'INTEGER',
+    };
+    for (final MapEntry<String, String> required in requiredTypes.entries) {
+      final Iterable<Map<String, Object?>> found = columns.where(
+        (Map<String, Object?> column) => column['name'] == required.key,
+      );
+      if (found.length != 1 || found.single['type'].toString().toUpperCase() != required.value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<bool> _hasMileagePostingPeriodClosureConstraints() async {
+    final List<Map<String, Object?>> tableRows = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'mileage_posting_period_closures'",
+      const <Object?>[],
+    );
+    if (tableRows.length != 1) return false;
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(mileage_posting_period_closures)',
+      const <Object?>[],
+    );
+    return hasMileagePostingPeriodClosureSchema(tableSql: tableRows.single['sql']?.toString() ?? '', columns: columns);
+  }
+
+  Future<bool> _hasMileageTripPostingGuard() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_trip_posting_guard'",
+      const <Object?>[],
+    );
+    if (rows.length != 1) return false;
+    final String sql = (rows.single['sql']?.toString() ?? '').toLowerCase();
+    return sql.contains('mileage_posting_period_closures') &&
+        sql.contains('mileage_kategorie_id_snapshot') &&
+        sql.contains('mileage_euer_zeile_snapshot') &&
+        sql.contains('source_kind') &&
+        sql.contains('count(*)');
+  }
+
+  Future<bool> _mileagePostingNeedsRepair() async {
+    try {
+      await _verifyMileagePostingSchema();
+      return false;
+    } catch (_) {
+      return true;
+    }
   }
 
   Future<bool> _mileageLifecycleNeedsRepair() async {
@@ -565,6 +839,17 @@ WHERE state = 'calculated'
     );
     if (triggers.length != _mileageLifecycleTriggersSql.length) {
       throw StateError('Mileage lifecycle triggers could not be verified');
+    }
+    final List<Map<String, Object?>> correctionGuards = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_update_guard'",
+      const <Object?>[],
+    );
+    if (correctionGuards.length != 1) {
+      throw StateError('Mileage correction posting remains fail-closed until its accounting operation is wired');
+    }
+    final String correctionGuardSql = correctionGuards.single['sql']?.toString().toLowerCase() ?? '';
+    if (!correctionGuardSql.replaceAll(RegExp(r'\s+'), ' ').contains("or new.state = 'applied'")) {
+      throw StateError('Mileage correction posting remains fail-closed until its accounting operation is wired');
     }
   }
 
@@ -616,6 +901,7 @@ WHERE state = 'calculated'
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
       await _migrateMileageLifecycle();
+      await _migrateMileagePosting();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -649,7 +935,9 @@ WHERE state = 'calculated'
       'fingerprint_direction',
       'fingerprint_date_policy',
     };
-    if (!required.every((name) => columns.any((row) => row['name'] == name))) return true;
+    if (!required.every((name) => columns.any((row) => row['name'] == name))) {
+      return true;
+    }
     return !(await _receivableFeatureHasRequiredConstraints());
   }
 
@@ -1751,6 +2039,8 @@ const Set<String> _featureOwnedTables = <String>{
   'rechnungsvorlagen_occurrences',
   'mileage_trips',
   'mileage_trip_corrections',
+  'mileage_posting_account_mapping',
+  'mileage_posting_period_closures',
   'category_mapping_history',
   'feature_table_state',
   'master_data_import_templates',
@@ -1770,6 +2060,8 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'feature_table_state': 13,
   'mileage_trips': 13,
   'mileage_trip_corrections': 13,
+  'mileage_posting_account_mapping': 25,
+  'mileage_posting_period_closures': 25,
   'master_data_import_templates': 16,
   'anlage_afa_jahreswerte': 17,
   'inventuren': 18,
@@ -1846,6 +2138,7 @@ const Map<String, Set<String>> _declaredRelationshipIdColumns = <String, Set<Str
   'kunden_belege': <String>{'kunde_id', 'beleg_id'},
   'buchungsvorlagen_occurrences': <String>{'rechnung_id', 'journal_id'},
   'settlement_allocations': <String>{'forderung_id'},
+  'mileage_posting_account_mapping': <String>{'konto_id', 'kategorie_id'},
   'dokument_email_versuche': <String>{'dokument_id', 'mahnung_id'},
 };
 
@@ -1889,6 +2182,8 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
     'updated_at',
   },
   'mileage_trip_corrections': <String>{'id', 'trip_id', 'kind', 'reason', 'state', 'created_at'},
+  'mileage_posting_account_mapping': <String>{'role', 'konto_id', 'kategorie_id', 'reviewed_at'},
+  'mileage_posting_period_closures': <String>{'id', 'closed_from', 'closed_through', 'closed_at'},
   'feature_table_state': <String>{'table_name', 'state'},
   'master_data_import_templates': <String>{
     'id',
@@ -2092,6 +2387,23 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       OR (state = 'cancelled' AND accounting_correction_id IS NULL AND applied_at IS NULL))
 )''';
 
+const String _mileagePostingAccountMappingTableSql = '''
+CREATE TABLE IF NOT EXISTS mileage_posting_account_mapping (
+  role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  kategorie_id INTEGER NOT NULL REFERENCES kategorien(id) ON DELETE RESTRICT,
+  reviewed_at TEXT NOT NULL CHECK (trim(reviewed_at) <> '')
+)''';
+
+const String _mileagePostingPeriodClosuresTableSql = '''
+CREATE TABLE IF NOT EXISTS mileage_posting_period_closures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  closed_from TEXT NOT NULL CHECK (strftime('%Y-%m-%d', closed_from) IS closed_from),
+  closed_through TEXT NOT NULL CHECK (strftime('%Y-%m-%d', closed_through) IS closed_through),
+  closed_at TEXT NOT NULL CHECK (trim(closed_at) <> ''),
+  CHECK (closed_from <= closed_through)
+)''';
+
 const List<String> _mileageLifecycleTriggersSql = <String>[
   '''
 CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_date_insert
@@ -2277,9 +2589,113 @@ WHEN OLD.state = 'calculated'
     OR NEW.posting_event_id IS NULL
     OR trim(NEW.posting_event_id) = ''
     OR OLD.posting_event_id IS NOT NULL
+    OR EXISTS (
+      SELECT 1 FROM mileage_posting_period_closures c
+      WHERE NEW.trip_date BETWEEN c.closed_from AND c.closed_through
+    )
+    OR (SELECT COUNT(*) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id) <> 2
+    OR (SELECT COUNT(*) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+          AND j.mileage_role_snapshot = 'travel_expense') <> 1
+    OR (SELECT COUNT(*) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+          AND j.mileage_role_snapshot = 'private_contribution') <> 1
+    OR (SELECT COUNT(DISTINCT j.gruppe_id) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id) <> 1
+    OR (SELECT COUNT(*) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+          AND j.id = j.gruppe_id AND j.mileage_role_snapshot = 'travel_expense') <> 1
+    OR EXISTS (
+      SELECT 1 FROM journal j
+      LEFT JOIN konten a ON a.id = j.konto_id
+      LEFT JOIN kategorien k ON k.id = j.kategorie_id
+      LEFT JOIN category_mapping_history h ON h.id = (
+        SELECT MAX(h2.id) FROM category_mapping_history h2 WHERE h2.kategorie_id = j.kategorie_id
+      )
+      WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+        AND (
+          j.gruppe_id IS NULL
+          OR j.datum IS NOT NEW.trip_date
+          OR j.beleg_typ IS NOT 'Ausgabe'
+          OR j.konto_id IS NULL
+          OR j.kategorie_id IS NULL
+          OR a.kontoart IS NOT 'Sachkonto'
+          OR k.aktiv IS NOT 1
+          OR NOT EXISTS (
+            SELECT 1 FROM mileage_posting_account_mapping m
+            WHERE m.role = j.mileage_role_snapshot
+              AND m.konto_id = j.konto_id
+              AND m.kategorie_id = j.kategorie_id
+          )
+          OR j.immutable IS NOT 1
+          OR j.legacy_unverified IS NOT 0
+          OR j.mileage_role_snapshot IS NULL
+          OR j.mileage_role_snapshot NOT IN ('travel_expense', 'private_contribution')
+          OR j.mileage_kategorie_id_snapshot IS NOT j.kategorie_id
+          OR j.mileage_kategorie_name_snapshot IS NOT k.bezeichnung
+          OR j.mileage_kategorie_art_snapshot IS NOT k.art
+          OR j.mileage_euer_zeile_snapshot IS NOT k.euer_zeile
+          OR j.mileage_kategorie_skr03_snapshot IS NOT k.konto_skr03
+          OR j.mileage_kategorie_skr04_snapshot IS NOT k.konto_skr04
+          OR j.mileage_mapping_status_snapshot NOT IN ('catalog_verified', 'user_confirmed')
+          OR j.mileage_mapping_status_snapshot IS NOT k.mapping_status
+          OR j.mileage_mapping_source_reference_snapshot IS NOT k.catalog_source_reference
+          OR j.mileage_mapping_source_version_snapshot IS NOT k.catalog_source_version
+          OR j.mileage_mapping_history_id_snapshot IS NOT h.id
+          OR coalesce(trim(j.mileage_kategorie_name_snapshot), '') = ''
+          OR (j.mileage_mapping_status_snapshot = 'catalog_verified'
+            AND (coalesce(trim(j.mileage_mapping_source_reference_snapshot), '') = ''
+              OR coalesce(trim(j.mileage_mapping_source_version_snapshot), '') = ''))
+          OR j.mileage_mapping_history_id_snapshot IS NULL
+          OR j.mileage_mapping_history_id_snapshot <= 0
+          OR (coalesce(trim(j.mileage_kategorie_skr03_snapshot), '') = ''
+            AND coalesce(trim(j.mileage_kategorie_skr04_snapshot), '') = '')
+          OR (j.mileage_role_snapshot = 'travel_expense'
+            AND (lower(j.mileage_kategorie_art_snapshot) <> 'ausgabe'
+              OR j.mileage_euer_zeile_snapshot <> 71))
+          OR (j.mileage_role_snapshot = 'private_contribution'
+            AND (lower(j.mileage_kategorie_art_snapshot) <> 'einnahme'
+              OR j.mileage_euer_zeile_snapshot <> 107))
+          OR j.ust_satz_id IS NOT NULL
+          OR j.ust_satz IS NOT NULL
+          OR j.ust_sonderfall IS NOT NULL
+          OR j.vorsteuer_betrag IS NOT NULL
+          OR j.marge_25a_brutto IS NOT NULL
+          OR j.ust_satz_25a IS NOT NULL
+        )
+    )
+    OR coalesce((SELECT SUM(j.soll) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id), 0) <> NEW.calculated_amount
+    OR coalesce((SELECT SUM(j.haben) FROM journal j
+        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id), 0) <> NEW.calculated_amount
+    OR NOT EXISTS (
+      SELECT 1 FROM journal j
+      WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+        AND j.mileage_role_snapshot = 'travel_expense'
+        AND j.gruppe_id = j.id
+        AND j.soll = NEW.calculated_amount
+        AND j.haben = 0
+        AND j.betrag = NEW.calculated_amount
+        AND j.soll_konto_id = j.konto_id
+        AND j.haben_konto_id IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM journal j
+      WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id
+        AND j.mileage_role_snapshot = 'private_contribution'
+        AND j.gruppe_id = (SELECT e.id FROM journal e
+          WHERE e.source_kind = 'mileage_trip' AND e.source_id = NEW.id
+            AND e.mileage_role_snapshot = 'travel_expense')
+        AND j.soll = 0
+        AND j.haben = NEW.calculated_amount
+        AND j.betrag = -NEW.calculated_amount
+        AND j.soll_konto_id IS NULL
+        AND j.haben_konto_id = j.konto_id
+    )
   )
 BEGIN
-  SELECT RAISE(ABORT, 'posting must preserve the calculated mileage snapshot');
+  SELECT RAISE(ABORT, 'mileage posting requires an open period and one valid balanced two-leg source group');
 END
 ''',
   '''
@@ -2367,10 +2783,12 @@ BEGIN
   SELECT RAISE(ABORT, 'mileage correction must start as a draft for a posted trip');
 END
 ''',
+  // Correction remains fail-closed until the accounting reversal/replacement service is wired.
   '''
 CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_update_guard
 BEFORE UPDATE ON mileage_trip_corrections
 WHEN OLD.state <> 'draft'
+  OR NEW.state = 'applied'
   OR NEW.id IS NOT OLD.id
   OR NEW.created_at IS NOT OLD.created_at
   OR (NEW.state = 'draft' AND (NEW.accounting_correction_id IS NOT NULL OR NEW.applied_at IS NOT NULL))
