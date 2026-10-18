@@ -114,3 +114,8 @@
 - [x] 8.4 Remove dashboard monthly profit derivation and keep monthly trend data limited to its supported income and expense fields.
 - [x] 8.5 Refactor and verify dashboard implementation with focused FVM tests and static analysis.
 - [x] 8.6 Refresh the dashboard coverage ledger and verification evidence without changing proposal, design, or delta specifications.
+
+## 9. Dashboard maintained-spec synchronization and review
+
+- [x] 9.1 Sync the accepted dashboard delta into `openspec/specs/dashboard/spec.md`, preserve unrelated maintained requirements, keep the delta unchanged, verify a repeat sync makes no further requirement changes, and pass strict change/spec validation plus `git diff --check`.
+- [ ] 9.2 Obtain an independent semantic review of the synchronized maintained dashboard contract and record its exact-revision verdict before archive.
