@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -12,8 +13,7 @@ import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 /// validation alone and never without generation succeeding first.
 enum EInvoiceReadiness { notValidated, valid, invalid, unavailable }
 
-/// Staged ZUGFeRD output pair. CII XML remains separate from PDF bytes; this
-/// is not a compliant hybrid PDF container.
+/// Structurally checked ZUGFeRD hybrid PDF and its exact embedded CII XML.
 class ZugferdHybridArtifact {
   const ZugferdHybridArtifact({required this.pdfBytes, required this.ciiXml, required this.documentNumber});
 
@@ -83,11 +83,11 @@ class EInvoiceService {
     return validator.validate(snapshot, format);
   }
 
-  /// Builds the staged PDF/XML pair from one canonical snapshot.
+  /// Validates a generated hybrid against one canonical snapshot.
   ///
-  /// Both outputs consume [snapshot]; callers must pass the same immutable
-  /// instance they persist. CII XML passes the pinned offline profile before
-  /// this returns. This does not embed XML or prove PDF/A-3b conformance.
+  /// The CII passes the pinned offline XML profile, and the PDF must contain
+  /// that exact XML payload and the expected Factur-X/PDF-A metadata. These
+  /// structural checks do not establish formal PDF/A-3b conformance.
   Future<ZugferdHybridArtifact> hybridFromPdf({
     required FinalizationSnapshot snapshot,
     required List<int> pdfBytes,
@@ -97,9 +97,9 @@ class EInvoiceService {
       throw EInvoiceExportValidationException(result);
     }
     final String xml = serializer.zugferdCii(snapshot);
-    _requirePdfStructure(pdfBytes);
     _requireXmlStructure(xml, 'rsm:CrossIndustryInvoice');
     await _requireOfflineXmlValidation(format: EInvoiceOutputFormat.zugferd, xml: xml);
+    _requirePdfStructure(pdfBytes, expectedCiiXml: xml);
     return ZugferdHybridArtifact(
       pdfBytes: List<int>.unmodifiable(pdfBytes),
       ciiXml: xml,
@@ -197,27 +197,50 @@ class EInvoiceService {
     };
   }
 
-  // Minimal structural guards for the packaged artifacts. Full PDF/A-3b
-  // conformance and embedded-file relationship checks run in release
-  // verification with the pinned offline validator; these guards only reject
-  // truncated or non-PDF input before it can be stored as a hybrid.
-  void _requirePdfStructure(List<int> pdfBytes) {
+  // The structural checks reject non-hybrid artifacts before they can be stored.
+  // Formal PDF/A-3b conformance still requires the pinned veraPDF validation path.
+  void _requirePdfStructure(List<int> pdfBytes, {required String expectedCiiXml}) {
+    const EInvoiceSourceException invalidArtifact = EInvoiceSourceException(
+      code: 'invalidPdfArtifact',
+      messageDe: 'PDF-Artefakt entspricht nicht dem erwarteten ZUGFeRD-Profil',
+      messageEn: 'PDF artifact does not match the expected ZUGFeRD profile',
+      fields: ['original_pdf_pfad'],
+    );
     if (pdfBytes.length < 8) {
-      throw const EInvoiceSourceException(
-        code: 'invalidPdfArtifact',
-        messageDe: 'PDF-Artefakt ist unvollständig',
-        messageEn: 'PDF artifact is incomplete',
-        fields: ['original_pdf_pfad'],
-      );
+      throw invalidArtifact;
     }
-    final String header = String.fromCharCodes(pdfBytes.take(5));
-    if (!header.startsWith('%PDF-')) {
-      throw const EInvoiceSourceException(
-        code: 'invalidPdfArtifact',
-        messageDe: 'PDF-Artefakt hat keinen gültigen PDF-Kopf',
-        messageEn: 'PDF artifact has no valid PDF header',
-        fields: ['original_pdf_pfad'],
-      );
+    final String structure = latin1.decode(pdfBytes);
+    if (!structure.startsWith('%PDF-')) {
+      throw invalidArtifact;
+    }
+    const List<String> requiredMarkers = <String>[
+      '/EmbeddedFiles',
+      '/AFRelationship/Alternative',
+      'factur-x.xml',
+      '<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>',
+      '<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>',
+      '<pdfaid:part>3</pdfaid:part>',
+      '<pdfaid:conformance>B</pdfaid:conformance>',
+      '/DestOutputProfile',
+    ];
+    if (requiredMarkers.any((String marker) => !structure.contains(marker))) {
+      throw invalidArtifact;
+    }
+
+    final String expectedPayload = latin1.decode(utf8.encode(expectedCiiXml));
+    final int payloadStart = structure.indexOf(expectedPayload);
+    if (payloadStart < 0 || structure.indexOf(expectedPayload, payloadStart + expectedPayload.length) >= 0) {
+      throw invalidArtifact;
+    }
+
+    final String prefix = structure.substring(0, payloadStart);
+    final int paramsStart = prefix.lastIndexOf('/Params');
+    if (paramsStart < 0) {
+      throw invalidArtifact;
+    }
+    final RegExpMatch? sizeMatch = RegExp(r'/Params\s*<<\s*/Size\s+(\d+)').firstMatch(prefix.substring(paramsStart));
+    if (sizeMatch == null || int.tryParse(sizeMatch.group(1) ?? '') != expectedPayload.length) {
+      throw invalidArtifact;
     }
   }
 

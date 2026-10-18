@@ -48,28 +48,27 @@ class RechnungenDataSource {
     required PdfDocumentSnapshot snapshot,
     required String locale,
     String? zugferdCiiXml,
+    Uint8List? pdfBytes,
   }) async {
-    final Uint8List pdfBytes = await const PdfGenerator().generate(
-      snapshot,
-      locale: locale,
-      zugferdCiiXml: zugferdCiiXml,
-    );
+    final Uint8List artifactBytes =
+        pdfBytes ?? await const PdfGenerator().generate(snapshot, locale: locale, zugferdCiiXml: zugferdCiiXml);
     final File expectedFile = File('${documentsDir.path}/$documentId.pdf');
     File? committedFile;
     try {
-      committedFile = await correctionArtifactWriter.commitFinalizedArtifact(
+      final File persistedFile = await correctionArtifactWriter.commitFinalizedArtifact(
         documentsDir: documentsDir,
         documentId: documentId,
-        pdfBytes: pdfBytes,
+        pdfBytes: artifactBytes,
       );
-      if (committedFile.absolute.path != expectedFile.absolute.path) {
-        throw FileSystemException('PDF wurde am unerwarteten Pfad gespeichert', committedFile.path);
+      committedFile = persistedFile;
+      if (persistedFile.absolute.path != expectedFile.absolute.path) {
+        throw FileSystemException('PDF wurde am unerwarteten Pfad gespeichert', persistedFile.path);
       }
-      final String? artifactError = correctionArtifactWriter.transaction.checkCommitted(committedFile.path);
+      final String? artifactError = correctionArtifactWriter.transaction.checkCommitted(persistedFile.path);
       if (artifactError != null) {
-        throw FileSystemException(artifactError, committedFile.path);
+        throw FileSystemException(artifactError, persistedFile.path);
       }
-      return committedFile;
+      return persistedFile;
     } catch (_) {
       if (committedFile?.absolute.path == expectedFile.absolute.path) {
         _removeCommittedCorrectionArtifact(committedFile);
@@ -644,8 +643,53 @@ WHERE id = ?
           (!isOutgoingInvoice || typ.trim().toLowerCase() != 'rechnung')) {
         throw StateError('Strukturierte E-Rechnung nur für gewöhnliche Ausgangsrechnungen zulässig');
       }
+      const List<String> eInvoiceEvidenceColumns = <String>[
+        'tax_treatment',
+        'tax_legal_basis',
+        'e_invoice_tax_category_code',
+        'e_invoice_exemption_reason_code',
+        'e_invoice_exemption_reason_text',
+        'e_invoice_intra_community_destination_country_iso',
+        'e_invoice_intra_community_supply_evidence_source_ref',
+        'e_invoice_reverse_charge_supplier_establishment_country_iso',
+        'e_invoice_reverse_charge_supplier_establishment_basis',
+        'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+        'e_invoice_reverse_charge_recipient_status',
+        'e_invoice_reverse_charge_recipient_establishment_country_iso',
+        'e_invoice_reverse_charge_service_kind',
+        'e_invoice_reverse_charge_place_of_supply_basis',
+        'e_invoice_reverse_charge_place_of_supply_country_iso',
+        'e_invoice_reverse_charge_taxability',
+        'e_invoice_reverse_charge_evidence_source_ref',
+        'e_invoice_reverse_charge_recipient_13b5_basis',
+        'e_invoice_reverse_charge_ust1tg_certificate_ref',
+        'e_invoice_reverse_charge_ust1tg_scope',
+        'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+        'e_invoice_reverse_charge_ust1tg_issued_on',
+        'e_invoice_reverse_charge_ust1tg_valid_through',
+      ];
+      final List<Map<String, Object?>> positionSchema = await transaction.runSelect(
+        'PRAGMA table_info(rechnungspositionen)',
+        const <Object?>[],
+      );
+      final Set<String> availablePositionColumns = <String>{
+        for (final Map<String, Object?> column in positionSchema) column['name']?.toString() ?? '',
+      };
+      final List<String> selectedPositionColumns = <String>[
+        'artikel_id',
+        'bezeichnung',
+        'menge',
+        'einzelpreis',
+        'gesamt',
+        'ust_satz',
+        'rabatt_prozent',
+        'position',
+        for (final String column in eInvoiceEvidenceColumns)
+          if (availablePositionColumns.contains(column)) column,
+      ];
       final posRows = await transaction.runSelect(
-        '''\nSELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, rabatt_prozent, position\nFROM rechnungspositionen\nWHERE rechnung_id = ?\nORDER BY position, id\n''',
+        'SELECT ${selectedPositionColumns.join(', ')} FROM rechnungspositionen WHERE rechnung_id = ? '
+        'ORDER BY position, id',
         <Object?>[rechnungId],
       );
       final positionen = posRows
@@ -830,7 +874,8 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         }
       }
 
-      // Render from the transaction-captured immutable snapshot and commit the PDF before the row.
+      // Generate from the transaction-captured immutable snapshot. A selected ZUGFeRD
+      // artifact is structurally and semantically validated before any file is committed.
       final PdfDocumentSnapshot snapshot = await _buildPdfSnapshot(
         transaction: transaction,
         invoice: invoice,
@@ -842,20 +887,37 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         eingabemodus: eingabemodus,
         companyRows: companyRows,
       );
+      final Uint8List generatedPdfBytes = await const PdfGenerator().generate(
+        snapshot,
+        locale: locale,
+        zugferdCiiXml: zugferdCiiXml,
+      );
+      Uint8List finalizedPdfBytes = generatedPdfBytes;
+      String? finalizedCiiXml;
+      if (selectedFormat == EInvoiceOutputFormat.zugferd) {
+        final FinalizationSnapshot validatedSnapshot =
+            eSnapshot ?? (throw StateError('ZUGFeRD-Ausgabe erfordert einen unveränderlichen Rechnungssnapshot'));
+        final ZugferdHybridArtifact validatedArtifact = await eInvoiceService.hybridFromPdf(
+          snapshot: validatedSnapshot,
+          pdfBytes: generatedPdfBytes,
+        );
+        if (validatedArtifact.ciiXml != zugferdCiiXml) {
+          throw StateError('Validiertes CII stimmt nicht mit dem finalisierten Rechnungssnapshot überein');
+        }
+        finalizedPdfBytes = Uint8List.fromList(validatedArtifact.pdfBytes);
+        finalizedCiiXml = validatedArtifact.ciiXml;
+      }
       final Directory pdfDir = _finalizedDocumentsDirectory(profileDirOverride: profileDirOverride);
       createdPdfFile = await _writeFinalizedDocumentArtifact(
         documentsDir: pdfDir,
         documentId: rechnungId,
         snapshot: snapshot,
         locale: locale,
-        zugferdCiiXml: zugferdCiiXml,
+        pdfBytes: finalizedPdfBytes,
       );
-      if (zugferdCiiXml != null) {
-        createdXmlFile = await _writeZugferdXmlArtifact(
-          documentsDir: pdfDir,
-          documentId: rechnungId,
-          ciiXml: zugferdCiiXml,
-        );
+      final String? ciiXml = finalizedCiiXml;
+      if (ciiXml != null) {
+        createdXmlFile = await _writeZugferdXmlArtifact(documentsDir: pdfDir, documentId: rechnungId, ciiXml: ciiXml);
       }
       final String pdfPath = createdPdfFile.path;
       final String? kundeSnapshotJson = await _kundeSnapshotJson(transaction, invoice);

@@ -9,6 +9,7 @@ import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/documents/artifact_transaction.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/features/pdf/pdf_generator.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
@@ -47,6 +48,45 @@ int _declaredCiiSize(Uint8List pdfBytes, String ciiXml) {
   final RegExpMatch? match = RegExp(r'/Params\s*<<\s*/Size\s+(\d+)').firstMatch(prefix.substring(paramsStart));
   if (match == null) throw StateError('Embedded CII size value was not found');
   return int.parse(match.group(1)!);
+}
+
+Future<void> _ensureV28TaxEvidenceColumns(AppDatabase db) async {
+  const List<String> columns = <String>[
+    'tax_treatment',
+    'tax_legal_basis',
+    'e_invoice_tax_category_code',
+    'e_invoice_exemption_reason_code',
+    'e_invoice_exemption_reason_text',
+    'e_invoice_intra_community_destination_country_iso',
+    'e_invoice_intra_community_supply_evidence_source_ref',
+  ];
+  final List<Map<String, Object?>> schema = await db.executor.runSelect(
+    'PRAGMA table_info(rechnungspositionen)',
+    const <Object?>[],
+  );
+  final Set<String> existing = <String>{
+    for (final Map<String, Object?> column in schema) column['name']?.toString() ?? '',
+  };
+  for (final String column in columns) {
+    if (existing.contains(column)) continue;
+    await db.executor.runCustom('ALTER TABLE rechnungspositionen ADD COLUMN $column TEXT');
+  }
+}
+
+class _RecordingHybridInvoiceService extends EInvoiceService {
+  _RecordingHybridInvoiceService()
+    : super(bundle: eInvoiceTestService.bundle, offlineXmlValidation: eInvoiceTestOfflineXmlValidation);
+
+  int hybridValidationCalls = 0;
+
+  @override
+  Future<ZugferdHybridArtifact> hybridFromPdf({
+    required FinalizationSnapshot snapshot,
+    required List<int> pdfBytes,
+  }) async {
+    hybridValidationCalls++;
+    return super.hybridFromPdf(snapshot: snapshot, pdfBytes: pdfBytes);
+  }
 }
 
 void main() {
@@ -406,6 +446,15 @@ void main() {
     test('stores_validated_hybrid_pdf_and_references_artifact', () async {
       final int customerId = await addEInvoiceCustomer(db);
       final int invoiceId = await createEInvoiceDraft(ds, kundeId: customerId);
+      await _ensureV28TaxEvidenceColumns(db);
+      await db.executor.runUpdate(
+        'UPDATE rechnungspositionen SET tax_treatment = ?, tax_legal_basis = ?, e_invoice_tax_category_code = ? '
+        'WHERE rechnung_id = ?',
+        <Object?>['standard_19', 'ustg_12_1', 'S', invoiceId],
+      );
+      final _RecordingHybridInvoiceService recordingService = _RecordingHybridInvoiceService();
+      ds = RechnungenDataSource(db.executor, eInvoiceService: recordingService);
+
       await ds.finalizeRechnung(
         rechnungId: invoiceId,
         locale: 'de_DE',
@@ -413,12 +462,28 @@ void main() {
         ausgabeformat: 'zugferd',
       );
 
+      expect(recordingService.hybridValidationCalls, 1, reason: 'ZUGFeRD finalization must validate its generated PDF');
+
       final Map<String, Object?> row = await eInvoiceRow(db, invoiceId);
       final String pdfPath = row['original_pdf_pfad']! as String;
-      expect(pdfPath.endsWith('$invoiceId.pdf'), isTrue);
+      expect(pdfPath, '${profileDir.path}/pdfs/documents/$invoiceId.pdf');
       expect(File(pdfPath).existsSync(), isTrue);
+      final Uint8List pdfBytes = await File(pdfPath).readAsBytes();
+      final String pdfStructure = latin1.decode(pdfBytes);
       final String xml = File('${profileDir.path}/pdfs/documents/$invoiceId.zugferd.xml').readAsStringSync();
+
+      expect(_extractCiiPayload(pdfBytes, xml), utf8.encode(xml));
+      expect(_declaredCiiSize(pdfBytes, xml), utf8.encode(xml).length);
+      expect(pdfStructure, contains('/EmbeddedFiles'));
+      expect(pdfStructure, contains('/AFRelationship/Alternative'));
+      expect(pdfStructure, contains('factur-x.xml'));
+      expect(pdfStructure, contains('<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>'));
+      expect(pdfStructure, contains('<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>'));
+      expect(pdfStructure, contains('<pdfaid:part>3</pdfaid:part>'));
+      expect(pdfStructure, contains('<pdfaid:conformance>B</pdfaid:conformance>'));
+      expect(pdfStructure, contains('/DestOutputProfile'));
       expect(xml.contains('<ram:TaxTotalAmount currencyID="EUR">38.00</ram:TaxTotalAmount>'), isTrue);
+      expect(xml.contains(row['rechnungsnummer']! as String), isTrue);
     });
 
     test('explicit_non_zugferd_choice_generates_non_hybrid_pdf', () async {
