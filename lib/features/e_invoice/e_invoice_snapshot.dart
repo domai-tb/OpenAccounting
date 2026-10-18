@@ -34,6 +34,7 @@ class EInvoicePartySnapshot {
     this.country,
     this.taxNumber,
     this.vatId,
+    this.taxRepresentativeVatId,
     this.email,
     this.iban,
     this.endpointId,
@@ -48,6 +49,7 @@ class EInvoicePartySnapshot {
   final String? country;
   final String? taxNumber;
   final String? vatId;
+  final String? taxRepresentativeVatId;
   final String? email;
 
   /// Company IBAN for XRechnung payment means (BG-16/BG-17), or null when
@@ -108,11 +110,13 @@ class FinalizationSnapshot {
     required this.seller,
     required this.buyer,
     required this.lines,
+    required this.taxBreakdowns,
     required this.netCents,
     required this.taxCents,
     required this.grossCents,
     this.buyerReference,
     this.deliveryDate,
+    this.invoiceNotes = const <String>[],
   });
 
   final String documentNumber;
@@ -127,6 +131,8 @@ class FinalizationSnapshot {
   final EInvoicePartySnapshot seller;
   final EInvoicePartySnapshot buyer;
   final List<EInvoiceLineSnapshot> lines;
+  final List<EInvoiceTaxBreakdownSnapshot> taxBreakdowns;
+  final List<String> invoiceNotes;
   final int netCents;
   final int taxCents;
   final int grossCents;
@@ -152,6 +158,20 @@ class EInvoiceCanonicalTotals {
   final int grossCents;
 }
 
+class EInvoiceTaxBreakdownSnapshot {
+  const EInvoiceTaxBreakdownSnapshot({
+    required this.taxRateHundredths,
+    required this.classification,
+    required this.netCents,
+    required this.taxCents,
+  });
+
+  final int taxRateHundredths;
+  final EInvoiceLineClassification classification;
+  final int netCents;
+  final int taxCents;
+}
+
 /// Builds [FinalizationSnapshot] values from transaction-captured rows.
 ///
 /// Canonical totals come from the accepted money calculator result passed in
@@ -160,6 +180,36 @@ class EInvoiceCanonicalTotals {
 /// build fails. Nothing here replaces the calculator: a mismatch throws.
 class EInvoiceSnapshotBuilder {
   const EInvoiceSnapshotBuilder();
+
+  static const Set<String> _euMemberCountryCodes = <String>{
+    'AT',
+    'BE',
+    'BG',
+    'CY',
+    'CZ',
+    'DE',
+    'DK',
+    'EE',
+    'ES',
+    'FI',
+    'FR',
+    'GR',
+    'HR',
+    'HU',
+    'IE',
+    'IT',
+    'LT',
+    'LU',
+    'LV',
+    'MT',
+    'NL',
+    'PL',
+    'PT',
+    'RO',
+    'SE',
+    'SI',
+    'SK',
+  };
 
   FinalizationSnapshot buildFinalization({
     required String documentNumber,
@@ -193,13 +243,30 @@ class EInvoiceSnapshotBuilder {
     }
     final List<_PreDiscountLine> prepared = <_PreDiscountLine>[];
     for (var index = 0; index < posRows.length; index++) {
-      prepared.add(_prepareLine(posRows[index], index: index, eingabemodus: eingabemodus));
+      prepared.add(
+        _prepareLine(
+          posRows[index],
+          index: index,
+          eingabemodus: eingabemodus,
+          sellerHasTaxRegistration:
+              _text(companyRow['ust_idnr']) != null ||
+              _text(companyRow['ust_id']) != null ||
+              _text(companyRow['steuernummer']) != null ||
+              _text(companyRow['tax_representative_vat_id']) != null,
+        ),
+      );
     }
     final List<EInvoiceLineSnapshot> lines = _applyDocumentDiscount(
       prepared,
       eingabemodus: eingabemodus,
       documentDiscountPercent: documentDiscountPercent,
       documentDiscountAmount: documentDiscountAmount,
+    );
+    _validateCrossBorderEvidence(
+      lines: lines,
+      companyRow: companyRow,
+      customerRow: customerRow,
+      deliveryDate: deliveryDate,
     );
     var netSum = 0;
     var taxSum = 0;
@@ -225,6 +292,11 @@ class EInvoiceSnapshotBuilder {
       seller: _sellerFromCompany(companyRow),
       buyer: _buyerFromCustomer(customerRow, buyerReference: buyerReference),
       lines: List<EInvoiceLineSnapshot>.unmodifiable(lines),
+      taxBreakdowns: _buildTaxBreakdowns(lines),
+      invoiceNotes: List<String>.unmodifiable(<String>{
+        for (final EInvoiceLineSnapshot line in lines)
+          if (line.classification.invoiceNote != null) line.classification.invoiceNote!,
+      }),
       netCents: preview.netCents,
       taxCents: preview.taxCents,
       grossCents: preview.grossCents,
@@ -233,7 +305,12 @@ class EInvoiceSnapshotBuilder {
     );
   }
 
-  _PreDiscountLine _prepareLine(Map<String, Object?> row, {required int index, required String eingabemodus}) {
+  _PreDiscountLine _prepareLine(
+    Map<String, Object?> row, {
+    required int index,
+    required String eingabemodus,
+    required bool sellerHasTaxRegistration,
+  }) {
     final String description = row['bezeichnung']?.toString().trim() ?? '';
     if (description.isEmpty) {
       throw EInvoiceSourceException(
@@ -255,13 +332,22 @@ class EInvoiceSnapshotBuilder {
         fields: ['position[$index].ustSatz'],
       );
     }
-    final EInvoiceLineClassification? classification = ApprovedTaxClassification.resolve(ustSatz);
+    final EInvoiceTaxClassificationResult taxClassification = ApprovedTaxClassification.resolve(
+      treatmentCode: row['tax_treatment']?.toString(),
+      legalBasisCode: row['tax_legal_basis']?.toString(),
+      categoryCode: row['e_invoice_tax_category_code']?.toString(),
+      exemptionReasonCode: row['e_invoice_exemption_reason_code']?.toString(),
+      exemptionReasonText: row['e_invoice_exemption_reason_text']?.toString(),
+      taxRateHundredths: rateHundredths,
+      sellerHasTaxRegistration: sellerHasTaxRegistration,
+    );
+    final EInvoiceLineClassification? classification = taxClassification.classification;
     if (classification == null) {
       throw EInvoiceSourceException(
         code: 'unresolvedTaxClassification',
-        messageDe: 'Position ${index + 1}: keine freigegebene Steuerklassifizierung für $ustSatz %',
-        messageEn: 'Line ${index + 1}: no approved tax classification for $ustSatz %',
-        fields: ['position[$index].ustSatz'],
+        messageDe: 'Position ${index + 1}: Steuerklassifizierung fehlt oder ist nicht freigegeben',
+        messageEn: 'Line ${index + 1}: tax classification is missing or unsupported',
+        fields: <String>[for (final String field in taxClassification.fieldDiagnostics) 'position[$index].$field'],
       );
     }
     // Canonical per-line split with the accepted money scales and half-up
@@ -310,6 +396,71 @@ class EInvoiceSnapshotBuilder {
       taxRateHundredths: rateHundredths,
       classification: classification,
     );
+  }
+
+  void _validateCrossBorderEvidence({
+    required List<EInvoiceLineSnapshot> lines,
+    required Map<String, Object?> companyRow,
+    required Map<String, Object?> customerRow,
+    required String? deliveryDate,
+  }) {
+    final bool intraCommunity = lines.any(
+      (EInvoiceLineSnapshot line) => line.classification.treatment == EInvoiceTaxTreatment.intraCommunitySupply6a,
+    );
+    final bool export = lines.any(
+      (EInvoiceLineSnapshot line) => line.classification.treatment == EInvoiceTaxTreatment.exportSupply6,
+    );
+    if (!intraCommunity && !export) return;
+
+    final List<String> fields = <String>[];
+    for (var index = 0; index < lines.length; index++) {
+      final EInvoiceTaxTreatment treatment = lines[index].classification.treatment;
+      if (intraCommunity && treatment != EInvoiceTaxTreatment.intraCommunitySupply6a) {
+        fields.add('position[$index].tax_treatment');
+      }
+      if (export && treatment != EInvoiceTaxTreatment.exportSupply6) {
+        fields.add('position[$index].tax_treatment');
+      }
+    }
+
+    final String? sellerCountry = _text(companyRow['land'])?.toUpperCase();
+    final String? buyerCountry = _text(customerRow['land'])?.toUpperCase();
+    if (sellerCountry != 'DE') fields.add('unternehmen.land');
+    if (buyerCountry == null || !RegExp(r'^[A-Z]{2}$').hasMatch(buyerCountry)) {
+      fields.add('kunden.land');
+    }
+
+    if (intraCommunity) {
+      if (_text(companyRow['ust_idnr']) == null && _text(companyRow['ust_id']) == null) {
+        fields.add('unternehmen.ust_idnr');
+      }
+      if (_text(customerRow['ust_idnr']) == null) fields.add('kunden.ust_idnr');
+      if (deliveryDate?.trim().isNotEmpty != true) fields.add('leistungsdatum');
+      if (buyerCountry == null || !_euMemberCountryCodes.contains(buyerCountry) || buyerCountry == 'DE') {
+        fields.add('kunden.land');
+      }
+    }
+
+    if (export) {
+      if (_text(companyRow['ust_idnr']) == null &&
+          _text(companyRow['ust_id']) == null &&
+          _text(companyRow['steuernummer']) == null &&
+          _text(companyRow['tax_representative_vat_id']) == null) {
+        fields.add('unternehmen.ust_idnr');
+      }
+      if (buyerCountry != null && _euMemberCountryCodes.contains(buyerCountry)) {
+        fields.add('kunden.land');
+      }
+    }
+
+    if (fields.isNotEmpty) {
+      throw EInvoiceSourceException(
+        code: 'incompleteCrossBorderTaxEvidence',
+        messageDe: 'Steuerangaben für die grenzüberschreitende Lieferung sind unvollständig oder widersprüchlich',
+        messageEn: 'Cross-border tax evidence is incomplete or contradictory',
+        fields: List<String>.unmodifiable(fields.toSet()),
+      );
+    }
   }
 
   /// Distributes an optional document discount across lines with the
@@ -443,6 +594,34 @@ class EInvoiceSnapshotBuilder {
     return List<EInvoiceLineSnapshot>.unmodifiable(lines);
   }
 
+  List<EInvoiceTaxBreakdownSnapshot> _buildTaxBreakdowns(List<EInvoiceLineSnapshot> lines) {
+    final Map<String, EInvoiceTaxBreakdownSnapshot> groups = <String, EInvoiceTaxBreakdownSnapshot>{};
+    for (final EInvoiceLineSnapshot line in lines) {
+      final EInvoiceLineClassification classification = line.classification;
+      final String key = <String>[
+        line.taxRateHundredths.toString(),
+        classification.treatment.code,
+        classification.legalBasis.code,
+        classification.category.code,
+        classification.exemptionReasonCode ?? '',
+        classification.exemptionReason ?? '',
+      ].join('|');
+      final EInvoiceTaxBreakdownSnapshot? existing = groups[key];
+      groups[key] = EInvoiceTaxBreakdownSnapshot(
+        taxRateHundredths: line.taxRateHundredths,
+        classification: classification,
+        netCents: (existing?.netCents ?? 0) + line.netCents,
+        taxCents: (existing?.taxCents ?? 0) + line.taxCents,
+      );
+    }
+    final List<EInvoiceTaxBreakdownSnapshot> sorted = groups.values.toList(growable: false)
+      ..sort((EInvoiceTaxBreakdownSnapshot a, EInvoiceTaxBreakdownSnapshot b) {
+        final int categoryOrder = a.classification.category.code.compareTo(b.classification.category.code);
+        return categoryOrder != 0 ? categoryOrder : a.taxRateHundredths.compareTo(b.taxRateHundredths);
+      });
+    return List<EInvoiceTaxBreakdownSnapshot>.unmodifiable(sorted);
+  }
+
   EInvoicePartySnapshot _sellerFromCompany(Map<String, Object?> row) {
     final String? street = row['strasse']?.toString().trim().isEmpty ?? true
         ? null
@@ -459,6 +638,7 @@ class EInvoiceSnapshotBuilder {
       country: _text(row['land']),
       taxNumber: _text(row['steuernummer']),
       vatId: vatId,
+      taxRepresentativeVatId: _text(row['tax_representative_vat_id']),
       email: _text(row['email']),
       iban: _text(row['iban']),
       endpointId: vatId,

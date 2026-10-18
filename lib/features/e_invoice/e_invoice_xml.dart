@@ -29,6 +29,9 @@ class EInvoiceXmlSerializer {
     xml.writeln(
       '    <ram:IssueDateTime><udt:DateTimeString format="102">${_basicDate(snapshot.issueDate)}</udt:DateTimeString></ram:IssueDateTime>',
     );
+    for (final String note in snapshot.invoiceNotes) {
+      xml.writeln('    <ram:IncludedNote><ram:Content>${_escape(note)}</ram:Content></ram:IncludedNote>');
+    }
     xml.writeln('  </rsm:ExchangedDocument>');
     xml.writeln('  <rsm:SupplyChainTradeTransaction>');
     for (final EInvoiceLineSnapshot line in snapshot.lines) {
@@ -41,16 +44,23 @@ class EInvoiceXmlSerializer {
     xml.writeln('    <ram:ApplicableHeaderTradeDelivery/>');
     xml.writeln('    <ram:ApplicableHeaderTradeSettlement>');
     xml.writeln('      <ram:InvoiceCurrencyCode>${snapshot.currency}</ram:InvoiceCurrencyCode>');
-    for (final _TaxGroup group in _groupByRate(snapshot)) {
+    for (final EInvoiceTaxBreakdownSnapshot group in snapshot.taxBreakdowns) {
       xml.writeln('      <ram:ApplicableTradeTax>');
       xml.writeln('        <ram:CalculatedAmount>${_cents(group.taxCents)}</ram:CalculatedAmount>');
       xml.writeln('        <ram:TypeCode>VAT</ram:TypeCode>');
-      if (group.exemptionReason != null && group.exemptionReason!.isNotEmpty) {
-        xml.writeln('        <ram:ExemptionReason>${_escape(group.exemptionReason!)}</ram:ExemptionReason>');
+      final String? exemptionCode = group.classification.exemptionReasonCode;
+      if (exemptionCode != null && exemptionCode.isNotEmpty) {
+        xml.writeln('        <ram:ExemptionReasonCode>${_escape(exemptionCode)}</ram:ExemptionReasonCode>');
+      }
+      final String? exemptionReason = group.classification.exemptionReason;
+      if (exemptionReason != null && exemptionReason.isNotEmpty) {
+        xml.writeln('        <ram:ExemptionReason>${_escape(exemptionReason)}</ram:ExemptionReason>');
       }
       xml.writeln('        <ram:BasisAmount>${_cents(group.netCents)}</ram:BasisAmount>');
-      xml.writeln('        <ram:CategoryCode>${group.categoryCode}</ram:CategoryCode>');
-      xml.writeln('        <ram:RateApplicablePercent>${_rateText(group.rateHundredths)}</ram:RateApplicablePercent>');
+      xml.writeln('        <ram:CategoryCode>${group.classification.category.code}</ram:CategoryCode>');
+      xml.writeln(
+        '        <ram:RateApplicablePercent>${_rateText(group.taxRateHundredths)}</ram:RateApplicablePercent>',
+      );
       xml.writeln('      </ram:ApplicableTradeTax>');
     }
     xml.writeln('      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>');
@@ -87,6 +97,9 @@ class EInvoiceXmlSerializer {
     xml.writeln('  <cbc:ID>${_escape(snapshot.documentNumber)}</cbc:ID>');
     xml.writeln('  <cbc:IssueDate>${_escape(snapshot.issueDate)}</cbc:IssueDate>');
     xml.writeln('  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
+    for (final String note in snapshot.invoiceNotes) {
+      xml.writeln('  <cbc:Note>${_escape(note)}</cbc:Note>');
+    }
     xml.writeln('  <cbc:DocumentCurrencyCode>${snapshot.currency}</cbc:DocumentCurrencyCode>');
     xml.writeln('  <cbc:BuyerReference>${_escape(snapshot.buyerReference ?? '')}</cbc:BuyerReference>');
     final String? deliveryDate = snapshot.deliveryDate;
@@ -110,17 +123,22 @@ class EInvoiceXmlSerializer {
     }
     xml.writeln('  <cac:TaxTotal>');
     xml.writeln('    <cbc:TaxAmount currencyID="${snapshot.currency}">${_cents(snapshot.taxCents)}</cbc:TaxAmount>');
-    for (final _TaxGroup group in _groupByRate(snapshot)) {
+    for (final EInvoiceTaxBreakdownSnapshot group in snapshot.taxBreakdowns) {
       xml.writeln('    <cac:TaxSubtotal>');
       xml.writeln(
         '      <cbc:TaxableAmount currencyID="${snapshot.currency}">${_cents(group.netCents)}</cbc:TaxableAmount>',
       );
       xml.writeln('      <cbc:TaxAmount currencyID="${snapshot.currency}">${_cents(group.taxCents)}</cbc:TaxAmount>');
       xml.writeln('      <cac:TaxCategory>');
-      xml.writeln('        <cbc:ID>${group.categoryCode}</cbc:ID>');
-      xml.writeln('        <cbc:Percent>${_rateText(group.rateHundredths)}</cbc:Percent>');
-      if (group.exemptionReason != null && group.exemptionReason!.isNotEmpty) {
-        xml.writeln('        <cbc:TaxExemptionReason>${_escape(group.exemptionReason!)}</cbc:TaxExemptionReason>');
+      xml.writeln('        <cbc:ID>${group.classification.category.code}</cbc:ID>');
+      xml.writeln('        <cbc:Percent>${_rateText(group.taxRateHundredths)}</cbc:Percent>');
+      final String? exemptionCode = group.classification.exemptionReasonCode;
+      if (exemptionCode != null && exemptionCode.isNotEmpty) {
+        xml.writeln('        <cbc:TaxExemptionReasonCode>${_escape(exemptionCode)}</cbc:TaxExemptionReasonCode>');
+      }
+      final String? exemptionReason = group.classification.exemptionReason;
+      if (exemptionReason != null && exemptionReason.isNotEmpty) {
+        xml.writeln('        <cbc:TaxExemptionReason>${_escape(exemptionReason)}</cbc:TaxExemptionReason>');
       }
       xml.writeln('        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>');
       xml.writeln('      </cac:TaxCategory>');
@@ -154,6 +172,10 @@ class EInvoiceXmlSerializer {
       xml.writeln('      <cac:ClassifiedTaxCategory>');
       xml.writeln('        <cbc:ID>${line.classification.category.code}</cbc:ID>');
       xml.writeln('        <cbc:Percent>${_rateText(line.taxRateHundredths)}</cbc:Percent>');
+      final String? itemReasonCode = line.classification.exemptionReasonCode;
+      if (itemReasonCode != null && itemReasonCode.isNotEmpty) {
+        xml.writeln('        <cbc:TaxExemptionReasonCode>${_escape(itemReasonCode)}</cbc:TaxExemptionReasonCode>');
+      }
       final String? itemReason = line.classification.exemptionReason;
       if (itemReason != null && itemReason.isNotEmpty) {
         xml.writeln('        <cbc:TaxExemptionReason>${_escape(itemReason)}</cbc:TaxExemptionReason>');
@@ -196,16 +218,17 @@ class EInvoiceXmlSerializer {
       '      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="H87">${_escape(line.quantityText)}</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>',
     );
     xml.writeln('      <ram:SpecifiedLineTradeSettlement>');
+    final String? lineReasonCode = line.classification.exemptionReasonCode;
     final String? lineReason = line.classification.exemptionReason;
-    if (lineReason == null || lineReason.isEmpty) {
-      xml.writeln(
-        '        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>${line.classification.category.code}</ram:CategoryCode><ram:RateApplicablePercent>${_rateText(line.taxRateHundredths)}</ram:RateApplicablePercent></ram:ApplicableTradeTax>',
-      );
-    } else {
-      xml.writeln(
-        '        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:ExemptionReason>${_escape(lineReason)}</ram:ExemptionReason><ram:CategoryCode>${line.classification.category.code}</ram:CategoryCode><ram:RateApplicablePercent>${_rateText(line.taxRateHundredths)}</ram:RateApplicablePercent></ram:ApplicableTradeTax>',
-      );
-    }
+    final String exemptionCodeXml = lineReasonCode == null
+        ? ''
+        : '<ram:ExemptionReasonCode>${_escape(lineReasonCode)}</ram:ExemptionReasonCode>';
+    final String exemptionReasonXml = lineReason == null
+        ? ''
+        : '<ram:ExemptionReason>${_escape(lineReason)}</ram:ExemptionReason>';
+    xml.writeln(
+      '        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode>$exemptionCodeXml$exemptionReasonXml<ram:CategoryCode>${line.classification.category.code}</ram:CategoryCode><ram:RateApplicablePercent>${_rateText(line.taxRateHundredths)}</ram:RateApplicablePercent></ram:ApplicableTradeTax>',
+    );
     xml.writeln(
       '        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${_cents(line.netCents)}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>',
     );
@@ -259,31 +282,6 @@ class EInvoiceXmlSerializer {
     xml.writeln('  </cac:$tag>');
   }
 
-  List<_TaxGroup> _groupByRate(FinalizationSnapshot snapshot) {
-    final Map<String, _TaxGroup> groups = <String, _TaxGroup>{};
-    for (final EInvoiceLineSnapshot line in snapshot.lines) {
-      final String key =
-          '${line.taxRateHundredths}|${line.classification.category.code}|${line.classification.exemptionReason ?? ''}';
-      final _TaxGroup existing =
-          groups[key] ??
-          _TaxGroup(
-            rateHundredths: line.taxRateHundredths,
-            categoryCode: line.classification.category.code,
-            exemptionReason: line.classification.exemptionReason,
-          );
-      groups[key] = _TaxGroup(
-        rateHundredths: line.taxRateHundredths,
-        categoryCode: existing.categoryCode,
-        exemptionReason: existing.exemptionReason,
-        netCents: existing.netCents + line.netCents,
-        taxCents: existing.taxCents + line.taxCents,
-      );
-    }
-    final List<_TaxGroup> sorted = groups.values.toList(growable: false)
-      ..sort((a, b) => a.rateHundredths.compareTo(b.rateHundredths));
-    return sorted;
-  }
-
   String _cents(int value) {
     final bool negative = value < 0;
     final String digits = value.abs().toString().padLeft(3, '0');
@@ -305,20 +303,4 @@ class EInvoiceXmlSerializer {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&apos;');
   }
-}
-
-class _TaxGroup {
-  const _TaxGroup({
-    required this.rateHundredths,
-    required this.categoryCode,
-    this.exemptionReason,
-    this.netCents = 0,
-    this.taxCents = 0,
-  });
-
-  final int rateHundredths;
-  final String categoryCode;
-  final String? exemptionReason;
-  final int netCents;
-  final int taxCents;
 }

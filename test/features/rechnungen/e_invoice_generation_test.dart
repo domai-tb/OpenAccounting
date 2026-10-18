@@ -234,55 +234,48 @@ void main() {
 
     test('serializes_exempt_tax_category_with_statutory_reason', () {
       const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
-      const FinalizationSnapshot exempt = FinalizationSnapshot(
+      final FinalizationSnapshot exempt = const EInvoiceSnapshotBuilder().buildFinalization(
         documentNumber: 'RE-2026-0002',
         outputFormat: EInvoiceOutputFormat.xrechnung,
         issueDate: '2026-03-15',
-        currency: 'EUR',
-        seller: EInvoicePartySnapshot(
-          name: 'Muster GmbH',
-          street: 'Musterstraße 1',
-          postalCode: '10115',
-          city: 'Berlin',
-          country: 'DE',
-          taxNumber: '13/123/12345',
-        ),
-        buyer: EInvoicePartySnapshot(
-          name: 'Kunde GmbH',
-          street: 'Kundenweg 5',
-          postalCode: '20095',
-          city: 'Hamburg',
-          country: 'DE',
-        ),
-        lines: <EInvoiceLineSnapshot>[
-          EInvoiceLineSnapshot(
-            position: 0,
-            description: 'Beratung',
-            quantityText: '1',
-            unitPriceText: '100.0000',
-            unitPriceIsGross: false,
-            netCents: 10000,
-            taxCents: 0,
-            grossCents: 10000,
-            taxRateHundredths: 0,
-            classification: EInvoiceLineClassification(
-              category: EInvoiceTaxCategory.exempt,
-              exemptionReason: 'Steuerfrei nach § 19 UStG',
-            ),
-          ),
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Beratung',
+            'menge': 1,
+            'einzelpreis': 100,
+            'ust_satz': 0,
+            'tax_treatment': 'kleinunternehmer_19',
+            'tax_legal_basis': 'ustg_19',
+            'e_invoice_tax_category_code': 'E',
+            'e_invoice_exemption_reason_code': null,
+            'e_invoice_exemption_reason_text': ApprovedTaxClassification.kleinunternehmerReason,
+            'position': 0,
+          },
         ],
-        netCents: 10000,
-        taxCents: 0,
-        grossCents: 10000,
+        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+        eingabemodus: 'netto',
         buyerReference: 'LEITWEG-123',
       );
 
       final String cii = serializer.zugferdCii(exempt);
       expect(cii.contains('<ram:CategoryCode>E</ram:CategoryCode>'), isTrue);
-      expect(cii.contains('<ram:ExemptionReason>Steuerfrei nach § 19 UStG</ram:ExemptionReason>'), isTrue);
+      expect(
+        cii.contains('<ram:ExemptionReason>${ApprovedTaxClassification.kleinunternehmerReason}</ram:ExemptionReason>'),
+        isTrue,
+      );
+      expect(cii.contains('<ram:ExemptionReasonCode>'), isFalse);
+
       final String ubl = serializer.xrechnungUbl(exempt);
       expect(ubl.contains('<cbc:ID>E</cbc:ID>'), isTrue);
-      expect(ubl.contains('<cbc:TaxExemptionReason>Steuerfrei nach § 19 UStG</cbc:TaxExemptionReason>'), isTrue);
+      expect(
+        ubl.contains(
+          '<cbc:TaxExemptionReason>${ApprovedTaxClassification.kleinunternehmerReason}</cbc:TaxExemptionReason>',
+        ),
+        isTrue,
+      );
+      expect(ubl.contains('<cbc:TaxExemptionReasonCode>'), isFalse);
     });
 
     test('seller_endpoint_uses_vat_id_with_9930', () {
@@ -377,6 +370,7 @@ void main() {
         seller: base.seller,
         buyer: base.buyer,
         lines: base.lines,
+        taxBreakdowns: base.taxBreakdowns,
         netCents: base.netCents,
         taxCents: base.taxCents,
         grossCents: base.grossCents,
@@ -474,6 +468,376 @@ void main() {
       final String xml = serializer.zugferdCii(validSnapshot(format: EInvoiceOutputFormat.zugferd));
 
       expect(xml, contains('<ram:ID>urn:cen.eu:en16931:2017</ram:ID>'));
+    });
+
+    test('standard_rate_without_typed_treatment_fails_with_tax_field_diagnostic', () {
+      for (final num rate in <num>[19, 7]) {
+        final Map<String, Object?> position = <String, Object?>{
+          'bezeichnung': 'Leistung',
+          'menge': 1,
+          'einzelpreis': 100,
+          'ust_satz': rate,
+          'position': 0,
+        };
+
+        expect(
+          () => const EInvoiceSnapshotBuilder().buildFinalization(
+            documentNumber: 'RE-2026-0001',
+            outputFormat: EInvoiceOutputFormat.xrechnung,
+            issueDate: '2026-03-15',
+            companyRow: validCompany(),
+            customerRow: validCustomer(),
+            posRows: <Map<String, Object?>>[position],
+            preview: EInvoiceCanonicalTotals(
+              netCents: 10000,
+              taxCents: rate == 19 ? 1900 : 700,
+              grossCents: rate == 19 ? 11900 : 10700,
+            ),
+            eingabemodus: 'netto',
+          ),
+          throwsA(
+            predicate(
+              (Object? error) =>
+                  error is EInvoiceSourceException &&
+                  error.code == 'unresolvedTaxClassification' &&
+                  error.fields.contains('position[0].tax_treatment'),
+            ),
+          ),
+          reason: 'the tax percentage alone cannot select an EN 16931 category',
+        );
+      }
+    });
+
+    test('maps_explicit_standard_and_reduced_rates_to_s', () {
+      for (final ({String treatment, String basis, num rate, int taxCents}) value
+          in <({String treatment, String basis, num rate, int taxCents})>[
+            (treatment: 'standard_19', basis: 'ustg_12_1', rate: 19, taxCents: 1900),
+            (treatment: 'reduced_7', basis: 'ustg_12_2', rate: 7, taxCents: 700),
+          ]) {
+        final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Leistung',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': value.rate,
+              'tax_treatment': value.treatment,
+              'tax_legal_basis': value.basis,
+              'e_invoice_tax_category_code': 'S',
+              'e_invoice_exemption_reason_code': null,
+              'e_invoice_exemption_reason_text': null,
+              'position': 0,
+            },
+          ],
+          preview: EInvoiceCanonicalTotals(
+            netCents: 10000,
+            taxCents: value.taxCents,
+            grossCents: 10000 + value.taxCents,
+          ),
+          eingabemodus: 'netto',
+        );
+
+        expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.standard);
+        expect(snapshot.taxBreakdowns.single.taxCents, value.taxCents);
+      }
+    });
+
+    test('maps_taxable_zero_to_z_only_with_explicit_basis_and_seller_registration', () {
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Leistung',
+            'menge': 1,
+            'einzelpreis': 100,
+            'ust_satz': 0,
+            'tax_treatment': 'taxable_zero_12_3',
+            'tax_legal_basis': 'ustg_12_3',
+            'e_invoice_tax_category_code': 'Z',
+            'e_invoice_exemption_reason_code': null,
+            'e_invoice_exemption_reason_text': null,
+            'position': 0,
+          },
+        ],
+        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+        eingabemodus: 'netto',
+      );
+
+      expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.zeroRated);
+      expect(snapshot.lines.single.classification.exemptionReason, isNull);
+      expect(const EInvoiceXmlSerializer().xrechnungUbl(snapshot), contains('<cbc:ID>Z</cbc:ID>'));
+    });
+
+    test('tax_evidence_tuple_mismatch_fails_with_position_field_diagnostic', () {
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Leistung',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': 19,
+              'tax_treatment': 'standard_19',
+              'tax_legal_basis': 'ustg_12_2',
+              'e_invoice_tax_category_code': 'S',
+              'e_invoice_exemption_reason_code': null,
+              'e_invoice_exemption_reason_text': null,
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 1900, grossCents: 11900),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].tax_legal_basis'),
+          ),
+        ),
+      );
+    });
+
+    test('reverse_charge_fails_closed_without_persisted_eligibility_evidence', () {
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Leistung',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': 0,
+              'tax_treatment': 'reverse_charge_eu_service_13b_1',
+              'tax_legal_basis': 'ustg_3a_2_13b_1',
+              'e_invoice_tax_category_code': 'AE',
+              'e_invoice_exemption_reason_code': 'VATEX-EU-AE',
+              'e_invoice_exemption_reason_text': 'Steuerschuldnerschaft des Leistungsempfängers',
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_evidence_source_ref'),
+          ),
+        ),
+      );
+    });
+
+    test('maps_section_6a_to_k_with_vatex_and_cross_border_evidence', () {
+      final Map<String, Object?> customer = validCustomer()
+        ..['land'] = 'FR'
+        ..['ust_idnr'] = 'FR12345678901';
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: customer,
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Lieferung nach Frankreich',
+            'menge': 1,
+            'einzelpreis': 100,
+            'ust_satz': 0,
+            'tax_treatment': 'intra_community_supply_6a',
+            'tax_legal_basis': 'ustg_4_1b_6a',
+            'e_invoice_tax_category_code': 'K',
+            'e_invoice_exemption_reason_code': 'VATEX-EU-IC',
+            'e_invoice_exemption_reason_text': 'Steuerfreie innergemeinschaftliche Lieferung',
+            'position': 0,
+          },
+        ],
+        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+        eingabemodus: 'netto',
+        deliveryDate: '2026-03-10',
+      );
+
+      expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.intraCommunitySupply);
+      expect(snapshot.taxBreakdowns.single.classification.exemptionReasonCode, 'VATEX-EU-IC');
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+      expect(ubl, contains('<cbc:ID>K</cbc:ID>'));
+      expect(ubl, contains('<cbc:TaxExemptionReasonCode>VATEX-EU-IC</cbc:TaxExemptionReasonCode>'));
+      expect(cii, contains('<ram:CategoryCode>K</ram:CategoryCode>'));
+      expect(cii, contains('<ram:ExemptionReasonCode>VATEX-EU-IC</ram:ExemptionReasonCode>'));
+    });
+
+    test('section_6a_requires_party_vat_ids_and_delivery_date', () {
+      final Map<String, Object?> customer = validCustomer()..['land'] = 'FR';
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: customer,
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Lieferung nach Frankreich',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': 0,
+              'tax_treatment': 'intra_community_supply_6a',
+              'tax_legal_basis': 'ustg_4_1b_6a',
+              'e_invoice_tax_category_code': 'K',
+              'e_invoice_exemption_reason_code': 'VATEX-EU-IC',
+              'e_invoice_exemption_reason_text': 'Steuerfreie innergemeinschaftliche Lieferung',
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'incompleteCrossBorderTaxEvidence' &&
+                error.fields.contains('kunden.ust_idnr') &&
+                error.fields.contains('leistungsdatum'),
+          ),
+        ),
+      );
+    });
+
+    test('maps_section_6_export_to_g_with_destination_country_evidence', () {
+      final Map<String, Object?> customer = validCustomer()..['land'] = 'US';
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: customer,
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Ausfuhrlieferung',
+            'menge': 1,
+            'einzelpreis': 100,
+            'ust_satz': 0,
+            'tax_treatment': 'export_supply_6',
+            'tax_legal_basis': 'ustg_4_1a_6',
+            'e_invoice_tax_category_code': 'G',
+            'e_invoice_exemption_reason_code': 'VATEX-EU-G',
+            'e_invoice_exemption_reason_text': null,
+            'position': 0,
+          },
+        ],
+        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+        eingabemodus: 'netto',
+      );
+
+      expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.export);
+      expect(const EInvoiceXmlSerializer().xrechnungUbl(snapshot), contains('<cbc:ID>G</cbc:ID>'));
+      expect(
+        const EInvoiceXmlSerializer().zugferdCii(snapshot),
+        contains('<ram:ExemptionReasonCode>VATEX-EU-G</ram:ExemptionReasonCode>'),
+      );
+    });
+
+    test('maps_section_25a_only_with_vatex_subtype_and_emits_required_invoice_note', () {
+      for (final (String code, String note) in <(String, String)>[
+        ('VATEX-EU-F', 'Gebrauchtgegenstände/Sonderregelung'),
+        ('VATEX-EU-I', 'Kunstgegenstände/Sonderregelung'),
+        ('VATEX-EU-J', 'Sammlungsstücke und Antiquitäten/Sonderregelung'),
+      ]) {
+        final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Differenzbesteuerter Artikel',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': 0,
+              'tax_treatment': 'margin_scheme_25a_unmapped',
+              'tax_legal_basis': 'ustg_25a',
+              'e_invoice_tax_category_code': 'E',
+              'e_invoice_exemption_reason_code': code,
+              'e_invoice_exemption_reason_text': note,
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        );
+
+        expect(snapshot.netCents, 10000);
+        expect(snapshot.taxCents, 0);
+        expect(snapshot.invoiceNotes, contains(note));
+        expect(snapshot.taxBreakdowns.single.classification.category, EInvoiceTaxCategory.exempt);
+        expect(snapshot.taxBreakdowns.single.taxCents, 0);
+        final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+        final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+        expect(ubl, contains('<cbc:Note>$note</cbc:Note>'));
+        expect(ubl, contains('<cbc:TaxExemptionReasonCode>$code</cbc:TaxExemptionReasonCode>'));
+        expect(cii, contains('<ram:IncludedNote><ram:Content>$note</ram:Content></ram:IncludedNote>'));
+        expect(cii, contains('<ram:ExemptionReasonCode>$code</ram:ExemptionReasonCode>'));
+      }
+    });
+
+    test('section_25a_without_supported_reason_code_fails_with_position_diagnostic', () {
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Differenzbesteuerter Artikel',
+              'menge': 1,
+              'einzelpreis': 100,
+              'ust_satz': 0,
+              'tax_treatment': 'margin_scheme_25a_unmapped',
+              'tax_legal_basis': 'ustg_25a',
+              'e_invoice_tax_category_code': 'E',
+              'e_invoice_exemption_reason_code': null,
+              'e_invoice_exemption_reason_text': null,
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].e_invoice_exemption_reason_code'),
+          ),
+        ),
+      );
     });
 
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {

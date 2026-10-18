@@ -1,24 +1,26 @@
 /// Approved typed tax classification for structured e-invoice output.
 ///
-/// Initial approved scope (E1 table): standard-rated lines at exactly 19.00 %
-/// or 7.00 % map to EN 16931 category `S`; legally zero-rated maps to `Z`;
-/// domestic exempt (incl. Kleinunternehmer §19 and §25a margin scheme) maps
-/// to `E` with a precise statutory reason; supplier-side reverse charge maps
-/// to `AE` with `VATEX-EU-AE`. Intra-community supplies (`K`) and exports
-/// (`G`) remain out of scope and fail closed. Extending the scope requires an
-/// explicit map entry reviewed with the owning tax capability; never add
-/// rate-only guesses here.
+/// Category selection follows an explicit persisted treatment tuple; a rate
+/// alone never selects a legal category. Cross-border and margin-scheme values
+/// are emitted only when their statutory code and required source evidence are
+/// present.
 enum EInvoiceTaxCategory {
-  /// Standard-rated sale.
+  /// Standard-rated taxable supply.
   standard('S'),
 
-  /// Legally zero-rated sale (0 %, no exemption reason).
+  /// Legally zero-rated taxable supply (0 %, no exemption reason).
   zeroRated('Z'),
 
-  /// Exempt sale (0 % with precise statutory reason text).
+  /// Exempt supply (0 % with the exact statutory reason text).
   exempt('E'),
 
-  /// Supplier-side reverse charge (0 % with VATEX reason).
+  /// Intra-community supply under UStG § 4 Nr. 1(b) with § 6a.
+  intraCommunitySupply('K'),
+
+  /// Export supply under UStG § 4 Nr. 1(a) with § 6.
+  export('G'),
+
+  /// Reverse charge (0 %, with an explicit VATEX reason code and text).
   reverseCharge('AE');
 
   const EInvoiceTaxCategory(this.code);
@@ -35,14 +37,81 @@ enum EInvoiceTaxCategory {
 }
 
 /// Explicit per-line classification consumed by serialization.
+enum EInvoiceTaxTreatment {
+  standard19('standard_19'),
+  reduced7('reduced_7'),
+  taxableZero12_3('taxable_zero_12_3'),
+  kleinunternehmer19('kleinunternehmer_19'),
+  reverseChargeEuService13b1('reverse_charge_eu_service_13b_1'),
+  reverseChargeDomesticConstruction13b2_4_5('reverse_charge_domestic_construction_13b_2_4_5'),
+  intraCommunitySupply6a('intra_community_supply_6a'),
+  exportSupply6('export_supply_6'),
+  marginScheme25aUnmapped('margin_scheme_25a_unmapped');
+
+  const EInvoiceTaxTreatment(this.code);
+
+  final String code;
+
+  static EInvoiceTaxTreatment? fromCode(String? code) {
+    for (final EInvoiceTaxTreatment treatment in EInvoiceTaxTreatment.values) {
+      if (treatment.code == code) return treatment;
+    }
+    return null;
+  }
+}
+
+enum EInvoiceTaxLegalBasis {
+  ustg12_1('ustg_12_1'),
+  ustg12_2('ustg_12_2'),
+  ustg12_3('ustg_12_3'),
+  ustg19('ustg_19'),
+  ustg3a2_13b1('ustg_3a_2_13b_1'),
+  ustg13b2_4_5('ustg_13b_2_4_5'),
+  ustg4_1b_6a('ustg_4_1b_6a'),
+  ustg4_1a_6('ustg_4_1a_6'),
+  ustg25a('ustg_25a');
+
+  const EInvoiceTaxLegalBasis(this.code);
+
+  final String code;
+
+  static EInvoiceTaxLegalBasis? fromCode(String? code) {
+    for (final EInvoiceTaxLegalBasis basis in EInvoiceTaxLegalBasis.values) {
+      if (basis.code == code) return basis;
+    }
+    return null;
+  }
+}
+
+class EInvoiceTaxClassificationResult {
+  const EInvoiceTaxClassificationResult.resolved(this.classification) : fieldDiagnostics = const <String>[];
+
+  const EInvoiceTaxClassificationResult.unresolved(this.fieldDiagnostics) : classification = null;
+
+  final EInvoiceLineClassification? classification;
+  final List<String> fieldDiagnostics;
+
+  bool get isResolved => classification != null;
+}
+
 class EInvoiceLineClassification {
-  const EInvoiceLineClassification({required this.category, this.exemptionReason});
+  const EInvoiceLineClassification({
+    required this.treatment,
+    required this.legalBasis,
+    required this.category,
+    this.exemptionReasonCode,
+    this.exemptionReason,
+    this.invoiceNote,
+  });
 
+  final EInvoiceTaxTreatment treatment;
+  final EInvoiceTaxLegalBasis legalBasis;
   final EInvoiceTaxCategory category;
-
-  /// Required reason text for exempt-type categories; unused in the initial
-  /// scope but carried so the contract stays stable when it grows.
+  final String? exemptionReasonCode;
   final String? exemptionReason;
+
+  /// Statutory BT-22 note required for this treatment, when applicable.
+  final String? invoiceNote;
 }
 
 /// Typed source for the approved initial-scope mapping.
@@ -53,19 +122,151 @@ class EInvoiceLineClassification {
 class ApprovedTaxClassification {
   const ApprovedTaxClassification._();
 
-  static const Map<int, EInvoiceTaxCategory> _byRateHundredths = <int, EInvoiceTaxCategory>{
-    1900: EInvoiceTaxCategory.standard,
-    700: EInvoiceTaxCategory.standard,
-  };
+  static const String kleinunternehmerReason = 'Kein Ausweis von Umsatzsteuer, da Kleinunternehmer gemäß § 19 UStG';
 
-  /// Resolves the approved category for an exact stored rate, or null when
-  /// the treatment has no approved mapping.
-  static EInvoiceLineClassification? resolve(num ustSatz) {
-    final int hundredths = (ustSatz * 100).round();
-    // Reject non-exact decimals instead of coercing them into the map.
-    if ((hundredths / 100 - ustSatz).abs() > 0.000001) return null;
-    final EInvoiceTaxCategory? category = _byRateHundredths[hundredths];
-    if (category == null) return null;
-    return EInvoiceLineClassification(category: category);
+  /// Resolves only explicit, persisted treatment tuples in the supported scope.
+  /// Percentages never select a treatment or category.
+  static EInvoiceTaxClassificationResult resolve({
+    required String? treatmentCode,
+    required String? legalBasisCode,
+    required String? categoryCode,
+    required String? exemptionReasonCode,
+    required String? exemptionReasonText,
+    required int taxRateHundredths,
+    required bool sellerHasTaxRegistration,
+  }) {
+    final EInvoiceTaxTreatment? treatment = EInvoiceTaxTreatment.fromCode(treatmentCode);
+    if (treatment == null) {
+      return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_treatment']);
+    }
+
+    if (treatment == EInvoiceTaxTreatment.reverseChargeEuService13b1) {
+      return const EInvoiceTaxClassificationResult.unresolved(<String>[
+        'e_invoice_reverse_charge_supplier_establishment_country_iso',
+        'e_invoice_reverse_charge_supplier_establishment_basis',
+        'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+        'e_invoice_reverse_charge_recipient_status',
+        'e_invoice_reverse_charge_recipient_establishment_country_iso',
+        'e_invoice_reverse_charge_service_kind',
+        'e_invoice_reverse_charge_place_of_supply_basis',
+        'e_invoice_reverse_charge_place_of_supply_country_iso',
+        'e_invoice_reverse_charge_taxability',
+        'e_invoice_reverse_charge_evidence_source_ref',
+      ]);
+    }
+    if (treatment == EInvoiceTaxTreatment.reverseChargeDomesticConstruction13b2_4_5) {
+      return const EInvoiceTaxClassificationResult.unresolved(<String>[
+        'e_invoice_reverse_charge_service_kind',
+        'e_invoice_reverse_charge_place_of_supply_basis',
+        'e_invoice_reverse_charge_place_of_supply_country_iso',
+        'e_invoice_reverse_charge_taxability',
+        'e_invoice_reverse_charge_recipient_status',
+        'e_invoice_reverse_charge_recipient_13b5_basis',
+        'e_invoice_reverse_charge_ust1tg_certificate_ref',
+        'e_invoice_reverse_charge_ust1tg_scope',
+        'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+        'e_invoice_reverse_charge_ust1tg_issued_on',
+        'e_invoice_reverse_charge_ust1tg_valid_through',
+      ]);
+    }
+    final EInvoiceTaxLegalBasis? legalBasis = EInvoiceTaxLegalBasis.fromCode(legalBasisCode);
+    if (legalBasis == null) {
+      return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_legal_basis']);
+    }
+
+    final EInvoiceTaxCategory expectedCategory;
+    final EInvoiceTaxLegalBasis expectedBasis;
+    final int expectedRate;
+    final String? expectedReason;
+    final String? expectedReasonCode;
+    String? invoiceNote;
+    switch (treatment) {
+      case EInvoiceTaxTreatment.standard19:
+        expectedCategory = EInvoiceTaxCategory.standard;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg12_1;
+        expectedRate = 1900;
+        expectedReason = null;
+        expectedReasonCode = null;
+      case EInvoiceTaxTreatment.reduced7:
+        expectedCategory = EInvoiceTaxCategory.standard;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg12_2;
+        expectedRate = 700;
+        expectedReason = null;
+        expectedReasonCode = null;
+      case EInvoiceTaxTreatment.taxableZero12_3:
+        expectedCategory = EInvoiceTaxCategory.zeroRated;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg12_3;
+        expectedRate = 0;
+        expectedReason = null;
+        expectedReasonCode = null;
+      case EInvoiceTaxTreatment.kleinunternehmer19:
+        expectedCategory = EInvoiceTaxCategory.exempt;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg19;
+        expectedRate = 0;
+        expectedReason = kleinunternehmerReason;
+        expectedReasonCode = null;
+      case EInvoiceTaxTreatment.intraCommunitySupply6a:
+        expectedCategory = EInvoiceTaxCategory.intraCommunitySupply;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg4_1b_6a;
+        expectedRate = 0;
+        expectedReasonCode = 'VATEX-EU-IC';
+        expectedReason = exemptionReasonText;
+        if (exemptionReasonText != 'Steuerfreie innergemeinschaftliche Lieferung' &&
+            exemptionReasonText != 'Steuerfrei nach § 4 Nr. 1 Buchst. b i. V. m. § 6a UStG') {
+          return const EInvoiceTaxClassificationResult.unresolved(<String>['e_invoice_exemption_reason_text']);
+        }
+      case EInvoiceTaxTreatment.exportSupply6:
+        expectedCategory = EInvoiceTaxCategory.export;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg4_1a_6;
+        expectedRate = 0;
+        expectedReason = null;
+        expectedReasonCode = 'VATEX-EU-G';
+      case EInvoiceTaxTreatment.marginScheme25aUnmapped:
+        expectedCategory = EInvoiceTaxCategory.exempt;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg25a;
+        expectedRate = 0;
+        final Map<String, String> statutoryNotes = <String, String>{
+          'VATEX-EU-F': 'Gebrauchtgegenstände/Sonderregelung',
+          'VATEX-EU-I': 'Kunstgegenstände/Sonderregelung',
+          'VATEX-EU-J': 'Sammlungsstücke und Antiquitäten/Sonderregelung',
+        };
+        final String? requiredNote = statutoryNotes[exemptionReasonCode];
+        if (requiredNote == null) {
+          return const EInvoiceTaxClassificationResult.unresolved(<String>['e_invoice_exemption_reason_code']);
+        }
+        if (exemptionReasonText != requiredNote) {
+          return const EInvoiceTaxClassificationResult.unresolved(<String>['e_invoice_exemption_reason_text']);
+        }
+        expectedReason = requiredNote;
+        expectedReasonCode = exemptionReasonCode;
+        invoiceNote = requiredNote;
+      case EInvoiceTaxTreatment.reverseChargeEuService13b1:
+      case EInvoiceTaxTreatment.reverseChargeDomesticConstruction13b2_4_5:
+        return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_treatment']);
+    }
+
+    final List<String> fields = <String>[];
+    if (legalBasis != expectedBasis) fields.add('tax_legal_basis');
+    if (categoryCode != expectedCategory.code) fields.add('e_invoice_tax_category_code');
+    if (taxRateHundredths != expectedRate) fields.add('ust_satz');
+    if (exemptionReasonCode != expectedReasonCode) fields.add('e_invoice_exemption_reason_code');
+    if (exemptionReasonText != expectedReason) fields.add('e_invoice_exemption_reason_text');
+    if (treatment == EInvoiceTaxTreatment.taxableZero12_3 && !sellerHasTaxRegistration) {
+      fields.addAll(<String>['ust_idnr', 'steuernummer', 'tax_representative_vat_id']);
+    }
+    if (fields.isNotEmpty) {
+      return EInvoiceTaxClassificationResult.unresolved(List<String>.unmodifiable(fields));
+    }
+
+    return EInvoiceTaxClassificationResult.resolved(
+      EInvoiceLineClassification(
+        treatment: treatment,
+        legalBasis: legalBasis,
+        category: expectedCategory,
+        exemptionReasonCode: exemptionReasonCode,
+        exemptionReason: exemptionReasonText,
+        invoiceNote: invoiceNote,
+      ),
+    );
   }
 }

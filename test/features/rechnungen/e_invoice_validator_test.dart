@@ -145,7 +145,23 @@ void main() {
             taxCents: 3800,
             grossCents: 23800,
             taxRateHundredths: 1900,
-            classification: EInvoiceLineClassification(category: EInvoiceTaxCategory.standard),
+            classification: EInvoiceLineClassification(
+              treatment: EInvoiceTaxTreatment.standard19,
+              legalBasis: EInvoiceTaxLegalBasis.ustg12_1,
+              category: EInvoiceTaxCategory.standard,
+            ),
+          ),
+        ],
+        taxBreakdowns: <EInvoiceTaxBreakdownSnapshot>[
+          EInvoiceTaxBreakdownSnapshot(
+            taxRateHundredths: 1900,
+            classification: EInvoiceLineClassification(
+              treatment: EInvoiceTaxTreatment.standard19,
+              legalBasis: EInvoiceTaxLegalBasis.ustg12_1,
+              category: EInvoiceTaxCategory.standard,
+            ),
+            netCents: 20000,
+            taxCents: 3800,
           ),
         ],
         netCents: 20000,
