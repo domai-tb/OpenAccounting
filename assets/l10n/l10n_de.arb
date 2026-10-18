@@ -158,6 +158,8 @@
   "documentReceipt": "Beleg",
   "documentOther": "Dokument",
   "dateLabel": "Datum",
+  "invoiceWorkspaceDeliveryDate": "Leistungsdatum (optional)",
+  "invoiceWorkspaceClearDeliveryDate": "Leistungsdatum löschen",
   "amountHidden": "Betrag verborgen",
   "dashboardTitle": "Übersicht",
   "dashboardWelcome": "Willkommen in deiner lokalen Buchhaltung.",

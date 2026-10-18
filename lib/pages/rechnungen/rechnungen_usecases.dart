@@ -34,6 +34,7 @@ class RechnungenUseCases {
   Future<RechnungItem> createDraftRechnung({
     required String datum,
     required List<RechnungPositionItem> positionen,
+    String? leistungsdatum,
     String typ = 'rechnung',
     String eingabemodus = 'netto',
     int? kundeId,
@@ -52,6 +53,7 @@ class RechnungenUseCases {
     return repository.createDraftRechnung(
       datum: datum,
       positionen: positionen,
+      leistungsdatum: leistungsdatum,
       typ: typ,
       eingabemodus: eingabemodus,
       kundeId: kundeId,
@@ -92,6 +94,7 @@ class RechnungenUseCases {
     required int rechnungId,
     required String datum,
     required List<RechnungPositionItem> positionen,
+    String? leistungsdatum,
     String? eingabemodus,
     int? kundeId,
     int? lieferadresseId,
@@ -115,6 +118,7 @@ class RechnungenUseCases {
       rechnungId: rechnungId,
       datum: datum,
       positionen: positionen,
+      leistungsdatum: leistungsdatum,
       eingabemodus: eingabemodus,
       kundeId: kundeId,
       lieferadresseId: lieferadresseId,

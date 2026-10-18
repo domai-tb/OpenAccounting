@@ -6,10 +6,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/core/database.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
+
+class _CapturingEInvoiceService extends EInvoiceService {
+  FinalizationSnapshot? capturedSnapshot;
+
+  @override
+  Future<String> zugferdXml(FinalizationSnapshot snapshot) async {
+    capturedSnapshot = snapshot;
+    return '<?xml version="1.0"?><rsm:CrossIndustryInvoice></rsm:CrossIndustryInvoice>';
+  }
+}
 
 RechnungenUseCases _useCases(AppDatabase db) =>
     RechnungenUseCases(RechnungenRepository(RechnungenDataSource(db.executor, profileDir: db.profileDir)));
@@ -456,6 +468,93 @@ void main() {
 
     expect(find.text('Aktion fehlgeschlagen. Prüfen Sie das Dokument und versuchen Sie es erneut.'), findsOneWidget);
     expect(find.textContaining('StateError'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('persists_optional_leistungsdatum_through_workspace', (WidgetTester tester) async {
+    final Directory profileDirectory = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('invoice-leistungsdatum-workspace-'),
+    ))!;
+    final AppDatabase db = (await tester.runAsync(() => _openProfileDb(profileDirectory)))!;
+    addTearDown(() async {
+      await db.close();
+      await profileDirectory.delete(recursive: true);
+    });
+    await tester.runAsync(() => db.executor.runCustom("INSERT INTO unternehmen (name) VALUES ('Workspace GmbH')"));
+    await tester.runAsync(
+      () => db.executor.runCustom(
+        "INSERT INTO kunden (name, strasse, plz, ort) VALUES ('Workspace Kunde', 'Str. 1', '10115', 'Berlin')",
+      ),
+    );
+    tester.view.physicalSize = const Size(1280, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    final _CapturingEInvoiceService eInvoiceService = _CapturingEInvoiceService();
+    final RechnungenUseCases useCases = RechnungenUseCases(
+      RechnungenRepository(
+        RechnungenDataSource(db.executor, profileDir: db.profileDir, eInvoiceService: eInvoiceService),
+      ),
+    );
+    final GoRouter router = createRouter(db);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    router.go('/invoices/new');
+    await tester.pumpAndSettle();
+
+    final Finder deliveryDate = find.byKey(const ValueKey<String>('workspace_delivery_date'));
+    expect(deliveryDate, findsOneWidget);
+    await tester.enterText(deliveryDate, '2026-03-10');
+    await tester.tap(find.byKey(const ValueKey<String>('workspace_add_position')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey<String>('workspace_position_0_description')), 'Beratung');
+    await tester.enterText(find.byKey(const ValueKey<String>('workspace_position_0_quantity')), '1');
+    await tester.enterText(find.byKey(const ValueKey<String>('workspace_position_0_price')), '100');
+    await tester.tap(find.byKey(const ValueKey<String>('workspace_customer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Workspace Kunde'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('workspace_save')));
+    await tester.pumpAndSettle();
+
+    final List<Map<String, Object?>> savedRows = await db.executor.runSelect(
+      'SELECT id, leistungsdatum FROM rechnungen WHERE ist_entwurf = 1 ORDER BY id DESC LIMIT 1',
+      const <Object?>[],
+    );
+    expect(savedRows, hasLength(1));
+    final int invoiceId = (savedRows.single['id']! as num).toInt();
+    expect(savedRows.single['leistungsdatum'], '2026-03-10');
+    expect((await useCases.findById(invoiceId))!.leistungsdatum, '2026-03-10');
+
+    router.go('/invoices/$invoiceId/edit');
+    await tester.pumpAndSettle();
+    final EditableText reopenedDate = tester.widget<EditableText>(
+      find.descendant(of: deliveryDate, matching: find.byType(EditableText)),
+    );
+    expect(reopenedDate.controller.text, '2026-03-10');
+    await tester.enterText(deliveryDate, '');
+    await tester.tap(find.byKey(const ValueKey<String>('workspace_save')));
+    await tester.pumpAndSettle();
+    final List<Map<String, Object?>> clearedRows = await db.executor.runSelect(
+      'SELECT leistungsdatum FROM rechnungen WHERE id = ?',
+      <Object?>[invoiceId],
+    );
+    expect(clearedRows.single['leistungsdatum'], isNull);
+
+    router.go('/invoices/$invoiceId/edit');
+    await tester.pumpAndSettle();
+    await tester.enterText(deliveryDate, '2026-03-10');
+    await tester.tap(find.byKey(const ValueKey<String>('workspace_save')));
+    await tester.pumpAndSettle();
+    final RechnungItem finalized = (await tester.runAsync(
+      () => useCases.finalizeRechnung(locale: 'de_DE', rechnungId: invoiceId, ausgabeformat: 'zugferd'),
+    ))!;
+    expect(eInvoiceService.capturedSnapshot?.deliveryDate, '2026-03-10');
+    expect(finalized.leistungsdatum, '2026-03-10');
     expect(tester.takeException(), isNull);
   });
 }

@@ -37,12 +37,14 @@ class InvoiceWorkspace extends ConsumerStatefulWidget {
 class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
   late final InvoiceEditorState _state = InvoiceEditorState();
   final TextEditingController _dateController = TextEditingController();
+  final TextEditingController _deliveryDateController = TextEditingController();
   bool _loaded = false;
   bool _saving = false;
 
   @override
   void dispose() {
     _dateController.dispose();
+    _deliveryDateController.dispose();
     super.dispose();
   }
 
@@ -52,14 +54,18 @@ class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
     if (draft != null) {
       _state.loadDraft(draft);
       _dateController.text = _state.datum;
+      _deliveryDateController.text = _state.leistungsdatum ?? '';
     } else {
       _dateController.text = _state.datum;
+      _deliveryDateController.text = '';
       _state.recalculate();
     }
   }
 
   void _refreshPreview() {
     _state.datum = _dateController.text.trim();
+    final String deliveryDate = _deliveryDateController.text.trim();
+    _state.leistungsdatum = deliveryDate.isEmpty ? null : deliveryDate;
     setState(() {
       _state.recalculate();
       _state.validateDate();
@@ -69,6 +75,8 @@ class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
   Future<void> _save() async {
     if (_saving) return;
     _state.datum = _dateController.text.trim();
+    final String deliveryDate = _deliveryDateController.text.trim();
+    _state.leistungsdatum = deliveryDate.isEmpty ? null : deliveryDate;
     final bool previewValid = _state.recalculate();
     final bool dateValid = _state.validateDate();
     if (!previewValid || !dateValid) {
@@ -86,6 +94,7 @@ class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
       if (widget.draftId == null) {
         saved = await services.createDraftRechnung(
           datum: _state.datum,
+          leistungsdatum: _state.leistungsdatum,
           positionen: _state.toDomainPositions(),
           eingabemodus: _state.eingabemodus,
           kundeId: _state.kundeId,
@@ -96,6 +105,7 @@ class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
         saved = await services.updateDraftRechnung(
           rechnungId: widget.draftId!,
           datum: _state.datum,
+          leistungsdatum: _state.leistungsdatum,
           positionen: _state.toDomainPositions(),
           eingabemodus: _state.eingabemodus,
           rabattProzent: _state.rabattProzent,
@@ -230,6 +240,27 @@ class _InvoiceWorkspaceState extends ConsumerState<InvoiceWorkspace> {
               labelText: l10n.dateLabel,
               hintText: '2026-01-31',
               errorText: _workspaceFieldErrorText(_state.fieldErrors['datum'], l10n),
+            ),
+            onChanged: (_) => _refreshPreview(),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            key: const ValueKey<String>('workspace_delivery_date'),
+            controller: _deliveryDateController,
+            decoration: InputDecoration(
+              labelText: l10n.invoiceWorkspaceDeliveryDate,
+              hintText: 'YYYY-MM-DD',
+              suffixIcon: _deliveryDateController.text.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const ValueKey<String>('workspace_delivery_date_clear'),
+                      onPressed: () {
+                        _deliveryDateController.clear();
+                        _refreshPreview();
+                      },
+                      icon: const Icon(Icons.clear),
+                      tooltip: l10n.invoiceWorkspaceClearDeliveryDate,
+                    ),
             ),
             onChanged: (_) => _refreshPreview(),
           ),

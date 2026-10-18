@@ -425,7 +425,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         rabattBetrag: rabattBetrag,
       );
       await transaction.runUpdate(
-        "UPDATE rechnungen SET datum = ?, leistungsdatum = COALESCE(NULLIF(?, ''), leistungsdatum), eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, "
+        'UPDATE rechnungen SET datum = ?, leistungsdatum = ?, eingabemodus = ?, netto_betrag = ?, ust_betrag = ?, '
         'brutto_betrag = ?, rabatt_prozent = ?, rabatt_betrag = ?, '
         'kunde_id = COALESCE(?, kunde_id), lieferadresse_id = COALESCE(?, lieferadresse_id) '
         'WHERE id = ? AND ist_entwurf = 1',
@@ -603,7 +603,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     try {
       final invoiceRows = await transaction.runSelect(
         '''
-SELECT id, ist_entwurf, datum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id, netto_betrag, ust_betrag, brutto_betrag
+SELECT id, ist_entwurf, datum, leistungsdatum, unternehmen_id, typ, eingabemodus, rabatt_prozent, rabatt_betrag, kunde_id, lieferant_id, netto_betrag, ust_betrag, brutto_betrag
 FROM rechnungen
 WHERE id = ?
 ''',
@@ -1874,7 +1874,7 @@ WHERE id = ? AND ist_entwurf = 1
       '''
 SELECT r.id, r.rechnungsnummer, r.typ, r.status, r.ist_entwurf, r.eingabemodus, r.datum, r.lieferadresse_id,
        r.rabatt_prozent, r.rabatt_betrag, r.original_pdf_pfad, r.ausgabeformat, r.kunde_snapshot,
-       r.kunde_id, r.lieferant_id, r.beleg_id, r.faelligkeit, r.fremd_rechnungsnummer,
+       r.kunde_id, r.lieferant_id, r.beleg_id, r.faelligkeit, r.leistungsdatum, r.fremd_rechnungsnummer,
        k.name AS kunde_name, k.firma AS kunde_firma, k.strasse AS kunde_strasse,
        k.plz AS kunde_plz, k.ort AS kunde_ort
 FROM rechnungen r

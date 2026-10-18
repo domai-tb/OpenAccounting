@@ -158,6 +158,8 @@
   "documentReceipt": "Receipt",
   "documentOther": "Document",
   "dateLabel": "Date",
+  "invoiceWorkspaceDeliveryDate": "Delivery date (optional)",
+  "invoiceWorkspaceClearDeliveryDate": "Clear delivery date",
   "amountHidden": "Amount hidden",
   "dashboardTitle": "Overview",
   "dashboardWelcome": "Welcome to your local accounting workspace.",

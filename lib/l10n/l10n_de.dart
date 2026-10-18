@@ -441,6 +441,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dateLabel => 'Datum';
 
   @override
+  String get invoiceWorkspaceDeliveryDate => 'Leistungsdatum (optional)';
+
+  @override
+  String get invoiceWorkspaceClearDeliveryDate => 'Leistungsdatum löschen';
+
+  @override
   String get amountHidden => 'Betrag verborgen';
 
   @override

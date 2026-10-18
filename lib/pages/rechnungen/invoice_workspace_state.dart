@@ -102,10 +102,17 @@ class EditorPosition {
 /// change) invalidates the prior preview until a new domain result is
 /// returned; widgets display only fields copied from that result.
 class InvoiceEditorState {
-  InvoiceEditorState({String? datum, this.eingabemodus = 'netto', this.rabattProzent, this.rabattBetrag, this.kundeId})
-    : datum = datum ?? _todayIso();
+  InvoiceEditorState({
+    String? datum,
+    this.leistungsdatum,
+    this.eingabemodus = 'netto',
+    this.rabattProzent,
+    this.rabattBetrag,
+    this.kundeId,
+  }) : datum = datum ?? _todayIso();
 
   String datum;
+  String? leistungsdatum;
   String eingabemodus;
   num? rabattProzent;
   num? rabattBetrag;
@@ -256,6 +263,7 @@ class InvoiceEditorState {
   /// Loads persisted draft values into the editor (reopen flow).
   void loadDraft(RechnungItem draft) {
     datum = draft.datum;
+    leistungsdatum = draft.leistungsdatum;
     eingabemodus = draft.eingabemodus;
     rabattProzent = draft.rabattProzent;
     rabattBetrag = draft.rabattBetrag;

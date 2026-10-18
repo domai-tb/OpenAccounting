@@ -440,6 +440,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dateLabel => 'Date';
 
   @override
+  String get invoiceWorkspaceDeliveryDate => 'Delivery date (optional)';
+
+  @override
+  String get invoiceWorkspaceClearDeliveryDate => 'Clear delivery date';
+
+  @override
   String get amountHidden => 'Amount hidden';
 
   @override

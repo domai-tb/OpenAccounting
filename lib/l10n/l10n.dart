@@ -932,6 +932,18 @@ abstract class AppLocalizations {
   /// **'Datum'**
   String get dateLabel;
 
+  /// No description provided for @invoiceWorkspaceDeliveryDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Leistungsdatum (optional)'**
+  String get invoiceWorkspaceDeliveryDate;
+
+  /// No description provided for @invoiceWorkspaceClearDeliveryDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Leistungsdatum löschen'**
+  String get invoiceWorkspaceClearDeliveryDate;
+
   /// No description provided for @amountHidden.
   ///
   /// In de, this message translates to:

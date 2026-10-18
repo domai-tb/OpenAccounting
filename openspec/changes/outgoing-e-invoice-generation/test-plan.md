@@ -62,7 +62,7 @@
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Delivery date is emitted verbatim | test/features/rechnungen/e_invoice_generation_test.dart | delivery_date_emitted_verbatim | 🟢 green |
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Missing delivery date fails closed | test/features/rechnungen/e_invoice_generation_test.dart | missing_delivery_date_fails_closed | 🟢 green |
 
-| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Invoice persists and captures the delivery date | test/features/rechnungen/workspace_lifecycle_actions_test.dart | persists_optional_leistungsdatum_through_workspace | 🔴 red |
+| specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Invoice persists and captures the delivery date | test/features/rechnungen/workspace_lifecycle_actions_test.dart | persists_optional_leistungsdatum_through_workspace | 🟢 green |
 
 | tasks.md → Offline XML validation service wiring | Valid serialized UBL and CII pass the validator boundary before return | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_accepts_serialized_ubl_and_cii_before_return | 🟢 green |
 | tasks.md → Offline XML validation service wiring | Schema-invalid serialized UBL is rejected before return | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_rejects_schema_invalid_xrechnung_xml | 🟢 green |

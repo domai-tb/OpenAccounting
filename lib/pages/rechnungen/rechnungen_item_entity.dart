@@ -61,6 +61,7 @@ class RechnungItem {
     this.lieferantId,
     this.belegId,
     this.faelligkeit,
+    this.leistungsdatum,
     this.fremdRechnungsnummer,
     required List<RechnungPositionItem> positionen,
     List<RechnungBeziehung> beziehungen = const <RechnungBeziehung>[],
@@ -88,6 +89,7 @@ class RechnungItem {
   final int? lieferantId;
   final int? belegId;
   final String? faelligkeit;
+  final String? leistungsdatum;
   final String? fremdRechnungsnummer;
 
   /// Explicit per-invoice output choice persisted at finalization
