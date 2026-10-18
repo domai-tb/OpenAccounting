@@ -7,6 +7,7 @@
 - [x] The canonical card regression test failed before provider wiring because the dashboard card omitted the accepted profit field.
 - [x] The annual card renders income, expenses, profit, and margin from `DashboardAnnualKpis`; an unavailable summary remains pending and does not fall back to journal totals.
 - [x] The widget fixture deliberately supplies profit and margin values that differ from local income/expense formulas, proving that the displayed annual fields are consumed as provided.
+- [x] Margin uses the active locale: the focused widget regression failed on German `12,3 %` before the formatter fix and passes for English `12.3 %` and German `12,3 %` afterward.
 - [x] Monthly trend data exposes income and expense only. The unsupported monthly profit getter and formula helpers are removed.
 
 ### Current Evidence

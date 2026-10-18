@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import 'package:openaccounting/design_system/components/app_money.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
@@ -16,6 +17,14 @@ import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
 
 String _dashboardLoadError(BuildContext context) => appLocalizationsOf(context).dashboardLoadError;
+
+String _formatDashboardMargin(BuildContext context, double? marginPercent, AppLocalizations l10n) {
+  if (marginPercent == null) return l10n.dashboardMarginUnavailable;
+  final NumberFormat format = NumberFormat.decimalPattern(localeTag(Localizations.localeOf(context)))
+    ..minimumFractionDigits = 1
+    ..maximumFractionDigits = 1;
+  return '${format.format(marginPercent)} %';
+}
 
 String _dashboardErrorMessage(BuildContext context, String area, Object error, StackTrace stackTrace) {
   debugPrint('dashboard $area failed: $error\n$stackTrace');
@@ -280,9 +289,7 @@ class _WidgetCard extends ConsumerWidget {
       case 'einnahmen_ausgaben':
         final DashboardAnnualKpis? summary = d.annualSummary;
         if (summary == null) return Text(l10n.dashboardReportingPending);
-        final String margin = summary.marginPercent == null
-            ? l10n.dashboardMarginUnavailable
-            : '${summary.marginPercent!.toStringAsFixed(1)} %';
+        final String margin = _formatDashboardMargin(context, summary.marginPercent, l10n);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -551,9 +558,7 @@ class _PeriodSummaryChip extends ConsumerWidget {
             child: Text(l10n.dashboardReportingPending, style: Theme.of(context).textTheme.bodySmall),
           );
         }
-        final String margin = kpis.marginPercent == null
-            ? l10n.dashboardMarginUnavailable
-            : '${kpis.marginPercent!.toStringAsFixed(1)} %';
+        final String margin = _formatDashboardMargin(context, kpis.marginPercent, l10n);
         return Semantics(
           label: '${kpis.year} Gewinn ${kpis.profitCents} Marge $margin',
           child: Text('${kpis.year} · $margin', style: Theme.of(context).textTheme.bodySmall),

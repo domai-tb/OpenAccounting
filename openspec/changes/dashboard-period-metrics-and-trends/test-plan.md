@@ -40,6 +40,6 @@
 ## Coverage Notes
 
 - Every listed scenario maps to a named executable test, including the dashboard's annual-summary consumer guards.
-- The new canonical-card regression test failed before provider wiring because the income/expense card omitted the accepted profit field. Its values deliberately make profit differ from income minus expenses and margin differ from a local recomputation; the card must preserve every canonical field in the German locale.
+- The new canonical-card regression test failed before provider wiring because the income/expense card omitted the accepted profit field. Its values deliberately make profit differ from income minus expenses and margin differ from a local recomputation; the card preserves every canonical field and checks English `12.3 %` and German `12,3 %` margin formatting.
 - The unavailable-summary widget test verifies that a legacy journal row does not replace missing canonical reporting data; the unsupported-year audit tests cover legacy direction and reversal rows.
 - Monthly trend points expose income and expense only; no monthly profit calculation is part of the dashboard implementation.

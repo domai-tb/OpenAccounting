@@ -367,28 +367,32 @@ void main() {
         annualSummaries: <int, DashboardAnnualKpis>{2025: kpis},
       );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            appDatabaseProvider.overrideWithValue(db),
-            dashboardConfigProvider.overrideWith((ref) async => config),
-            dashboardUseCaseProvider.overrideWithValue(useCase),
-            dashboardSelectedYearProvider.overrideWith(_FixedDashboardYearNotifier.new),
-          ],
-          child: const MaterialApp(
-            locale: Locale('de'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: DashboardPageImpl(),
-          ),
+      Widget buildDashboard(Locale locale) => ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          dashboardConfigProvider.overrideWith((ref) async => config),
+          dashboardUseCaseProvider.overrideWithValue(useCase),
+          dashboardSelectedYearProvider.overrideWith(_FixedDashboardYearNotifier.new),
+        ],
+        child: MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const DashboardPageImpl(),
         ),
       );
+
+      await tester.pumpWidget(buildDashboard(const Locale('en')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Margin: 12.3 %'), findsOneWidget);
+
+      await tester.pumpWidget(buildDashboard(const Locale('de')));
       await tester.pumpAndSettle();
 
       expect(find.text('Einnahmen:'), findsOneWidget);
       expect(find.text('Ausgaben:'), findsOneWidget);
       expect(find.text('Gewinn:'), findsOneWidget);
-      expect(find.textContaining('Marge: 12.3 %'), findsOneWidget);
+      expect(find.textContaining('Marge: 12,3 %'), findsOneWidget);
       expect(find.textContaining('2.300,00'), findsOneWidget);
       expect(find.textContaining('500,00'), findsOneWidget);
       expect(find.textContaining('1.770,00'), findsOneWidget);
