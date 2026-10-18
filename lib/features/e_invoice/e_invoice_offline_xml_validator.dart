@@ -11,21 +11,15 @@ import 'package:xml/xml.dart';
 const String _assetPrefix = 'assets/e_invoice_validator/';
 const String _manifestAsset = '${_assetPrefix}manifest.json';
 const String _reportNamespace = 'http://www.xoev.de/de/validator/varl/1';
-const String _scenarioNamespace =
-    'http://www.xoev.de/de/validator/framework/1/scenarios';
-const String _expectedManifestSha256 =
-    '50ab8f735bb338761fe2db4c580220a714cde6e1d55c789aa89cc6e17d5fd894';
+const String _scenarioNamespace = 'http://www.xoev.de/de/validator/framework/1/scenarios';
+const String _expectedManifestSha256 = '50ab8f735bb338761fe2db4c580220a714cde6e1d55c789aa89cc6e17d5fd894';
 
 /// Result state for validation by the packaged offline XML rules.
 enum EInvoiceOfflineXmlValidationStatus { valid, invalid, unavailable }
 
 /// One finding returned by KoSIT and the selected profile rules.
 class EInvoiceOfflineXmlDiagnostic {
-  const EInvoiceOfflineXmlDiagnostic({
-    required this.code,
-    required this.level,
-    required this.message,
-  });
+  const EInvoiceOfflineXmlDiagnostic({required this.code, required this.level, required this.message});
 
   final String code;
   final String level;
@@ -34,10 +28,7 @@ class EInvoiceOfflineXmlDiagnostic {
 
 /// One schema or business-rule step reported by the pinned engine.
 class EInvoiceOfflineXmlValidationStep {
-  const EInvoiceOfflineXmlValidationStep({
-    required this.id,
-    required this.valid,
-  });
+  const EInvoiceOfflineXmlValidationStep({required this.id, required this.valid});
 
   final String id;
   final bool valid;
@@ -62,8 +53,7 @@ class EInvoiceOfflineXmlValidationResult {
   final List<EInvoiceOfflineXmlValidationStep> steps;
 
   bool get valid => status == EInvoiceOfflineXmlValidationStatus.valid;
-  bool get available =>
-      status != EInvoiceOfflineXmlValidationStatus.unavailable;
+  bool get available => status != EInvoiceOfflineXmlValidationStatus.unavailable;
 }
 
 /// Runs the packaged KoSIT engine and selected XRechnung / Factur-X profiles.
@@ -104,38 +94,21 @@ class EInvoiceOfflineXmlValidator {
       EInvoiceOutputFormat.pdf => null,
     };
     if (expectedScenarioName == null) {
-      return _unavailable(
-        'The selected output format has no packaged XML validation profile.',
-      );
+      return _unavailable('The selected output format has no packaged XML validation profile.');
     }
 
     final List<int> xmlBytes = utf8.encode(xml);
     if (xmlBytes.length > maxXmlBytes) {
-      return _invalid(
-        'INPUT_TOO_LARGE',
-        'error',
-        'XML exceeds the $maxXmlBytes byte validation limit.',
-      );
+      return _invalid('INPUT_TOO_LARGE', 'error', 'XML exceeds the $maxXmlBytes byte validation limit.');
     }
-    if (RegExp(
-      r'<!\s*(DOCTYPE|ENTITY)\b',
-      caseSensitive: false,
-    ).hasMatch(xml)) {
-      return _invalid(
-        'DTD_NOT_ALLOWED',
-        'error',
-        'XML DTD and entity declarations are not accepted.',
-      );
+    if (RegExp(r'<!\s*(DOCTYPE|ENTITY)\b', caseSensitive: false).hasMatch(xml)) {
+      return _invalid('DTD_NOT_ALLOWED', 'error', 'XML DTD and entity declarations are not accepted.');
     }
     final XmlDocument inputDocument;
     try {
       inputDocument = XmlDocument.parse(xml);
     } on Object catch (error) {
-      return _invalid(
-        'MALFORMED_XML',
-        'error',
-        'XML is not well formed: $error',
-      );
+      return _invalid('MALFORMED_XML', 'error', 'XML is not well formed: $error');
     }
     final Iterable<XmlElement> inputElements = <XmlElement>[
       inputDocument.rootElement,
@@ -144,8 +117,7 @@ class EInvoiceOfflineXmlValidator {
     final bool hasSchemaHint = inputElements.any(
       (XmlElement element) => element.attributes.any(
         (XmlAttribute attribute) =>
-            attribute.name.local == 'schemaLocation' ||
-            attribute.name.local == 'noNamespaceSchemaLocation',
+            attribute.name.local == 'schemaLocation' || attribute.name.local == 'noNamespaceSchemaLocation',
       ),
     );
     if (hasSchemaHint) {
@@ -158,14 +130,11 @@ class EInvoiceOfflineXmlValidator {
 
     Directory? runDirectory;
     try {
-      final Directory workspace = await (_workspaceFuture ??=
-          _createWorkspace());
+      final Directory workspace = await (_workspaceFuture ??= _createWorkspace());
       final Directory runsDirectory = Directory(p.join(workspace.path, 'runs'));
       await runsDirectory.create(recursive: true);
       runDirectory = await runsDirectory.createTemp('invoice-');
-      final Directory reportDirectory = Directory(
-        p.join(runDirectory.path, 'reports'),
-      );
+      final Directory reportDirectory = Directory(p.join(runDirectory.path, 'reports'));
       await reportDirectory.create();
       final String inputName = 'invoice-${_nextRunNumber()}.xml';
       final File inputFile = File(p.join(runDirectory.path, inputName));
@@ -182,34 +151,21 @@ class EInvoiceOfflineXmlValidator {
         reportDirectory.path,
         inputFile.path,
       ], workingDirectory: workspace.path);
-      final Future<String> stdoutFuture = process.stdout
-          .transform(utf8.decoder)
-          .join();
-      final Future<String> stderrFuture = process.stderr
-          .transform(utf8.decoder)
-          .join();
+      final Future<String> stdoutFuture = process.stdout.transform(utf8.decoder).join();
+      final Future<String> stderrFuture = process.stderr.transform(utf8.decoder).join();
       final int exitCode;
       try {
         exitCode = await process.exitCode.timeout(timeout);
       } on TimeoutException {
         process.kill();
         await Future.wait<String>(<Future<String>>[stdoutFuture, stderrFuture]);
-        return _unavailable(
-          'The offline XML validator exceeded its $timeout timeout.',
-        );
+        return _unavailable('The offline XML validator exceeded its $timeout timeout.');
       }
       final String stdout = await stdoutFuture;
       final String stderr = await stderrFuture;
-      final File reportFile = File(
-        p.join(
-          reportDirectory.path,
-          '${p.basenameWithoutExtension(inputName)}-report.xml',
-        ),
-      );
+      final File reportFile = File(p.join(reportDirectory.path, '${p.basenameWithoutExtension(inputName)}-report.xml'));
       if (!reportFile.existsSync()) {
-        final String details = _trimProcessOutput(
-          stderr.isEmpty ? stdout : stderr,
-        );
+        final String details = _trimProcessOutput(stderr.isEmpty ? stdout : stderr);
         return _unavailable(
           details.isEmpty
               ? 'The offline XML validator did not produce a validation report.'
@@ -217,9 +173,7 @@ class EInvoiceOfflineXmlValidator {
         );
       }
 
-      final EInvoiceOfflineXmlValidationResult report = _parseReport(
-        await reportFile.readAsString(),
-      );
+      final EInvoiceOfflineXmlValidationResult report = _parseReport(await reportFile.readAsString());
       if (report.scenarioName != expectedScenarioName) {
         return _invalid(
           'PROFILE_MISMATCH',
@@ -227,17 +181,13 @@ class EInvoiceOfflineXmlValidator {
           'The invoice did not match the requested $expectedScenarioName profile.',
         );
       }
-      if (report.status == EInvoiceOfflineXmlValidationStatus.valid &&
-          exitCode == 0) {
+      if (report.status == EInvoiceOfflineXmlValidationStatus.valid && exitCode == 0) {
         return report;
       }
-      if (report.status == EInvoiceOfflineXmlValidationStatus.invalid &&
-          (exitCode == 1 || exitCode == 2)) {
+      if (report.status == EInvoiceOfflineXmlValidationStatus.invalid && (exitCode == 1 || exitCode == 2)) {
         return report;
       }
-      return _unavailable(
-        'The validator process and its report did not agree (exit code $exitCode).',
-      );
+      return _unavailable('The validator process and its report did not agree (exit code $exitCode).');
     } on Object catch (error) {
       return _unavailable('The offline XML validator could not run: $error');
     } finally {
@@ -266,46 +216,29 @@ class EInvoiceOfflineXmlValidator {
     final Uint8List manifestBytes = _byteDataBytes(manifestData);
     final String manifestDigest = sha256.convert(manifestBytes).toString();
     if (manifestDigest != _expectedManifestSha256) {
-      throw const FormatException(
-        'The packaged validator manifest checksum does not match.',
-      );
+      throw const FormatException('The packaged validator manifest checksum does not match.');
     }
-    final Map<String, Object?> manifest =
-        jsonDecode(utf8.decode(manifestBytes)) as Map<String, Object?>;
+    final Map<String, Object?> manifest = jsonDecode(utf8.decode(manifestBytes)) as Map<String, Object?>;
     final Object? runtimeFiles = manifest['runtimeFiles'];
     if (runtimeFiles is! List<Object?> || runtimeFiles.isEmpty) {
-      throw const FormatException(
-        'The packaged validator manifest has no runtime files.',
-      );
+      throw const FormatException('The packaged validator manifest has no runtime files.');
     }
 
-    final Directory workspace = await Directory.systemTemp.createTemp(
-      'openaccounting-einvoice-validator-',
-    );
+    final Directory workspace = await Directory.systemTemp.createTemp('openaccounting-einvoice-validator-');
     try {
       for (final Object? rawEntry in runtimeFiles) {
         if (rawEntry is! Map<String, Object?>) {
-          throw const FormatException(
-            'The packaged validator manifest contains an invalid file entry.',
-          );
+          throw const FormatException('The packaged validator manifest contains an invalid file entry.');
         }
         final Object? pathValue = rawEntry['path'];
         final Object? digestValue = rawEntry['sha256'];
-        if (pathValue is! String ||
-            digestValue is! String ||
-            !_isSafeAssetPath(pathValue)) {
-          throw const FormatException(
-            'The packaged validator manifest contains an unsafe file entry.',
-          );
+        if (pathValue is! String || digestValue is! String || !_isSafeAssetPath(pathValue)) {
+          throw const FormatException('The packaged validator manifest contains an unsafe file entry.');
         }
-        final ByteData data = await _assetBundle.load(
-          '$_assetPrefix$pathValue',
-        );
+        final ByteData data = await _assetBundle.load('$_assetPrefix$pathValue');
         final Uint8List bytes = _byteDataBytes(data);
         if (sha256.convert(bytes).toString() != digestValue) {
-          throw FormatException(
-            'The packaged validator file checksum does not match: $pathValue',
-          );
+          throw FormatException('The packaged validator file checksum does not match: $pathValue');
         }
         final File output = File(p.join(workspace.path, pathValue));
         await output.parent.create(recursive: true);
@@ -320,25 +253,16 @@ class EInvoiceOfflineXmlValidator {
 
   EInvoiceOfflineXmlValidationResult _parseReport(String source) {
     final XmlElement root = XmlDocument.parse(source).rootElement;
-    if (root.name.local != 'report' ||
-        root.name.namespaceUri != _reportNamespace) {
-      throw const FormatException(
-        'The offline validator returned an unrecognized report.',
-      );
+    if (root.name.local != 'report' || root.name.namespaceUri != _reportNamespace) {
+      throw const FormatException('The offline validator returned an unrecognized report.');
     }
     final String? validValue = root.getAttribute('valid');
     if (validValue != 'true' && validValue != 'false') {
-      throw const FormatException(
-        'The offline validator report has no validity result.',
-      );
+      throw const FormatException('The offline validator report has no validity result.');
     }
     final List<EInvoiceOfflineXmlDiagnostic> diagnostics = root.descendants
         .whereType<XmlElement>()
-        .where(
-          (XmlElement element) =>
-              element.name.local == 'message' &&
-              element.name.namespaceUri == _reportNamespace,
-        )
+        .where((XmlElement element) => element.name.local == 'message' && element.name.namespaceUri == _reportNamespace)
         .map(
           (XmlElement element) => EInvoiceOfflineXmlDiagnostic(
             code: element.getAttribute('code') ?? 'VALIDATION_MESSAGE',
@@ -351,8 +275,7 @@ class EInvoiceOfflineXmlValidator {
         .whereType<XmlElement>()
         .where(
           (XmlElement element) =>
-              element.name.local == 'validationStepResult' &&
-              element.name.namespaceUri == _reportNamespace,
+              element.name.local == 'validationStepResult' && element.name.namespaceUri == _reportNamespace,
         )
         .map(
           (XmlElement element) => EInvoiceOfflineXmlValidationStep(
@@ -363,28 +286,18 @@ class EInvoiceOfflineXmlValidator {
         .toList(growable: false);
     final String? engineVersion = root.descendants
         .whereType<XmlElement>()
-        .where(
-          (XmlElement element) =>
-              element.name.local == 'name' &&
-              element.name.namespaceUri == _reportNamespace,
-        )
+        .where((XmlElement element) => element.name.local == 'name' && element.name.namespaceUri == _reportNamespace)
         .map((XmlElement element) => element.innerText.trim())
         .firstOrNull;
     final XmlElement? matchedScenario = root.descendants
         .whereType<XmlElement>()
         .where(
-          (XmlElement element) =>
-              element.name.local == 'scenario' &&
-              element.name.namespaceUri == _scenarioNamespace,
+          (XmlElement element) => element.name.local == 'scenario' && element.name.namespaceUri == _scenarioNamespace,
         )
         .firstOrNull;
     final String? scenarioName = matchedScenario?.children
         .whereType<XmlElement>()
-        .where(
-          (XmlElement element) =>
-              element.name.local == 'name' &&
-              element.name.namespaceUri == _scenarioNamespace,
-        )
+        .where((XmlElement element) => element.name.local == 'name' && element.name.namespaceUri == _scenarioNamespace)
         .map((XmlElement element) => element.innerText.trim())
         .firstOrNull;
 
@@ -409,8 +322,7 @@ class EInvoiceOfflineXmlValidator {
         : diagnostics;
     return EInvoiceOfflineXmlValidationResult(
       status: EInvoiceOfflineXmlValidationStatus.invalid,
-      message:
-          'XML did not pass the pinned schema and business-rule validation.',
+      message: 'XML did not pass the pinned schema and business-rule validation.',
       engineVersion: engineVersion,
       scenarioName: scenarioName,
       diagnostics: findings,
@@ -418,29 +330,18 @@ class EInvoiceOfflineXmlValidator {
     );
   }
 
-  EInvoiceOfflineXmlValidationResult _invalid(
-    String code,
-    String level,
-    String message,
-  ) {
+  EInvoiceOfflineXmlValidationResult _invalid(String code, String level, String message) {
     return EInvoiceOfflineXmlValidationResult(
       status: EInvoiceOfflineXmlValidationStatus.invalid,
       message: message,
       diagnostics: <EInvoiceOfflineXmlDiagnostic>[
-        EInvoiceOfflineXmlDiagnostic(
-          code: code,
-          level: level,
-          message: message,
-        ),
+        EInvoiceOfflineXmlDiagnostic(code: code, level: level, message: message),
       ],
     );
   }
 
   EInvoiceOfflineXmlValidationResult _unavailable(String message) {
-    return EInvoiceOfflineXmlValidationResult(
-      status: EInvoiceOfflineXmlValidationStatus.unavailable,
-      message: message,
-    );
+    return EInvoiceOfflineXmlValidationResult(status: EInvoiceOfflineXmlValidationStatus.unavailable, message: message);
   }
 
   int _nextRunNumber() => ++_runNumber;
@@ -454,8 +355,7 @@ class EInvoiceOfflineXmlValidator {
         !normalized.startsWith('..');
   }
 
-  Uint8List _byteDataBytes(ByteData data) =>
-      Uint8List.view(data.buffer, data.offsetInBytes, data.lengthInBytes);
+  Uint8List _byteDataBytes(ByteData data) => Uint8List.view(data.buffer, data.offsetInBytes, data.lengthInBytes);
 
   String _trimProcessOutput(String output) {
     final String trimmed = output.trim();
