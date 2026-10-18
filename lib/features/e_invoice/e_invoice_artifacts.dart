@@ -13,7 +13,7 @@ class EInvoicePinnedVersions {
   static const String zugferdProfile = 'EN16931';
 
   /// Profile context parameter embedded in CII output.
-  static const String zugferdContextParameter = 'urn:factur-x.eu:1p0:en16931';
+  static const String zugferdContextParameter = 'urn:cen.eu:en16931:2017';
 
   /// Normative XRechnung format version (in force at least through 2027-07-31).
   static const String xrechnungVersion = '3.0';

@@ -25,6 +25,7 @@ class EInvoiceXmlSerializer {
     xml.writeln('  </rsm:ExchangedDocumentContext>');
     xml.writeln('  <rsm:ExchangedDocument>');
     xml.writeln('    <ram:ID>${_escape(snapshot.documentNumber)}</ram:ID>');
+    xml.writeln('    <ram:TypeCode>380</ram:TypeCode>');
     xml.writeln(
       '    <ram:IssueDateTime><udt:DateTimeString format="102">${_basicDate(snapshot.issueDate)}</udt:DateTimeString></ram:IssueDateTime>',
     );
@@ -42,6 +43,7 @@ class EInvoiceXmlSerializer {
     xml.writeln('      <ram:InvoiceCurrencyCode>${snapshot.currency}</ram:InvoiceCurrencyCode>');
     for (final _TaxGroup group in _groupByRate(snapshot)) {
       xml.writeln('      <ram:ApplicableTradeTax>');
+      xml.writeln('        <ram:CalculatedAmount>${_cents(group.taxCents)}</ram:CalculatedAmount>');
       xml.writeln('        <ram:TypeCode>VAT</ram:TypeCode>');
       if (group.exemptionReason != null && group.exemptionReason!.isNotEmpty) {
         xml.writeln('        <ram:ExemptionReason>${_escape(group.exemptionReason!)}</ram:ExemptionReason>');
@@ -49,7 +51,6 @@ class EInvoiceXmlSerializer {
       xml.writeln('        <ram:BasisAmount>${_cents(group.netCents)}</ram:BasisAmount>');
       xml.writeln('        <ram:CategoryCode>${group.categoryCode}</ram:CategoryCode>');
       xml.writeln('        <ram:RateApplicablePercent>${_rateText(group.rateHundredths)}</ram:RateApplicablePercent>');
-      xml.writeln('        <ram:CalculatedAmount>${_cents(group.taxCents)}</ram:CalculatedAmount>');
       xml.writeln('      </ram:ApplicableTradeTax>');
     }
     xml.writeln('      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>');
@@ -89,11 +90,13 @@ class EInvoiceXmlSerializer {
     xml.writeln('  <cbc:DocumentCurrencyCode>${snapshot.currency}</cbc:DocumentCurrencyCode>');
     xml.writeln('  <cbc:BuyerReference>${_escape(snapshot.buyerReference ?? '')}</cbc:BuyerReference>');
     final String? deliveryDate = snapshot.deliveryDate;
-    if (deliveryDate != null && deliveryDate.isNotEmpty) {
-      xml.writeln('  <cbc:ActualDeliveryDate>${_escape(deliveryDate)}</cbc:ActualDeliveryDate>');
-    }
     _ublParty(xml, tag: 'AccountingSupplierParty', party: snapshot.seller);
     _ublParty(xml, tag: 'AccountingCustomerParty', party: snapshot.buyer);
+    if (deliveryDate != null && deliveryDate.isNotEmpty) {
+      xml.writeln('  <cac:Delivery>');
+      xml.writeln('    <cbc:ActualDeliveryDate>${_escape(deliveryDate)}</cbc:ActualDeliveryDate>');
+      xml.writeln('  </cac:Delivery>');
+    }
     final String? payeeIban = snapshot.seller.iban;
     if (payeeIban != null && payeeIban.isNotEmpty) {
       // BT-81 58 SEPA transfer with BG-17 credit transfer account.
@@ -213,17 +216,17 @@ class EInvoiceXmlSerializer {
   void _ciiParty(StringBuffer xml, {required String tag, required EInvoicePartySnapshot party}) {
     xml.writeln('      <ram:$tag>');
     xml.writeln('        <ram:Name>${_escape(party.company ?? party.name)}</ram:Name>');
-    if (party.vatId != null) {
-      xml.writeln(
-        '        <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${_escape(party.vatId!)}</ram:ID></ram:SpecifiedTaxRegistration>',
-      );
-    }
     xml.writeln('        <ram:PostalTradeAddress>');
     xml.writeln('          <ram:PostcodeCode>${_escape(party.postalCode ?? '')}</ram:PostcodeCode>');
     xml.writeln('          <ram:LineOne>${_escape(party.street ?? '')}</ram:LineOne>');
     xml.writeln('          <ram:CityName>${_escape(party.city ?? '')}</ram:CityName>');
     xml.writeln('          <ram:CountryID>${_escape(party.country ?? '')}</ram:CountryID>');
     xml.writeln('        </ram:PostalTradeAddress>');
+    if (party.vatId != null) {
+      xml.writeln(
+        '        <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">${_escape(party.vatId!)}</ram:ID></ram:SpecifiedTaxRegistration>',
+      );
+    }
     xml.writeln('      </ram:$tag>');
   }
 

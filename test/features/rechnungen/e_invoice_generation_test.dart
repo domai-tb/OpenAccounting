@@ -31,7 +31,7 @@ void main() {
       expect(hybrid.pdfBytes, fakePdfBytes);
       expect(hybrid.documentNumber, 'RE-2026-0001');
       expect(hybrid.ciiXml.contains('CrossIndustryInvoice'), isTrue);
-      expect(hybrid.ciiXml.contains('urn:factur-x.eu:1p0:en16931'), isTrue);
+      expect(hybrid.ciiXml.contains('urn:cen.eu:en16931:2017'), isTrue);
       expect(hybrid.ciiXml.contains('<ram:GrandTotalAmount>238.00</ram:GrandTotalAmount>'), isTrue);
       expect(service.readiness(validation), EInvoiceReadiness.valid);
     });
@@ -262,6 +262,81 @@ void main() {
       expect(result.valid, isFalse);
       expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('invoice.deliveryDate'));
       expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+    });
+
+    test('xrechnung_delivery_date_follows_ubl_21_sequence', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final FinalizationSnapshot snapshot = validSnapshot(
+        buyerReference: 'LEITWEG-123',
+        format: EInvoiceOutputFormat.xrechnung,
+      );
+
+      final String xml = serializer.xrechnungUbl(snapshot);
+      final int supplierIndex = xml.indexOf('<cac:AccountingSupplierParty>');
+      final int customerIndex = xml.indexOf('<cac:AccountingCustomerParty>');
+      final int deliveryIndex = xml.indexOf('<cac:Delivery>');
+      final int deliveryDateIndex = xml.indexOf('<cbc:ActualDeliveryDate>2026-03-10</cbc:ActualDeliveryDate>');
+      final int deliveryEndIndex = xml.indexOf('</cac:Delivery>');
+      final int paymentIndex = xml.indexOf('<cac:PaymentMeans>');
+
+      expect(customerIndex, greaterThan(supplierIndex));
+      expect(deliveryIndex, greaterThan(customerIndex));
+      expect(deliveryDateIndex, greaterThan(deliveryIndex));
+      expect(deliveryEndIndex, greaterThan(deliveryDateIndex));
+      expect(paymentIndex, greaterThan(deliveryEndIndex));
+    });
+
+    test('zugferd_cii_type_code_precedes_issue_date', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final String xml = serializer.zugferdCii(validSnapshot(format: EInvoiceOutputFormat.zugferd));
+      final int documentStart = xml.indexOf('<rsm:ExchangedDocument>');
+      final int documentEnd = xml.indexOf('</rsm:ExchangedDocument>');
+      final String document = xml.substring(documentStart, documentEnd);
+      final int idIndex = document.indexOf('<ram:ID>');
+      final int typeCodeIndex = document.indexOf('<ram:TypeCode>380</ram:TypeCode>');
+      final int issueDateIndex = document.indexOf('<ram:IssueDateTime>');
+
+      expect(idIndex, greaterThanOrEqualTo(0));
+      expect(typeCodeIndex, greaterThan(idIndex));
+      expect(issueDateIndex, greaterThan(typeCodeIndex));
+    });
+
+    test('zugferd_cii_address_precedes_tax_registration', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final String xml = serializer.zugferdCii(validSnapshot(format: EInvoiceOutputFormat.zugferd));
+      final int sellerStart = xml.indexOf('<ram:SellerTradeParty>');
+      final int sellerEnd = xml.indexOf('</ram:SellerTradeParty>');
+      final String seller = xml.substring(sellerStart, sellerEnd);
+
+      final int addressIndex = seller.indexOf('<ram:PostalTradeAddress>');
+      final int registrationIndex = seller.indexOf('<ram:SpecifiedTaxRegistration>');
+
+      expect(addressIndex, greaterThanOrEqualTo(0));
+      expect(registrationIndex, greaterThan(addressIndex));
+    });
+
+    test('zugferd_cii_calculated_amount_precedes_tax_details', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final String xml = serializer.zugferdCii(validSnapshot(format: EInvoiceOutputFormat.zugferd));
+      final int settlementStart = xml.indexOf('<ram:ApplicableHeaderTradeSettlement>');
+      final int settlementEnd = xml.indexOf('</ram:ApplicableHeaderTradeSettlement>');
+      final String settlement = xml.substring(settlementStart, settlementEnd);
+      final int taxStart = settlement.indexOf('<ram:ApplicableTradeTax>');
+      final int taxEnd = settlement.indexOf('</ram:ApplicableTradeTax>');
+      final String tax = settlement.substring(taxStart, taxEnd);
+
+      final int calculatedAmountIndex = tax.indexOf('<ram:CalculatedAmount>');
+      final int taxTypeIndex = tax.indexOf('<ram:TypeCode>VAT</ram:TypeCode>');
+
+      expect(calculatedAmountIndex, greaterThanOrEqualTo(0));
+      expect(taxTypeIndex, greaterThan(calculatedAmountIndex));
+    });
+
+    test('zugferd_cii_uses_en16931_profile_id', () {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final String xml = serializer.zugferdCii(validSnapshot(format: EInvoiceOutputFormat.zugferd));
+
+      expect(xml, contains('<ram:ID>urn:cen.eu:en16931:2017</ram:ID>'));
     });
 
     test('unresolved_tax_mapping_fails_without_inference_or_output', () {

@@ -102,7 +102,7 @@ void main() {
       expect(xml.existsSync(), isTrue);
       final String content = xml.readAsStringSync();
       expect(content.contains('CrossIndustryInvoice'), isTrue);
-      expect(content.contains('urn:factur-x.eu:1p0:en16931'), isTrue);
+      expect(content.contains('urn:cen.eu:en16931:2017'), isTrue);
       expect(content.contains(row['rechnungsnummer']! as String), isTrue);
     });
 
