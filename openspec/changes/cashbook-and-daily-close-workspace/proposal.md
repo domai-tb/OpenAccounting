@@ -5,10 +5,10 @@ The feature map requires a cash book with income, expenses, running balance, sup
 ## What Changes
 
 - Add Cashbook and Daily Close views to the existing `/banking` workspace while preserving its import, history, rule, and review views.
-- Show and record cash movements only through a typed service backed by an approved balanced-posting contract; obtain running and expected balances only from an approved complete cash-reporting result.
-- Record a close only from a complete expected-balance result, the user's actual count, a required explanation when the close contract reports a discrepancy, and a signed immutable snapshot. Do not auto-post a cash difference.
+- Show and record cash movements only through the accepted balanced-posting service; obtain running and expected balances from a complete typed account/date result containing integer cents, currency, source reference, and completeness. Count verified setup opening cash once; never add its duplicate `konten.saldo` value.
+- Record a close only for an explicit company/account/date, with `betrag` expected, `kassenbestand` counted, `differenz` counted minus expected, and the selected `konto_id`. Store a versioned canonical `zaehlung_json` plus SHA-256 integrity digest; this digest does not authenticate a person or signing key. Do not auto-post a cash difference.
 - Render the existing Tagesabschluss PDF only from a complete finalized snapshot; do not calculate cash, tax, or discrepancy values in the UI or PDF renderer.
-- Add the missing `zaehlung_json` field and signed-close immutability protection to the existing `tagesabschluesse` table without adding a new ledger or table.
+- Reserve migration v25, after v23 mileage and the v24 setup anchor, to add versioned `zaehlung_json` and `integrity_hash` fields and finalized-close immutability protection to the existing `tagesabschluesse` table without adding a new ledger or table. Verify the canonical UTF-8 digest before finalized display or PDF generation and preserve legacy rows unchanged.
 
 ## Capabilities
 
@@ -19,9 +19,10 @@ The feature map requires a cash book with income, expenses, running balance, sup
 ### Modified Capabilities
 
 - `accounting`: replace the unsupported same-day-journal-sum rule for Tagesabschluss with an approved balance-source boundary and explicit fail-closed behavior.
-- `db`: migrate close evidence storage and protect signed close rows.
-- `pdf`: require Tagesabschluss PDFs to consume a complete signed close snapshot without recalculation.
+- `receipts-and-payment-reconciliation`: require a selected receipt reference and balanced cash posting to commit or roll back together.
+- `db`: migrate close evidence storage and protect finalized close rows.
+- `pdf`: require Tagesabschluss PDFs to consume a complete integrity-verified stored snapshot without recalculation.
 
 ## Impact
 
-The existing Banking route and app-service graph, journal posting, a separately approved account/date cash-balance source contract, `tagesabschluesse` migration/immutability, existing PDF generation, and localized desktop views. The active balanced-posting and reporting-workspace proposals are prerequisites but do not by themselves provide an accepted cash-balance source; their current review verdicts are `REVISE`. Cash writes, balances, closes, and PDFs stay unavailable until each required contract is separately approved and registered.
+The existing Banking route and app-service graph, the accepted `balanced-journal-postings-and-settlement-events` posting boundary, an account/date cash-balance result defined by this change, `tagesabschluesse` migration/immutability, receipt references, existing PDF generation, and localized desktop views. The accepted posting boundary supplies balanced `cash_payment` groups; this change defines how those groups and the verified setup opening event produce a complete account/date result. Cash writes, balances, closes, and PDFs remain unavailable until this change passes fresh independent review and the specified production paths are implemented and verified.

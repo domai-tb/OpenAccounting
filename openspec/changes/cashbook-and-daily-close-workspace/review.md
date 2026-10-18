@@ -43,3 +43,19 @@ CHANGES_APPLIED: n/a
 ## Rebuttals
 
 None; first review round.
+
+## Author response after the user-approved contract plan
+
+### Review status
+
+- Round 1 above remains the historical independent review: `VERDICT: REVISE`.
+- Its verdict is stale because proposal.md, design.md, and specs/ changed after that review.
+- Round 2 independent reviewer, reviewer context, and verdict: **pending**. No new review has been performed, and this author response does not approve implementation.
+- The latest user-approved plan authorizes the contract details below. Test-plan and task entries remain planned and red; no implementation or test result is claimed.
+
+### Response to round-1 findings
+
+1. **Posting, balance/completeness, and receipt-link contracts:** the accepted archived `balanced-journal-postings-and-settlement-events` contract supplies balanced `cash_payment` groups. This change now defines the account/date result fields and fail-closed completeness rules, counts the verified setup opening event once while treating duplicate `konten.saldo` as corroborating metadata, and adds the receipt-owner delta requiring the selected receipt reference and posting group to commit or roll back in one database transaction. These proposed contracts have not yet received fresh independent review.
+2. **Close persistence and digest verification:** the deltas now map `betrag` to expected, `kassenbestand` to counted, `differenz` to counted-minus-expected, and require an explicit `konto_id`; define a version-1 `zaehlung_json` with fixed RFC 8785 property order and integer cents; add a canonical UTF-8 SHA-256 `integrity_hash`; and require verification before finalized display or PDF. The digest is explicitly integrity-only, with no authenticated-signature, identity, Ed25519, or key-custody claim. The database plan reserves v25 after v23 mileage and the v24 setup anchor, preserves legacy rows, and requires `(unternehmen_id, konto_id, datum)` lookup/insertion under `BEGIN IMMEDIATE`.
+
+The round-1 findings are **addressed in author-edited proposal/design/delta text; reviewer acceptance is pending**. The historical round-1 `VERDICT: REVISE` remains in force for the implementation gate until a fresh independent reviewer evaluates the revised artifacts.
