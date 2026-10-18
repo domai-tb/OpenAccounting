@@ -50,8 +50,8 @@ Tax-contract revision note: the delivered base ledger was 96/128 complete. Tasks
 
 ## 4. ZUGFeRD and XRechnung E-Invoicing
 
-- [ ] 4.1 Write failing test for "ZUGFeRD PDF generation": generates_hybrid_pdf_with_validated_zugferd_metadata in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
-- [ ] 4.2 Implement the required application behavior for "ZUGFeRD PDF generation" from specs/pdf/spec.md to pass the named test.
+- [x] 4.1 Write failing test for "ZUGFeRD PDF generation": zugferd_pdf_generator_embeds_cii_as_facturx_attachment_with_pdfa_metadata in test/features/rechnungen/e_invoice_finalization_test.dart; the Unicode regression proved `/Params/Size` was 259 while the UTF-8 payload was 261 bytes.
+- [x] 4.2 Implement Factur-X PDF construction in PdfGenerator and declare the embedded CII attachment size from its UTF-8 bytes; exact payload and size assertions pass. Formal PDF/A-3b validation remains open under task 1.3.
 - [ ] 4.3 Refactor the related implementation; targeted tests and the full suite stay green.
 - [ ] 4.4 Write failing test for "XRechnung generation": generates_standalone_xrechnung_ubl_without_mutating_invoice in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
 - [ ] 4.5 Implement the required application behavior for "XRechnung generation" from specs/pdf/spec.md to pass the named test.
@@ -180,3 +180,11 @@ Tax serializer checkpoint (2026-10-18): focused tests cover explicit S/Z/E tuple
 - [x] 14.3 Preserve offline-validator diagnostics on `EInvoiceExportValidationException` and prove invalid UBL does not open the save dialog or write a file with `offline_schema_failure_prevents_save_dialog_and_file_write`; focused tests and analyzer pass.
 - [x] 14.4 Distinguish unavailable validation from invalid XML in typed results and localized diagnostics; prove unavailable UBL/CII output and export are blocked without opening the save dialog or writing a file.
 - [x] 14.5 Validate generated ZUGFeRD CII during production finalization before number reservation, stock, invoice/accounting mutations, or PDF/CII/temp artifact writes; prove unavailable validation preserves all state with `zugferd_validator_unavailable_prevents_any_finalization_side_effects` in `test/features/rechnungen/e_invoice_finalization_test.dart`.
+
+## 15. Hybrid attachment integrity and crash recovery
+
+- [x] 15.1 Write a failing regression proving non-ASCII embedded CII bytes match the payload and declared `/Params/Size`.
+- [x] 15.2 Set the embedded-file size to the actual UTF-8 byte count and verify the German `Straße ß` payload.
+- [x] 15.3 Write a failing recovery regression with a real draft row, an absent invoice ID, a finalized row, and exact final/temp sidecars; verify retry succeeds.
+- [x] 15.4 Recover only strict numeric ZUGFeRD sidecar names for draft or absent invoice rows; preserve finalized-row sidecars, finalized PDF, and unrelated files.
+- [x] 15.5 Run both focused regressions and scoped analysis; formal PDF/A-3b conformance and v28 tax-input wiring remain separate open gates.

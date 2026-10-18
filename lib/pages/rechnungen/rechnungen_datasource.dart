@@ -47,8 +47,13 @@ class RechnungenDataSource {
     required int documentId,
     required PdfDocumentSnapshot snapshot,
     required String locale,
+    String? zugferdCiiXml,
   }) async {
-    final Uint8List pdfBytes = await const PdfGenerator().generate(snapshot, locale: locale);
+    final Uint8List pdfBytes = await const PdfGenerator().generate(
+      snapshot,
+      locale: locale,
+      zugferdCiiXml: zugferdCiiXml,
+    );
     final File expectedFile = File('${documentsDir.path}/$documentId.pdf');
     File? committedFile;
     try {
@@ -744,6 +749,9 @@ WHERE nummernkreis_id = ? AND ist_entwurf = 0 AND rechnungsnummer IS NOT NULL
       final String? zugferdCiiXml = eSnapshot != null && selectedFormat == EInvoiceOutputFormat.zugferd
           ? await eInvoiceService.zugferdXml(eSnapshot)
           : null;
+      if (selectedFormat == EInvoiceOutputFormat.zugferd && zugferdCiiXml == null) {
+        throw StateError('ZUGFeRD-Ausgabe erfordert ein validiertes CII-Dokument');
+      }
 
       final sequenceUpdated = await transaction.runUpdate(
         '''
@@ -840,6 +848,7 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         documentId: rechnungId,
         snapshot: snapshot,
         locale: locale,
+        zugferdCiiXml: zugferdCiiXml,
       );
       if (zugferdCiiXml != null) {
         createdXmlFile = await _writeZugferdXmlArtifact(
@@ -1072,25 +1081,13 @@ WHERE id = ? AND ist_entwurf = 1
     required Directory documentsDir,
     required int documentId,
     required String ciiXml,
-  }) async {
-    final File expectedFile = File('${documentsDir.path}/$documentId.zugferd.xml');
-    final File tmpFile = File('${documentsDir.path}/$documentId.zugferd.xml.tmp');
-    try {
-      if (expectedFile.existsSync()) {
-        throw FileSystemException('ZUGFeRD-XML existiert bereits', expectedFile.path);
-      }
-      if (tmpFile.existsSync()) {
-        throw FileSystemException('ZUGFeRD-XML-Temporärdatei existiert bereits', tmpFile.path);
-      }
-      tmpFile.writeAsStringSync(ciiXml, flush: true);
-      tmpFile.renameSync(expectedFile.path);
-      return expectedFile;
-    } catch (_) {
-      try {
-        if (tmpFile.existsSync()) tmpFile.deleteSync();
-      } catch (_) {}
-      rethrow;
-    }
+  }) {
+    return correctionArtifactWriter.transaction.writeArtifact(
+      directory: documentsDir,
+      baseName: '$documentId.zugferd.xml',
+      stagingName: '$documentId.zugferd.xml.tmp',
+      bytes: utf8.encode(ciiXml),
+    );
   }
 
   Future<int> stornoRechnung({required int rechnungId, required String grund, String? debugFailAt}) async {

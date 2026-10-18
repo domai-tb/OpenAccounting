@@ -1,6 +1,6 @@
 ## Why
 
-Feature 01 documents outbound ZUGFeRD and XRechnung generation, and maintained PDF/customer specifications require those outputs. The production PDF generator creates visual PDFs only; there is no structured outbound XML serializer, PDF/A-3 embedding path, standards validator, or user-facing XRechnung export. The incoming-invoice proposal explicitly excludes outbound generation.
+Feature 01 documents outbound ZUGFeRD and XRechnung generation, and maintained PDF/customer specifications require those outputs. The CII/UBL serializers and pinned offline XML validator are now implemented. The PDF generator now has a local Factur-X hybrid construction path when supplied validated CII, but persisted tax treatment inputs are not yet available to the invoice finalization data source, and app-generated PDF/A-3b conformance is not yet independently verified. The incoming-invoice proposal explicitly excludes outbound generation.
 
 The existing contracts distinguish two behaviors: a customer with `zugferd_aktiv` defaults to a hybrid ZUGFeRD PDF when an outgoing invoice is finalized, while XRechnung is a standalone XML export. The current PDF spec incorrectly describes XRechnung as XML embedded in PDF/A-3 and the feature guide names the obsolete ZUGFeRD 2.1.1 release.
 

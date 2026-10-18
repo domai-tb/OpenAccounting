@@ -50,6 +50,9 @@ flutter:
   generate: true
   assets:
     - assets/branding/openaccounting_icon.png
+    - assets/e_invoice/pdfa/DejaVuSans.ttf
+    - assets/e_invoice/pdfa/DejaVuSans-Bold.ttf
+    - assets/e_invoice/pdfa/sRGB2014.icc
     - assets/e_invoice_validator/
     - assets/e_invoice_validator/licenses/
     - assets/e_invoice_validator/resources/

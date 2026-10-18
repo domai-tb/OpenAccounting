@@ -8,7 +8,7 @@ The system SHALL generate ZUGFeRD 2.5.2 `EN16931` hybrid PDF/A-3b invoices with 
 
 - **GIVEN** an outgoing invoice is finalized with ZUGFeRD selected and all required values for the pinned profile
 - **WHEN** finalization generates the selected output
-- **THEN** the system SHALL produce a human-readable PDF/A-3b file with a validated embedded ZUGFeRD 2.5.2 `EN16931` CII invoice and matching format metadata; readiness is derived from the validated artifact
+- **THEN** the system SHALL produce a human-readable PDF/A-3b file with the validated ZUGFeRD 2.5.2 `EN16931` CII invoice attached once as `factur-x.xml` with the `/Alternative` relationship, matching Factur-X XMP metadata, and invoice values from the same snapshot; readiness is derived from the validated artifact
 
 #### Scenario: XRechnung generation
 

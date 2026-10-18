@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
+import 'package:openaccounting/features/pdf/pdfa_utf8_attachment.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
@@ -9,10 +11,46 @@ import 'package:pdf/widgets.dart' as pw;
 final class PdfGenerator {
   const PdfGenerator();
 
-  Future<Uint8List> generate(PdfDocumentSnapshot snapshot, {required String locale}) {
+  Future<Uint8List> generate(PdfDocumentSnapshot snapshot, {required String locale, String? zugferdCiiXml}) async {
+    if (zugferdCiiXml != null && zugferdCiiXml.trim().isEmpty) {
+      throw ArgumentError.value(zugferdCiiXml, 'zugferdCiiXml', 'must not be empty');
+    }
+
     final AppLocalizations l10n = lookupAppLocalizations(Locale(locale.split('_').first));
-    final document = pw.Document(compress: false);
-    final isCopy = snapshot.copyState == PdfCopyState.copy;
+    final pw.Document document;
+    if (zugferdCiiXml == null) {
+      document = pw.Document(compress: false);
+    } else {
+      final pw.Font regularFont = pw.Font.ttf(await rootBundle.load('assets/e_invoice/pdfa/DejaVuSans.ttf'));
+      final pw.Font boldFont = pw.Font.ttf(await rootBundle.load('assets/e_invoice/pdfa/DejaVuSans-Bold.ttf'));
+      final ByteData colorProfile = await rootBundle.load('assets/e_invoice/pdfa/sRGB2014.icc');
+      final Uint8List colorProfileBytes = colorProfile.buffer.asUint8List(
+        colorProfile.offsetInBytes,
+        colorProfile.lengthInBytes,
+      );
+      final String facturxRdf = pdf.PdfaFacturxRdf().create(
+        namespace: 'urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#',
+        conformanceLevel: 'EN 16931',
+      );
+
+      document = pw.Document(
+        compress: false,
+        theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont, italic: regularFont, boldItalic: boldFont),
+        metadata: pdf.PdfaRdf(
+          title: 'Electronic invoice',
+          author: 'OpenAccounting',
+          creator: 'OpenAccounting',
+          subject: 'Factur-X / ZUGFeRD invoice',
+          keywords: 'Factur-X, ZUGFeRD',
+          producer: 'OpenAccounting',
+          invoiceRdf: facturxRdf,
+        ).create(),
+      );
+      pdf.PdfaColorProfile(document.document, colorProfileBytes);
+      addUtf8PdfaAttachment(document: document.document, name: 'factur-x.xml', content: zugferdCiiXml);
+    }
+
+    final bool isCopy = snapshot.copyState == PdfCopyState.copy;
     final pageTheme = pw.PageTheme(
       pageFormat: pdf.PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(36),

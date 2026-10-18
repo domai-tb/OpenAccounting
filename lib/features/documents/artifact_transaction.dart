@@ -16,13 +16,28 @@ class ArtifactTransaction {
   ///
   /// Returns the final file. Throws and leaves no temporary file behind when
   /// the write or readability verification fails.
-  Future<File> writeArtifact({required Directory directory, required String baseName, required List<int> bytes}) async {
+  Future<File> writeArtifact({
+    required Directory directory,
+    required String baseName,
+    required List<int> bytes,
+    String? stagingName,
+  }) async {
     directory.createSync(recursive: true);
     final File target = File('${directory.path}/$baseName');
     if (target.existsSync()) {
       throw FileSystemException('Artifact existiert bereits', target.path);
     }
-    final File staging = File('${directory.path}/$baseName.tmp.${DateTime.now().microsecondsSinceEpoch}');
+    if (stagingName != null &&
+        (stagingName.isEmpty ||
+            stagingName == '.' ||
+            stagingName == '..' ||
+            stagingName == baseName ||
+            stagingName.contains('/') ||
+            stagingName.contains(Platform.pathSeparator))) {
+      throw ArgumentError.value(stagingName, 'stagingName', 'Must be a distinct file name');
+    }
+    final String stagingFileName = stagingName ?? '$baseName.tmp.${DateTime.now().microsecondsSinceEpoch}';
+    final File staging = File('${directory.path}/$stagingFileName');
     if (staging.existsSync()) {
       throw FileSystemException('Artifact-Temporärdatei existiert bereits', staging.path);
     }
@@ -53,13 +68,14 @@ class ArtifactTransaction {
     required Directory directory,
     required Set<String> referencedNames,
     RegExp? ownedArtifactPattern,
+    RegExp? ownedStagingPattern,
   }) async {
     if (!directory.existsSync()) return 0;
     final RegExp owned = ownedArtifactPattern ?? RegExp(r'^\d+\.pdf$');
     var removed = 0;
     await for (final FileSystemEntity entity in directory.list()) {
       final String name = entity.path.split(Platform.pathSeparator).last;
-      final bool isStaging = name.contains('.tmp.');
+      final bool isStaging = name.contains('.tmp.') || (ownedStagingPattern?.hasMatch(name) ?? false);
       final bool isUnreferencedOwned = owned.hasMatch(name) && !referencedNames.contains(name);
       if (!isStaging && !isUnreferencedOwned) continue;
       try {
@@ -121,6 +137,7 @@ class ArtifactRecovery {
       final Directory docsDir = Directory('$profileDir/pdfs/documents');
       if (docsDir.existsSync()) {
         removed += await const ArtifactTransaction().reconcile(directory: docsDir, referencedNames: referencedDocs);
+        removed += await _reconcileZugferdSidecars(executor, docsDir);
       }
       try {
         final List<Map<String, Object?>> rows = await executor.runSelect(
@@ -146,5 +163,48 @@ class ArtifactRecovery {
       } catch (_) {}
     } catch (_) {}
     return (removed: removed, broken: broken);
+  }
+
+  /// Removes only numeric ZUGFeRD sidecars whose invoice is still a draft or
+  /// whose invoice row is absent. Finalized rows are always preserved.
+  static Future<int> _reconcileZugferdSidecars(QueryExecutor executor, Directory docsDir) async {
+    if (!docsDir.existsSync()) return 0;
+
+    final List<Map<String, Object?>> invoiceRows;
+    try {
+      invoiceRows = await executor.runSelect('SELECT id, ist_entwurf FROM rechnungen', const <Object?>[]);
+    } catch (_) {
+      // Without authoritative row state, fail closed and preserve sidecars.
+      return 0;
+    }
+
+    final Map<int, int?> draftStateById = <int, int?>{};
+    for (final Map<String, Object?> row in invoiceRows) {
+      final int? id = int.tryParse(row['id']?.toString() ?? '');
+      if (id == null || id <= 0) continue;
+      draftStateById[id] = int.tryParse(row['ist_entwurf']?.toString() ?? '');
+    }
+
+    final RegExp sidecarName = RegExp(r'^([1-9]\d*)\.zugferd\.xml(?:\.tmp)?$');
+    var removed = 0;
+    try {
+      await for (final FileSystemEntity entity in docsDir.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final String name = entity.path.split(Platform.pathSeparator).last;
+        final RegExpMatch? match = sidecarName.firstMatch(name);
+        if (match == null) continue;
+
+        final String idText = match.group(1)!;
+        final int? id = int.tryParse(idText);
+        if (id == null || id.toString() != idText) continue;
+        if (draftStateById.containsKey(id) && draftStateById[id] != 1) continue;
+
+        try {
+          await entity.delete();
+          removed++;
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return removed;
   }
 }
