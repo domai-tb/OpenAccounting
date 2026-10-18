@@ -2,13 +2,13 @@
 
 ## Historical baseline record
 
-The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23 migration, or the newly reconciled 46-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
+The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23 migration, or the corrected 45-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
 
 ## Revised-contract tests — all open
 
-Do not implement dependent application code until a separate fresh independent review approves the revised contract. The 37 tests marked missing in the scenario matrix are planned, not passing. The existing policy test also needs contract-specific assertions before it can establish the revised policy requirement.
+Do not implement dependent application code until a separate fresh independent review approves the revised contract. The 36 missing scenario rows are planned, not passing. Separately, the existing policy test needs contract-specific assertions before it can establish the revised policy requirement; that extension is not a missing scenario row.
 
-### `mileage-entry` tests (7 missing scenarios)
+### `mileage-entry` tests (7 missing scenarios; 1 existing-test assertion task)
 
 - [ ] Add `test_mileage_form_is_keyboard_operable_and_localized` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_posting_is_unavailable_without_each_prerequisite` in `test/features/mileage/mileage_entry_workflow_test.dart`.
@@ -17,9 +17,9 @@ Do not implement dependent application code until a separate fresh independent r
 - [ ] Add `test_undo_posted_trip_through_correction` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_correction_apply_is_unavailable_without_accepted_operation` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_failed_or_repeated_correction_is_safe` in `test/features/mileage/mileage_entry_workflow_test.dart`.
-- [ ] Extend and rerun existing `test_calculate_from_an_approved_policy` to assert the v1 effective-date boundary, both supported vehicle classes and rates, exact integer half-up cent rounding, and every fail-closed eligibility exclusion. The current test predates this contract and does not establish these assertions.
+- [ ] Separately extend and rerun existing `test_calculate_from_an_approved_policy` to assert the v1 effective-date boundary, both supported vehicle classes and rates, exact integer half-up cent rounding, and every fail-closed eligibility exclusion. The current test predates this contract and does not establish these assertions; this is not a missing scenario row.
 
-### `db` tests (30 missing scenarios)
+### `db` tests (29 missing scenarios)
 
 - [ ] Add `test_create_mileage_tables_on_fresh_install` in `test/db/mileage_schema_test.dart`.
 - [ ] Add `test_reject_direct_insert_into_finalized_trip_state` in `test/db/mileage_schema_test.dart`.
@@ -62,6 +62,6 @@ Do not implement dependent application code until a separate fresh independent r
 
 ## Evidence discipline
 
-- `test-plan.md` is the row-by-row 46-scenario index. Existing tests are marked as prior-contract only; missing tests remain missing.
+- `test-plan.md` is the row-by-row 45-scenario index: 9 existing targets are prior-contract evidence only, and 36 scenario rows remain missing. The existing policy-test assertion task is separate from those missing rows.
 - Structural OpenSpec validation and formatting checks do not prove runtime behavior, migrations, posting, or correction semantics.
 - Do not mark tests complete from a proposed test name, prior review, or historical run.
