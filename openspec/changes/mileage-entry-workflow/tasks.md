@@ -39,8 +39,6 @@ Do not implement dependent application code until a separate fresh independent r
 - [ ] Add `test_missing_payment_table_at_v8_fails_before_repair` in `test/db/mileage_schema_health_test.dart`.
 - [ ] Add `test_payment_table_repair_preserves_existing_rows` in `test/db/mileage_migration_test.dart`.
 - [ ] Add `test_v12_to_v13_migration_adds_markers_and_mileage_tables` in `test/db/mileage_migration_test.dart`.
-- [ ] Resolve the inherited `V8-to-v9 migration adds shared markers and mileage tables` scenario with the owning shared-spec change; it conflicts with the same requirement's v13 mileage-table minimum. Do not implement either incompatible migration behavior until the contract owner resolves it.
-- [ ] After the owner resolves the migration version, add the corresponding `test_v8_to_v9_migration_adds_markers_and_mileage_tables` or corrected-version test in `test/db/mileage_migration_test.dart`.
 - [ ] Add `test_v9_requires_category_history` in `test/db/mileage_schema_health_test.dart`.
 - [ ] Add `test_unknown_lazy_table_is_not_created_by_feature_initialization` in `test/db/mileage_schema_health_test.dart`.
 - [ ] Add `test_table_inventory_matches_schema_version_and_initialized_lazy_tables` in `test/db/mileage_schema_health_test.dart`.
@@ -55,9 +53,10 @@ Do not implement dependent application code until a separate fresh independent r
 
 ## Contract and dependency gates — open
 
-- [x] Obtain a fresh independent review of the spec contract: Round 5 approved commit `d6d441c4c4e0779c83282f5fb16b824630d89688`. This approval is spec-only and does not close the inventory or shared migration-version gates.
+- [x] Record Round 5's spec-only approval at `d6d441c4c4e0779c83282f5fb16b824630d89688`; this approval is invalidated by the version correction in this revision.
+- [ ] Obtain fresh independent review of the corrected DB contract before dependent implementation.
 - [ ] Resolve the inventory dependency with both owners: `profile-data-portability` is 46 names/v13 while `customer-data-disclosure-export` is 55 names/v19. The common inventory and version-aware presence rules remain unaccepted; keep mileage migration and complete-export claims blocked.
-- [ ] Resolve the inherited `db` requirement's version conflict: its v8-to-v9 scenario creates mileage tables while its Table Definitions require those tables at v13. This shared maintained-spec edit is outside this revision; keep migration work blocked until the owner reconciles it.
+- [x] Reconcile the DB migration-version conflict: mileage tables and shared markers are created at v13 from v12; v9 remains the category-history migration. This closes the spec conflict only; no migration implementation is established.
 - [ ] After the review and inventory gates close, implement only against this contract and update each matrix row from planned/missing to evidence-backed status after running its named test.
 - [ ] Reconcile the accepted account mapping and atomic posting integration; preserve the rule that unresolved trips stay unresolved and mileage posting has no cash or VAT leg.
 

@@ -34,13 +34,12 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 - **WHEN** the database trigger evaluates the insert
 - **THEN** it rejects the insert and creates no row
 
-#### Scenario: Gate mileage migration until dependencies agree
+#### Scenario: Gate mileage migration until export inventories agree
 - **GIVEN** the archived `profile-data-portability` change declares 46 names at v13 and the archived `customer-data-disclosure-export` change declares 55 names at v19, while their maintained inventory requirements still conflict
-- **AND** the inherited shared `db` requirement contains a v8-to-v9 mileage-table scenario while its inventory requires mileage tables at v13
 - **WHEN** the mileage migration release gate is evaluated
-- **THEN** the v23 mileage migration remains blocked until both inventory owners accept the same 55-name v19 inventory and version-aware presence rules and the shared `db` owner resolves the version conflict
+- **THEN** the v23 mileage migration remains blocked until both inventory owners accept the same 55-name v19 inventory and version-aware presence rules
 - **AND** no migration or export may claim mileage completeness from the conflicting inventories
-- **AND** the existing profile and mileage rows remain unchanged while the dependency is open
+- **AND** the existing profile and mileage rows remain unchanged while the inventory dependency is open
 
 #### Scenario: Roll back failed mileage migration
 - **GIVEN** mileage table or index creation or schema verification fails during migration
@@ -50,8 +49,8 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 - **AND** the pre-migration backup is retained
 
 #### Scenario: Preserve mileage data on downgrade attempt
-- **GIVEN** a profile has the mileage schema at version 9
-- **WHEN** an older application that supports only version 8 opens the profile
+- **GIVEN** a profile has the mileage schema at version 13
+- **WHEN** an older application that supports only version 12 opens the profile
 - **THEN** it rejects the newer schema without dropping either mileage table or changing profile data
 
 #### Scenario: Protect posted trip facts at the database boundary
@@ -102,7 +101,7 @@ Before v8, forderung_zahlungen MAY be absent or in its accepted legacy v7 shape;
 
 The v13 feature_table_state table SHALL contain exactly one durable row for each recurring occurrence table, constrained to those two names and states `never_initialized`, `initialized`, or `unknown`. Fresh v13+ profiles SHALL seed both rows as `never_initialized`. The v12-to-v13 migration SHALL mark a valid existing occurrence table `initialized` and an absent table `unknown`; absence alone SHALL NOT imply `never_initialized`. Feature initialization SHALL create a table and transition its marker in one transaction, and SHALL NOT create an `unknown` table. Unknown may become `never_initialized` only after explicit integrity reconciliation verifies the feature was never initialized; it may become `initialized` only after a verified table is restored or its prior data otherwise verified.
 
-The mileage version-13 tables SHALL NOT be treated as complete-export eligible until both `profile-data-portability` and `customer-data-disclosure-export` accept the same 55-name v19 inventory and version-aware presence rules, including both mileage tables at v13. If either export encounters a profile containing a table while its accepted inventory omits that table, it SHALL mark the result incomplete and SHALL NOT publish or claim a complete export. These exporters SHALL NOT create, repair, or remove mileage tables. Lifecycle triggers enforcing unresolved-only trip INSERTs, draft-only correction INSERTs, correction transitions, final-row immutability with no DELETEs, and replacement-posted atomicity SHALL be installed by migration v23 (following verified current version 22); if another migration lands first, the triggers SHALL use the next sequential version. The v23 migration SHALL remain blocked until both inventory owners accept the common inventory and the shared `db` spec owner resolves the inherited v8-to-v9 versus v13 migration-version conflict.
+The mileage version-13 tables SHALL NOT be treated as complete-export eligible until both `profile-data-portability` and `customer-data-disclosure-export` accept the same 55-name v19 inventory and version-aware presence rules, including both mileage tables at v13. If either export encounters a profile containing a table while its accepted inventory omits that table, it SHALL mark the result incomplete and SHALL NOT publish or claim a complete export. These exporters SHALL NOT create, repair, or remove mileage tables. Lifecycle triggers enforcing unresolved-only trip INSERTs, draft-only correction INSERTs, correction transitions, final-row immutability with no DELETEs, and replacement-posted atomicity SHALL be installed by migration v23 (following verified current version 22); if another migration lands first, the triggers SHALL use the next sequential version. The v23 migration SHALL remain blocked until both inventory owners accept the common inventory and version-aware presence rules.
 
 #### Scenario: All Tables Created on Fresh Install
 
@@ -157,14 +156,6 @@ The mileage version-13 tables SHALL NOT be treated as complete-export eligible u
 - **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v13 transaction
 - **AND** it SHALL mark existing valid occurrence tables `initialized` and absent occurrence tables `unknown`
 - **AND** it SHALL increment user_version to 13 only after successful verification
-
-#### Scenario: V8-to-v9 migration adds shared markers and mileage tables
-
-- **GIVEN** a valid profile is at schema version 8 with forderung_zahlungen present
-- **WHEN** the next sequential migration runs
-- **THEN** it SHALL create and verify feature_table_state and both mileage tables in the coordinated v9 transaction
-- **AND** it SHALL mark existing valid lazy occurrence tables initialized and absent lazy tables unknown
-- **AND** it SHALL increment user_version to 9 only after successful verification
 
 #### Scenario: V9 migration adds category history
 

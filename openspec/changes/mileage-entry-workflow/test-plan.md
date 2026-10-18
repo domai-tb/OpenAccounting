@@ -1,6 +1,6 @@
 # Mileage Entry Workflow Test Plan
 
-This matrix maps all 16 `mileage-entry` scenarios and all 30 `db` scenarios (46 total) to one named test target each. The nine named mileage tests already exist and were reported passing against the earlier contract; they have not been rerun against this revised contract, and their coverage of the new structured eligibility policy is not established. The other 37 tests are missing and remain planned. No missing test is reported as passing.
+This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 total) to one named test target each. The nine named mileage tests already exist and were reported passing against the earlier contract; they have not been rerun against this revised contract, and their coverage of the new structured eligibility policy is not established. The other 36 tests are missing and remain planned. No missing test is reported as passing.
 
 | Spec | Scenario | Test file | Test name | Evidence status |
 |---|---|---|---|---|
@@ -22,7 +22,7 @@ This matrix maps all 16 `mileage-entry` scenarios and all 30 `db` scenarios (46 
 | `specs/mileage-entry/spec.md` | Failed or repeated correction is safe | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_failed_or_repeated_correction_is_safe` | MISSING — planned, not run |
 | `specs/db/spec.md` | Create mileage tables on fresh install | `test/db/mileage_schema_test.dart` | `test_create_mileage_tables_on_fresh_install` | MISSING — planned, not run |
 | `specs/db/spec.md` | Reject direct inserts into finalized trip states | `test/db/mileage_schema_test.dart` | `test_reject_direct_insert_into_finalized_trip_state` | MISSING — planned, not run |
-| `specs/db/spec.md` | Gate mileage migration until dependencies agree | `test/db/mileage_migration_test.dart` | `test_gate_v23_migration_until_all_dependencies_agree` | MISSING — planned, not run |
+| `specs/db/spec.md` | Gate mileage migration until export inventories agree | `test/db/mileage_migration_test.dart` | `test_gate_v23_migration_until_all_dependencies_agree` | MISSING — planned, not run |
 | `specs/db/spec.md` | Roll back failed mileage migration | `test/db/mileage_migration_test.dart` | `test_failed_mileage_migration_rolls_back` | MISSING — planned, not run |
 | `specs/db/spec.md` | Preserve mileage data on downgrade attempt | `test/db/mileage_migration_test.dart` | `test_downgrade_rejects_without_changing_mileage_data` | MISSING — planned, not run |
 | `specs/db/spec.md` | Protect posted trip facts at the database boundary | `test/db/mileage_schema_test.dart` | `test_database_rejects_mutating_or_deleting_posted_trip` | MISSING — planned, not run |
@@ -38,7 +38,6 @@ This matrix maps all 16 `mileage-entry` scenarios and all 30 `db` scenarios (46 
 | `specs/db/spec.md` | Missing payment table at v8 or later preserves the incomplete signal | `test/db/mileage_schema_health_test.dart` | `test_missing_payment_table_at_v8_fails_before_repair` | MISSING — planned, not run |
 | `specs/db/spec.md` | Current payment table repair preserves existing rows | `test/db/mileage_migration_test.dart` | `test_payment_table_repair_preserves_existing_rows` | MISSING — planned, not run |
 | `specs/db/spec.md` | V12-to-v13 migration adds shared markers and mileage tables | `test/db/mileage_migration_test.dart` | `test_v12_to_v13_migration_adds_markers_and_mileage_tables` | MISSING — planned, not run |
-| `specs/db/spec.md` | V8-to-v9 migration adds shared markers and mileage tables | `test/db/mileage_migration_test.dart` | `test_v8_to_v9_migration_adds_markers_and_mileage_tables` | MISSING — planned, not run; inherited scenario conflicts with the v13 table requirement |
 | `specs/db/spec.md` | V9 migration adds category history | `test/db/mileage_schema_health_test.dart` | `test_v9_requires_category_history` | MISSING — planned, not run |
 | `specs/db/spec.md` | Unknown lazy-table state is not repaired by initialization | `test/db/mileage_schema_health_test.dart` | `test_unknown_lazy_table_is_not_created_by_feature_initialization` | MISSING — planned, not run |
 | `specs/db/spec.md` | Table Count Verification | `test/db/mileage_schema_health_test.dart` | `test_table_inventory_matches_schema_version_and_initialized_lazy_tables` | MISSING — planned, not run |
@@ -53,7 +52,11 @@ This matrix maps all 16 `mileage-entry` scenarios and all 30 `db` scenarios (46 
 
 ## Coverage and evidence notes
 
-- Scenario count: 16 `mileage-entry` + 30 `db` = 46 mapped rows.
+- Scenario count: 16 `mileage-entry` + 29 `db` = 45 mapped rows.
 - Existing executable tests: 9. Their earlier 9/9 result is historical evidence only; none were rerun after this contract revision.
-- Missing tests: 37 (7 feature scenarios and all 30 database scenarios). Every missing row remains explicitly unverified.
+- Missing tests: 36 (7 feature scenarios and all 29 database scenarios). Every missing row remains explicitly unverified.
 - The future test files in this matrix are targets, not existing files. OpenSpec structural validation and `git diff --check` can validate artifact structure/formatting, but cannot substitute for these behavioral tests.
+
+## Version correction
+
+The stale duplicate `V8-to-v9 migration adds shared markers and mileage tables` scenario was removed. Its correct table-creation coverage remains in `V12-to-v13 migration adds shared markers and mileage tables`; the distinct `V9 migration adds category history` scenario remains. The v12-to-v13 test target remains MISSING — planned, not run.
