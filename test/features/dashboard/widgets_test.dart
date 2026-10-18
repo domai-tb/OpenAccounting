@@ -5,8 +5,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/dashboard/dashboard_entity.dart';
 import 'package:openaccounting/features/dashboard/dashboard_page.dart';
+import 'package:openaccounting/features/dashboard/dashboard_period.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
+import 'package:openaccounting/features/dashboard/dashboard_usecases.dart';
 import 'package:openaccounting/features/dashboard/dashboard_widgets.dart';
+import 'package:openaccounting/l10n/l10n.dart';
+
+class _FixedDashboardYearNotifier extends DashboardYearNotifier {
+  @override
+  int build() => 2025;
+}
 
 void main() {
   group('Dashboard widgets — 13+ render', () {
@@ -334,6 +342,100 @@ void main() {
       expect(find.text('2 Rechnungen • 300.50 €'), findsOneWidget);
     });
 
+    testWidgets('income and expense card renders canonical annual reporting values', (tester) async {
+      final AppDatabase db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
+      tester.view.physicalSize = const Size(1600, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      const DashboardAnnualKpis kpis = DashboardAnnualKpis(
+        year: 2025,
+        incomeCents: 230000,
+        expenseCents: 50000,
+        profitCents: 177000,
+        marginPercent: 12.3,
+      );
+      const DashboardConfig config = DashboardConfig(
+        order: <String>['einnahmen_ausgaben'],
+        visibility: <String, bool>{'einnahmen_ausgaben': true},
+        quickLinks: <QuickLink>[],
+      );
+      final DashboardUseCase useCase = DashboardUseCase(
+        db.executor,
+        annualSummaries: <int, DashboardAnnualKpis>{2025: kpis},
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            dashboardConfigProvider.overrideWith((ref) async => config),
+            dashboardUseCaseProvider.overrideWithValue(useCase),
+            dashboardSelectedYearProvider.overrideWith(_FixedDashboardYearNotifier.new),
+          ],
+          child: const MaterialApp(
+            locale: Locale('de'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: DashboardPageImpl(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Einnahmen:'), findsOneWidget);
+      expect(find.text('Ausgaben:'), findsOneWidget);
+      expect(find.text('Gewinn:'), findsOneWidget);
+      expect(find.textContaining('Marge: 12.3 %'), findsOneWidget);
+      expect(find.textContaining('2.300,00'), findsOneWidget);
+      expect(find.textContaining('500,00'), findsOneWidget);
+      expect(find.textContaining('1.770,00'), findsOneWidget);
+    });
+
+    testWidgets('income and expense card stays unavailable without canonical annual values', (tester) async {
+      final AppDatabase db = AppDatabase.createTestDatabase();
+      await db.ensureOpen();
+      addTearDown(db.close);
+      await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES (?, ?, ?, ?)',
+        <Object?>['2025-03-10', 'Legacy income', '100.00', 'Einnahme'],
+      );
+      tester.view.physicalSize = const Size(1600, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      const DashboardConfig config = DashboardConfig(
+        order: <String>['einnahmen_ausgaben'],
+        visibility: <String, bool>{'einnahmen_ausgaben': true},
+        quickLinks: <QuickLink>[],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(db),
+            dashboardConfigProvider.overrideWith((ref) async => config),
+            dashboardUseCaseProvider.overrideWithValue(DashboardUseCase(db.executor)),
+            dashboardSelectedYearProvider.overrideWith(_FixedDashboardYearNotifier.new),
+            dashboardAnnualSummaryProvider(2025).overrideWith((ref) async => null),
+          ],
+          child: const MaterialApp(
+            locale: Locale('de'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: DashboardPageImpl(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Auswertung ausstehend'), findsWidgets);
+      expect(find.text('Einnahmen:'), findsNothing);
+      expect(find.textContaining('100,00'), findsNothing);
+    });
+
     testWidgets('loading shows skeleton CircularProgressIndicator', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -413,7 +515,7 @@ void main() {
 
     tearDown(() async => db.close());
 
-    test('ueberfaellige, einnahmenAusgaben, kontostand, aktivitaetsLog, fristen, mahnung, ustvaFrist', () async {
+    test('ueberfaellige, kontostand, aktivitaetsLog, fristen, mahnung, ustvaFrist', () async {
       final kundeId = await db.executor.runInsert(
         'INSERT INTO kunden (name, strasse, plz, ort, land, anrede) VALUES (?, ?, ?, ?, ?, ?)',
         <Object?>['K', 'S', '10115', 'B', 'DE', 'Herr'],
@@ -450,9 +552,6 @@ void main() {
         'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ) VALUES (?, ?, ?, ?, ?)',
         <Object?>['2026-02-02', 'Ausgabe', 1, '-400.00', 'Ausgabe'],
       );
-      final ea = await repo.fetchEinnahmenAusgaben();
-      expect(ea['einnahmen'], isNotNull);
-      expect(ea['ausgaben'], isNotNull);
 
       await db.executor.runInsert('INSERT INTO konten (name, saldo) VALUES (?, ?)', <Object?>['Kasse', '500.00']);
       final ks = await repo.fetchKontostand();

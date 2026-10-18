@@ -93,7 +93,7 @@
 
 ## 7. dashboard: Localized dashboard interactions
 
-- [x] 7.1 Write failing test `test_render_metrics_in_the_selected_locale` in `test/features/dashboard/dashboard_period_metrics_and_trends_test.dart` for scenario "Render metrics in the selected locale"; assert it fails for the right reason.
+- [x] 7.1 Write failing widget test `income and expense card renders canonical annual reporting values` in `test/features/dashboard/widgets_test.dart` for scenario "Render metrics in the selected locale"; confirm the baseline card does not display canonical profit.
 - [x] 7.2 Implement the specified behavior for "Render metrics in the selected locale" to pass 7.1.
 - [x] 7.3 Refactor the affected code; keep the focused and full suites green.
 - [x] 7.4 Write failing test `test_no_data_for_a_selected_period` in `test/features/dashboard/dashboard_period_metrics_and_trends_test.dart` for scenario "No data for a selected period"; assert it fails for the right reason.
@@ -104,4 +104,13 @@
 
 - Follow `design.md` for implementation decisions and dependency order.
 - Keep each scenario in red-green-refactor order; do not implement behavior before its failing test.
-- Keep `test-plan.md` red until its named test passes.
+- Update `test-plan.md` current status only after its named test passes.
+
+## 8. dashboard: Canonical annual summary consumption
+
+- [x] 8.1 Add failing widget test `income and expense card renders canonical annual reporting values` in `test/features/dashboard/widgets_test.dart`; confirm the baseline card omits canonical profit.
+- [x] 8.2 Route the annual income/expense widget through the selected year's `dashboardAnnualSummaryProvider` and render the canonical income, expense, profit, and margin fields.
+- [x] 8.3 Keep the annual widget pending when the canonical summary is unavailable; do not fall back to raw journal totals, and update dashboard audit tests to assert that boundary.
+- [x] 8.4 Remove dashboard monthly profit derivation and keep monthly trend data limited to its supported income and expense fields.
+- [x] 8.5 Refactor and verify dashboard implementation with focused FVM tests and static analysis.
+- [x] 8.6 Refresh the dashboard coverage ledger and verification evidence without changing proposal, design, or delta specifications.

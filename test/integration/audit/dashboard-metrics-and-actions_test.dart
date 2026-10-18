@@ -3,6 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/dashboard/dashboard_repository.dart';
+import 'package:openaccounting/features/dashboard/dashboard_usecases.dart';
 
 void main() {
   group('Dashboard metrics and actions', () {
@@ -40,8 +41,8 @@ void main() {
       expect(result['sum'], contains('600'));
     });
 
-    test('test_dashboard_metrics_and_actions_1_2_income_and_expense_direction_is_correct', () async {
-      // Insert journal rows: einnahme (positive), ausgabe (negative persisted)
+    test('test_dashboard_metrics_and_actions_1_2_unapproved_period_has_no_journal_fallback', () async {
+      // Legacy journal totals do not become annual dashboard metrics for an unsupported year.
       await db.executor.runCustom(
         "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES ('2026-06-01', 'Sale', 500.00, 'Einnahme')",
       );
@@ -52,14 +53,12 @@ void main() {
         "INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES ('2026-06-01', 'Refund', 100.00, 'Einnahme')",
       );
 
-      final result = await repo.fetchEinnahmenAusgaben();
+      final result = await DashboardUseCase(db.executor).annualSummaryFromReporting(2026);
 
-      // Income = 500 + 100 = 600, Expense = 300
-      expect(result['einnahmen'], contains('600'));
-      expect(result['ausgaben'], contains('300'));
+      expect(result, isNull);
     });
 
-    test('test_dashboard_metrics_and_actions_1_2_reversals_reduce_totals', () async {
+    test('test_dashboard_metrics_and_actions_1_2_reversals_do_not_fill_unavailable_periods', () async {
       final int incomeId = await db.executor.runInsert(
         'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ) VALUES (?, ?, ?, ?)',
         const <Object?>['2026-06-01', 'Sale', '500.00', 'Einnahme'],
@@ -77,10 +76,9 @@ void main() {
         <Object?>['2026-06-01', 'Storno Rent', '-300.00', 'Ausgabe', expenseId],
       );
 
-      final result = await repo.fetchEinnahmenAusgaben();
+      final result = await DashboardUseCase(db.executor).annualSummaryFromReporting(2026);
 
-      expect(result['einnahmen'], '0.00');
-      expect(result['ausgaben'], '0.00');
+      expect(result, isNull);
     });
 
     test('test_dashboard_metrics_and_actions_1_3_filing_deadline_follows_configuration', () async {

@@ -66,8 +66,6 @@ class DashboardTrendPoint {
   final int month;
   final int incomeCents;
   final int expenseCents;
-
-  int get profitCents => incomeCents - expenseCents;
 }
 
 /// Comparable change for one KPI.
@@ -163,15 +161,6 @@ bool isDashboardRouteAllowed(String route) {
     }
   }
   return false;
-}
-
-/// Profit equals recognized income less deductible expenses.
-int dashboardProfitCents(int incomeCents, int expenseCents) => incomeCents - expenseCents;
-
-/// Margin equals profit / income * 100 when income is positive, else null.
-double? dashboardMarginPercent(int profitCents, int incomeCents) {
-  if (incomeCents <= 0) return null;
-  return profitCents / incomeCents * 100;
 }
 
 /// Percentage change uses the absolute prior amount as denominator.

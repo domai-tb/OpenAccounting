@@ -278,19 +278,22 @@ class _WidgetCard extends ConsumerWidget {
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         );
       case 'einnahmen_ausgaben':
+        final DashboardAnnualKpis? summary = d.annualSummary;
+        if (summary == null) return Text(l10n.dashboardReportingPending);
+        final String margin = summary.marginPercent == null
+            ? l10n.dashboardMarginUnavailable
+            : '${summary.marginPercent!.toStringAsFixed(1)} %';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _DashboardMoneyLine(
-              label: l10n.dashboardIncome,
-              amount: _parseDashboardMoney(d.sum),
-              obscured: privacyMode,
-            ),
+            _DashboardMoneyLine(label: l10n.dashboardIncome, amount: summary.incomeCents / 100, obscured: privacyMode),
             _DashboardMoneyLine(
               label: l10n.dashboardExpenses,
-              amount: _parseDashboardMoney(d.subtitle),
+              amount: summary.expenseCents / 100,
               obscured: privacyMode,
             ),
+            _DashboardMoneyLine(label: l10n.dashboardProfit, amount: summary.profitCents / 100, obscured: privacyMode),
+            Text('${l10n.dashboardMargin}: $margin'),
           ],
         );
       case 'quick_links':
@@ -310,6 +313,7 @@ class _WidgetCard extends ConsumerWidget {
   }
 
   String? _emptyFor(WidgetData d, AppLocalizations l10n) {
+    if (d.id == 'einnahmen_ausgaben' && d.annualSummary == null) return l10n.dashboardReportingPending;
     if (d.id == 'lagerwarnung' && (d.count ?? 0) == 0) return l10n.dashboardEmptyNoWarnings;
     if (d.id == 'lagerbestand' && (d.count ?? 0) == 0) {
       return l10n.dashboardEmptyNoStock;

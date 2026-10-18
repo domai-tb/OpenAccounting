@@ -260,19 +260,6 @@ class DashboardRepository {
     };
   }
 
-  Future<Map<String, Object?>> fetchEinnahmenAusgaben() async {
-    final rows = await executor.runSelect(
-      "SELECT COALESCE(SUM(CASE WHEN beleg_typ = 'Einnahme' THEN "
-      "CASE WHEN storno_von IS NOT NULL THEN -ABS(betrag) ELSE ABS(betrag) END ELSE 0 END),0) as ein, "
-      "COALESCE(SUM(CASE WHEN beleg_typ = 'Ausgabe' THEN "
-      "CASE WHEN storno_von IS NOT NULL THEN -ABS(betrag) ELSE ABS(betrag) END ELSE 0 END),0) as aus FROM journal",
-      const <Object?>[],
-    );
-    final ein = money.formatBetrag('${rows.first['ein']}');
-    final aus = money.formatBetrag('${rows.first['aus']}');
-    return <String, Object?>{'einnahmen': ein, 'ausgaben': aus};
-  }
-
   Future<Map<String, Object?>> fetchOffeneVerbindlichkeiten() async {
     final rows = await executor.runSelect(
       'SELECT COUNT(*) as c, COALESCE(SUM(brutto_betrag),0) as s '

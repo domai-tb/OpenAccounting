@@ -345,8 +345,15 @@ void main() {
       expect(change.absoluteCents, 2000);
       expect(change.percent, closeTo(20.0, 0.001));
       expect(change.comparable, isTrue);
-      expect(dashboardProfitCents(12000, 7000), 5000);
-      expect(dashboardMarginPercent(5000, 12000), closeTo(41.666, 0.01));
+      const DashboardAnnualKpis annual = DashboardAnnualKpis(
+        year: 2025,
+        incomeCents: 12000,
+        expenseCents: 7000,
+        profitCents: 5300,
+        marginPercent: 38.4,
+      );
+      expect(annual.profitCents, 5300);
+      expect(annual.marginPercent, closeTo(38.4, 0.001));
     });
 
     test('test_handle_a_zero_comparison_baseline', () async {
@@ -372,7 +379,8 @@ void main() {
       );
       final List<DashboardTrendPoint> points = withTrend.monthlyTrend(2025);
       expect(withTrend.hasRenderableTrend(points), isTrue);
-      expect(points.first.profitCents, 6000);
+      expect(points.first.incomeCents, 10000);
+      expect(points.first.expenseCents, 4000);
     });
 
     test('test_trend_data_is_missing_or_invalid', () async {
@@ -499,8 +507,7 @@ void main() {
       expect(await useCase.bankingSelection(<String>['999999']), 'not-found');
     });
 
-    test('test_render_metrics_in_the_selected_locale', () async {
-      expect(dashboardProfitCents(100, 40), 60);
+    test('test_render_supported_trend_values_and_routes', () async {
       expect(isDashboardTrendValue(12), isTrue);
       expect(isDashboardTrendValue(double.nan), isFalse);
       expect(dashboardRouteBase('/banking?transactionId=42'), '/banking');

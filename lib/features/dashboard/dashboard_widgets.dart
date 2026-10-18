@@ -23,6 +23,7 @@ class WidgetData {
     this.icon,
     this.route,
     this.raw,
+    this.annualSummary,
   });
 
   final String id;
@@ -33,6 +34,7 @@ class WidgetData {
   final IconData? icon;
   final String? route;
   final Object? raw;
+  final DashboardAnnualKpis? annualSummary;
 }
 
 /// Icon mapping per widget.
@@ -277,17 +279,6 @@ Future<WidgetData> _fetchWidgetData(DashboardRepository repo, String id) async {
         route: route,
         raw: cfg.quickLinks,
       );
-    case 'einnahmen_ausgaben':
-      final m = await repo.fetchEinnahmenAusgaben();
-      return WidgetData(
-        id: id,
-        title: title,
-        sum: m['einnahmen'] as String?,
-        subtitle: m['ausgaben'] as String?,
-        icon: icon,
-        route: route,
-        raw: m,
-      );
     case 'offene_verbindlichkeiten':
       final m = await repo.fetchOffeneVerbindlichkeiten();
       return WidgetData(
@@ -316,6 +307,17 @@ final dashboardWidgetDataProvider = FutureProvider.family<WidgetData?, String>((
   if (id == 'lagerwarnung' || id == 'lagerbestand') return null;
   final cfg = await ref.watch(dashboardConfigProvider.future);
   if (cfg.visibility[id] == false) return null;
+  if (id == 'einnahmen_ausgaben') {
+    final int year = ref.watch(dashboardSelectedYearProvider);
+    final DashboardAnnualKpis? summary = await ref.watch(dashboardAnnualSummaryProvider(year).future);
+    return WidgetData(
+      id: id,
+      title: dashboardWidgetTitles[id] ?? id,
+      icon: dashboardWidgetIcons[id],
+      route: dashboardWidgetRoutes[id],
+      annualSummary: summary,
+    );
+  }
   final repo = ref.watch(dashboardRepositoryProvider);
   return _fetchWidgetData(repo, id);
 });
