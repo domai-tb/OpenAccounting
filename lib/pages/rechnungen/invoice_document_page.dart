@@ -51,6 +51,8 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
 
   /// Validation details from the last failed export, shown beside the format.
   List<EInvoiceDiagnostic> _exportDiagnostics = const <EInvoiceDiagnostic>[];
+  EInvoiceValidationResult? _exportValidationFailure;
+  int? _exportValidationForId;
 
   /// Session flag: XRechnung was validated and written for this invoice.
   bool _xrechnungExported = false;
@@ -353,6 +355,9 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
         if (!const EInvoiceService().validatorAvailable) return EInvoiceReadiness.unavailable;
         return _zugferdXmlExists(invoice.id) ? EInvoiceReadiness.valid : EInvoiceReadiness.invalid;
       case EInvoiceOutputFormat.xrechnung:
+        if (_exportValidationForId == invoice.id && _exportValidationFailure != null) {
+          return const EInvoiceService().readiness(_exportValidationFailure);
+        }
         if (!const EInvoiceService().validatorAvailable) return EInvoiceReadiness.unavailable;
         return (_exportedForId == invoice.id && _xrechnungExported)
             ? EInvoiceReadiness.valid
@@ -405,10 +410,12 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     setState(() {
       _exportPending = true;
       _exportDiagnostics = const <EInvoiceDiagnostic>[];
+      _exportValidationFailure = null;
+      _exportValidationForId = null;
     });
     try {
       // Validation runs before any save dialog or file write inside the use
-      // case; a failing snapshot never opens a dialog and changes nothing.
+      // case; a failing snapshot never shows the save dialog or changes data.
       final String? destination = await _useCases.exportXRechnung(
         rechnungId: widget.id,
         buyerReference: buyerReference.trim().isEmpty ? null : buyerReference.trim(),
@@ -425,8 +432,17 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
       }
     } on EInvoiceExportValidationException catch (error) {
       if (mounted) {
-        setState(() => _exportDiagnostics = error.result.diagnostics);
-        _showMessage(l10n.eInvoiceReadinessInvalid);
+        setState(() {
+          _exportDiagnostics = error.result.diagnostics;
+          _exportValidationFailure = error.result;
+          _exportValidationForId = invoice.id;
+        });
+        final String message = switch (error.result.status) {
+          EInvoiceValidationStatus.valid => l10n.eInvoiceReadinessValid,
+          EInvoiceValidationStatus.invalid => l10n.eInvoiceReadinessInvalid,
+          EInvoiceValidationStatus.unavailable => l10n.eInvoiceReadinessUnavailable,
+        };
+        _showMessage(message);
       }
     } catch (_) {
       if (mounted) _showMessage(l10n.invoiceActionFailed);

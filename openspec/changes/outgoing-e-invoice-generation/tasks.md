@@ -8,7 +8,7 @@ Tax-contract revision note: the delivered base ledger was 96/128 complete. Tasks
 
 - [x] 1.1 Establish an accepted invoice-money contract and record it as a dependency; do not recalculate or round money during serialization.
 - [ ] 1.2 Independently accept the closed treatment/category/reason mapping and typed persistence contract for the named supported scope; keep §25a incomplete until its category/reason and disclosed-total relationship are accepted. Tax evidence requires additive migration v26 after reserved v23 mileage, v24 setup anchor, and v25 cashbook evidence.
-- [ ] 1.3 Package and demonstrate the pinned offline validator and PDF/A-3b validation on Linux, Windows, and macOS.
+- [ ] 1.3 Package and demonstrate the pinned offline validator and PDF/A-3b validation on Linux, Windows, and macOS; package private Java runtimes for each supported OS without runtime validator downloads.
 - [x] 1.4 Provide a user-facing master-data editor for the customer ZUGFeRD default, or establish the accepted dependency that supplies it.
 - [x] 1.5 Establish and migrate persistent finalized customer snapshot storage so standalone exports cannot read changed live customer data.
 
@@ -170,3 +170,11 @@ Tax-contract revision note: the delivered base ledger was 96/128 complete. Tasks
 - [ ] 13.7 Write failing test for invoice `leistungsdatum` persistence and workspace capture: persists_optional_leistungsdatum_through_workspace in test/features/rechnungen/workspace_lifecycle_actions_test.dart (assert it fails for the right reason).
 - [ ] 13.8 Implement the invoice `leistungsdatum` column, snapshot capture, and workspace field to pass 13.7.
 - [ ] 13.9 Refactor the related implementation; targeted tests and the full suite stay green.
+
+## 14. Offline XML validation service wiring
+
+- [x] 14.1 Write failing service-boundary tests proving schema-invalid serialized UBL and CII are rejected and accepted validation results allow output: `offline_validator_rejects_schema_invalid_xrechnung_xml`, `offline_validator_rejects_schema_invalid_cii_before_hybrid_return`, and `offline_validator_accepts_serialized_ubl_and_cii_before_return` in `test/features/rechnungen/e_invoice_generation_test.dart`.
+- [x] 14.2 Invoke the packaged offline XML validator after serialization and structural checks, before UBL return/save-dialog/write and before CII artifact return; adapt callers to await the async boundary.
+- [x] 14.3 Preserve offline-validator diagnostics on `EInvoiceExportValidationException` and prove invalid UBL does not open the save dialog or write a file with `offline_schema_failure_prevents_save_dialog_and_file_write`; focused tests and analyzer pass.
+- [x] 14.4 Distinguish unavailable validation from invalid XML in typed results and localized diagnostics; prove unavailable UBL/CII output and export are blocked without opening the save dialog or writing a file.
+- [x] 14.5 Validate generated ZUGFeRD CII during production finalization before number reservation, stock, invoice/accounting mutations, or PDF/CII/temp artifact writes; prove unavailable validation preserves all state with `zugferd_validator_unavailable_prevents_any_finalization_side_effects` in `test/features/rechnungen/e_invoice_finalization_test.dart`.

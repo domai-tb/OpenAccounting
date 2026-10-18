@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_artifacts.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
@@ -26,6 +27,11 @@ class ZugferdHybridArtifact {
 /// verify without an interactive desktop session.
 typedef EInvoiceSaveDialog = Future<String?> Function({required String suggestedName, required String extension});
 
+typedef EInvoiceOfflineXmlValidationCallback = Future<EInvoiceOfflineXmlValidationResult> Function({
+  required EInvoiceOutputFormat format,
+  required String xml,
+});
+
 /// Production save dialog backed by the native file selector.
 Future<String?> nativeEInvoiceSaveDialog({required String suggestedName, required String extension}) async {
   final FileSaveLocation? location = await getSaveLocation(
@@ -47,11 +53,15 @@ class EInvoiceService {
     this.validator = const EInvoiceValidator(),
     this.serializer = const EInvoiceXmlSerializer(),
     this.bundle = PinnedArtifactBundle.packaged,
+    this.offlineXmlValidation,
   });
+
+  static final EInvoiceOfflineXmlValidator _packagedOfflineXmlValidator = EInvoiceOfflineXmlValidator();
 
   final EInvoiceValidator validator;
   final EInvoiceXmlSerializer serializer;
   final PinnedArtifactBundle bundle;
+  final EInvoiceOfflineXmlValidationCallback? offlineXmlValidation;
 
   bool get validatorAvailable => bundle.available;
 
@@ -61,11 +71,12 @@ class EInvoiceService {
   /// packaged and verified, so production calls fail closed.
   EInvoiceValidationResult validate(FinalizationSnapshot snapshot, EInvoiceOutputFormat format) {
     if (!bundle.available) {
-      return EInvoiceValidationResult.invalid(<EInvoiceDiagnostic>[
+      return const EInvoiceValidationResult.unavailable(<EInvoiceDiagnostic>[
         EInvoiceDiagnostic(
           ruleId: 'bundleUnavailable',
-          messageDe: 'Validierung nicht verfügbar: ${bundle.reason ?? 'Prüfartefakte fehlen'}',
-          messageEn: 'Validation unavailable: ${bundle.reason ?? 'validator artifacts are missing'}',
+          messageDe:
+              'Die erforderlichen Prüfartefakte sind nicht verfügbar. Es wurde kein E-Rechnungsartefakt ausgegeben.',
+          messageEn: 'Required validation artifacts are unavailable. No e-invoice artifact was produced.',
         ),
       ]);
     }
@@ -75,10 +86,12 @@ class EInvoiceService {
   /// Builds the staged PDF/XML pair from one canonical snapshot.
   ///
   /// Both outputs consume [snapshot]; callers must pass the same immutable
-  /// instance they persist. This does not embed XML or establish standards
-  /// compliance. Production output stays gated until packaging and validator
-  /// prerequisites are implemented.
-  ZugferdHybridArtifact hybridFromPdf({required FinalizationSnapshot snapshot, required List<int> pdfBytes}) {
+  /// instance they persist. CII XML passes the pinned offline profile before
+  /// this returns. This does not embed XML or prove PDF/A-3b conformance.
+  Future<ZugferdHybridArtifact> hybridFromPdf({
+    required FinalizationSnapshot snapshot,
+    required List<int> pdfBytes,
+  }) async {
     final EInvoiceValidationResult result = validate(snapshot, EInvoiceOutputFormat.zugferd);
     if (!result.valid) {
       throw EInvoiceExportValidationException(result);
@@ -86,6 +99,7 @@ class EInvoiceService {
     final String xml = serializer.zugferdCii(snapshot);
     _requirePdfStructure(pdfBytes);
     _requireXmlStructure(xml, 'rsm:CrossIndustryInvoice');
+    await _requireOfflineXmlValidation(format: EInvoiceOutputFormat.zugferd, xml: xml);
     return ZugferdHybridArtifact(
       pdfBytes: List<int>.unmodifiable(pdfBytes),
       ciiXml: xml,
@@ -95,14 +109,65 @@ class EInvoiceService {
 
   /// Serializes standalone XRechnung XML after validation. The invoice is
   /// never mutated by this call.
-  String xrechnungXml(FinalizationSnapshot snapshot) {
+  Future<String> xrechnungXml(FinalizationSnapshot snapshot) async {
     final EInvoiceValidationResult result = validate(snapshot, EInvoiceOutputFormat.xrechnung);
     if (!result.valid) {
       throw EInvoiceExportValidationException(result);
     }
     final String xml = serializer.xrechnungUbl(snapshot);
     _requireXmlStructure(xml, 'Invoice');
+    await _requireOfflineXmlValidation(format: EInvoiceOutputFormat.xrechnung, xml: xml);
     return xml;
+  }
+
+  /// Serializes and validates ZUGFeRD CII before a caller begins finalization side effects.
+  Future<String> zugferdXml(FinalizationSnapshot snapshot) async {
+    final EInvoiceValidationResult result = validate(snapshot, EInvoiceOutputFormat.zugferd);
+    if (!result.valid) {
+      throw EInvoiceExportValidationException(result);
+    }
+    final String xml = serializer.zugferdCii(snapshot);
+    _requireXmlStructure(xml, 'rsm:CrossIndustryInvoice');
+    await _requireOfflineXmlValidation(format: EInvoiceOutputFormat.zugferd, xml: xml);
+    return xml;
+  }
+
+  Future<void> _requireOfflineXmlValidation({required EInvoiceOutputFormat format, required String xml}) async {
+    final EInvoiceOfflineXmlValidationResult offlineResult =
+        await (offlineXmlValidation ?? _packagedOfflineXmlValidator.validateXml)(format: format, xml: xml);
+    if (offlineResult.valid) return;
+
+    final bool unavailable = offlineResult.status == EInvoiceOfflineXmlValidationStatus.unavailable;
+    final String messageDe = unavailable
+        ? 'Die Offline-Prüfung ist nicht verfügbar. Es wurde kein E-Rechnungsartefakt ausgegeben.'
+        : 'Die Offline-Prüfung hat das E-Rechnungs-XML abgelehnt.';
+    final String messageEn = unavailable
+        ? 'Offline validation is unavailable. No e-invoice artifact was produced.'
+        : 'Offline validation rejected the e-invoice XML.';
+    final List<EInvoiceDiagnostic> diagnostics = offlineResult.diagnostics
+        .map(
+          (diagnostic) => EInvoiceDiagnostic(
+            ruleId: diagnostic.code,
+            messageDe: messageDe,
+            messageEn: messageEn,
+            route: 'rechnungen',
+          ),
+        )
+        .toList();
+    if (diagnostics.isEmpty) {
+      diagnostics.add(
+        EInvoiceDiagnostic(
+          ruleId: 'offlineValidator.${offlineResult.status.name}',
+          messageDe: messageDe,
+          messageEn: messageEn,
+          route: 'rechnungen',
+        ),
+      );
+    }
+    final EInvoiceValidationResult result = unavailable
+        ? EInvoiceValidationResult.unavailable(diagnostics)
+        : EInvoiceValidationResult.invalid(diagnostics);
+    throw EInvoiceExportValidationException(result, offlineXmlResult: offlineResult);
   }
 
   /// Validates, asks for a destination, and writes the XML atomically.
@@ -114,7 +179,7 @@ class EInvoiceService {
     required FinalizationSnapshot snapshot,
     required EInvoiceSaveDialog saveDialog,
   }) async {
-    final String xml = xrechnungXml(snapshot);
+    final String xml = await xrechnungXml(snapshot);
     final String? destination = await saveDialog(suggestedName: '${snapshot.documentNumber}.xml', extension: 'xml');
     if (destination == null || destination.trim().isEmpty) return null;
     _writeAtomically(destination, xml);
@@ -125,13 +190,11 @@ class EInvoiceService {
   /// generation and validation to have succeeded for the selected format.
   EInvoiceReadiness readiness(EInvoiceValidationResult? result) {
     if (result == null) return EInvoiceReadiness.notValidated;
-    if (!result.valid) {
-      if (result.diagnostics.any((diagnostic) => diagnostic.ruleId == 'bundleUnavailable')) {
-        return EInvoiceReadiness.unavailable;
-      }
-      return EInvoiceReadiness.invalid;
-    }
-    return EInvoiceReadiness.valid;
+    return switch (result.status) {
+      EInvoiceValidationStatus.valid => EInvoiceReadiness.valid,
+      EInvoiceValidationStatus.invalid => EInvoiceReadiness.invalid,
+      EInvoiceValidationStatus.unavailable => EInvoiceReadiness.unavailable,
+    };
   }
 
   // Minimal structural guards for the packaged artifacts. Full PDF/A-3b
@@ -188,9 +251,10 @@ class EInvoiceService {
 
 /// Thrown when export validation fails before any dialog or file write.
 class EInvoiceExportValidationException implements Exception {
-  const EInvoiceExportValidationException(this.result);
+  const EInvoiceExportValidationException(this.result, {this.offlineXmlResult});
 
   final EInvoiceValidationResult result;
+  final EInvoiceOfflineXmlValidationResult? offlineXmlResult;
 
   @override
   String toString() => result.diagnostics.map((diagnostic) => diagnostic.messageDe).join('; ');

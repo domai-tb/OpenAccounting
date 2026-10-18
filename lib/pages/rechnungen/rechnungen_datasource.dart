@@ -9,8 +9,6 @@ import 'package:openaccounting/features/documents/correction_artifact_writer.dar
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
-import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
-import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 import 'package:openaccounting/features/pdf/pdf_generator.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
@@ -730,6 +728,22 @@ WHERE nummernkreis_id = ? AND ist_entwurf = 0 AND rechnungsnummer IS NOT NULL
           : linkedCompany;
       final senderSnapshot = jsonEncode(companyRows.isEmpty ? <String, Object?>{} : companyRows.single);
       final issuedAt = DateTime.now().toUtc().toIso8601String();
+      final FinalizationSnapshot? eSnapshot = await _buildFinalizationSnapshot(
+        transaction: transaction,
+        invoice: invoice,
+        posRows: posRows,
+        preview: preview,
+        documentNumber: documentNumber,
+        invoiceDate: invoiceDate,
+        typ: typ,
+        eingabemodus: eingabemodus,
+        companyRows: companyRows,
+        selectedFormat: selectedFormat,
+        isOutgoingInvoice: isOutgoingInvoice,
+      );
+      final String? zugferdCiiXml = eSnapshot != null && selectedFormat == EInvoiceOutputFormat.zugferd
+          ? await eInvoiceService.zugferdXml(eSnapshot)
+          : null;
 
       final sequenceUpdated = await transaction.runUpdate(
         '''
@@ -821,40 +835,17 @@ WHERE id = ? AND aktiv = 1 AND naechste_nummer = ?
         companyRows: companyRows,
       );
       final Directory pdfDir = _finalizedDocumentsDirectory(profileDirOverride: profileDirOverride);
-      // One canonical e-invoice snapshot for the selected output, materialized
-      // after number allocation and canonical calculation. Its values are the
-      // same values persisted below; serializers consume only this instance.
-      final FinalizationSnapshot? eSnapshot = await _buildFinalizationSnapshot(
-        transaction: transaction,
-        invoice: invoice,
-        posRows: posRows,
-        preview: preview,
-        documentNumber: documentNumber,
-        invoiceDate: invoiceDate,
-        typ: typ,
-        eingabemodus: eingabemodus,
-        companyRows: companyRows,
-        selectedFormat: selectedFormat,
-        isOutgoingInvoice: isOutgoingInvoice,
-      );
       createdPdfFile = await _writeFinalizedDocumentArtifact(
         documentsDir: pdfDir,
         documentId: rechnungId,
         snapshot: snapshot,
         locale: locale,
       );
-      if (eSnapshot != null && selectedFormat == EInvoiceOutputFormat.zugferd) {
-        // Validated hybrid: CII XML from the same snapshot is generated and
-        // validated before anything commits; any failure rolls back numbering,
-        // status, stock, and database writes and removes temp artifacts.
-        final EInvoiceValidationResult validation = eInvoiceService.validate(eSnapshot, selectedFormat);
-        if (!validation.valid) {
-          throw EInvoiceExportValidationException(validation);
-        }
+      if (zugferdCiiXml != null) {
         createdXmlFile = await _writeZugferdXmlArtifact(
           documentsDir: pdfDir,
           documentId: rechnungId,
-          ciiXml: const EInvoiceXmlSerializer().zugferdCii(eSnapshot),
+          ciiXml: zugferdCiiXml,
         );
       }
       final String pdfPath = createdPdfFile.path;

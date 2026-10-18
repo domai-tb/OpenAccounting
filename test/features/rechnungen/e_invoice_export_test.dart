@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
@@ -159,6 +160,70 @@ void main() {
           },
         ),
         throwsA(isA<EInvoiceExportValidationException>()),
+      );
+
+      expect(dialogOpened, isFalse);
+      expect(exportDir.listSync(), isEmpty);
+    });
+
+    test('offline_schema_failure_prevents_save_dialog_and_file_write', () async {
+      final int invoiceId = await finalizePdfInvoice();
+      var dialogOpened = false;
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: invalidEInvoiceTestOfflineXmlValidation,
+      );
+
+      await expectLater(
+        useCases.exportXRechnung(
+          rechnungId: invoiceId,
+          buyerReference: 'LEITWEG-123',
+          service: service,
+          saveDialog: ({required String extension, required String suggestedName}) async {
+            dialogOpened = true;
+            return '${exportDir.path}/$suggestedName';
+          },
+        ),
+        throwsA(
+          isA<EInvoiceExportValidationException>().having(
+            (error) => error.offlineXmlResult?.diagnostics.single.code,
+            'offline validator diagnostic',
+            'SCHEMA_INVALID',
+          ),
+        ),
+      );
+
+      expect(dialogOpened, isFalse);
+      expect(exportDir.listSync(), isEmpty);
+    });
+
+    test('offline_validator_unavailability_prevents_save_dialog_and_file_write', () async {
+      final int invoiceId = await finalizePdfInvoice();
+      var dialogOpened = false;
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: unavailableEInvoiceTestOfflineXmlValidation,
+      );
+
+      await expectLater(
+        useCases.exportXRechnung(
+          rechnungId: invoiceId,
+          buyerReference: 'LEITWEG-123',
+          service: service,
+          saveDialog: ({required String extension, required String suggestedName}) async {
+            dialogOpened = true;
+            return '${exportDir.path}/$suggestedName';
+          },
+        ),
+        throwsA(
+          isA<EInvoiceExportValidationException>()
+              .having(
+                (error) => error.offlineXmlResult?.status,
+                'offline validator status',
+                EInvoiceOfflineXmlValidationStatus.unavailable,
+              )
+              .having((error) => service.readiness(error.result), 'service readiness', EInvoiceReadiness.unavailable),
+        ),
       );
 
       expect(dialogOpened, isFalse);

@@ -49,7 +49,7 @@ void main() {
       expect(service.validate(snapshot, EInvoiceOutputFormat.xrechnung).valid, isTrue);
     });
 
-    test('unavailable_or_corrupt_bundle_rejects_output_without_compliance_claim', () {
+    test('unavailable_or_corrupt_bundle_rejects_output_without_compliance_claim', () async {
       const EInvoiceService service = EInvoiceService();
       final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
 
@@ -59,9 +59,9 @@ void main() {
       expect(result.diagnostics.single.ruleId, 'bundleUnavailable');
       expect(service.readiness(result), EInvoiceReadiness.unavailable);
       // No compliance is claimed and no output is produced.
-      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
-      expect(
-        () => service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes),
+      await expectLater(service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+      await expectLater(
+        service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes),
         throwsA(isA<EInvoiceExportValidationException>()),
       );
     });

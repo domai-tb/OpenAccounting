@@ -64,12 +64,26 @@
 
 | specs/outgoing-e-invoice-generation/spec.md → XRechnung delivery date | Invoice persists and captures the delivery date | test/features/rechnungen/workspace_lifecycle_actions_test.dart | persists_optional_leistungsdatum_through_workspace | 🔴 red |
 
+| tasks.md → Offline XML validation service wiring | Valid serialized UBL and CII pass the validator boundary before return | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_accepts_serialized_ubl_and_cii_before_return | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Schema-invalid serialized UBL is rejected before return | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_rejects_schema_invalid_xrechnung_xml | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Schema-invalid serialized CII is rejected before hybrid artifact return | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_rejects_schema_invalid_cii_before_hybrid_return | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Schema-invalid UBL prevents save dialog and file write and preserves diagnostics | test/features/rechnungen/e_invoice_export_test.dart | offline_schema_failure_prevents_save_dialog_and_file_write | 🟢 green |
+
+| tasks.md → Offline XML validation service wiring | Unavailable validation blocks UBL and CII output | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_unavailability_blocks_ubl_and_cii_output | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Invalid-result messages are localized and retain engine details separately | test/features/rechnungen/e_invoice_generation_test.dart | offline_validator_invalid_diagnostics_are_localized_and_engine_details_are_retained | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Unavailable validation prevents export dialog and file write | test/features/rechnungen/e_invoice_export_test.dart | offline_validator_unavailability_prevents_save_dialog_and_file_write | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Readiness and validation diagnostics are localized | test/features/rechnungen/invoice_output_format_widget_test.dart | offline_validator_results_show_localized_readiness_and_diagnostics | 🟢 green |
+| tasks.md → Offline XML validation service wiring | Unavailable CII validation prevents production finalization before database, stock, or artifact side effects | test/features/rechnungen/e_invoice_finalization_test.dart | zugferd_validator_unavailable_prevents_any_finalization_side_effects | 🟢 green |
+
 ## Coverage Notes
 
 - Every scenario in the delta spec maps to a named executable test. Tax-classification rows are red because the accepted contract now requires persisted v26 evidence and specific treatment/reason cases; the prior green tests only exercised a rate-derived mapping and do not prove this contract.
 - Reverse-charge coverage has separate executable cases for complete §13b(1) supplier/place-of-supply evidence, complete §13b(2) no. 4 certificate-backed recipient evidence, and fail-closed missing/invalid evidence. VAT IDs, customer type, and service description alone are never eligibility proof.
 - Tax evidence persistence is an additive v26 implementation task. No DDL or migration was changed in this spec-only checkpoint; legacy null rows must fail closed rather than be backfilled from rates.
 - §25a category/reason and its VAT-breakdown/payable-total relationship remain unresolved. Its executable test must prove no e-invoice output and no disclosure of internal margin tax.
-- Tests that inject `PinnedArtifactBundle(available: true)` exercise application-level validation only. They do not load official XSD/Schematron artifacts or prove PDF/A-3 output.
-- Validator and PDF/A tests still require the exact pinned offline artifacts and representative valid/invalid fixtures on Linux, Windows, and macOS.
+- Tests that inject `PinnedArtifactBundle(available: true)` exercise application-level validation only. The service-wiring tests inject validator results to prove call order, fail-closed output, and diagnostic retention; the real-engine package tests separately validate official XSD/Schematron fixtures on Linux.
+- The offline validator package has real-engine Linux evidence. Windows/macOS validation and private Java runtimes for each supported OS remain open; runtime validator downloads are not part of the approved design. App-generated PDF/A-3b conformance and embedded-file relationship checks remain open.
+- Typed offline-validation results distinguish `unavailable` from `invalid`. Engine details remain attached to the raw validation result; user-facing messages are localized, and unavailable validation prevents UBL/CII output, the save dialog, and file writes.
+- Production ZUGFeRD finalization validates the exact serialized CII before number reservation, stock mutation, PDF/CII output, or invoice/accounting writes. The unavailable-validator regression snapshots invoice, sequence, stock, journal, receivable, tax-claim, and inventory state and confirms the artifact directory remains absent/empty.
+- Seller contact policy and the typed tax evidence/migration contract, including §25a, remain unchanged and open. This wiring slice consumes the existing serialized XML and does not revise those decisions.
 - Export dialog tests should inject the native save-dialog adapter so cancellation and atomic output behavior can be verified without an interactive desktop session.

@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 
 import 'e_invoice_test_fixtures.dart';
@@ -114,6 +116,82 @@ void main() {
 
       expect(File('${profileDir.path}/pdfs/documents/$invoiceId.zugferd.xml').existsSync(), isFalse);
       expect(File('${profileDir.path}/pdfs/documents/$invoiceId.pdf').existsSync(), isTrue);
+    });
+
+    test('zugferd_validator_unavailable_prevents_any_finalization_side_effects', () async {
+      final int articleId = (await db.artikelRepository.create(
+        bezeichnung: 'Lagerartikel',
+        vkBrutto: 119,
+        lagerAktiv: true,
+        bestandAktuell: 10,
+      )).id;
+      final int customerId = await addEInvoiceCustomer(db, zugferdAktiv: true);
+      final int invoiceId = await createEInvoiceDraft(ds, kundeId: customerId);
+      await db.executor.runUpdate('UPDATE rechnungspositionen SET artikel_id = ? WHERE rechnung_id = ?', <Object?>[
+        articleId,
+        invoiceId,
+      ]);
+
+      final Map<String, Object?> invoiceBefore = await eInvoiceRow(db, invoiceId);
+      final int sequenceBefore = await eInvoiceSequence(db);
+      final List<Map<String, Object?>> stockBefore = await db.executor.runSelect(
+        'SELECT bestand, bestand_aktuell, lager_aktiv FROM artikel WHERE id = ?',
+        <Object?>[articleId],
+      );
+      Future<int> rowCount(String tableName) async {
+        final List<Map<String, Object?>> rows = await db.executor.runSelect(
+          'SELECT COUNT(*) AS row_count FROM $tableName',
+          const <Object?>[],
+        );
+        return (rows.single['row_count']! as num).toInt();
+      }
+
+      const List<String> tables = <String>['journal', 'forderungen', 'vorsteuer_ansprueche', 'inventarbewegungen'];
+      final Map<String, int> countsBefore = <String, int>{};
+      for (final String table in tables) {
+        countsBefore[table] = await rowCount(table);
+      }
+
+      final EInvoiceService unavailableService = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: unavailableEInvoiceTestOfflineXmlValidation,
+      );
+      final RechnungenDataSource unavailableDataSource = RechnungenDataSource(
+        db.executor,
+        eInvoiceService: unavailableService,
+      );
+      final Directory documentsDir = Directory('${profileDir.path}/pdfs/documents');
+      expect(documentsDir.existsSync(), isFalse);
+
+      await expectLater(
+        unavailableDataSource.finalizeRechnung(
+          rechnungId: invoiceId,
+          locale: 'de_DE',
+          profileDir: profileDir,
+          ausgabeformat: 'zugferd',
+        ),
+        throwsA(
+          isA<EInvoiceExportValidationException>().having(
+            (error) => error.result.status,
+            'validation status',
+            EInvoiceValidationStatus.unavailable,
+          ),
+        ),
+      );
+
+      expect(await eInvoiceRow(db, invoiceId), invoiceBefore);
+      expect(await eInvoiceSequence(db), sequenceBefore);
+      expect(
+        await db.executor.runSelect('SELECT bestand, bestand_aktuell, lager_aktiv FROM artikel WHERE id = ?', <Object?>[
+          articleId,
+        ]),
+        stockBefore,
+      );
+      for (final String table in tables) {
+        expect(await rowCount(table), countsBefore[table], reason: '$table must remain unchanged');
+      }
+      expect(documentsDir.existsSync(), isFalse);
+      expect(await eInvoiceArtifacts(profileDir, invoiceId), isEmpty);
     });
 
     test('invalid_zugferd_data_blocks_finalization_without_side_effects', () async {

@@ -4,14 +4,65 @@ import 'dart:io';
 
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_artifacts.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 
+class InvalidSchemaEInvoiceXmlSerializer extends EInvoiceXmlSerializer {
+  const InvalidSchemaEInvoiceXmlSerializer();
+
+  @override
+  String zugferdCii(FinalizationSnapshot snapshot) =>
+      '<?xml version="1.0" encoding="UTF-8"?><rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"></rsm:CrossIndustryInvoice>';
+
+  @override
+  String xrechnungUbl(FinalizationSnapshot snapshot) =>
+      '<?xml version="1.0" encoding="UTF-8"?><Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"></Invoice>';
+}
+
+/// Keeps service tests independent of Java and the desktop runtime package.
+Future<EInvoiceOfflineXmlValidationResult> eInvoiceTestOfflineXmlValidation({
+  required EInvoiceOutputFormat format,
+  required String xml,
+}) async => const EInvoiceOfflineXmlValidationResult(
+  status: EInvoiceOfflineXmlValidationStatus.valid,
+  message: 'Test validator accepted the serialized XML.',
+);
+
+/// Supplies a deterministic invalid result for service-boundary tests.
+Future<EInvoiceOfflineXmlValidationResult> invalidEInvoiceTestOfflineXmlValidation({
+  required EInvoiceOutputFormat format,
+  required String xml,
+}) async => const EInvoiceOfflineXmlValidationResult(
+  status: EInvoiceOfflineXmlValidationStatus.invalid,
+  message: 'Der XML-Prüflauf hat ein Schema-Problem gefunden.',
+  diagnostics: <EInvoiceOfflineXmlDiagnostic>[
+    EInvoiceOfflineXmlDiagnostic(
+      code: 'SCHEMA_INVALID',
+      level: 'error',
+      message: 'Die XML-Datei verletzt die Schemastruktur.',
+    ),
+  ],
+);
+
+/// Simulates a validator runtime that cannot evaluate serialized XML.
+Future<EInvoiceOfflineXmlValidationResult> unavailableEInvoiceTestOfflineXmlValidation({
+  required EInvoiceOutputFormat format,
+  required String xml,
+}) async => const EInvoiceOfflineXmlValidationResult(
+  status: EInvoiceOfflineXmlValidationStatus.unavailable,
+  message: 'The Java runtime is not available.',
+);
+
 /// Simulates an available bundle for application-boundary tests only.
-const EInvoiceService eInvoiceTestService = EInvoiceService(bundle: PinnedArtifactBundle(available: true));
+const EInvoiceService eInvoiceTestService = EInvoiceService(
+  bundle: PinnedArtifactBundle(available: true),
+  offlineXmlValidation: eInvoiceTestOfflineXmlValidation,
+);
 
 Map<String, Object?> validCompany() => <String, Object?>{
   'name': 'Muster GmbH',

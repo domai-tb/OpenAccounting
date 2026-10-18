@@ -1,6 +1,7 @@
 // ignore_for_file: file_names
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
@@ -10,7 +11,10 @@ import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 
 import 'e_invoice_test_fixtures.dart'
     show
+        InvalidSchemaEInvoiceXmlSerializer,
         eInvoiceTestService,
+        invalidEInvoiceTestOfflineXmlValidation,
+        unavailableEInvoiceTestOfflineXmlValidation,
         fakePdfBytes,
         standardPositions,
         standardTotals,
@@ -20,13 +24,146 @@ import 'e_invoice_test_fixtures.dart'
 
 void main() {
   group('ZUGFeRD and XRechnung e-invoicing', () {
-    test('generates_hybrid_pdf_with_validated_zugferd_metadata', () {
+    test('offline_validator_accepts_serialized_ubl_and_cii_before_return', () async {
+      final List<EInvoiceOutputFormat> validatedFormats = <EInvoiceOutputFormat>[];
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: ({required EInvoiceOutputFormat format, required String xml}) async {
+          validatedFormats.add(format);
+          if (format == EInvoiceOutputFormat.xrechnung) {
+            expect(xml, contains('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"'));
+          } else {
+            expect(xml, contains('<rsm:CrossIndustryInvoice'));
+          }
+          return const EInvoiceOfflineXmlValidationResult(
+            status: EInvoiceOfflineXmlValidationStatus.valid,
+            message: 'The pinned profile accepted this XML.',
+          );
+        },
+      );
+      final String ubl = await service.xrechnungXml(
+        validSnapshot(buyerReference: 'LEITWEG-123', format: EInvoiceOutputFormat.xrechnung),
+      );
+      final ZugferdHybridArtifact hybrid = await service.hybridFromPdf(
+        snapshot: validSnapshot(format: EInvoiceOutputFormat.zugferd),
+        pdfBytes: fakePdfBytes,
+      );
+
+      expect(ubl, contains('<Invoice'));
+      expect(hybrid.ciiXml, contains('<rsm:CrossIndustryInvoice'));
+      expect(validatedFormats, <EInvoiceOutputFormat>[EInvoiceOutputFormat.xrechnung, EInvoiceOutputFormat.zugferd]);
+    });
+
+    test('offline_validator_rejects_schema_invalid_xrechnung_xml', () async {
+      final EInvoiceService service = EInvoiceService(
+        serializer: const InvalidSchemaEInvoiceXmlSerializer(),
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: invalidEInvoiceTestOfflineXmlValidation,
+      );
+      final FinalizationSnapshot snapshot = validSnapshot(
+        buyerReference: 'LEITWEG-123',
+        format: EInvoiceOutputFormat.xrechnung,
+      );
+
+      await expectLater(
+        Future<String>.sync(() => service.xrechnungXml(snapshot)),
+        throwsA(isA<EInvoiceExportValidationException>()),
+      );
+    });
+
+    test('offline_validator_rejects_schema_invalid_cii_before_hybrid_return', () async {
+      final EInvoiceService service = EInvoiceService(
+        serializer: const InvalidSchemaEInvoiceXmlSerializer(),
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: invalidEInvoiceTestOfflineXmlValidation,
+      );
+      final FinalizationSnapshot snapshot = validSnapshot(format: EInvoiceOutputFormat.zugferd);
+
+      await expectLater(
+        Future<ZugferdHybridArtifact>.sync(() => service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes)),
+        throwsA(isA<EInvoiceExportValidationException>()),
+      );
+    });
+
+    test('offline_validator_unavailability_blocks_ubl_and_cii_output', () async {
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: unavailableEInvoiceTestOfflineXmlValidation,
+      );
+      EInvoiceExportValidationException? ublError;
+      EInvoiceExportValidationException? ciiError;
+
+      try {
+        await service.xrechnungXml(
+          validSnapshot(buyerReference: 'LEITWEG-123', format: EInvoiceOutputFormat.xrechnung),
+        );
+      } on EInvoiceExportValidationException catch (error) {
+        ublError = error;
+      }
+      try {
+        await service.hybridFromPdf(
+          snapshot: validSnapshot(format: EInvoiceOutputFormat.zugferd),
+          pdfBytes: fakePdfBytes,
+        );
+      } on EInvoiceExportValidationException catch (error) {
+        ciiError = error;
+      }
+
+      void expectUnavailable(EInvoiceExportValidationException? error) {
+        expect(error, isNotNull);
+        final EInvoiceExportValidationException failure = error!;
+        expect(failure.offlineXmlResult?.status, EInvoiceOfflineXmlValidationStatus.unavailable);
+        expect(failure.result.status, EInvoiceValidationStatus.unavailable);
+        expect(failure.offlineXmlResult?.message, 'The Java runtime is not available.');
+        expect(service.readiness(failure.result), EInvoiceReadiness.unavailable);
+        final EInvoiceDiagnostic diagnostic = failure.result.diagnostics.single;
+        expect(diagnostic.ruleId, 'offlineValidator.unavailable');
+        expect(
+          diagnostic.messageFor('de'),
+          'Die Offline-Prüfung ist nicht verfügbar. Es wurde kein E-Rechnungsartefakt ausgegeben.',
+        );
+        expect(
+          diagnostic.messageFor('en_US'),
+          'Offline validation is unavailable. No e-invoice artifact was produced.',
+        );
+      }
+
+      expectUnavailable(ublError);
+      expectUnavailable(ciiError);
+    });
+
+    test('offline_validator_invalid_diagnostics_are_localized_and_engine_details_are_retained', () async {
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: invalidEInvoiceTestOfflineXmlValidation,
+      );
+      EInvoiceExportValidationException? failure;
+
+      try {
+        await service.xrechnungXml(validSnapshot(buyerReference: 'LEITWEG-123'));
+      } on EInvoiceExportValidationException catch (error) {
+        failure = error;
+      }
+
+      expect(failure, isNotNull);
+      final EInvoiceExportValidationException result = failure!;
+      expect(result.result.status, EInvoiceValidationStatus.invalid);
+      expect(service.readiness(result.result), EInvoiceReadiness.invalid);
+      expect(result.offlineXmlResult?.diagnostics.single.message, 'Die XML-Datei verletzt die Schemastruktur.');
+      final EInvoiceDiagnostic diagnostic = result.result.diagnostics.single;
+      expect(diagnostic.ruleId, 'SCHEMA_INVALID');
+      expect(diagnostic.messageFor('de'), 'Die Offline-Prüfung hat das E-Rechnungs-XML abgelehnt.');
+      expect(diagnostic.messageFor('en_US'), 'Offline validation rejected the e-invoice XML.');
+      expect(diagnostic.messageFor('en_US'), isNot(contains('Die XML-Datei verletzt die Schemastruktur.')));
+    });
+
+    test('generates_hybrid_pdf_with_validated_zugferd_metadata', () async {
       const EInvoiceService service = eInvoiceTestService;
       final FinalizationSnapshot snapshot = validSnapshot(format: EInvoiceOutputFormat.zugferd);
 
       final EInvoiceValidationResult validation = service.validate(snapshot, EInvoiceOutputFormat.zugferd);
       expect(validation.valid, isTrue);
-      final ZugferdHybridArtifact hybrid = service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes);
+      final ZugferdHybridArtifact hybrid = await service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes);
 
       expect(hybrid.pdfBytes, fakePdfBytes);
       expect(hybrid.documentNumber, 'RE-2026-0001');
@@ -36,7 +173,7 @@ void main() {
       expect(service.readiness(validation), EInvoiceReadiness.valid);
     });
 
-    test('generates_standalone_xrechnung_ubl_without_mutating_invoice', () {
+    test('generates_standalone_xrechnung_ubl_without_mutating_invoice', () async {
       const EInvoiceService service = eInvoiceTestService;
       final FinalizationSnapshot snapshot = validSnapshot(
         buyerReference: 'LEITWEG-123',
@@ -44,7 +181,7 @@ void main() {
       );
       final int netBefore = snapshot.netCents;
 
-      final String xml = service.xrechnungXml(snapshot);
+      final String xml = await service.xrechnungXml(snapshot);
 
       expect(xml.contains('<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"'), isTrue);
       expect(xml.contains('xrechnung_3.0'), isTrue);
@@ -56,7 +193,7 @@ void main() {
       expect(snapshot.lines.single.netCents, 20000);
     });
 
-    test('rejects_invalid_invoice_with_localized_rule_diagnostic_and_no_output', () {
+    test('rejects_invalid_invoice_with_localized_rule_diagnostic_and_no_output', () async {
       const EInvoiceService service = eInvoiceTestService;
       final Map<String, Object?> customer = validCustomer()..remove('strasse');
       final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
@@ -78,7 +215,7 @@ void main() {
       expect(diagnostic.messageFor('de'), contains('buyer.street'));
       expect(diagnostic.messageFor('en_US'), isNotEmpty);
       expect(diagnostic.route, 'rechnungen');
-      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+      await expectLater(service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
     });
 
     test('serializes_approved_typed_tax_category_and_exemption_reason', () {
@@ -198,7 +335,7 @@ void main() {
       expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('seller.endpoint'));
     });
 
-    test('missing_payment_data_fails_closed', () {
+    test('missing_payment_data_fails_closed', () async {
       const EInvoiceService service = eInvoiceTestService;
       final Map<String, Object?> company = validCompany()..remove('iban');
       final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
@@ -216,7 +353,7 @@ void main() {
       final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
       expect(result.valid, isFalse);
       expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('seller.payment'));
-      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+      await expectLater(service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
     });
 
     test('emits_payment_means_with_company_iban', () {
@@ -253,7 +390,7 @@ void main() {
       );
     });
 
-    test('missing_delivery_date_fails_closed', () {
+    test('missing_delivery_date_fails_closed', () async {
       const EInvoiceService service = eInvoiceTestService;
       final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123', deliveryDate: null);
 
@@ -261,7 +398,7 @@ void main() {
       final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
       expect(result.valid, isFalse);
       expect(result.diagnostics.map((diagnostic) => diagnostic.ruleId), contains('invoice.deliveryDate'));
-      expect(() => service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
+      await expectLater(service.xrechnungXml(snapshot), throwsA(isA<EInvoiceExportValidationException>()));
     });
 
     test('xrechnung_delivery_date_follows_ubl_21_sequence', () {

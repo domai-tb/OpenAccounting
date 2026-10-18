@@ -10,11 +10,18 @@ import 'package:openaccounting/l10n/l10n.dart';
 import 'package:openaccounting/pages/rechnungen/invoice_output_format.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 
+import 'e_invoice_test_fixtures.dart'
+    show
+        eInvoiceTestService,
+        invalidEInvoiceTestOfflineXmlValidation,
+        unavailableEInvoiceTestOfflineXmlValidation,
+        validSnapshot;
+
 void main() {
   group('Invoice output format selection and state', () {
-    Widget wrap(Widget child) {
+    Widget wrap(Widget child, {Locale locale = const Locale('de')}) {
       return MaterialApp(
-        locale: const Locale('de'),
+        locale: locale,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: child),
@@ -120,6 +127,69 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsWidgets);
       expect(find.textContaining('buyer.street'), findsOneWidget);
       expect(find.text('XRechnung exportieren'), findsOneWidget);
+    });
+
+    testWidgets('offline_validator_results_show_localized_readiness_and_diagnostics', (WidgetTester tester) async {
+      final EInvoiceService service = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: unavailableEInvoiceTestOfflineXmlValidation,
+      );
+      late EInvoiceExportValidationException failure;
+      try {
+        await service.xrechnungXml(validSnapshot(buyerReference: 'LEITWEG-123'));
+        fail('Unavailable offline validation must not return XML.');
+      } on EInvoiceExportValidationException catch (error) {
+        failure = error;
+      }
+      final List<EInvoiceDiagnostic> diagnostics = failure.result.diagnostics;
+      final EInvoiceReadiness readiness = service.readiness(failure.result);
+
+      InvoiceOutputFormatSelector selector(EInvoiceReadiness state, List<EInvoiceDiagnostic> messages) =>
+          InvoiceOutputFormatSelector(
+            selected: EInvoiceOutputFormat.xrechnung,
+            readiness: state,
+            isDraft: false,
+            exportAvailable: true,
+            diagnostics: messages,
+          );
+
+      await tester.pumpWidget(wrap(selector(readiness, diagnostics)));
+      await tester.pumpAndSettle();
+      expect(find.text('Prüfung nicht verfügbar'), findsOneWidget);
+      expect(
+        find.textContaining('Die Offline-Prüfung ist nicht verfügbar. Es wurde kein E-Rechnungsartefakt ausgegeben.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('The Java runtime is not available.'), findsNothing);
+
+      await tester.pumpWidget(wrap(selector(readiness, diagnostics), locale: const Locale('en')));
+      await tester.pumpAndSettle();
+      expect(find.text('Validation unavailable'), findsOneWidget);
+      expect(
+        find.textContaining('Offline validation is unavailable. No e-invoice artifact was produced.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('The Java runtime is not available.'), findsNothing);
+
+      final EInvoiceService invalidService = EInvoiceService(
+        bundle: eInvoiceTestService.bundle,
+        offlineXmlValidation: invalidEInvoiceTestOfflineXmlValidation,
+      );
+      late EInvoiceExportValidationException invalidFailure;
+      try {
+        await invalidService.xrechnungXml(validSnapshot(buyerReference: 'LEITWEG-123'));
+        fail('Invalid offline validation must not return XML.');
+      } on EInvoiceExportValidationException catch (error) {
+        invalidFailure = error;
+      }
+      expect(invalidService.readiness(invalidFailure.result), EInvoiceReadiness.invalid);
+      await tester.pumpWidget(
+        wrap(selector(EInvoiceReadiness.invalid, invalidFailure.result.diagnostics), locale: const Locale('en')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('E-invoice invalid – check details'), findsOneWidget);
+      expect(find.textContaining('Offline validation rejected the e-invoice XML.'), findsOneWidget);
+      expect(find.textContaining('Die XML-Datei verletzt die Schemastruktur.'), findsNothing);
     });
 
     testWidgets('restores_persisted_xrechnung_selection_after_reopen', (WidgetTester tester) async {

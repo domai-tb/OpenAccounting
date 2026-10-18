@@ -19,16 +19,24 @@ class EInvoiceDiagnostic {
 }
 
 /// Outcome of pinned validation for one snapshot and format.
-class EInvoiceValidationResult {
-  const EInvoiceValidationResult._({required this.valid, required this.diagnostics});
+enum EInvoiceValidationStatus { valid, invalid, unavailable }
 
-  const EInvoiceValidationResult.valid() : this._(valid: true, diagnostics: const <EInvoiceDiagnostic>[]);
+class EInvoiceValidationResult {
+  const EInvoiceValidationResult._({required this.status, required this.diagnostics});
+
+  const EInvoiceValidationResult.valid()
+    : this._(status: EInvoiceValidationStatus.valid, diagnostics: const <EInvoiceDiagnostic>[]);
 
   const EInvoiceValidationResult.invalid(List<EInvoiceDiagnostic> diagnostics)
-    : this._(valid: false, diagnostics: diagnostics);
+    : this._(status: EInvoiceValidationStatus.invalid, diagnostics: diagnostics);
 
-  final bool valid;
+  const EInvoiceValidationResult.unavailable(List<EInvoiceDiagnostic> diagnostics)
+    : this._(status: EInvoiceValidationStatus.unavailable, diagnostics: diagnostics);
+
+  final EInvoiceValidationStatus status;
   final List<EInvoiceDiagnostic> diagnostics;
+
+  bool get valid => status == EInvoiceValidationStatus.valid;
 }
 
 /// Validates a snapshot against the pinned format rules without network
