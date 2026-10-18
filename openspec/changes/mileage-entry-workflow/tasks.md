@@ -1,38 +1,68 @@
-## 1. mileage-entry: Capture traceable business mileage
+# Mileage Entry Workflow Tasks
 
-- [x] 1.1 Write failing test `test_record_a_business_trip` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Record a business trip"; assert it fails for the right reason.
-- [x] 1.2 Implement the specified behavior for "Record a business trip" to pass 1.1.
-- [x] 1.3 Refactor the affected code; keep the focused and full suites green.
-- [x] 1.4 Write failing test `test_reject_invalid_trip_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject invalid trip facts"; assert it fails for the right reason.
-- [x] 1.5 Implement the specified behavior for "Reject invalid trip facts" to pass 1.4.
-- [x] 1.6 Refactor the affected code; keep the focused and full suites green.
-- [x] 1.7 Write failing test `test_preserve_posted_source_facts` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Preserve posted source facts"; assert it fails for the right reason.
-- [x] 1.8 Implement the specified behavior for "Preserve posted source facts" to pass 1.7.
-- [x] 1.9 Refactor the affected code; keep the focused and full suites green.
+## Historical baseline record
 
-## 2. mileage-entry: Mileage amounts require an approved effective policy
+The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23 migration, or the newly reconciled 46-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
 
-- [x] 2.1 Write failing test `test_calculate_from_an_approved_policy` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Calculate from an approved policy"; assert it fails for the right reason.
-- [x] 2.2 Implement the specified behavior for "Calculate from an approved policy" to pass 2.1.
-- [x] 2.3 Refactor the affected code; keep the focused and full suites green.
-- [x] 2.4 Write failing test `test_keep_an_unresolved_trip_out_of_accounting` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Keep an unresolved trip out of accounting"; assert it fails for the right reason.
-- [x] 2.5 Implement the specified behavior for "Keep an unresolved trip out of accounting" to pass 2.4.
-- [x] 2.6 Refactor the affected code; keep the focused and full suites green.
-- [x] 2.7 Write failing test `test_do_not_treat_the_eks_allowance_as_the_general_deduction` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Do not treat the EKS allowance as the general deduction"; assert it fails for the right reason.
-- [x] 2.8 Implement the specified behavior for "Do not treat the EKS allowance as the general deduction" to pass 2.7.
-- [x] 2.9 Refactor the affected code; keep the focused and full suites green.
+## Revised-contract tests — all open
 
-## 3. mileage-entry: Post resolved mileage through the accounting boundary
+Do not implement dependent application code until a separate fresh independent review approves the revised contract. The 37 tests marked missing in the scenario matrix are planned, not passing. The existing policy test also needs contract-specific assertions before it can establish the revised policy requirement.
 
-- [x] 3.1 Write failing test `test_post_a_confirmed_resolved_mileage_expense` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Post a confirmed resolved mileage expense"; assert it fails for the right reason.
-- [x] 3.2 Implement the specified behavior for "Post a confirmed resolved mileage expense" to pass 3.1.
-- [x] 3.3 Refactor the affected code; keep the focused and full suites green.
-- [x] 3.4 Write failing test `test_reject_duplicate_or_incomplete_posting` in `test/features/mileage/mileage_entry_workflow_test.dart` for scenario "Reject duplicate or incomplete posting"; assert it fails for the right reason.
-- [x] 3.5 Implement the specified behavior for "Reject duplicate or incomplete posting" to pass 3.4.
-- [x] 3.6 Refactor the affected code; keep the focused and full suites green.
+### `mileage-entry` tests (7 missing scenarios)
 
-## Implementation Notes
+- [ ] Add `test_mileage_form_is_keyboard_operable_and_localized` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_posting_is_unavailable_without_each_prerequisite` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_prepare_replacement_correction_without_accounting_changes` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_apply_accepted_replacement_correction_atomically` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_undo_posted_trip_through_correction` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_correction_apply_is_unavailable_without_accepted_operation` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Add `test_failed_or_repeated_correction_is_safe` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [ ] Extend and rerun existing `test_calculate_from_an_approved_policy` to assert the v1 effective-date boundary, both supported vehicle classes and rates, exact integer half-up cent rounding, and every fail-closed eligibility exclusion. The current test predates this contract and does not establish these assertions.
 
-- Follow `design.md` for implementation decisions and dependency order.
-- Keep each scenario in red-green-refactor order; do not implement behavior before its failing test.
-- Keep `test-plan.md` red until its named test passes.
+### `db` tests (30 missing scenarios)
+
+- [ ] Add `test_create_mileage_tables_on_fresh_install` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_reject_direct_insert_into_finalized_trip_state` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_gate_v23_migration_until_all_dependencies_agree` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_failed_mileage_migration_rolls_back` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_downgrade_rejects_without_changing_mileage_data` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_database_rejects_mutating_or_deleting_posted_trip` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_database_allows_only_valid_trip_lifecycle_transitions` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_database_requires_matching_applied_correction_for_terminal_transition` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_database_requires_posted_replacement_before_source_correction` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_database_keeps_applied_and_cancelled_corrections_immutable` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_database_rejects_unlinked_or_invalid_lifecycle_transitions` in `test/db/mileage_schema_test.dart`.
+- [ ] Add `test_fresh_install_matches_versioned_table_inventory` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_pre_v13_profile_is_valid_before_mileage_tables_are_required` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_pre_v9_profile_is_valid_before_later_tables_are_required` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_v7_to_v8_migration_creates_missing_payment_table` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_missing_payment_table_at_v8_fails_before_repair` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_payment_table_repair_preserves_existing_rows` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_v12_to_v13_migration_adds_markers_and_mileage_tables` in `test/db/mileage_migration_test.dart`.
+- [ ] Resolve the inherited `V8-to-v9 migration adds shared markers and mileage tables` scenario with the owning shared-spec change; it conflicts with the same requirement's v13 mileage-table minimum. Do not implement either incompatible migration behavior until the contract owner resolves it.
+- [ ] After the owner resolves the migration version, add the corresponding `test_v8_to_v9_migration_adds_markers_and_mileage_tables` or corrected-version test in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_v9_requires_category_history` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_unknown_lazy_table_is_not_created_by_feature_initialization` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_table_inventory_matches_schema_version_and_initialized_lazy_tables` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_version_18_inventory_has_expected_table_count` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_unknown_or_malformed_application_table_fails_health` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_failed_required_table_creation_rolls_back_version_and_schema` in `test/db/mileage_migration_test.dart`.
+- [ ] Add `test_present_document_email_tables_require_declared_schema` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_missing_mileage_table_at_v13_fails_without_repair` in `test/db/mileage_schema_health_test.dart`.
+- [ ] Add `test_mileage_export_completeness_waits_for_both_inventories` in `test/db/mileage_export_gate_test.dart`.
+- [ ] Add `test_export_with_undeclared_mileage_table_is_incomplete` in `test/db/mileage_export_gate_test.dart`.
+- [ ] Add `test_v22_to_v23_migration_adds_eligibility_fields_and_triggers` in `test/db/mileage_migration_test.dart`.
+
+## Contract and dependency gates — open
+
+- [ ] Obtain a fresh independent review of the exact revised spec commit. Do not begin dependent code work before approval.
+- [ ] Resolve the inventory dependency with both owners: `profile-data-portability` is 46 names/v13 while `customer-data-disclosure-export` is 55 names/v19. The common inventory and version-aware presence rules remain unaccepted; keep mileage migration and complete-export claims blocked.
+- [ ] Resolve the inherited `db` requirement's version conflict: its v8-to-v9 scenario creates mileage tables while its Table Definitions require those tables at v13. This shared maintained-spec edit is outside this revision; keep migration work blocked until the owner reconciles it.
+- [ ] After the review and inventory gates close, implement only against this contract and update each matrix row from planned/missing to evidence-backed status after running its named test.
+- [ ] Reconcile the accepted account mapping and atomic posting integration; preserve the rule that unresolved trips stay unresolved and mileage posting has no cash or VAT leg.
+
+## Evidence discipline
+
+- `test-plan.md` is the row-by-row 46-scenario index. Existing tests are marked as prior-contract only; missing tests remain missing.
+- Structural OpenSpec validation and formatting checks do not prove runtime behavior, migrations, posting, or correction semantics.
+- Do not mark tests complete from a proposed test name, prior review, or historical run.

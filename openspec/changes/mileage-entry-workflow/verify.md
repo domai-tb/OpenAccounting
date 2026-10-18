@@ -1,39 +1,29 @@
-## Verification Results
+# Verification Record — Revised Mileage Policy Contract
 
-### Task Completion
+## Current revision status (2026-10-18)
 
-- [x] All 24 implementation tasks are marked `[x]` in `tasks.md`.
-- Remaining implementation tasks: none. Archive gates (v23 triggers, production posting integration, full suite) remain open.
+- **Contract validation:** `openspec validate mileage-entry-workflow --type change --strict --json` passed with no issues after the current edits. This is structural validation only.
+- **Behavioral tests:** not run against this revised contract. No code or tests were changed in this spec-only revision.
+- **Scenario inventory:** `test-plan.md` maps all 46 scenarios: 9 existing test names and 37 missing tests. The nine tests were reported passing before this policy revision; that historical result does not prove the revised eligibility inputs, policy boundaries, rounding, database migration, posting, or correction contract.
+- **Test-plan status:** all 37 missing tests remain `MISSING — planned, not run`. The existing policy calculation test requires assertions for v1 dates, classes/rates, half-up cents, and fail-closed exclusions before it can establish the revised requirement.
+- **Migration/runtime:** v23 fields and trigger behavior are specified but not implemented or verified here. No migration DDL was changed.
+- **Posting and corrections:** the contract retains debit travel expense / credit private contribution, no cash or VAT leg, trip-date accounting, and unresolved-trip fail-closed behavior. Runtime atomicity/idempotency is not verified by this revision.
+- **Inventory dependencies:** still open. `profile-data-portability` declares 46 names at v13; `customer-data-disclosure-export` declares 55 names at v19. Mileage v23 migration and complete-export claims remain blocked pending both owners' acceptance of one inventory and version-aware presence rules. The inherited maintained `db` spec also contains a v8-to-v9 scenario that creates mileage tables, conflicting with its v13 minimum-version rule; the shared owner must reconcile this before migration behavior is implemented or tested.
+- **Independent review:** Round 4 `APPROVE` reviewed the prior contract only. It does not approve this policy-source, eligibility, scenario-map, task, or verification revision. A fresh independent review is required before dependent code work.
+- **Full suite, production runtime, migration execution, and export integration:** not run or established by this revision.
 
-### TDD Integrity
+## Historical evidence from the earlier contract
 
-- [x] Every test-plan row maps to an executable test.
-- [x] Every test-plan row is green (9 scoped tests).
-- [ ] Full suite passes (reserved for the archive gate per M5; not run in this cycle).
-- [x] No test was weakened or removed.
+The earlier work reported the following; these results predate the current contract and have not been rerun here:
 
-### Evidence
+- Focused mileage suite: `fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart` → 9 passed, exit 0.
+- Scoped analysis: `fvm flutter analyze lib/features/mileage test/features/mileage` → no issues reported.
+- Scoped format: `fvm dart format --line-length=120 --set-exit-if-changed lib/features/mileage test/features/mileage` → 0 changed.
+- Earlier OpenSpec validation and strict validation passed structurally; those passes predate this revision and are not evidence for the final edited artifacts.
+- The earlier review's `APPROVE` verdict and its findings remain in `review.md` as historical context only.
 
-- Focused suite: `fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart` → 9 passed, exit 0.
-- Static analysis scoped: `fvm flutter analyze lib/features/mileage test/features/mileage` → `No issues found!`.
-- Format scoped: `fvm dart format --line-length=120 --set-exit-if-changed lib/features/mileage test/features/mileage` → 0 changed.
-- Structural validation: `openspec validate mileage-entry-workflow --json` and `--strict` → passed.
-- `git diff --check` → clean for scoped paths.
-- Calculation uses approved `DE-private-business-travel/1` (car 30c, other motor 20c, half-up); EKS 0.10 never reused (guard test green, zero EKS coupling in mileage code).
-- Posting runs through injected `MileagePostingPort` test doubles with exactly-once semantics; production `PostingGroupService` extension and atomic shared transaction remain pending (M2).
-- Lifecycle triggers are specified for migration v23 (no v23 DDL in code yet); test schema omits coherence CHECKs and trigger tests (Round 4 Moderate 4-5).
+## Current decision
 
-### Review Integrity
+**DECISION: FAIL — revised contract is not independently reviewed, 37 mapped tests are missing, one existing policy test needs contract-specific assertions, and the inventory dependency remains open.**
 
-- [x] Latest review verdict: Round 4 `APPROVE` (5 non-blocking Moderate follow-ups recorded).
-- [x] No proposal, design, or spec text changed after Round 4 except none in this cycle (contract repair preceded the review).
-- [x] Required changes: none blocking.
-
-### Change Delivery
-
-- Delivery state: code plus contract repair published as scoped partial commits on `dev`; no archive yet.
-- This change remains incomplete for archive until v23 triggers land, production posting integration is verified, and the full suite passes.
-
-## Overall Decision
-
-DECISION: FAIL
+Archive and implementation readiness are not established. Do not treat planned tests, historical test results, or mechanical artifact checks as runtime evidence.

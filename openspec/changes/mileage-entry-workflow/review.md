@@ -182,3 +182,15 @@ CHANGES_APPLIED: no (review-only round)
 ## Rebuttals — Round 4
 
 None.
+
+---
+
+## Revised contract review gate — Round 4 is stale
+
+- **Revision date:** 2026-10-18
+- **Review state:** `PENDING`; no independent review has evaluated this revision.
+- **Scope changed since Round 4:** explicit private-vehicle business-trip policy and eligibility fields; official source/version/effective dates; explicit half-up cents rule and source-scope caveat; fail-closed exclusions; corrected 55/v19 versus 46/v13 dependency ledger; complete mapping of 46 scenarios; 37 missing tests marked unverified; tasks and verification status rewritten.
+- **Historical verdict:** Round 4 `APPROVE` applies only to the artifacts it reviewed and does not approve this revision. Treat its verdict as stale until a fresh independent reviewer accepts or revises this contract.
+- **Required review checks:** assess the legal/source scope caveat and whether the product policy is explicit enough; verify the class/rate/date/exclusion and rounding contract is internally consistent; verify migration and export gates; verify all 46 scenario rows align with the two specs; verify no missing test is called green; verify the pending-task and verification wording matches the contract; assess the inherited v8-to-v9 versus v13 migration-version conflict.
+- **Dependency gates:** `profile-data-portability` remains 46 names/v13 and `customer-data-disclosure-export` remains 55 names/v19. The mismatch is explicitly unresolved in the design and DB delta. The maintained `db` requirement also retains a v8-to-v9 mileage-table scenario alongside its v13 minimum. Do not approve migration or complete-export readiness until the inventory owners and shared-spec owner reconcile these contracts.
+- **Implementation gate:** dependent code must remain unstarted until a separate fresh independent review approves the fixed revision. This review artifact records the gate; it is not the approval.
