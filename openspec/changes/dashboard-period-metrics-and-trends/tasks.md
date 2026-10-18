@@ -118,4 +118,4 @@
 ## 9. Dashboard maintained-spec synchronization and review
 
 - [x] 9.1 Sync the accepted dashboard delta into `openspec/specs/dashboard/spec.md`, preserve unrelated maintained requirements, keep the delta unchanged, verify a repeat sync makes no further requirement changes, and pass strict change/spec validation plus `git diff --check`.
-- [ ] 9.2 Obtain an independent semantic review of the synchronized maintained dashboard contract and record its exact-revision verdict before archive.
+- [x] 9.2 Obtain an independent semantic review of the synchronized maintained dashboard contract and record its exact-revision verdict before archive.

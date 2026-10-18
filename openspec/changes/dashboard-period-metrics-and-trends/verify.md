@@ -2,7 +2,7 @@
 
 ### Implementation and coverage
 
-- [x] 88 of 89 checklist entries in `tasks.md` are checked: 81 inherited tasks, six annual-summary consumption tasks, and the maintained-spec sync; task 9.2 remains open for independent review.
+- [x] All 89 checklist entries in `tasks.md` are checked: 81 inherited tasks, six annual-summary consumption tasks, the maintained-spec sync, and the independent semantic review.
 - [x] All 31 scenario rows in `test-plan.md` are green and map to named executable tests.
 - [x] The canonical card regression failed before provider wiring because the dashboard card omitted accepted profit data.
 - [x] The annual card renders income, expenses, profit, and margin directly from `DashboardAnnualKpis`; an unavailable summary remains unavailable and does not fall back to journal totals.
@@ -28,10 +28,10 @@
 - [x] The accepted dashboard delta is synchronized into `openspec/specs/dashboard/spec.md`; the Quick-Links requirement matches the delta after blank-line normalization, and all six added requirements match it byte-for-byte. The pre-existing dashboard requirements outside the modified Quick-Links block are preserved.
 - [x] The agent-driven `openspec-sync-specs` workflow was run a second time against the same delta and maintained spec; it found Quick-Links and all six added requirements already synchronized, changing zero requirement blocks and zero bytes. The maintained spec SHA-256 remained `bd54e07b0c110fe2a9b6f8ede3326f88b50580a0c077dc00ce1292ea6d60b9af`; the pre/post diff is empty (`/tmp/openaccounting-dashboard-evidence/sync-pass-2.diff`, hashes in `sync-pass-2-hashes.txt`), and the delta remains unchanged.
 - [x] The modified Quick-Links content has the same normalized SHA-256 in delta and maintained spec (`7c0ae15b628962f1f04344ab9ba2cfd60c4b9083a8563a8e2652b35b84825441`), and the appended requirements have the same SHA-256 byte-for-byte (`1feb5169cb6ccd2966a3a37214db26af7343d0089ccb8211793074c76647983b`). The pre-existing maintained-spec prefix and suffix outside the modified Quick-Links block are preserved byte-for-byte, except for the separator blank line before appended requirements.
-- [ ] Independent semantic review of the synchronized maintained dashboard contract is pending; task 9.2 remains open until its exact-revision verdict is recorded.
+- [x] Independent semantic review approved the synchronized maintained dashboard contract at exact checkpoint `c831cabc2de46fcc1724685f523794ff52ff8149` (`APPROVE`); task 9.2 is complete.
 - [x] Strict change validation passes 1/1, strict maintained-spec validation passes 72/72, and `git diff --check` is clean after synchronization.
-- [x] This checkpoint records the maintained-spec sync and evidence; it does not archive or publish the change.
+- [x] All 89 checklist tasks and all seven required artifacts are complete. The separately authorized archive operation is tracked in a separate commit after this evidence commit; no publication claim is added.
 
 ## Overall Decision
 
-DECISION: IN PROGRESS — dashboard implementation, focused coverage, exact-revision full VM suites, static analysis, synchronization, and strict validation pass. Independent semantic review of the synchronized maintained contract remains pending, so the change is not ready to archive.
+DECISION: VERIFIED — dashboard implementation, focused coverage, exact-revision full VM suites, static analysis, synchronized specifications, independent semantic review, and strict validation pass; all 89 tasks and seven artifacts are complete.
