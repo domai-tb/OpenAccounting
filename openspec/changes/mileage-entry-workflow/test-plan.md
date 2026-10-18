@@ -1,18 +1,18 @@
 # Mileage Entry Workflow Test Plan
 
-This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 total) to one named test target each. The nine existing mileage tests were rerun on 2026-10-18; only the capture-identity and exact-distance assertions described below are verified for the revised contract. Coverage of the structured eligibility policy and the other 44 rows remains incomplete. The other 36 named tests are still missing and remain planned. No missing test is reported as passing.
+This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 total) to one named test target each. On 2026-10-18, the focused command passed 10 mileage workflow tests, 3 lifecycle migration tests, and 8 inventory migration tests (21 total). Capture identity/exact persisted distance, selected eligibility behavior, and selected migration guards now have partial evidence; the full policy boundary, posting integration, corrections, export inventories, and most database scenarios remain unverified.
 
 | Spec | Scenario | Test file | Test name | Evidence status |
 |---|---|---|---|---|
-| `specs/mileage-entry/spec.md` | Record a business trip | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_record_a_business_trip` | Partial — focused suite passed 9/9 on 2026-10-18; UUIDv4 persistence and exact `distance_hundredths_km` are verified, but structured eligibility fields remain unverified |
-| `specs/mileage-entry/spec.md` | Reject invalid trip facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_reject_invalid_trip_facts` | Exists; prior-contract run only, revised contract not verified |
+| `specs/mileage-entry/spec.md` | Record a business trip | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_record_a_business_trip` | Partial — reloaded row verifies UUIDv4, exact persisted integer distance, structured classification, and unresolved state; 10 workflow tests passed in the 21-test focused run |
+| `specs/mileage-entry/spec.md` | Reject invalid trip facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_reject_invalid_trip_facts` | Partial — invalid date, blank purpose/context, and nonpositive distance rejected in the focused run; additional invalid classification cases remain unverified |
 | `specs/mileage-entry/spec.md` | Use the form with keyboard and supported locales | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_mileage_form_is_keyboard_operable_and_localized` | MISSING — planned, not run |
-| `specs/mileage-entry/spec.md` | Preserve posted source facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_preserve_posted_source_facts` | Exists; prior-contract run only, revised contract not verified |
-| `specs/mileage-entry/spec.md` | Editing a calculated trip invalidates its calculation | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_editing_calculated_trip_invalidates_calculation` | Exists; prior-contract run only, revised contract not verified |
-| `specs/mileage-entry/spec.md` | Calculate from an approved policy | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_calculate_from_an_approved_policy` | Exists; prior-contract run only; effective dates, classes, rates, and half-up assertions need revalidation |
-| `specs/mileage-entry/spec.md` | Keep an unresolved trip out of accounting | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_keep_an_unresolved_trip_out_of_accounting` | Exists; prior-contract run only, revised contract not verified |
-| `specs/mileage-entry/spec.md` | Do not treat the EKS allowance as the general deduction | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_do_not_treat_the_eks_allowance_as_the_general_deduction` | Exists; prior-contract run only, revised contract not verified |
-| `specs/mileage-entry/spec.md` | Post a confirmed resolved mileage expense | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_post_a_confirmed_resolved_mileage_expense` | Exists; prior-contract run only, revised contract not verified |
+| `specs/mileage-entry/spec.md` | Preserve posted source facts | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_preserve_posted_source_facts` | Partial — stand-in posting port verifies source facts reject edits; production accounting integration remains unverified |
+| `specs/mileage-entry/spec.md` | Editing a calculated trip invalidates its calculation | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_editing_calculated_trip_invalidates_calculation` | Partial — calculation snapshot is cleared back to unresolved in the focused run |
+| `specs/mileage-entry/spec.md` | Calculate from an approved policy | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_calculate_from_an_approved_policy` | Partial — both rates and integer half-up examples verified; the 2025 start boundary and lower/upper date boundaries need explicit assertions |
+| `specs/mileage-entry/spec.md` | Keep an unresolved trip out of accounting | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_keep_an_unresolved_trip_out_of_accounting` | Partial — unresolved trip remains without policy, amount, or event and posting rejects it |
+| `specs/mileage-entry/spec.md` | Do not treat the EKS allowance as the general deduction | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_do_not_treat_the_eks_allowance_as_the_general_deduction` | Partial — EKS remains unresolved and is not assigned the business-travel rate |
+| `specs/mileage-entry/spec.md` | Post a confirmed resolved mileage expense | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_post_a_confirmed_resolved_mileage_expense` | Partial — test port only; production posting integration is not present |
 | `specs/mileage-entry/spec.md` | Keep posting unavailable while a prerequisite is missing | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_posting_is_unavailable_without_each_prerequisite` | MISSING — planned, not run |
 | `specs/mileage-entry/spec.md` | Reject duplicate or incomplete posting | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_reject_duplicate_or_incomplete_posting` | Exists; prior-contract run only, revised contract not verified |
 | `specs/mileage-entry/spec.md` | Prepare a replacement correction without changing accounting | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_prepare_replacement_correction_without_accounting_changes` | MISSING — planned, not run |
@@ -20,7 +20,7 @@ This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 
 | `specs/mileage-entry/spec.md` | Undo a posted trip | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_undo_posted_trip_through_correction` | MISSING — planned, not run |
 | `specs/mileage-entry/spec.md` | Keep correction execution unavailable without an accepted operation | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_correction_apply_is_unavailable_without_accepted_operation` | MISSING — planned, not run |
 | `specs/mileage-entry/spec.md` | Failed or repeated correction is safe | `test/features/mileage/mileage_entry_workflow_test.dart` | `test_failed_or_repeated_correction_is_safe` | MISSING — planned, not run |
-| `specs/db/spec.md` | Create mileage tables on fresh install | `test/db/mileage_schema_test.dart` | `test_create_mileage_tables_on_fresh_install` | MISSING — planned, not run |
+| `specs/db/spec.md` | Create mileage tables on fresh install | `test/db/mileage_lifecycle_migration_test.dart` | `fresh schema installs structured eligibility and lifecycle guards` | Partial — fresh database has eligibility columns, 16 triggers, and user_version 23; full table inventory assertion remains open |
 | `specs/db/spec.md` | Reject direct inserts into finalized trip states | `test/db/mileage_schema_test.dart` | `test_reject_direct_insert_into_finalized_trip_state` | MISSING — planned, not run |
 | `specs/db/spec.md` | Gate mileage migration until export inventories agree | `test/db/mileage_migration_test.dart` | `test_gate_v23_migration_until_all_dependencies_agree` | MISSING — planned, not run |
 | `specs/db/spec.md` | Roll back failed mileage migration | `test/db/mileage_migration_test.dart` | `test_failed_mileage_migration_rolls_back` | MISSING — planned, not run |
@@ -48,14 +48,13 @@ This matrix maps all 16 `mileage-entry` scenarios and all 29 `db` scenarios (45 
 | `specs/db/spec.md` | Missing mileage tables are checked at their required version | `test/db/mileage_schema_health_test.dart` | `test_missing_mileage_table_at_v13_fails_without_repair` | MISSING — planned, not run |
 | `specs/db/spec.md` | Block mileage completeness until export inventories include its tables | `test/db/mileage_export_gate_test.dart` | `test_mileage_export_completeness_waits_for_both_inventories` | MISSING — planned, not run |
 | `specs/db/spec.md` | Keep exports incomplete for undeclared mileage tables | `test/db/mileage_export_gate_test.dart` | `test_export_with_undeclared_mileage_table_is_incomplete` | MISSING — planned, not run |
-| `specs/db/spec.md` | v22-to-v23 migration adds eligibility fields and lifecycle enforcement | `test/db/mileage_migration_test.dart` | `test_v22_to_v23_migration_adds_eligibility_fields_and_triggers` | MISSING — planned, not run |
+| `specs/db/spec.md` | v22-to-v23 migration adds eligibility fields and lifecycle enforcement | `test/db/mileage_lifecycle_migration_test.dart` | `v22 migration preserves posted facts and marks legacy classifications unknown` | Partial — legacy snapshot and exact integer distance survive; fresh-schema trigger inventory and selected rejection behavior pass; exhaustive lifecycle cases remain open |
 
 ## Coverage and evidence notes
 
 - Scenario count: 16 `mileage-entry` + 29 `db` = 45 mapped rows.
-- Existing executable tests: 9. Their earlier 9/9 result is historical evidence only; none were rerun after this contract revision.
-- Missing tests: 36 (7 feature scenarios and all 29 database scenarios). Every missing row remains explicitly unverified.
-- The future test files in this matrix are targets, not existing files. OpenSpec structural validation and `git diff --check` can validate artifact structure/formatting, but cannot substitute for these behavioral tests.
+- Focused executable evidence: 10 mileage workflow tests, 3 lifecycle migration tests, and 8 inventory migration tests passed together on 2026-10-18. Each row above remains `Partial`, `MISSING`, or planned unless its full scenario contract is covered.
+- The remaining future test files in this matrix are targets, not existing files. OpenSpec structural validation and `git diff --check` can validate artifact structure/formatting, but cannot substitute for behavioral tests.
 
 ## Version correction
 

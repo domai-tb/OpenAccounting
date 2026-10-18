@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS mileage_trips (
   trip_date TEXT NOT NULL,
   purpose TEXT NOT NULL CHECK (length(trim(purpose)) > 0),
   business_context TEXT NOT NULL CHECK (length(trim(business_context)) > 0),
+  trip_kind TEXT NOT NULL CHECK (trip_kind IN ('business_trip','commuting','eks_allowance','other','unknown')),
+  vehicle_source TEXT NOT NULL CHECK (vehicle_source IN ('private','company','unknown')),
+  vehicle_class TEXT NOT NULL CHECK (vehicle_class IN ('kraftwagen','other_motor_vehicle','unsupported','unknown')),
   distance_hundredths_km INTEGER NOT NULL CHECK (distance_hundredths_km BETWEEN 1 AND 999999999999),
   state TEXT NOT NULL CHECK (state IN ('unresolved','calculated','posted','corrected','voided')),
   policy_id TEXT,
@@ -45,16 +48,19 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
 
   Future<void> insertTrip(MileageTrip trip) async {
     await executor.runInsert(
-      'INSERT INTO mileage_trips (id, trip_date, purpose, business_context, '
+      'INSERT INTO mileage_trips (id, trip_date, purpose, business_context, trip_kind, vehicle_source, vehicle_class, '
       'distance_hundredths_km, state, policy_id, policy_source, policy_version, '
       'policy_effective_from, policy_effective_to, calculated_amount, calculated_at, '
       'posting_event_id, created_at, updated_at) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       <Object?>[
         trip.id,
         trip.tripDate,
         trip.purpose,
         trip.businessContext,
+        mileageTripKindStorageValue(trip.tripKind),
+        mileageVehicleSourceStorageValue(trip.vehicleSource),
+        mileageVehicleClassStorageValue(trip.vehicleClass),
         trip.distanceHundredthsKm,
         trip.state.name,
         trip.policyId,
@@ -94,11 +100,25 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
     required String tripDate,
     required int dist,
     required String businessContext,
+    required MileageTripKind tripKind,
+    required MileageVehicleSource vehicleSource,
+    required MileageVehicleClass vehicleClass,
   }) async {
     await executor.runUpdate(
       'UPDATE mileage_trips SET purpose = ?, trip_date = ?, distance_hundredths_km = ?, business_context = ?, '
-      'updated_at = ? WHERE id = ? AND state = ?',
-      <Object?>[purpose, tripDate, dist, businessContext, DateTime.now().toUtc().toIso8601String(), id, 'unresolved'],
+      'trip_kind = ?, vehicle_source = ?, vehicle_class = ?, updated_at = ? WHERE id = ? AND state = ?',
+      <Object?>[
+        purpose,
+        tripDate,
+        dist,
+        businessContext,
+        mileageTripKindStorageValue(tripKind),
+        mileageVehicleSourceStorageValue(vehicleSource),
+        mileageVehicleClassStorageValue(vehicleClass),
+        DateTime.now().toUtc().toIso8601String(),
+        id,
+        'unresolved',
+      ],
     );
   }
 
@@ -108,17 +128,23 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
     required String tripDate,
     required int dist,
     required String businessContext,
+    required MileageTripKind tripKind,
+    required MileageVehicleSource vehicleSource,
+    required MileageVehicleClass vehicleClass,
   }) async {
     await executor.runUpdate(
       'UPDATE mileage_trips SET purpose = ?, trip_date = ?, distance_hundredths_km = ?, business_context = ?, '
-      'state = ?, policy_id = NULL, policy_source = NULL, policy_version = NULL, policy_effective_from = NULL, '
-      'policy_effective_to = NULL, calculated_amount = NULL, calculated_at = NULL, updated_at = ? '
-      'WHERE id = ? AND state = ?',
+      'trip_kind = ?, vehicle_source = ?, vehicle_class = ?, state = ?, policy_id = NULL, policy_source = NULL, '
+      'policy_version = NULL, policy_effective_from = NULL, policy_effective_to = NULL, '
+      'calculated_amount = NULL, calculated_at = NULL, updated_at = ? WHERE id = ? AND state = ?',
       <Object?>[
         purpose,
         tripDate,
         dist,
         businessContext,
+        mileageTripKindStorageValue(tripKind),
+        mileageVehicleSourceStorageValue(vehicleSource),
+        mileageVehicleClassStorageValue(vehicleClass),
         'unresolved',
         DateTime.now().toUtc().toIso8601String(),
         id,
@@ -172,6 +198,9 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       purpose: '${r['purpose']}',
       businessContext: '${r['business_context']}',
       distanceHundredthsKm: (r['distance_hundredths_km']! as num).toInt(),
+      tripKind: mileageTripKindFromStorage('${r['trip_kind']}'),
+      vehicleSource: mileageVehicleSourceFromStorage('${r['vehicle_source']}'),
+      vehicleClass: mileageVehicleClassFromStorage('${r['vehicle_class']}'),
       state: MileageTrip.stateFrom('${r['state']}'),
       createdAt: '${r['created_at']}',
       updatedAt: '${r['updated_at']}',

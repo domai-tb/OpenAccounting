@@ -4,7 +4,7 @@
 
 The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23 migration, or the corrected 45-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
 
-## Revised-contract tests — all open
+## Revised-contract tests — in progress
 
 Implementation proceeds under the user's direct 2026-10-18 authorization despite the stale Round 5 review gate. Keep the review and inventory tasks open until their requirements are resolved with evidence. The 36 missing scenario rows remain planned unless their named tests pass. Separately, the existing policy test needs contract-specific assertions before it can establish the revised policy requirement; that extension is not a missing scenario row.
 
@@ -53,7 +53,7 @@ Implementation proceeds under the user's direct 2026-10-18 authorization despite
 - [ ] Add `test_missing_mileage_table_at_v13_fails_without_repair` in `test/db/mileage_schema_health_test.dart`.
 - [ ] Add `test_mileage_export_completeness_waits_for_both_inventories` in `test/db/mileage_export_gate_test.dart`.
 - [ ] Add `test_export_with_undeclared_mileage_table_is_incomplete` in `test/db/mileage_export_gate_test.dart`.
-- [ ] Add `test_v22_to_v23_migration_adds_eligibility_fields_and_triggers` in `test/db/mileage_migration_test.dart`.
+- [x] Add focused v22-to-v23 eligibility/lifecycle coverage in `test/db/mileage_lifecycle_migration_test.dart` (2026-10-18; three migration tests passed; exhaustive migration/lifecycle coverage remains open).
 
 ## Contract and dependency gates — open
 
@@ -66,6 +66,6 @@ Implementation proceeds under the user's direct 2026-10-18 authorization despite
 
 ## Evidence discipline
 
-- `test-plan.md` is the row-by-row 45-scenario index: 9 existing targets are prior-contract evidence only, and 36 scenario rows remain missing. The existing policy-test assertion task is separate from those missing rows.
+- `test-plan.md` is the row-by-row 45-scenario index: The 2026-10-18 focused run passed 10 mileage workflow tests, 3 lifecycle migration tests, and 8 inventory migration tests; most rows remain missing or partial. The existing policy-test assertion task is separate from those missing rows.
 - Structural OpenSpec validation and formatting checks do not prove runtime behavior, migrations, posting, or correction semantics.
 - Do not mark tests complete from a proposed test name, prior review, or historical run.

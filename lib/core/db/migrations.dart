@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 22;
+  static const int currentVersion = 23;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -221,7 +221,9 @@ class MigrationRunner {
 
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
-      if (await _receivableFeatureNeedsRepair() || await _postingSchemaNeedsRepair()) {
+      if (await _receivableFeatureNeedsRepair() ||
+          await _postingSchemaNeedsRepair() ||
+          await _mileageLifecycleNeedsRepair()) {
         await _repairCurrentFeature(afterFeatureSchemaDdl);
         return true;
       }
@@ -306,6 +308,7 @@ class MigrationRunner {
       await _migrateQuickBookingPresets();
       await _migrateFeatureModules();
       await _migrateProfilePortabilityTables(freshProfile: true);
+      await _migrateMileageLifecycle();
       await _migrateContactArchive();
       await _migrateMasterDataImportTemplates();
       await _migrateAssetRegister();
@@ -457,6 +460,60 @@ class MigrationRunner {
       await _migrateTo(21, createSchema);
       await _migrateEInvoiceOutputFormat();
     }
+    if (version == 23) {
+      await _migrateMileageLifecycle();
+    }
+  }
+
+  Future<void> _migrateMileageLifecycle() async {
+    await _addColumnIfMissing(
+      'mileage_trips',
+      'trip_kind',
+      "TEXT NOT NULL DEFAULT 'unknown' CHECK (trip_kind IN ('business_trip','commuting','eks_allowance','other','unknown'))",
+    );
+    await _addColumnIfMissing(
+      'mileage_trips',
+      'vehicle_source',
+      "TEXT NOT NULL DEFAULT 'unknown' CHECK (vehicle_source IN ('private','company','unknown'))",
+    );
+    await _addColumnIfMissing(
+      'mileage_trips',
+      'vehicle_class',
+      "TEXT NOT NULL DEFAULT 'unknown' CHECK (vehicle_class IN ('kraftwagen','other_motor_vehicle','unsupported','unknown'))",
+    );
+    for (final String trigger in _mileageLifecycleTriggersSql) {
+      await executor.runCustom(trigger);
+    }
+    await _verifyMileageLifecycleSchema();
+  }
+
+  Future<bool> _mileageLifecycleNeedsRepair() async {
+    try {
+      await _verifyMileageLifecycleSchema();
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> _verifyMileageLifecycleSchema() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(mileage_trips)',
+      const <Object?>[],
+    );
+    const Set<String> requiredColumns = <String>{'trip_kind', 'vehicle_source', 'vehicle_class'};
+    final Set<String> columnNames = <String>{for (final Map<String, Object?> row in columns) row['name'].toString()};
+    if (!requiredColumns.every(columnNames.contains)) {
+      throw StateError('Mileage eligibility columns could not be verified');
+    }
+
+    final List<Map<String, Object?>> triggers = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_mileage_%'",
+      const <Object?>[],
+    );
+    if (triggers.length != _mileageLifecycleTriggersSql.length) {
+      throw StateError('Mileage lifecycle triggers could not be verified');
+    }
   }
 
   Future<void> _migrateProfilePortabilityTables({required bool freshProfile}) async {
@@ -506,6 +563,7 @@ class MigrationRunner {
       await _migrateAccountHolder();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
+      await _migrateMileageLifecycle();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -1770,6 +1828,9 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
     'trip_date',
     'purpose',
     'business_context',
+    'trip_kind',
+    'vehicle_source',
+    'vehicle_class',
     'distance_hundredths_km',
     'state',
     'created_at',
@@ -1976,6 +2037,312 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
         AND trim(accounting_correction_id) <> '' AND applied_at IS NOT NULL)
       OR (state = 'cancelled' AND accounting_correction_id IS NULL AND applied_at IS NULL))
 )''';
+
+const List<String> _mileageLifecycleTriggersSql = <String>[
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_date_insert
+BEFORE INSERT ON mileage_trips
+WHEN strftime('%Y-%m-%d', NEW.trip_date) IS NOT NEW.trip_date
+BEGIN
+  SELECT RAISE(ABORT, 'mileage trip date must be canonical ISO date');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_date_update
+BEFORE UPDATE ON mileage_trips
+WHEN strftime('%Y-%m-%d', NEW.trip_date) IS NOT NEW.trip_date
+BEGIN
+  SELECT RAISE(ABORT, 'mileage trip date must be canonical ISO date');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_insert_unresolved
+BEFORE INSERT ON mileage_trips
+WHEN NEW.state <> 'unresolved'
+  OR NEW.policy_id IS NOT NULL
+  OR NEW.policy_source IS NOT NULL
+  OR NEW.policy_version IS NOT NULL
+  OR NEW.policy_effective_from IS NOT NULL
+  OR NEW.policy_effective_to IS NOT NULL
+  OR NEW.calculated_amount IS NOT NULL
+  OR NEW.calculated_at IS NOT NULL
+  OR NEW.posting_event_id IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'mileage trip must start unresolved without a snapshot');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_state_transition
+BEFORE UPDATE OF state ON mileage_trips
+WHEN NEW.state <> OLD.state
+  AND NOT (
+    (OLD.state = 'unresolved' AND NEW.state = 'calculated')
+    OR (OLD.state = 'calculated' AND NEW.state IN ('unresolved', 'posted'))
+    OR (OLD.state = 'posted' AND NEW.state IN ('corrected', 'voided'))
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'invalid mileage trip state transition');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_unresolved_guard
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'unresolved'
+  AND NEW.state = 'unresolved'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.policy_id IS NOT NULL
+    OR NEW.policy_source IS NOT NULL
+    OR NEW.policy_version IS NOT NULL
+    OR NEW.policy_effective_from IS NOT NULL
+    OR NEW.policy_effective_to IS NOT NULL
+    OR NEW.calculated_amount IS NOT NULL
+    OR NEW.calculated_at IS NOT NULL
+    OR NEW.posting_event_id IS NOT NULL
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'unresolved mileage trip cannot carry a calculation or posting');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_calculation_guard
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'unresolved'
+  AND NEW.state = 'calculated'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.trip_date IS NOT OLD.trip_date
+    OR NEW.purpose IS NOT OLD.purpose
+    OR NEW.business_context IS NOT OLD.business_context
+    OR NEW.distance_hundredths_km IS NOT OLD.distance_hundredths_km
+    OR NEW.trip_kind IS NOT OLD.trip_kind
+    OR NEW.vehicle_source IS NOT OLD.vehicle_source
+    OR NEW.vehicle_class IS NOT OLD.vehicle_class
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.posting_event_id IS NOT NULL
+    OR NEW.trip_kind <> 'business_trip'
+    OR NEW.vehicle_source <> 'private'
+    OR NEW.vehicle_class NOT IN ('kraftwagen', 'other_motor_vehicle')
+    OR NEW.trip_date < '2025-01-01'
+    OR NEW.trip_date > '2026-12-31'
+    OR NEW.policy_id <> 'DE-private-business-travel/1'
+    OR NEW.policy_version <> '1'
+    OR NEW.policy_effective_from <> '2025-01-01'
+    OR NEW.policy_effective_to <> '2026-12-31'
+    OR NEW.policy_source <> 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71'
+    OR CAST(NEW.calculated_amount * 100 AS INTEGER) <>
+      ((NEW.distance_hundredths_km * CASE NEW.vehicle_class
+        WHEN 'kraftwagen' THEN 30
+        WHEN 'other_motor_vehicle' THEN 20
+      END + 50) / 100)
+    OR NEW.calculated_amount * 100 <> CAST(NEW.calculated_amount * 100 AS INTEGER)
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'mileage calculation does not match the approved policy');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_demote_guard
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'calculated'
+  AND NEW.state = 'unresolved'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.policy_id IS NOT NULL
+    OR NEW.policy_source IS NOT NULL
+    OR NEW.policy_version IS NOT NULL
+    OR NEW.policy_effective_from IS NOT NULL
+    OR NEW.policy_effective_to IS NOT NULL
+    OR NEW.calculated_amount IS NOT NULL
+    OR NEW.calculated_at IS NOT NULL
+    OR NEW.posting_event_id IS NOT NULL
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'demoted mileage trip must clear its calculation snapshot');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_calculated_immutable
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'calculated'
+  AND NEW.state = 'calculated'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.trip_date IS NOT OLD.trip_date
+    OR NEW.purpose IS NOT OLD.purpose
+    OR NEW.business_context IS NOT OLD.business_context
+    OR NEW.distance_hundredths_km IS NOT OLD.distance_hundredths_km
+    OR NEW.trip_kind IS NOT OLD.trip_kind
+    OR NEW.vehicle_source IS NOT OLD.vehicle_source
+    OR NEW.vehicle_class IS NOT OLD.vehicle_class
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.policy_id IS NOT OLD.policy_id
+    OR NEW.policy_source IS NOT OLD.policy_source
+    OR NEW.policy_version IS NOT OLD.policy_version
+    OR NEW.policy_effective_from IS NOT OLD.policy_effective_from
+    OR NEW.policy_effective_to IS NOT OLD.policy_effective_to
+    OR NEW.calculated_amount IS NOT OLD.calculated_amount
+    OR NEW.calculated_at IS NOT OLD.calculated_at
+    OR NEW.posting_event_id IS NOT OLD.posting_event_id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'calculated mileage facts are immutable until demoted');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_posting_guard
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'calculated'
+  AND NEW.state = 'posted'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.trip_date IS NOT OLD.trip_date
+    OR NEW.purpose IS NOT OLD.purpose
+    OR NEW.business_context IS NOT OLD.business_context
+    OR NEW.distance_hundredths_km IS NOT OLD.distance_hundredths_km
+    OR NEW.trip_kind IS NOT OLD.trip_kind
+    OR NEW.vehicle_source IS NOT OLD.vehicle_source
+    OR NEW.vehicle_class IS NOT OLD.vehicle_class
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.policy_id IS NOT OLD.policy_id
+    OR NEW.policy_source IS NOT OLD.policy_source
+    OR NEW.policy_version IS NOT OLD.policy_version
+    OR NEW.policy_effective_from IS NOT OLD.policy_effective_from
+    OR NEW.policy_effective_to IS NOT OLD.policy_effective_to
+    OR NEW.calculated_amount IS NOT OLD.calculated_amount
+    OR NEW.calculated_at IS NOT OLD.calculated_at
+    OR NEW.posting_event_id IS NULL
+    OR trim(NEW.posting_event_id) = ''
+    OR OLD.posting_event_id IS NOT NULL
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'posting must preserve the calculated mileage snapshot');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_posted_immutable
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'posted'
+  AND (
+    NEW.id IS NOT OLD.id
+    OR NEW.trip_date IS NOT OLD.trip_date
+    OR NEW.purpose IS NOT OLD.purpose
+    OR NEW.business_context IS NOT OLD.business_context
+    OR NEW.distance_hundredths_km IS NOT OLD.distance_hundredths_km
+    OR NEW.trip_kind IS NOT OLD.trip_kind
+    OR NEW.vehicle_source IS NOT OLD.vehicle_source
+    OR NEW.vehicle_class IS NOT OLD.vehicle_class
+    OR NEW.created_at IS NOT OLD.created_at
+    OR NEW.policy_id IS NOT OLD.policy_id
+    OR NEW.policy_source IS NOT OLD.policy_source
+    OR NEW.policy_version IS NOT OLD.policy_version
+    OR NEW.policy_effective_from IS NOT OLD.policy_effective_from
+    OR NEW.policy_effective_to IS NOT OLD.policy_effective_to
+    OR NEW.calculated_amount IS NOT OLD.calculated_amount
+    OR NEW.calculated_at IS NOT OLD.calculated_at
+    OR NEW.posting_event_id IS NOT OLD.posting_event_id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'posted mileage source facts are immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_correction_transition
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state = 'posted'
+  AND NEW.state IN ('corrected', 'voided')
+  AND NOT EXISTS (
+    SELECT 1 FROM mileage_trip_corrections c
+    WHERE c.trip_id = OLD.id
+      AND c.state = 'applied'
+      AND c.accounting_correction_id IS NOT NULL
+      AND trim(c.accounting_correction_id) <> ''
+      AND (
+        (NEW.state = 'corrected' AND c.kind = 'replace'
+          AND c.replacement_trip_id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM mileage_trips replacement
+            WHERE replacement.id = c.replacement_trip_id
+              AND replacement.state = 'posted'
+              AND replacement.posting_event_id IS NOT NULL
+              AND trim(replacement.posting_event_id) <> ''
+          ))
+        OR (NEW.state = 'voided' AND c.kind = 'void' AND c.replacement_trip_id IS NULL)
+      )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'posted mileage requires a matching applied correction');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_terminal_immutable
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.state IN ('corrected', 'voided')
+BEGIN
+  SELECT RAISE(ABORT, 'terminal mileage trip is immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_delete_guard
+BEFORE DELETE ON mileage_trips
+WHEN OLD.state IN ('posted', 'corrected', 'voided')
+BEGIN
+  SELECT RAISE(ABORT, 'posted mileage trip cannot be deleted');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_insert_draft
+BEFORE INSERT ON mileage_trip_corrections
+WHEN NEW.state <> 'draft'
+  OR NEW.accounting_correction_id IS NOT NULL
+  OR NEW.applied_at IS NOT NULL
+  OR NOT EXISTS (
+    SELECT 1 FROM mileage_trips source
+    WHERE source.id = NEW.trip_id AND source.state = 'posted'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'mileage correction must start as a draft for a posted trip');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_update_guard
+BEFORE UPDATE ON mileage_trip_corrections
+WHEN OLD.state <> 'draft'
+  OR NEW.id IS NOT OLD.id
+  OR NEW.created_at IS NOT OLD.created_at
+  OR (NEW.state = 'draft' AND (NEW.accounting_correction_id IS NOT NULL OR NEW.applied_at IS NOT NULL))
+  OR (NEW.state = 'cancelled' AND (NEW.accounting_correction_id IS NOT NULL OR NEW.applied_at IS NOT NULL))
+  OR (NEW.state = 'applied' AND (
+    NEW.accounting_correction_id IS NULL
+    OR trim(NEW.accounting_correction_id) = ''
+    OR NEW.applied_at IS NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM mileage_trips source
+      WHERE source.id = NEW.trip_id AND source.state = 'posted'
+    )
+    OR (NEW.kind = 'replace' AND NOT EXISTS (
+      SELECT 1 FROM mileage_trips replacement
+      WHERE replacement.id = NEW.replacement_trip_id
+        AND replacement.state = 'posted'
+        AND replacement.posting_event_id IS NOT NULL
+        AND trim(replacement.posting_event_id) <> ''
+    ))
+    OR (NEW.kind = 'void' AND NEW.replacement_trip_id IS NOT NULL)
+  ))
+BEGIN
+  SELECT RAISE(ABORT, 'invalid mileage correction update');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_delete_guard
+BEFORE DELETE ON mileage_trip_corrections
+BEGIN
+  SELECT RAISE(ABORT, 'mileage correction records cannot be deleted');
+END
+''',
+];
 
 const String _masterDataImportTemplatesTableSql = '''
 CREATE TABLE IF NOT EXISTS master_data_import_templates (

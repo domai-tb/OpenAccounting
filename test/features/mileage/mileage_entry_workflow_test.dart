@@ -28,12 +28,18 @@ void main() {
         purpose: 'Kundenbesuch München',
         distanceHundredthsKm: 4525,
         businessContext: 'Projekt Alpha, Fahrzeug privat',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
 
       expect(trip.id, matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')));
       expect(trip.tripDate, '2026-03-14');
       expect(trip.purpose, 'Kundenbesuch München');
       expect(trip.distanceHundredthsKm, 4525);
+      expect(trip.tripKind, MileageTripKind.businessTrip);
+      expect(trip.vehicleSource, MileageVehicleSource.private);
+      expect(trip.vehicleClass, MileageVehicleClass.kraftwagen);
       expect(trip.state, MileageTripState.unresolved);
       expect(trip.policyId, isNull);
       expect(trip.calculatedAmount, isNull);
@@ -41,7 +47,11 @@ void main() {
 
       final List<MileageTrip> rows = await repo.listTrips();
       expect(rows.length, 1);
-      expect(rows.first.id, trip.id);
+      expect(rows.single.id, trip.id);
+      expect(rows.single.distanceHundredthsKm, 4525);
+      expect(rows.single.tripKind, MileageTripKind.businessTrip);
+      expect(rows.single.vehicleSource, MileageVehicleSource.private);
+      expect(rows.single.vehicleClass, MileageVehicleClass.kraftwagen);
     });
 
     test('test_reject_invalid_trip_facts', () async {
@@ -51,6 +61,9 @@ void main() {
           purpose: '',
           distanceHundredthsKm: 0,
           businessContext: '',
+          tripKind: MileageTripKind.businessTrip,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: MileageVehicleClass.kraftwagen,
         ),
         throwsArgumentError,
       );
@@ -63,34 +76,39 @@ void main() {
         purpose: 'Kundenbesuch',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
-      await db.executor.runUpdate(
-        "UPDATE mileage_trips SET state = 'posted', posting_event_id = ?, "
-        "policy_id = ?, policy_source = ?, policy_version = ?, "
-        "policy_effective_from = ?, policy_effective_to = ?, "
-        "calculated_amount = ?, calculated_at = ? WHERE id = ?",
-        <Object?>[
-          'evt-1',
-          'test-policy',
-          'test',
-          'v1',
-          '2026-01-01',
-          '2026-12-31',
-          '12.50',
-          '2026-03-14T00:00:00Z',
-          trip.id,
-        ],
-      );
+      await useCases.calculateTrip(trip.id);
+      final MileageEntryUseCases postingUseCases = MileageEntryUseCases(repo, postingPort: _RecordingPort());
+      await postingUseCases.postTripWithPort(trip.id);
       await expectLater(() => useCases.editTripFacts(trip.id, purpose: 'Neu'), throwsStateError);
       final List<MileageTrip> rows = await repo.listTrips();
       expect(rows.first.purpose, 'Kundenbesuch');
     });
 
     test('test_calculate_from_an_approved_policy', () {
-      expect(useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4525, vehicleClass: 'car'), 1358);
-      expect(useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'otherMotor'), 200);
       expect(
-        () => useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'companyCar'),
+        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4525, vehicleClass: MileageVehicleClass.kraftwagen),
+        1358,
+      );
+      expect(
+        useCases.calculateApprovedAmountCents(
+          distanceHundredthsKm: 1000,
+          vehicleClass: MileageVehicleClass.otherMotorVehicle,
+        ),
+        200,
+      );
+      expect(
+        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 5, vehicleClass: MileageVehicleClass.kraftwagen),
+        2,
+      );
+      expect(
+        () => useCases.calculateApprovedAmountCents(
+          distanceHundredthsKm: 1000,
+          vehicleClass: MileageVehicleClass.unsupported,
+        ),
         throwsArgumentError,
       );
     });
@@ -101,9 +119,15 @@ void main() {
         purpose: 'Kundenbesuch',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
       await expectLater(
-        () => useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'companyCar'),
+        () => useCases.calculateApprovedAmountCents(
+          distanceHundredthsKm: 1000,
+          vehicleClass: MileageVehicleClass.unsupported,
+        ),
         throwsArgumentError,
       );
       await expectLater(() => useCases.postTrip(trip.id), throwsStateError);
@@ -117,19 +141,85 @@ void main() {
     test('test_do_not_treat_the_eks_allowance_as_the_general_deduction', () async {
       final MileageTrip trip = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',
-        purpose: 'Kundenbesuch',
+        purpose: 'EKS-Fahrt',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.eksAllowance,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
       const int eksAllowance = (1000 * 10) ~/ 100;
       expect(eksAllowance, 100);
+      await useCases.calculateTrip(trip.id);
       expect(
-        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: 'car'),
+        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 1000, vehicleClass: MileageVehicleClass.kraftwagen),
         isNot(eksAllowance),
       );
       final MileageTrip kept = (await repo.getById(trip.id))!;
       expect(kept.state, MileageTripState.unresolved);
       expect(kept.calculatedAmount, isNull);
+    });
+
+    test('test_keep_ineligible_trips_unresolved', () async {
+      final List<
+        ({String tripDate, MileageTripKind kind, MileageVehicleSource source, MileageVehicleClass vehicleClass})
+      >
+      ineligibleFacts =
+          <({String tripDate, MileageTripKind kind, MileageVehicleSource source, MileageVehicleClass vehicleClass})>[
+            (
+              tripDate: '2026-03-14',
+              kind: MileageTripKind.commuting,
+              source: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              tripDate: '2026-03-14',
+              kind: MileageTripKind.other,
+              source: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              tripDate: '2026-03-14',
+              kind: MileageTripKind.businessTrip,
+              source: MileageVehicleSource.company,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              tripDate: '2026-03-14',
+              kind: MileageTripKind.businessTrip,
+              source: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.unsupported,
+            ),
+            (
+              tripDate: '2026-03-14',
+              kind: MileageTripKind.unknown,
+              source: MileageVehicleSource.unknown,
+              vehicleClass: MileageVehicleClass.unknown,
+            ),
+            (
+              tripDate: '2027-01-01',
+              kind: MileageTripKind.businessTrip,
+              source: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+          ];
+
+      for (final fact in ineligibleFacts) {
+        final MileageTrip trip = await useCases.recordBusinessTrip(
+          tripDate: fact.tripDate,
+          purpose: 'Fahrt ${fact.tripDate}',
+          distanceHundredthsKm: 1000,
+          businessContext: 'Projekt',
+          tripKind: fact.kind,
+          vehicleSource: fact.source,
+          vehicleClass: fact.vehicleClass,
+        );
+        final MileageTrip result = await useCases.calculateTrip(trip.id);
+        expect(result.state, MileageTripState.unresolved);
+        expect(result.policyId, isNull);
+        expect(result.calculatedAmount, isNull);
+        expect(result.postingEventId, isNull);
+      }
     });
 
     test('test_editing_calculated_trip_invalidates_calculation', () async {
@@ -138,8 +228,11 @@ void main() {
         purpose: 'Kundenbesuch',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
-      await useCases.applyApprovedCalculation(trip.id, 'car');
+      await useCases.calculateTrip(trip.id);
       final MileageTrip edited = await useCases.editTripFacts(trip.id, purpose: 'Neuer Zweck');
       expect(edited.state, MileageTripState.unresolved);
       expect(edited.purpose, 'Neuer Zweck');
@@ -154,8 +247,11 @@ void main() {
         purpose: 'Kundenbesuch',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
-      await useCases.applyApprovedCalculation(trip.id, 'car');
+      await useCases.calculateTrip(trip.id);
       final _RecordingPort port = _RecordingPort();
       final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
       final String eventId = await wired.postTripWithPort(trip.id);
@@ -172,8 +268,11 @@ void main() {
         purpose: 'Kundenbesuch',
         distanceHundredthsKm: 1000,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
-      await useCases.applyApprovedCalculation(trip.id, 'car');
+      await useCases.calculateTrip(trip.id);
       final _RecordingPort port = _RecordingPort();
       final MileageEntryUseCases wired = MileageEntryUseCases(repo, postingPort: port);
       final String first = await wired.postTripWithPort(trip.id);
@@ -186,6 +285,9 @@ void main() {
         purpose: 'Ohne Kalkulation',
         distanceHundredthsKm: 500,
         businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
       );
       await expectLater(() => wired.postTripWithPort(bare.id), throwsStateError);
     });

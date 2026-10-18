@@ -22,6 +22,9 @@ class MileageEntryUseCases {
     required String purpose,
     required int distanceHundredthsKm,
     required String businessContext,
+    required MileageTripKind tripKind,
+    required MileageVehicleSource vehicleSource,
+    required MileageVehicleClass vehicleClass,
   }) async {
     _requireDate(tripDate);
     _requireText(purpose, 'purpose');
@@ -37,6 +40,9 @@ class MileageEntryUseCases {
       purpose: purpose.trim(),
       businessContext: businessContext.trim(),
       distanceHundredthsKm: distanceHundredthsKm,
+      tripKind: tripKind,
+      vehicleSource: vehicleSource,
+      vehicleClass: vehicleClass,
       state: MileageTripState.unresolved,
       createdAt: now,
       updatedAt: now,
@@ -51,6 +57,9 @@ class MileageEntryUseCases {
     String? tripDate,
     int? distanceHundredthsKm,
     String? businessContext,
+    MileageTripKind? tripKind,
+    MileageVehicleSource? vehicleSource,
+    MileageVehicleClass? vehicleClass,
   }) async {
     final MileageTrip? current = await repo.getById(id);
     if (current == null) throw StateError('not found');
@@ -63,6 +72,9 @@ class MileageEntryUseCases {
     final String nextDate = tripDate ?? current.tripDate;
     final int nextDist = distanceHundredthsKm ?? current.distanceHundredthsKm;
     final String nextContext = businessContext ?? current.businessContext;
+    final MileageTripKind nextTripKind = tripKind ?? current.tripKind;
+    final MileageVehicleSource nextVehicleSource = vehicleSource ?? current.vehicleSource;
+    final MileageVehicleClass nextVehicleClass = vehicleClass ?? current.vehicleClass;
     _requireDate(nextDate);
     _requireText(nextPurpose, 'purpose');
     _requireText(nextContext, 'businessContext');
@@ -74,6 +86,9 @@ class MileageEntryUseCases {
         tripDate: nextDate,
         dist: nextDist,
         businessContext: nextContext.trim(),
+        tripKind: nextTripKind,
+        vehicleSource: nextVehicleSource,
+        vehicleClass: nextVehicleClass,
       );
     } else {
       await repo.updateUnresolvedFacts(
@@ -82,6 +97,9 @@ class MileageEntryUseCases {
         tripDate: nextDate,
         dist: nextDist,
         businessContext: nextContext.trim(),
+        tripKind: nextTripKind,
+        vehicleSource: nextVehicleSource,
+        vehicleClass: nextVehicleClass,
       );
     }
     return (await repo.getById(id))!;
@@ -107,28 +125,42 @@ class MileageEntryUseCases {
     throw StateError('posting unavailable');
   }
 
-  /// M1 persistence: atomically store the approved snapshot on unresolved-to-calculated.
-  Future<MileageTrip> applyApprovedCalculation(String id, String vehicleClass) async {
+  /// Stores a policy snapshot only for trips that meet the active application policy.
+  Future<MileageTrip> calculateTrip(String id) async {
     final MileageTrip? current = await repo.getById(id);
     if (current == null) throw StateError('not found');
     if (current.state != MileageTripState.unresolved) throw StateError('not unresolved');
+    if (!_isEligibleForApprovedPolicy(current)) return current;
+
     final int cents = calculateApprovedAmountCents(
       distanceHundredthsKm: current.distanceHundredthsKm,
-      vehicleClass: vehicleClass,
+      vehicleClass: current.vehicleClass,
     );
     final String now = DateTime.now().toUtc().toIso8601String();
     await repo.storeCalculation(
       id: id,
       policyId: 'DE-private-business-travel/1',
-      policySource: 'EStH-R4.12-LStH-A25',
+      policySource: 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71',
       policyVersion: '1',
       policyFrom: '2025-01-01',
       policyTo: '2026-12-31',
-      amount: (cents / 100).toStringAsFixed(2),
+      amount: _formatEuroAmount(cents),
       calculatedAt: now,
     );
     return (await repo.getById(id))!;
   }
+
+  bool _isEligibleForApprovedPolicy(MileageTrip trip) {
+    return trip.tripKind == MileageTripKind.businessTrip &&
+        trip.vehicleSource == MileageVehicleSource.private &&
+        (trip.vehicleClass == MileageVehicleClass.kraftwagen ||
+            trip.vehicleClass == MileageVehicleClass.otherMotorVehicle) &&
+        trip.tripDate.compareTo('2025-01-01') >= 0 &&
+        trip.tripDate.compareTo('2026-12-31') <= 0;
+  }
+
+  String _formatEuroAmount(int amountCents) =>
+      '${amountCents ~/ 100}.${(amountCents % 100).toString().padLeft(2, '0')}';
 
   /// 3.x wiring: exactly-once posting through the injected port.
   /// Identical retries return the stored event without calling the port again.
@@ -145,19 +177,17 @@ class MileageEntryUseCases {
     return eventId;
   }
 
-  /// Approved policy DE-private-business-travel/1: car 30c/km, other motor 20c/km, half-up per trip.
-  /// shortcut: vehicle eligibility param only; full facts validated at record time.
-  int calculateApprovedAmountCents({required int distanceHundredthsKm, required String vehicleClass}) {
-    if (distanceHundredthsKm < 1 || distanceHundredthsKm > 999999999999) throw ArgumentError('distance out of range');
-    final int rate;
-    if (vehicleClass == 'car') {
-      rate = 30;
-    } else if (vehicleClass == 'otherMotor') {
-      rate = 20;
-    } else {
-      throw ArgumentError('unsupported vehicle');
+  /// Approved policy DE-private-business-travel/1: Kraftwagen 30c/km, other motor 20c/km.
+  int calculateApprovedAmountCents({required int distanceHundredthsKm, required MileageVehicleClass vehicleClass}) {
+    if (distanceHundredthsKm < 1 || distanceHundredthsKm > 999999999999) {
+      throw ArgumentError('distance out of range');
     }
-    return (distanceHundredthsKm * rate + 50) ~/ 100;
+    final int rateCentsPerKm = switch (vehicleClass) {
+      MileageVehicleClass.kraftwagen => 30,
+      MileageVehicleClass.otherMotorVehicle => 20,
+      MileageVehicleClass.unsupported || MileageVehicleClass.unknown => throw ArgumentError('unsupported vehicle'),
+    };
+    return (distanceHundredthsKm * rateCentsPerKm + 50) ~/ 100;
   }
 }
 

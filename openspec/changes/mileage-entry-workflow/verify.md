@@ -2,12 +2,20 @@
 
 ## Current implementation checkpoint (2026-10-18)
 
-- **Scope:** Replaced timestamp/random trip IDs with UUIDv4 and strengthened `test_record_a_business_trip` to verify the UUID format and exact persisted integer distance. No distance conversion or rounding was added.
+- **Scope:** Replaced timestamp/random trip IDs with UUIDv4 and strengthened `test_record_a_business_trip` to reload and verify the UUID format, exact persisted integer distance, structured eligibility facts, and unresolved state. No distance conversion or rounding was added.
 - **Red evidence:** Before the fix, the focused test failed because the generated ID was `1792347538129862-1436408645`, which was not a UUID.
 - **Focused test:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart` → 9 passed, exit 0. Flutter required an elevated local VM-test run because the sandbox denied its temporary localhost socket.
 - **Scoped analysis:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter analyze lib/features/mileage test/features/mileage` → no issues, exit 0.
 - **Formatting:** `fvm dart format --line-length=120` reported 0 changed files; the command then exited nonzero because Dart telemetry could not update `/home/ubuntu/.dart-tool/dart-flutter-telemetry-session.json` on the read-only filesystem.
-- **Scope limit:** This checkpoint does not verify structured eligibility fields, policy calculation, migration, posting, corrections, exports, or the rest of the 45-row matrix.
+- **Scope limit:** This checkpoint did not verify policy calculation, migration, posting, corrections, exports, or the rest of the 45-row matrix. The later focused run below adds partial evidence for eligibility and migration only.
+
+## Eligibility and v23 lifecycle checkpoint (2026-10-18)
+
+- **Scope:** Added typed trip/vehicle classification, preserved integer distance, applied the approved policy only to eligible facts and dates, added v23 eligibility columns with legacy `unknown` defaults, and installed lifecycle triggers. Posting remains test-port-only; production accounting, account configuration, corrections, export inventory integration, and UI are not established by this checkpoint.
+- **Focused tests:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart test/db/mileage_lifecycle_migration_test.dart test/db/inventory_stocktake_migration_test.dart` → 21 passed (10 mileage workflow, 3 mileage lifecycle migration, 8 inventory migration), exit 0. The command required an escalated local VM-test run because the sandbox denied Flutter's temporary localhost socket.
+- **Database evidence:** Fresh install reports schema version 23, three classification columns, and 16 mileage lifecycle triggers. The v22 fixture preserves a posted legacy row's classification as `unknown`, exact distance, policy snapshot, amount, and posting event. Trigger tests reject an ineligible calculation and an ungated void transition; the remaining lifecycle matrix is not verified.
+- **Eligibility evidence:** Focused workflow tests cover private business travel, both supported vehicle classes, integer half-up examples, and selected exclusions (commuting, other, company vehicle, unsupported class, unknown facts, out-of-period 2027, and EKS). Explicit effective-date boundary assertions and complete posting prerequisites remain untested.
+- **Validation limits:** No scoped analyzer was run after the migration changes. The prior formatter invocation formatted the touched Dart sources but exited nonzero when telemetry attempted to write outside the workspace. This checkpoint does not complete the feature or its 45-scenario matrix.
 
 ## Specification sync snapshot before implementation (2026-10-18)
 
@@ -31,4 +39,4 @@ These results predate this revision and were not rerun:
 
 ## Current decision
 
-**DECISION: PARTIAL — the UUID4 identity checkpoint is implemented and verified. The broader mileage feature, v23 lifecycle migration, account mapping, posting, correction, export, and remaining scenario coverage are still in progress.**
+**DECISION: PARTIAL — UUID4 identity, exact persisted integer distance, selected eligibility behavior, and selected v23 lifecycle behavior are implemented and have focused test evidence. Production UI/posting, account mapping, correction behavior, export inventory integration, exhaustive migration/lifecycle tests, scoped analysis, and the remaining scenario coverage are still in progress.**
