@@ -1,3 +1,7 @@
+## 0. Blocking prerequisite
+
+- [ ] 0.1 Before implementation or enabling cashbook operations, verify that the separately owned `account-opening-balance-source` v24 contract has fresh independent approval and is implemented/wired. Until then, keep cash writes, balances, close finalization, and PDFs unavailable; do not edit or complete the prerequisite change here.
+
 ## 1. accounting: Tagesabschluss
 
 - [ ] 1.1 Write failing test `test_tagesabschluss_creation` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Tagesabschluss creation"; assert it fails for the right reason.
@@ -7,7 +11,7 @@
 - [ ] 1.5 Implement the specified behavior for "Counting discrepancy" to pass 1.4.
 - [ ] 1.6 Refactor the affected code; keep the focused and full suites green.
 - [ ] 1.7 Write failing test `test_close_integrity_hash_uses_canonical_utf8_bytes` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for inherited scenario "GoBD signature"; assert canonical field order, integer cents, UTF-8 bytes, and SHA-256 digest only, with no authenticated-signature claim.
-- [ ] 1.8 Implement the specified behavior for "GoBD signature" to pass 1.7.
+- [ ] 1.8 Implement the inherited integrity-digest scenario without an authenticated-signature claim to pass 1.7.
 - [ ] 1.9 Refactor the affected code; keep the focused and full suites green.
 - [ ] 1.10 Write failing test `test_double_close_prevention` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Double close prevention"; assert it fails for the right reason.
 - [ ] 1.11 Implement the specified behavior for "Double close prevention" to pass 1.10.
@@ -18,7 +22,7 @@
 - [ ] 1.16 Write failing test `test_ambiguous_legacy_close_identity` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Ambiguous legacy close identity"; assert it fails for the right reason.
 - [ ] 1.17 Implement the specified behavior for "Ambiguous legacy close identity" to pass 1.16.
 - [ ] 1.18 Refactor the affected code; keep the focused and full suites green.
-- [ ] 1.19 Write failing test `test_expected_cash_source_is_unavailable` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Expected cash source is unavailable"; assert it fails for the right reason.
+- [ ] 1.19 Write failing test `test_expected_cash_source_is_unavailable` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Expected cash source is unavailable"; assert the pending/unavailable v24 source blocks writes, balances, closes, and PDFs without fallback values.
 - [ ] 1.20 Implement the specified behavior for "Expected cash source is unavailable" to pass 1.19.
 - [ ] 1.21 Refactor the affected code; keep the focused and full suites green.
 - [ ] 1.22 Write failing test `test_daily_close_columns_map_expected_count_and_account` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Daily close columns map to expected and counted values"; assert `betrag`, `kassenbestand`, `differenz`, and explicit `konto_id` mapping.
@@ -51,7 +55,7 @@
 - [ ] 3.4 Write failing test `test_incomplete_or_ambiguous_cash_history_is_unavailable` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Incomplete or ambiguous cash history is unavailable"; assert there is no usable amount and no zero or `konten.saldo` fallback.
 - [ ] 3.5 Implement the specified behavior for "Incomplete or ambiguous cash history is unavailable" to pass 3.4.
 - [ ] 3.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 3.7 Write failing test `test_verified_setup_opening_counted_once` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Verified opening cash is counted once"; assert `konten.saldo` is corroborating metadata and is not added.
+- [ ] 3.7 Write failing test `test_verified_setup_opening_counted_once` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Verified opening cash is counted once"; after the approved/wired v24 source supplies the event, assert `konten.saldo` is corroborating metadata and is not added.
 - [ ] 3.8 Implement the specified behavior for "Verified opening cash is counted once" to pass 3.7.
 - [ ] 3.9 Refactor the affected code; keep the focused and full suites green.
 
@@ -109,17 +113,20 @@
 - [ ] 7.5 Implement the specified behavior for "Legacy rows without one verified identity block a new close" to pass 7.4.
 - [ ] 7.6 Refactor the affected code; keep the focused and full suites green.
 
-## 8. pdf: Tagesabschluss PDF renders the finalized snapshot
+## 8. pdf: Tagesabschluss PDF
 
-- [ ] 8.1 Write failing test `test_complete_verified_close_produces_its_pdf` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Complete verified close produces its PDF"; assert it fails for the right reason.
-- [ ] 8.2 Implement the specified behavior for "Complete verified close produces its PDF" to pass 8.1.
+- [ ] 8.1 Write failing test `test_tagesabschluss_generation` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Tagesabschluss generation"; assert it reads the stored verified snapshot and labels the digest as integrity-only.
+- [ ] 8.2 Implement the specified behavior for "Tagesabschluss generation" to pass 8.1.
 - [ ] 8.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 8.4 Write failing test `test_incomplete_or_legacy_close_has_no_pdf` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Incomplete or legacy close has no PDF"; assert it fails for the right reason.
-- [ ] 8.5 Implement the specified behavior for "Incomplete or legacy close has no PDF" to pass 8.4.
+- [ ] 8.4 Write failing test `test_tagesabschluss_pdf_flags_counting_discrepancy` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Counting discrepancy"; assert the stored nonzero difference is flagged without recalculation or posting.
+- [ ] 8.5 Implement the specified behavior for "Counting discrepancy" to pass 8.4.
 - [ ] 8.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 8.7 Write failing test `test_changed_snapshot_is_not_exported` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Changed snapshot has no PDF"; assert malformed, unknown-version, non-canonical, and hash-mismatched evidence produces no artifact.
-- [ ] 8.8 Implement the specified behavior for "Changed snapshot has no PDF" to pass 8.7.
+- [ ] 8.7 Write failing test `test_incomplete_or_legacy_close_has_no_pdf` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Incomplete or legacy close has no PDF"; assert missing/unapproved v24 source, legacy rows, or incomplete evidence produces no artifact.
+- [ ] 8.8 Implement the specified behavior for "Incomplete or legacy close has no PDF" to pass 8.7.
 - [ ] 8.9 Refactor the affected code; keep the focused and full suites green.
+- [ ] 8.10 Write failing test `test_changed_snapshot_is_not_exported` in `test/features/pdf/cashbook_and_daily_close_workspace_test.dart` for scenario "Changed snapshot has no PDF"; assert malformed, unknown-version, non-canonical, and hash-mismatched evidence produces no artifact.
+- [ ] 8.11 Implement the specified behavior for "Changed snapshot has no PDF" to pass 8.10.
+- [ ] 8.12 Refactor the affected code; keep the focused and full suites green.
 
 ## 9. receipts-and-payment-reconciliation: Cash posting and receipt reference commit atomically
 

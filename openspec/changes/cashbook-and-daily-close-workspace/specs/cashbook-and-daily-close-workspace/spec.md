@@ -2,18 +2,18 @@
 
 ### Requirement: Cashbook view uses typed committed cash events
 
-The existing `/banking` workspace SHALL expose Cashbook and Daily Close views using isolated route state (`view=cashbook` and `view=close`) while preserving existing bank-import views and query state. Cashbook history SHALL show only events identified by the accepted `balanced-journal-postings-and-settlement-events` service as committed balanced `cash_payment` groups linked to an explicit cash account. Its typed rows SHALL provide event date, direction, amount and basis, category, tax treatment, description, posting identity, and selected receipt reference where present. Cash income and expense forms SHALL collect the inputs required by that posting service; the view SHALL NOT calculate tax, choose fallback category/account mappings, or write directly to `journal`. An imported bank row, free-text match, or legacy journal row SHALL NOT become a cash movement unless the accepted posting service identifies it as such. If the writer or required mapping is absent, the view SHALL show a localized unavailable state and SHALL NOT commit a cash event. Committed cash history SHALL not be edited or deleted in this workspace; corrections SHALL use the accepted linked accounting correction operation.
+The existing `/banking` workspace SHALL expose Cashbook and Daily Close views using isolated route state (`view=cashbook` and `view=close`) while preserving existing bank-import views and query state. Cashbook history SHALL show only events identified by the accepted `balanced-journal-postings-and-settlement-events` service as committed balanced `cash_payment` groups linked to an explicit cash account. Its typed rows SHALL provide event date, direction, amount and basis, category, tax treatment, description, posting identity, and selected receipt reference where present. Cash income and expense forms SHALL collect the inputs required by that posting service; the view SHALL NOT calculate tax, choose fallback category/account mappings, or write directly to `journal`. An imported bank row, free-text match, or legacy journal row SHALL NOT become a cash movement unless the accepted posting service identifies it as such. Cashbook writes and Daily Close SHALL remain unavailable until the separate `account-opening-balance-source` contract has fresh independent approval and is implemented at v24, in addition to the accepted posting and receipt boundaries. If any prerequisite or required mapping is absent, the view SHALL show a localized unavailable state and SHALL NOT commit a cash event. Committed cash history SHALL not be edited or deleted in this workspace; corrections SHALL use the accepted linked accounting correction operation.
 
 #### Scenario: Approved cash event appears in the cashbook
 
-- **GIVEN** the accepted posting service commits a balanced cash income event for an explicit account and returns its category, tax treatment, description, posting identity, and selected receipt reference
+- **GIVEN** `account-opening-balance-source` is independently approved and implemented at v24, and the accepted posting service commits a balanced cash income event for an explicit account and returns its category, tax treatment, description, posting identity, and selected receipt reference
 - **WHEN** the user records the event and opens Cashbook history
 - **THEN** one typed row SHALL display the returned fields and posting identity
 - **AND** no page-level SQL or second cash transaction record SHALL be created.
 
 #### Scenario: Missing posting contract blocks cash entry
 
-- **GIVEN** the balanced cash-event writer or a required account, category, tax, or receipt mapping is unavailable
+- **GIVEN** the v24 opening-source prerequisite is pending, or the balanced cash-event writer or a required account, category, tax, or receipt mapping is unavailable
 - **WHEN** the user attempts to record cash income or expense
 - **THEN** the workspace SHALL show a localized unavailable or validation state
 - **AND** no journal group, receipt link, or partial posting SHALL be committed.
@@ -34,7 +34,7 @@ The existing `/banking` workspace SHALL expose Cashbook and Daily Close views us
 
 ### Requirement: Cash balance uses a complete account/date result
 
-The Cashbook and Daily Close SHALL consume one typed account/date result with `company_id`, `account_id`, `as_of_date`, nullable integer `balance_cents`, uppercase ISO 4217 `currency_code`, stable `source_reference`, `complete`, and an unavailable reason when incomplete. `as_of_date` SHALL be the end of that local calendar date. A complete result SHALL have an unambiguous company/account/date, use one supported two-decimal currency without conversion, and identify its source. An incomplete result SHALL have no usable balance amount. The report source SHALL include only the verified setup opening event and committed balanced `cash_payment` groups through the requested date for that account.
+The Cashbook and Daily Close SHALL consume one typed account/date result with `company_id`, `account_id`, `as_of_date`, nullable integer `balance_cents`, uppercase ISO 4217 `currency_code`, stable `source_reference`, `complete`, and an unavailable reason when incomplete. `as_of_date` SHALL be the end of that local calendar date. A complete result SHALL have an unambiguous company/account/date, use one supported two-decimal currency without conversion, and identify its source. An incomplete result SHALL have no usable balance amount. The report source SHALL include only the verified opening event supplied by the separately approved and implemented `account-opening-balance-source` v24 contract and committed balanced `cash_payment` groups through the requested date for that account. Until that contract is independently approved and implemented, the result SHALL be incomplete and unavailable.
 
 The setup opening event SHALL contribute exactly once. If `konten.saldo` contains the same setup opening amount, it SHALL be checked only as corroborating metadata and SHALL NOT be added to the opening event or treated as another movement. Missing, duplicate, conflicting, or ambiguous opening identity; an unsupported currency; incomplete legacy coverage; an unbalanced or unlinked legacy row that could affect the account; or any other unresolved account/date source SHALL make the result incomplete. The workspace SHALL display the result returned by the source and SHALL NOT locally sum rows, use `konten.saldo` as an as-of balance, infer zero, or use descriptions/imports as a source. An incomplete balance SHALL be unavailable—not zero—and SHALL block close finalization and PDF generation.
 
@@ -47,14 +47,14 @@ The setup opening event SHALL contribute exactly once. If `konten.saldo` contain
 
 #### Scenario: Verified opening cash is counted once
 
-- **GIVEN** a verified setup opening event and `konten.saldo` contain the same account, date, currency, and amount
+- **GIVEN** `account-opening-balance-source` is independently approved and implemented at v24, and its verified opening event and `konten.saldo` contain the same account, date, currency, and amount
 - **WHEN** the account/date result is produced
 - **THEN** the opening amount SHALL contribute once from the setup event
 - **AND** `konten.saldo` SHALL be corroborating metadata and SHALL NOT be added a second time.
 
 #### Scenario: Incomplete or ambiguous cash history is unavailable
 
-- **GIVEN** the opening identity conflicts or duplicates, or legacy cash history through the requested date is incomplete, unbalanced, or ambiguous
+- **GIVEN** the v24 opening-source prerequisite is unapproved or unavailable, the opening identity conflicts or duplicates, or legacy cash history through the requested date is incomplete, unbalanced, or ambiguous
 - **WHEN** Cashbook or Daily Close requests the account/date result
 - **THEN** the result SHALL be incomplete with no usable amount and an actionable reason
 - **AND** the workspace SHALL NOT substitute a journal sum, account `saldo`, or zero.

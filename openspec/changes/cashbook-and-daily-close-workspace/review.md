@@ -59,3 +59,34 @@ None; first review round.
 2. **Close persistence and digest verification:** the deltas now map `betrag` to expected, `kassenbestand` to counted, `differenz` to counted-minus-expected, and require an explicit `konto_id`; define a version-1 `zaehlung_json` with fixed RFC 8785 property order and integer cents; add a canonical UTF-8 SHA-256 `integrity_hash`; and require verification before finalized display or PDF. The digest is explicitly integrity-only, with no authenticated-signature, identity, Ed25519, or key-custody claim. The database plan reserves v25 after v23 mileage and the v24 setup anchor, preserves legacy rows, and requires `(unternehmen_id, konto_id, datum)` lookup/insertion under `BEGIN IMMEDIATE`.
 
 The round-1 findings are **addressed in author-edited proposal/design/delta text; reviewer acceptance is pending**. The historical round-1 `VERDICT: REVISE` remains in force for the implementation gate until a fresh independent reviewer evaluates the revised artifacts.
+
+---
+
+## Independent Review Round 2 — findings for commit `51dbddc`
+
+- **Prior round**: Round 1 — `VERDICT: REVISE`; the author response above records that round's contract revision.
+- **Reviewer context**: fresh-context independent reviewer; findings relayed to the author for this scoped repair.
+- **Artifacts reviewed**: the committed proposal, design, delta specs, test plan, tasks, review, and verification record at `51dbddc1f15eee5eb929acf7ea2afa32bba42a96`.
+- **Tool restrictions**: read-only review; no implementation or test results were claimed.
+
+### Findings
+
+1. **PDF delta does not modify the maintained requirement.** The PDF delta was filed as ADDED even though `openspec/specs/pdf/spec.md` already defines `Tagesabschluss PDF`. Refile it as MODIFIED, retain the maintained requirement's scenarios, and specify snapshot/digest integrity checks without presenting a hash as an authenticated signature.
+2. **Test-plan paths are malformed.** Requirement paths use `specs/specs/...`; change them to capability-relative `specs/<capability>/spec.md` paths and keep every scenario mapped to a named planned test.
+3. **Design dependency status is stale.** `bank-import-confidence-and-rule-workspace` and `global-accounting-search` are archived, not active. Describe their archived route/query behavior accurately rather than as active proposals.
+
+### Verdict
+
+VERDICT: REVISE
+
+Required changes: address all three findings above before requesting another independent review. No implementation is authorized by this verdict.
+
+CHANGES_APPLIED: n/a
+
+## Author response after Round 2
+
+- The PDF delta now modifies the maintained `Tagesabschluss PDF` requirement, preserves its generation and discrepancy scenarios, and describes only integrity verification. It makes no authentication or signer-identity claim.
+- All test-plan requirement paths now use capability-relative paths; the updated PDF scenarios also have distinct red test rows and matching unchecked red-green-refactor tasks.
+- The design now identifies the bank-import and global-search changes as archived and preserves their established Banking route/query behavior.
+- The separate setup worker confirmed the v24 prerequisite name `account-opening-balance-source`; its independent review is pending. The cashbook proposal, design, deltas, tasks, and verification record now keep cash writes, balances, closes, and PDFs blocked until that contract is independently approved and implemented. No setup or maintained/shared spec was edited.
+- Round 2's `VERDICT: REVISE` applies to commit `51dbddc` and is now stale because the proposal, design, and delta specs were edited to address its findings. Round 3 independent review is pending; no reviewer acceptance is claimed, and implementation tasks remain unchecked.

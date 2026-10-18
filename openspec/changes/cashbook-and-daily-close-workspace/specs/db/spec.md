@@ -2,11 +2,11 @@
 
 ### Requirement: Tagesabschluss evidence storage and immutability
 
-The ordered v25 migration SHALL run after v23 mileage and the v24 setup anchor. It SHALL add nullable `zaehlung_json TEXT` and `integrity_hash TEXT` columns to the existing `tagesabschluesse` table and install database triggers that reject UPDATE or DELETE when the old row has a non-null `integrity_hash` or legacy `signatur`. It SHALL NOT create another cash ledger/table, backfill or reinterpret legacy close values, rewrite `signatur`, or add/remove any existing table. Existing legacy rows SHALL remain byte-for-byte unchanged and readable as unverified history; no snapshot, digest, signature, or verification state SHALL be synthesized. New finalized rows SHALL store their versioned snapshot and integrity digest together and SHALL leave the legacy `signatur` field unchanged.
+The ordered v25 migration SHALL run after v23 mileage and the separately reviewed and implemented v24 `account-opening-balance-source` prerequisite. Cashbook implementation SHALL remain blocked while that prerequisite lacks fresh independent approval. The v25 migration SHALL add nullable `zaehlung_json TEXT` and `integrity_hash TEXT` columns to the existing `tagesabschluesse` table and install database triggers that reject UPDATE or DELETE when the old row has a non-null `integrity_hash` or legacy `signatur`. It SHALL NOT create another cash ledger/table, backfill or reinterpret legacy close values, rewrite `signatur`, or add/remove any existing table. Existing legacy rows SHALL remain byte-for-byte unchanged and readable as unverified history; no snapshot, digest, signature, or verification state SHALL be synthesized. New finalized rows SHALL store their versioned snapshot and integrity digest together and SHALL leave the legacy `signatur` field unchanged.
 
 #### Scenario: Close evidence migration preserves existing history
 
-- **GIVEN** a supported profile at schema v24 contains `tagesabschluesse` rows, including legacy values
+- **GIVEN** the independently approved `account-opening-balance-source` v24 migration is implemented and a supported profile at schema v24 contains `tagesabschluesse` rows, including legacy values
 - **WHEN** the ordered v25 migration completes
 - **THEN** `zaehlung_json` and `integrity_hash` SHALL exist and the exact pre-migration table set SHALL remain unchanged
 - **AND** every existing close-row value SHALL remain byte-for-byte unchanged with no inferred snapshot or digest.

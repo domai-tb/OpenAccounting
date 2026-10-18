@@ -1,19 +1,26 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
-### Requirement: Tagesabschluss PDF renders the verified stored snapshot
+### Requirement: Tagesabschluss PDF
 
-The Tagesabschluss PDF SHALL render its date, explicit company and cash account, expected amount, counted amount, counted-minus-expected difference, explanation, currency, and source reference only from one stored version-1 `zaehlung_json` snapshot after its canonical UTF-8 SHA-256 `integrity_hash` has been verified under the accounting contract. PDF generation SHALL NOT query or sum journal rows, derive a balance or difference, recalculate tax, reinterpret legacy fields, alter the close, or create accounting effects. New PDFs SHALL label the digest as an integrity check only and SHALL NOT claim that a person signed or authenticated the close. The PDF action SHALL remain unavailable when the source result, snapshot, or digest is absent, unknown, malformed, or unverified.
+The system SHALL generate a daily cash close PDF (Tagesabschluss) only from a complete account/date result and one stored version-1 `zaehlung_json` snapshot whose canonical UTF-8 SHA-256 `integrity_hash` has been verified under the accounting contract. The opening source SHALL be supplied by `account-opening-balance-source` after its v24 contract receives fresh independent approval and is implemented; until then PDF generation SHALL remain unavailable. The PDF SHALL show the date, explicit company and cash account, expected amount, actual counted amount, counted-minus-expected difference, explanation, currency, and source reference from that stored snapshot only. It SHALL NOT query or sum journal rows, derive a balance or difference, recalculate tax, reinterpret legacy fields, alter the close, or create accounting effects. The digest SHALL be described only as an integrity check and SHALL NOT be represented as an authenticated signature, signer identity, or proof that a person approved the close. PDF generation SHALL remain unavailable when the source result, snapshot, or digest is absent, unknown, malformed, changed, or unverified.
 
-#### Scenario: Complete verified close produces its PDF
+#### Scenario: Tagesabschluss generation
 
-- **GIVEN** one finalized close has a complete account/date source result and its stored version-1 snapshot matches its integrity digest
-- **WHEN** the user generates the Tagesabschluss PDF
-- **THEN** the PDF SHALL render the values from that stored snapshot, including expected, counted, difference, account/date, currency, source reference, and explanation
-- **AND** it SHALL describe the digest only as an integrity check and leave the close row unchanged.
+- **GIVEN** `account-opening-balance-source` is independently approved and implemented at v24, and one finalized close has a complete account/date result and a stored version-1 snapshot matching its integrity digest
+- **WHEN** the Tagesabschluss PDF is rendered
+- **THEN** the PDF SHALL show the date, expected amount, actual counted amount, counted-minus-expected difference, company, cash account, currency, source reference, and explanation from the stored snapshot
+- **AND** it SHALL describe the digest only as an integrity check without claiming signer identity or authentication.
+
+#### Scenario: Counting discrepancy
+
+- **GIVEN** a verified finalized close has a counted amount that differs from the expected amount
+- **WHEN** the Tagesabschluss PDF is rendered
+- **THEN** the discrepancy SHALL be prominently flagged using the stored expected, counted, and difference values
+- **AND** PDF rendering SHALL NOT recalculate or post the difference.
 
 #### Scenario: Incomplete or legacy close has no PDF
 
-- **GIVEN** a close is a legacy row, lacks required evidence or an integrity digest, or has an unavailable/unverified balance source
+- **GIVEN** the v24 opening-source prerequisite is unapproved or unavailable, or a close is a legacy row, lacks required evidence or an integrity digest, or has an unavailable/unverified balance source
 - **WHEN** PDF generation is requested
 - **THEN** generation SHALL return a localized unavailable result
 - **AND** no incomplete PDF artifact SHALL be written.
