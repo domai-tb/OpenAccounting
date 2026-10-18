@@ -44,5 +44,20 @@
 ## Coverage Notes
 
 - Every scenario in all five change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths; all rows start red.
-- The mapped tests are planned work, not evidence that test files exist or that any test has passed. No implementation or test work is complete.
+- The 35 mapped scenario rows remain planned work; this isolated calculator suite does not satisfy the report, database, AppServices, or UI scenarios in those rows.
 - Tests are planned for the repository’s Flutter test infrastructure and focused fixtures for the affected feature and persistence boundaries.
+
+### Supplementary account/date balance core checks
+
+These unit checks cover the standalone calculator slice and do not change the status of the 35 mapped end-to-end scenario rows above.
+
+| Test File | Test Name | Current Result |
+|-----------|-----------|----------------|
+| test/features/cashbook/account_date_balance_test.dart | counts the verified opening once and only committed scoped cash movements | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | returns unavailable when the approved opening source is absent | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | returns unavailable for missing, duplicated, or unverified opening evidence | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | returns unavailable when the opening event is also presented as a cash movement | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | returns unavailable for incomplete history, unbalanced cash, or duplicate posting identity | 🟢 passed |
+| test/features/cashbook/account_date_balance_test.dart | carries account currency, rejects mixed currencies, and refuses integer-cent overflow | 🟢 passed |
+
+The suite verifies exact integer minor units under the app's two-decimal convention. It carries the account currency without conversion, accepts a matching non-EUR currency, and fails closed when movement currency differs. All six tests passed in the focused rerun after the currency-contract correction.

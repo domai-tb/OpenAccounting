@@ -138,4 +138,9 @@
 
 - Follow `design.md` for implementation decisions and dependency order.
 - Keep each scenario in red-green-refactor order; do not implement behavior before its failing test.
-- Keep `test-plan.md` red until its named test passes.
+- Keep mapped scenario rows in `test-plan.md` red until their named end-to-end tests pass.
+
+## Scoped implementation progress: account/date balance core
+
+- Added a standalone calculator that accepts an explicit account currency, a verified opening event, and complete movement evidence. It uses integer minor units with the app's two-decimal convention, counts the opening exactly once, aggregates only committed cash-account movements after the opening cutover, rejects mixed currencies, and returns unavailable when evidence is incomplete or ambiguous.
+- The focused six-test unit suite passed and scoped analysis found no issues after the currency-contract correction. These checks cover the pure calculator only; the existing scenario tasks remain open because database/source, AppServices, report, and UI integration are not part of this slice. The v24 opening-source prerequisite still gates enabling app-level cashbook operations.
