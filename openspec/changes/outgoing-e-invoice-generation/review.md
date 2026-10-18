@@ -343,3 +343,116 @@ Delivery-date delta correct and consistent. Moderate 1-5 must be resolved before
 ## Rebuttals
 
 None.
+
+---
+
+## Review Metadata
+
+- **Review round**: 7
+- **Prior round**: Round 6 approved the delivery-date delta only; this is the fresh review of the tax-contract revision.
+- **Reviewer context**: Fresh-context independent review subagent, working from the requested on-disk commit.
+- **Review date**: 2026-10-18
+- **Tool restrictions**: Inspected commit `969cfa605ffddb1bf2fbd9a104fb18d544d62a36` and its six-file diff from `86a71fe301447af3fe19b24916d0f830f65decf7`; appended only this entry to `review.md`; no application tests run.
+- **Artifacts reviewed**: `proposal.md`, `design.md`, `specs/outgoing-e-invoice-generation/spec.md`, `test-plan.md`, `tasks.md`, and `verify.md`.
+- **Validation**: `openspec validate outgoing-e-invoice-generation --type change --strict --json` → `valid: true`, zero issues. `openspec validate --specs --strict` → 72 passed, 0 failed. `openspec list --json` → 90/128 tasks complete. `git show --check` and `git diff --check 86a71fe301447af3fe19b24916d0f830f65decf7..969cfa605ffddb1bf2fbd9a104fb18d544d62a36` were clean; the commit changes exactly the six reviewed artifacts.
+- **Scope**: Full review of the revised explicit tax mapping and its proposal, test, task, migration, and verification consequences.
+
+## What This Change Does
+
+It replaces rate-derived e-invoice tax categorization with a closed, persisted treatment and legal-basis map for S, Z, E, AE, K, and G. It keeps §25a explicitly unavailable until its category, reason, and disclosed-total relationship receive an accepted decision.
+
+## Prior Recheck
+
+- The revised mapping requires additive v26 tax-evidence fields after reserved migration slots v23–v25; no migration implementation is claimed here.
+- A stored 0% rate alone does not classify a line; custom rates, generic exemptions, unsupported reverse-charge cases, and legacy rows without evidence fail closed.
+- §19 uses the exact XRechnung text and no VATEX code. §13b uses AE, 0%, VATEX-EU-AE, and the stated reverse-charge text. K and G are separately named cross-border treatments, with VAT IDs, destination/delivery evidence, homogeneous invoice treatment, and the format-specific codes. These EN 16931 code mappings are supported by the cited XRechnung specification and European Commission guidance.
+- §25a has no invented category or reason; disclosed invoice amounts remain separate from internal margin tax, and generation fails closed.
+- The test plan names executable red cases for each new tax scenario. Only tasks 7.1–7.6 were reopened. `verify.md` accurately records `DECISION: FAIL`, 90/128 complete, no tests for this spec-only revision, and absent cross-platform validator proof.
+
+## Findings
+
+### Critical (blocking)
+
+1. **§13b classification can be persisted without evidence that the reverse-charge case legally applies** (`design.md:32-33`; `specs/outgoing-e-invoice-generation/spec.md:57-58,63-65`).
+   - **What this is:** The table maps EU services under §13b(1) and domestic construction services under §13b(2) to AE, 0%, and VATEX-EU-AE.
+   - **Problem:** The required evidence is seller/buyer VAT IDs plus generic “EU destination/transaction” or “construction-service” evidence. §13b(1) requires a service taxable in Germany under §3a(2) from an entrepreneur established in another EU Member State. For §13b(2) construction services, §13b(5) limits the liable recipient to an entrepreneur who sustainably provides corresponding construction services (with a qualifying certificate providing a statutory presumption). A buyer VAT ID and proof that construction work occurred do not establish that recipient condition. For example, construction work for a VAT-registered business that does not itself sustainably provide construction services can be emitted as reverse charge even though §13b(5) does not make that recipient liable.
+   - **Fix:** Specify the accepted persisted upstream evidence for the §13b(1) place-of-supply/supplier conditions and the §13b(2)/§13b(5) recipient qualification; if that evidence source is not accepted, keep these treatments unsupported and fail closed. Do not infer eligibility in the serializer. See [UStG §13b](https://www.gesetze-im-internet.de/ustg_1980/__13b.html) and [UStG §3a](https://www.gesetze-im-internet.de/ustg_1980/__3a.html).
+   - **If we skip it:** An invoice can state that the recipient owes VAT when the statutory reverse-charge conditions are not met.
+
+### Not Checked
+
+Actual code-list files inside the pinned ZUGFeRD and XRechnung packages are not part of this spec-only revision. The design correctly leaves inspection of those exact local artifacts as an implementation gate.
+
+## Verdict
+
+VERDICT: REVISE
+
+The format codes and stated fail-closed boundaries are clear, but the supported §13b cases lack the legal eligibility evidence needed to accept the treatment whitelist as written. Resolve finding 1 before treating prerequisite 1.2 as accepted.
+
+## Required Changes
+
+Finding 1 must be resolved before this tax contract is approved.
+
+## Rebuttals
+
+None.
+
+## CHANGES_APPLIED
+
+No proposal, design, spec, test-plan, task, or verification edits were made. This independent review entry was appended to `review.md` only.
+
+
+---
+
+What this change does: It replaces rate-derived tax categories with persisted treatment and legal-basis evidence, including case-specific §13b eligibility evidence. It keeps §25a fail-closed and specifies additive v26 persistence.
+
+## Review Metadata
+
+- **Review round**: 8
+- **Prior round**: Round 7 ended `VERDICT: REVISE` for missing persisted §13b eligibility evidence.
+- **Reviewer context**: Fresh independent review from exact commit `c08768fa688a6de345c4b27779dd0ce317f757f2`, parent `969cfa605ffddb1bf2fbd9a104fb18d544d62a36`.
+- **Review date**: 2026-10-18
+- **Artifacts reviewed**: `proposal.md`, `design.md`, `specs/outgoing-e-invoice-generation/spec.md`, `test-plan.md`, `tasks.md`, and `verify.md` at the requested commit.
+- **Validation**: `openspec validate outgoing-e-invoice-generation --type change --strict --json` passed (1/1, no issues); `openspec validate --specs --strict` passed (72/72). `git show --check` and `git diff --check 969cfa605ffddb1bf2fbd9a104fb18d544d62a36..c08768fa688a6de345c4b27779dd0ce317f757f2` were clean. `git verify-commit` reported a good EdDSA signature from key `E1E40CF8628D8C6FFB49C0A5720E5F25F4EDFDD1`. The commit changes exactly the six contract artifacts reviewed.
+- **Task ledger**: Comparing `86a71fe301447af3fe19b24916d0f830f65decf7..969cfa605ffddb1bf2fbd9a104fb18d544d62a36` shows only tasks 7.1–7.6 reopened; `c08768f` leaves them open and changes no task checkbox. The ledger remains 90/128 complete.
+- **Scenario coverage**: All 40 current delta-spec scenarios have one named test-plan row. Two additional test-plan rows refer to scenarios absent from the current delta (`Missing payment data fails closed` and `Invoice persists and captures the delivery date`); they do not leave a current scenario unmapped.
+- **Tool restrictions**: Reviewed the six committed contract artifacts and official law/format sources only; appended this entry to `review.md`. No proposal, design, spec, task, verification, or implementation edits were made. No application tests or implementation review were performed.
+- **Scope**: Recheck of Round 7’s §13b eligibility-evidence finding plus the tax contract, v26 migration ordering, task/scenario traceability, and absence of new implementation claims.
+
+## Round 7 Finding Disposition
+
+- **§13b(1) eligibility evidence: resolved.** The contract now requires persisted supplier establishment country/basis and German-fixed-establishment participation status; recipient status and establishment; service kind; place-of-supply basis/country; German taxability; required seller/buyer profile IDs; and a reference to the immutable upstream tax assessment. Unknown, missing, unresolved, or contradictory facts produce a localized position/field diagnostic and no artifact.
+- **§13b(2) no. 4 construction eligibility: resolved for the stated supported subset.** The contract requires an explicitly taxable German construction service on German immovable property, an entrepreneur recipient, and an authority-issued USt 1 TG certificate identifying construction services, matching the immutable buyer VAT ID, and valid on `leistungsdatum`. The persisted certificate reference, scope, issue date, and validity-through date are checked. Missing, expired, mismatched, or out-of-scope evidence fails closed; a VAT ID or construction description alone does not qualify the recipient.
+- **§13b(1) EU supplier boundary: legally supported.** UStG §13b(1) expressly covers services taxable in Germany under §3a(2) supplied by an entrepreneur established in another EU Member State. §13b(7) supplies the establishment and German-fixed-establishment-not-involved rules. The contract’s EU supplier requirement is therefore not an unjustified format restriction. EN 16931’s AE / VATEX-EU-AE mapping is generic reverse-charge encoding: the European Commission guidance describes it for domestic reverse charge under national law. The code neither requires nor decides the supplier’s country.
+- **Explicit bounded scope:** The listed supplier-basis enum supports seat/management and fixed establishment; it does not encode the statute’s separate residence/ordinary-stay bases. The BMF USt 1 TG form also permits registration under a tax number or a VAT ID, while this contract accepts the VAT-ID-matching path. These are narrower, fail-closed evidence paths, not claims that the excluded cases are legally ineligible. Keep them unsupported unless an accepted owner decision expands the scope.
+- **§25a and migration: consistent.** §25a has no approved category/reason or disclosed-total relationship, remains unavailable, and cannot disclose internal margin tax. Tax evidence is additive migration v26 after reserved v23 (mileage), v24 (setup anchor), and v25 (cashbook close evidence); legacy tax fields remain unresolved without rate-based backfill.
+- **Implementation status: truthful.** The commit changes documentation only. `verify.md` continues to report the spec-only state, no tests run for this revision, §25a unresolved, migration and platform validator gates open, and `DECISION: FAIL`. No implementation or runtime capability is claimed.
+
+## Findings
+
+None blocking. Round 7’s missing-evidence finding is closed for the explicit supported cases. The evidence-model scope limits above remain fail-closed and are not represented as legal ineligibility.
+
+## Evidence
+
+- Official UStG §13b(1),(5),(7): §13b(1) states the EU-established supplier condition; §13b(5) establishes the construction-recipient qualification and a certificate valid at the time of service; §13b(7) defines establishment and treatment where a German fixed establishment is not involved. [UStG §13b](https://www.gesetze-im-internet.de/ustg_1980/__13b.html)
+- Official UStG §3a(2): the general place of supply for covered business services is the recipient business establishment or the recipient fixed establishment receiving the service. [UStG §3a](https://www.gesetze-im-internet.de/ustg_1980/__3a.html)
+- European Commission EN 16931 tax-code guidance, case 3: identifies AE / VATEX-EU-AE as the coding for domestic reverse charge under national law, requiring zero rates and amounts plus seller and buyer VAT IDs. [Technical guidance for tax codes in EN 16931](https://ec.europa.eu/digital-building-blocks/sites/download/attachments/467108974/eInvoicing%20technical%20guidance%20document_v1.pdf?api=v2&modificationDate=1721117125403&version=2)
+- BMF USt 1 TG form issued 2026-04-10: identifies the recipient by name/address, allows registration under a tax number or VAT ID, and states an expiry date limited to at most three years. This supports the contract’s certificate date check and shows that its VAT-ID matching rule is a conservative subset. [BMF USt 1 TG form](https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Steuerarten/Umsatzsteuer/2026-04-10-bescheinigung-USt-1-TG.pdf)
+- The requested commit and task/scenario checks were run directly against the specified checkout and commit. They establish structural validity, commit integrity, and mapping coverage only; they do not establish application behavior, tax assessment correctness for any real transaction, or platform validator packaging.
+
+## Verdict
+
+VERDICT: APPROVE
+
+The Round 7 evidence defect is resolved for the contract’s explicitly supported §13b cases. The EU-established-supplier condition follows the German statute; the EN 16931 reverse-charge code is generic. Construction recipient eligibility, certificate scope/identity/validity, persisted evidence, and fail-closed diagnostics are now specified. Approval is limited to the stated documentation contract; §25a, v26 implementation, and platform validator gates remain open.
+
+## Rebuttals
+
+None.
+
+## CHANGES_APPLIED
+
+No contract or implementation artifacts were edited. This independent Round 8 review was appended to `review.md` only.
+
+Verdict: Ship.
+Not checked: Application runtime behavior, actual serializer output, test execution, and validator packaging on supported platforms.
