@@ -2,10 +2,12 @@
 
 Complete all prerequisites before starting the scenario work. They are explicit design gates, not assumptions already satisfied by the current code.
 
+Tax-contract revision note: the delivered base ledger was 96/128 complete. Tasks 7.1–7.6 are reopened because their checked implementation/tests used or accepted rate-only classification and did not persist the revised v26 evidence tuple. All unrelated checked work remains checked.
+
 ## 1. Resolve implementation prerequisites
 
 - [x] 1.1 Establish an accepted invoice-money contract and record it as a dependency; do not recalculate or round money during serialization.
-- [ ] 1.2 Approve a typed tax-category and exemption-reason mapping for every tax treatment in the initial supported scope.
+- [ ] 1.2 Independently accept the closed treatment/category/reason mapping and typed persistence contract for the named supported scope; keep §25a incomplete until its category/reason and disclosed-total relationship are accepted. Tax evidence requires additive migration v26 after reserved v23 mileage, v24 setup anchor, and v25 cashbook evidence.
 - [ ] 1.3 Package and demonstrate the pinned offline validator and PDF/A-3b validation on Linux, Windows, and macOS.
 - [x] 1.4 Provide a user-facing master-data editor for the customer ZUGFeRD default, or establish the accepted dependency that supplies it.
 - [x] 1.5 Establish and migrate persistent finalized customer snapshot storage so standalone exports cannot read changed live customer data.
@@ -84,12 +86,12 @@ Complete all prerequisites before starting the scenario work. They are explicit 
 
 ## 7. Tax categories are explicitly classified
 
-- [x] 7.1 Write failing test for "Explicit tax classification is serialized": serializes_approved_typed_tax_category_and_exemption_reason in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
-- [x] 7.2 Implement the required application behavior for "Explicit tax classification is serialized" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [x] 7.3 Refactor the related implementation; targeted tests and the full suite stay green.
-- [x] 7.4 Write failing test for "Tax category mapping is unavailable": unresolved_tax_mapping_fails_without_inference_or_output in test/features/rechnungen/e_invoice_generation_test.dart (assert it fails for the right reason).
-- [x] 7.5 Implement the required application behavior for "Tax category mapping is unavailable" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [x] 7.6 Refactor the related implementation; targeted tests and the full suite stay green.
+- [ ] 7.1 Write failing tests for persisted typed mapping of explicit standard/reduced rates, taxable zero rate, §19, §13b(1) eligibility, certificate-backed §13b(2) no. 4 recipient qualification, §6a intra-Community supply, §6 export, and v26 snapshot capture: `serializes_persisted_tax_evidence_without_rate_inference`, `maps_explicit_standard_and_reduced_rates_to_s`, `maps_zero_rate_to_z_only_with_explicit_12_3_basis`, `maps_kleinunternehmer_to_e_with_exact_text_and_no_vatex`, `maps_only_named_reverse_charge_cases_to_ae_and_vatex`, `maps_eu_service_13b1_only_with_persisted_eligibility_evidence`, `maps_construction_13b2_only_with_valid_ust1tg_recipient_evidence`, `maps_section_6a_supply_to_k_with_required_evidence`, `maps_section_6_export_to_g_with_required_evidence`, and `persists_tax_evidence_in_v26_snapshot_without_rate_inference` in test/features/rechnungen/e_invoice_generation_test.dart.
+- [ ] 7.2 Implement additive migration v26 and the required invoice-position tax-evidence fields/input capture, immutable snapshot mapping, and profile serialization for the named supported treatments; never infer a category from rate or silently backfill legacy rows.
+- [ ] 7.3 Refactor the typed evidence and mapping implementation; focused tests stay green.
+- [ ] 7.4 Write failing tests for missing or invalid §13b eligibility, missing, mismatched, unsupported, generic exemption, legacy-null, and §25a evidence: `eu_service_13b1_missing_eligibility_evidence_fails_with_position_diagnostic`, `construction_13b2_missing_or_invalid_ust1tg_fails_with_position_diagnostic`, `unsupported_or_legacy_tax_treatment_fails_with_position_diagnostic`, `tax_evidence_tuple_mismatch_fails_with_position_diagnostic`, `margin_scheme_fails_closed_without_disclosing_internal_tax`, and `unresolved_tax_mapping_fails_without_inference_or_output` in test/features/rechnungen/e_invoice_generation_test.dart.
+- [ ] 7.5 Implement localized field-level diagnostics and fail-closed behavior for unsupported/incomplete tax evidence; keep canonical disclosed invoice totals separate from accounting-only §25a margin tax and expose no internal margin tax to serializers.
+- [ ] 7.6 Refactor the fail-closed diagnostic behavior; focused tests stay green.
 
 ## 8. Required-field and business-rule validation
 
