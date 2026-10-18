@@ -93,10 +93,10 @@ void main() {
 
     Set<String> expectedDeclaredTablesForVersion(int version) => switch (version) {
       18 => expectedV18BaseTables,
-      // v20-v23 are column-only migrations (konten.inhaber, occurrence review
+      // v20-v24 are column-only migrations (konten.inhaber, occurrence review
       // state, e-invoice output format, and mileage eligibility); the table inventory stays at the v19 set.
-      19 || 20 || 21 || 22 || 23 => <String>{...expectedV18BaseTables, ...unrelatedV19SettlementTables},
-      _ => throw ArgumentError.value(version, 'version', 'Expected schema version 18-23'),
+      19 || 20 || 21 || 22 || 23 || 24 => <String>{...expectedV18BaseTables, ...unrelatedV19SettlementTables},
+      _ => throw ArgumentError.value(version, 'version', 'Expected schema version 18-24'),
     };
 
     Set<String> expectedTablesForVersion(int version) => <String>{
@@ -126,7 +126,7 @@ void main() {
       final Set<String> expectedCurrentTables = expectedTablesForVersion(currentVersion);
       final names = await tableNames();
 
-      expect(currentVersion, anyOf(18, 19, 20, 21, 22, 23));
+      expect(currentVersion, anyOf(18, 19, 20, 21, 22, 23, 24));
       expect(expectedV18BaseTables, hasLength(41));
       expect(unrelatedV19SettlementTables, hasLength(3));
       expect(expectedVersionedFeatureTables, hasLength(7));

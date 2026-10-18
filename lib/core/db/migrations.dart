@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 23;
+  static const int currentVersion = 24;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -463,6 +463,9 @@ class MigrationRunner {
     if (version == 23) {
       await _migrateMileageLifecycle();
     }
+    if (version == 24) {
+      await _migrateMileageLifecycleV24();
+    }
   }
 
   Future<void> _migrateMileageLifecycle() async {
@@ -481,9 +484,58 @@ class MigrationRunner {
       'vehicle_class',
       "TEXT NOT NULL DEFAULT 'unknown' CHECK (vehicle_class IN ('kraftwagen','other_motor_vehicle','unsupported','unknown'))",
     );
+
+    await executor.runCustom('''
+UPDATE mileage_trips
+SET state = 'unresolved',
+  policy_id = NULL,
+  policy_source = NULL,
+  policy_version = NULL,
+  policy_effective_from = NULL,
+  policy_effective_to = NULL,
+  calculated_amount = NULL,
+  calculated_at = NULL,
+  posting_event_id = NULL,
+  updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE state = 'calculated'
+  AND (
+    trip_kind IS NOT 'business_trip'
+    OR vehicle_source IS NOT 'private'
+    OR vehicle_class IS NULL
+    OR vehicle_class NOT IN ('kraftwagen', 'other_motor_vehicle')
+    OR trip_date < '2025-01-01'
+    OR trip_date > '2026-12-31'
+    OR policy_id IS NOT 'DE-private-business-travel/1'
+    OR policy_source IS NOT 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71'
+    OR policy_version IS NOT '1'
+    OR policy_effective_from IS NOT '2025-01-01'
+    OR policy_effective_to IS NOT '2026-12-31'
+    OR calculated_amount IS NULL
+    OR calculated_at IS NULL
+    OR trim(calculated_at) = ''
+    OR posting_event_id IS NOT NULL
+    OR CAST(calculated_amount * 100 AS INTEGER) <>
+      ((distance_hundredths_km * CASE vehicle_class
+        WHEN 'kraftwagen' THEN 30
+        WHEN 'other_motor_vehicle' THEN 20
+      END + 50) / 100)
+    OR calculated_amount * 100 <> CAST(calculated_amount * 100 AS INTEGER)
+  )
+''');
+
     for (final String trigger in _mileageLifecycleTriggersSql) {
       await executor.runCustom(trigger);
     }
+    await _verifyMileageLifecycleSchema();
+  }
+
+  Future<void> _migrateMileageLifecycleV24() async {
+    await _migrateMileageLifecycle();
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_calculation_guard');
+    final String calculationGuard = _mileageLifecycleTriggersSql.singleWhere(
+      (String trigger) => trigger.contains('CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_calculation_guard'),
+    );
+    await executor.runCustom(calculationGuard);
     await _verifyMileageLifecycleSchema();
   }
 
@@ -2005,7 +2057,9 @@ CREATE TABLE IF NOT EXISTS mileage_trips (
       AND policy_effective_from IS NULL AND policy_effective_to IS NULL
       AND calculated_amount IS NULL AND calculated_at IS NULL)
     OR
-    (trim(policy_id) <> '' AND trim(policy_source) <> '' AND trim(policy_version) <> ''
+    (policy_id IS NOT NULL AND trim(policy_id) <> ''
+      AND policy_source IS NOT NULL AND trim(policy_source) <> ''
+      AND policy_version IS NOT NULL AND trim(policy_version) <> ''
       AND policy_effective_from IS NOT NULL AND policy_effective_to IS NOT NULL
       AND calculated_amount IS NOT NULL AND calculated_amount >= 0 AND calculated_at IS NOT NULL)
   ),
@@ -2126,6 +2180,13 @@ WHEN OLD.state = 'unresolved'
     OR NEW.vehicle_class NOT IN ('kraftwagen', 'other_motor_vehicle')
     OR NEW.trip_date < '2025-01-01'
     OR NEW.trip_date > '2026-12-31'
+    OR NEW.policy_id IS NULL
+    OR NEW.policy_source IS NULL
+    OR NEW.policy_version IS NULL
+    OR NEW.policy_effective_from IS NULL
+    OR NEW.policy_effective_to IS NULL
+    OR NEW.calculated_amount IS NULL
+    OR NEW.calculated_at IS NULL
     OR NEW.policy_id <> 'DE-private-business-travel/1'
     OR NEW.policy_version <> '1'
     OR NEW.policy_effective_from <> '2025-01-01'

@@ -2,7 +2,7 @@
 
 ## Historical baseline record
 
-The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23 migration, or the corrected 45-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
+The prior contract's 24 implementation tasks were marked complete before this revision. That record does not establish coverage or completion for the new structured eligibility facts, policy effective dates/rates, fail-closed exclusions, half-up calculation contract, v23/v24 migrations, or the corrected 45-scenario test matrix. The previous nine focused test results are recorded as historical only in `verify.md`.
 
 ## Revised-contract tests — in progress
 
@@ -11,6 +11,8 @@ Implementation proceeds under the user's direct 2026-10-18 authorization despite
 ### Completed bounded implementation checkpoints
 
 - [x] Generate stable UUIDv4 trip IDs and verify persisted identity plus exact integer distance in `test_record_a_business_trip` (2026-10-18 focused run; see `verify.md`).
+- [x] Add regression coverage that v22 unknown calculated trips are demoted while posted facts are preserved, and that the additive v24 correction also repairs v23 profiles; the focused mileage migration tests pass (see `verify.md`).
+- [x] Reject `NULL` in all seven required calculation-snapshot columns through direct SQL, and guard `postTripWithPort` against untrusted eligibility/policy snapshots before invoking the posting port (see `verify.md`).
 
 ### `mileage-entry` tests (7 missing scenarios; 1 existing-test assertion task)
 
@@ -53,7 +55,7 @@ Implementation proceeds under the user's direct 2026-10-18 authorization despite
 - [ ] Add `test_missing_mileage_table_at_v13_fails_without_repair` in `test/db/mileage_schema_health_test.dart`.
 - [ ] Add `test_mileage_export_completeness_waits_for_both_inventories` in `test/db/mileage_export_gate_test.dart`.
 - [ ] Add `test_export_with_undeclared_mileage_table_is_incomplete` in `test/db/mileage_export_gate_test.dart`.
-- [x] Add focused v22-to-v23 eligibility/lifecycle coverage in `test/db/mileage_lifecycle_migration_test.dart` (2026-10-18; three migration tests passed; exhaustive migration/lifecycle coverage remains open).
+- [x] Add focused v22-to-v24 eligibility/lifecycle coverage in `test/db/mileage_lifecycle_migration_test.dart` (2026-10-18; five migration tests passed in the focused run; exhaustive migration/lifecycle coverage remains open).
 
 ## Contract and dependency gates — open
 
@@ -66,6 +68,6 @@ Implementation proceeds under the user's direct 2026-10-18 authorization despite
 
 ## Evidence discipline
 
-- `test-plan.md` is the row-by-row 45-scenario index: The 2026-10-18 focused run passed 10 mileage workflow tests, 3 lifecycle migration tests, and 8 inventory migration tests; most rows remain missing or partial. The existing policy-test assertion task is separate from those missing rows.
+- `test-plan.md` is the row-by-row 45-scenario index: The 2026-10-18 focused run passed 11 mileage workflow tests, 5 lifecycle migration tests, and 8 inventory migration tests (24 total); most rows remain missing or partial. The existing policy-test assertion task is separate from those missing rows.
 - Structural OpenSpec validation and formatting checks do not prove runtime behavior, migrations, posting, or correction semantics.
 - Do not mark tests complete from a proposed test name, prior review, or historical run.

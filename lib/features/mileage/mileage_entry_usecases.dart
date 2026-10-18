@@ -159,6 +159,32 @@ class MileageEntryUseCases {
         trip.tripDate.compareTo('2026-12-31') <= 0;
   }
 
+  bool _hasApprovedCalculationSnapshot(MileageTrip trip) {
+    if (!_isEligibleForApprovedPolicy(trip) ||
+        trip.policyId != 'DE-private-business-travel/1' ||
+        trip.policySource != 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71' ||
+        trip.policyVersion != '1' ||
+        trip.policyEffectiveFrom != '2025-01-01' ||
+        trip.policyEffectiveTo != '2026-12-31' ||
+        trip.calculatedAt == null ||
+        trip.calculatedAt!.trim().isEmpty ||
+        trip.calculatedAmount == null) {
+      return false;
+    }
+
+    final Match? amountMatch = RegExp(r'^([0-9]+)(?:\.([0-9]{1,2}))?$').firstMatch(trip.calculatedAmount!);
+    if (amountMatch == null) return false;
+    final int? wholeEuros = int.tryParse(amountMatch.group(1)!);
+    final int? cents = int.tryParse((amountMatch.group(2) ?? '').padRight(2, '0'));
+    if (wholeEuros == null || cents == null) return false;
+
+    final int expectedCents = calculateApprovedAmountCents(
+      distanceHundredthsKm: trip.distanceHundredthsKm,
+      vehicleClass: trip.vehicleClass,
+    );
+    return wholeEuros * 100 + cents == expectedCents;
+  }
+
   String _formatEuroAmount(int amountCents) =>
       '${amountCents ~/ 100}.${(amountCents % 100).toString().padLeft(2, '0')}';
 
@@ -169,6 +195,9 @@ class MileageEntryUseCases {
     if (current == null) throw StateError('not found');
     if (current.postingEventId != null) return current.postingEventId!;
     if (current.state != MileageTripState.calculated) throw StateError('not calculated');
+    if (!_hasApprovedCalculationSnapshot(current)) {
+      throw StateError('mileage calculation is not eligible for posting');
+    }
     final MileagePostingPort? port = postingPort;
     if (port == null) throw StateError('posting unavailable');
     final String eventId = await port.postExpense(current);

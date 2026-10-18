@@ -241,6 +241,63 @@ void main() {
       expect(edited.postingEventId, isNull);
     });
 
+    test('test_posting_rejects_ineligible_or_untrusted_calculation_snapshot', () async {
+      MileageTrip calculatedTrip({required String id, required MileageTripKind tripKind, required String policyId}) {
+        return MileageTrip(
+          id: id,
+          tripDate: '2026-03-14',
+          purpose: 'Kundenbesuch',
+          businessContext: 'Projekt',
+          distanceHundredthsKm: 1000,
+          tripKind: tripKind,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: MileageVehicleClass.kraftwagen,
+          state: MileageTripState.calculated,
+          createdAt: '2026-03-14T12:00:00Z',
+          updatedAt: '2026-03-14T12:00:00Z',
+          policyId: policyId,
+          policySource: 'EStG-9-1-3-4a;BRKG-5-1-2;BMF-LStH-2026-A25-III-37;EÜR-2025-71',
+          policyVersion: '1',
+          policyEffectiveFrom: '2025-01-01',
+          policyEffectiveTo: '2026-12-31',
+          calculatedAmount: '3.00',
+          calculatedAt: '2026-03-14T12:00:00Z',
+        );
+      }
+
+      final _RecordingPort postingPort = _RecordingPort();
+      final _FixedMileageRepository ineligibleRepository = _FixedMileageRepository(
+        repo,
+        calculatedTrip(
+          id: 'ineligible-trip',
+          tripKind: MileageTripKind.commuting,
+          policyId: 'DE-private-business-travel/1',
+        ),
+      );
+      final MileageEntryUseCases ineligibleUseCases = MileageEntryUseCases(
+        ineligibleRepository,
+        postingPort: postingPort,
+      );
+      await expectLater(() => ineligibleUseCases.postTripWithPort('ineligible-trip'), throwsStateError);
+
+      final _FixedMileageRepository untrustedRepository = _FixedMileageRepository(
+        repo,
+        calculatedTrip(
+          id: 'untrusted-policy-trip',
+          tripKind: MileageTripKind.businessTrip,
+          policyId: 'unapproved-policy',
+        ),
+      );
+      final MileageEntryUseCases untrustedUseCases = MileageEntryUseCases(
+        untrustedRepository,
+        postingPort: postingPort,
+      );
+      await expectLater(() => untrustedUseCases.postTripWithPort('untrusted-policy-trip'), throwsStateError);
+      expect(postingPort.calls, 0);
+      expect(ineligibleRepository.storePostingCalls, 0);
+      expect(untrustedRepository.storePostingCalls, 0);
+    });
+
     test('test_post_a_confirmed_resolved_mileage_expense', () async {
       final MileageTrip trip = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',
@@ -301,5 +358,20 @@ class _RecordingPort implements MileagePostingPort {
   Future<String> postExpense(MileageTrip trip) async {
     calls++;
     return 'evt-${trip.id}';
+  }
+}
+
+class _FixedMileageRepository extends MileageEntryRepository {
+  _FixedMileageRepository(MileageEntryRepository delegate, this.trip) : super(delegate.executor);
+
+  final MileageTrip trip;
+  int storePostingCalls = 0;
+
+  @override
+  Future<MileageTrip?> getById(String id) async => id == trip.id ? trip : null;
+
+  @override
+  Future<void> storePosting({required String id, required String eventId}) async {
+    storePostingCalls++;
   }
 }

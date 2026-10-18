@@ -17,6 +17,14 @@
 - **Eligibility evidence:** Focused workflow tests cover private business travel, both supported vehicle classes, integer half-up examples, and selected exclusions (commuting, other, company vehicle, unsupported class, unknown facts, out-of-period 2027, and EKS). Explicit effective-date boundary assertions and complete posting prerequisites remain untested.
 - **Validation limits:** No scoped analyzer was run after the migration changes. The prior formatter invocation formatted the touched Dart sources but exited nonzero when telemetry attempted to write outside the workspace. This checkpoint does not complete the feature or its 45-scenario matrix.
 
+## v24 migration and review-fix checkpoint (2026-10-18)
+
+- **Scope:** Added an additive v24 correction for databases already at v23. Both the v22 migration and v23 correction demote calculated trips whose structured eligibility is unknown or whose calculation snapshot is not trusted, clear that snapshot, and preserve recorded trip facts and legacy posted rows. The calculation table constraint and trigger explicitly reject `NULL` in every required snapshot field. `postTripWithPort` independently validates structured eligibility, the approved policy snapshot, and exact cents before invoking the posting port.
+- **Focused tests:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter test --dart-define=platform=vm test/features/mileage/mileage_entry_workflow_test.dart test/db/mileage_lifecycle_migration_test.dart test/db/inventory_stocktake_migration_test.dart` → 24 passed (11 mileage workflow, 5 mileage lifecycle migration, 8 inventory migration), exit 0. This run required escalation because the sandbox denied Flutter's temporary localhost socket.
+- **Regression evidence:** The v22 fixture proves unknown calculated facts are demoted and posted facts/snapshots remain preserved. The v23 fixture proves the additive correction runs for an already-v23 profile. Direct SQL attempts setting each of the seven required snapshot fields to `NULL` are rejected. A fake repository/port test confirms ineligible or untrusted calculated snapshots never call the posting port.
+- **Scoped analysis:** `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/tmp/openaccounting-fvm-cache fvm flutter analyze lib/core/db/migrations.dart lib/features/mileage test/db/mileage_lifecycle_migration_test.dart test/db/inventory_stocktake_migration_test.dart test/features/mileage/mileage_entry_workflow_test.dart` → no issues, exit 0.
+- **Scope limit:** These checks establish the targeted migration, constraint, trigger, and usecase regressions only. Production accounting posting, full correction behavior, export inventory integration, and most of the 45-scenario matrix remain unverified.
+
 ## Specification sync snapshot before implementation (2026-10-18)
 
 - **Scope:** Synced the approved mileage database requirement into the maintained DB spec; corrected the false v8-to-v9 mileage-table claim in the active delta, removed its duplicate scenario, updated the related test-plan/task wording, and recorded this evidence. No DDL, application code, or tests were changed.
@@ -39,4 +47,4 @@ These results predate this revision and were not rerun:
 
 ## Current decision
 
-**DECISION: PARTIAL — UUID4 identity, exact persisted integer distance, selected eligibility behavior, and selected v23 lifecycle behavior are implemented and have focused test evidence. Production UI/posting, account mapping, correction behavior, export inventory integration, exhaustive migration/lifecycle tests, scoped analysis, and the remaining scenario coverage are still in progress.**
+**DECISION: PARTIAL — UUID4 identity, exact persisted integer distance, selected eligibility behavior, the posting-usecase snapshot guard, and selected v22/v23/v24 migration behavior have focused test evidence; scoped analysis passes. Production accounting posting, account mapping, correction behavior, export inventory integration, exhaustive migration/lifecycle tests, and the remaining scenario coverage are still in progress.**
