@@ -19,7 +19,9 @@ import 'e_invoice_test_fixtures.dart'
         standardPositions,
         standardTotals,
         validCompany,
+        construction13b2PositionWithoutResolvedCertificate,
         validCustomer,
+        euService13b1PositionWithoutResolvedAssessment,
         validSnapshot;
 
 void main() {
@@ -276,6 +278,10 @@ void main() {
         isTrue,
       );
       expect(ubl.contains('<cbc:TaxExemptionReasonCode>'), isFalse);
+      expect(
+        ubl,
+        contains('<cbc:CompanyLegalForm>${ApprovedTaxClassification.kleinunternehmerReason}</cbc:CompanyLegalForm>'),
+      );
     });
 
     test('seller_endpoint_uses_vat_id_with_9930', () {
@@ -613,7 +619,99 @@ void main() {
       );
     });
 
-    test('reverse_charge_fails_closed_without_persisted_eligibility_evidence', () {
+    test('eu_service_13b1_complete_facts_without_resolved_assessment_fail_closed', () {
+      final Map<String, Object?> company = validCompany()
+        ..['land'] = 'AT'
+        ..['ust_idnr'] = 'ATU12345678';
+      final Map<String, Object?> customer = validCustomer()..['ust_idnr'] = 'DE987654321';
+      final Map<String, Object?> position = euService13b1PositionWithoutResolvedAssessment();
+      expect(position['e_invoice_reverse_charge_evidence_source_ref'], 'dangling-assessment-13b1-not-found');
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: company,
+          customerRow: customer,
+          posRows: <Map<String, Object?>>[position],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_evidence_source_ref'),
+          ),
+        ),
+      );
+    });
+
+    test('construction_13b2_unresolved_references_fail_closed_without_seller_country_assumption', () {
+      final Map<String, Object?> company = validCompany()
+        ..['land'] = 'AT'
+        ..['ust_idnr'] = 'ATU12345678';
+      final Map<String, Object?> customer = validCustomer()..['ust_idnr'] = 'DE987654321';
+      final Map<String, Object?> position = construction13b2PositionWithoutResolvedCertificate();
+      expect(position['e_invoice_reverse_charge_evidence_source_ref'], 'dangling-assessment-13b2-not-found');
+      expect(position['e_invoice_reverse_charge_ust1tg_certificate_ref'], 'dangling-ust1tg-certificate-not-found');
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: company,
+          customerRow: customer,
+          posRows: <Map<String, Object?>>[position],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+          deliveryDate: '2026-03-10',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_evidence_source_ref') &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_ust1tg_certificate_ref') &&
+                !error.fields.contains('unternehmen.land'),
+          ),
+        ),
+      );
+    });
+
+    test('construction_13b2_missing_or_invalid_ust1tg_fails_with_position_diagnostic', () {
+      final Map<String, Object?> position = construction13b2PositionWithoutResolvedCertificate()
+        ..['e_invoice_reverse_charge_ust1tg_scope'] = 'building_cleaning_13b_2_8'
+        ..['e_invoice_reverse_charge_ust1tg_recipient_vat_id'] = 'DE000000000';
+      final Map<String, Object?> customer = validCustomer()..['ust_idnr'] = 'DE987654321';
+
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: customer,
+          posRows: <Map<String, Object?>>[position],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          eingabemodus: 'netto',
+          deliveryDate: '2026-03-10',
+        ),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                error is EInvoiceSourceException &&
+                error.code == 'unresolvedTaxClassification' &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_ust1tg_scope') &&
+                error.fields.contains('position[0].e_invoice_reverse_charge_ust1tg_recipient_vat_id'),
+          ),
+        ),
+      );
+    });
+
+    test('eu_service_13b1_missing_eligibility_evidence_fails_with_position_diagnostic', () {
       expect(
         () => const EInvoiceSnapshotBuilder().buildFinalization(
           documentNumber: 'RE-2026-0001',
@@ -761,10 +859,10 @@ void main() {
     });
 
     test('maps_section_25a_only_with_vatex_subtype_and_emits_required_invoice_note', () {
-      for (final (String code, String note) in <(String, String)>[
-        ('VATEX-EU-F', 'Gebrauchtgegenstände/Sonderregelung'),
-        ('VATEX-EU-I', 'Kunstgegenstände/Sonderregelung'),
-        ('VATEX-EU-J', 'Sammlungsstücke und Antiquitäten/Sonderregelung'),
+      for (final (String treatment, String code, String note) in <(String, String, String)>[
+        ('margin_scheme_25a_second_hand', 'VATEX-EU-F', 'Gebrauchtgegenstände/Sonderregelung'),
+        ('margin_scheme_25a_art', 'VATEX-EU-I', 'Kunstgegenstände/Sonderregelung'),
+        ('margin_scheme_25a_collectors_antiquities', 'VATEX-EU-J', 'Sammlungsstücke und Antiquitäten/Sonderregelung'),
       ]) {
         final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
           documentNumber: 'RE-2026-0001',
@@ -778,7 +876,7 @@ void main() {
               'menge': 1,
               'einzelpreis': 100,
               'ust_satz': 0,
-              'tax_treatment': 'margin_scheme_25a_unmapped',
+              'tax_treatment': treatment,
               'tax_legal_basis': 'ustg_25a',
               'e_invoice_tax_category_code': 'E',
               'e_invoice_exemption_reason_code': code,
@@ -818,7 +916,7 @@ void main() {
               'menge': 1,
               'einzelpreis': 100,
               'ust_satz': 0,
-              'tax_treatment': 'margin_scheme_25a_unmapped',
+              'tax_treatment': 'margin_scheme_25a_second_hand',
               'tax_legal_basis': 'ustg_25a',
               'e_invoice_tax_category_code': 'E',
               'e_invoice_exemption_reason_code': null,

@@ -46,7 +46,9 @@ enum EInvoiceTaxTreatment {
   reverseChargeDomesticConstruction13b2_4_5('reverse_charge_domestic_construction_13b_2_4_5'),
   intraCommunitySupply6a('intra_community_supply_6a'),
   exportSupply6('export_supply_6'),
-  marginScheme25aUnmapped('margin_scheme_25a_unmapped');
+  marginScheme25aSecondHand('margin_scheme_25a_second_hand'),
+  marginScheme25aArt('margin_scheme_25a_art'),
+  marginScheme25aCollectorsAntiquities('margin_scheme_25a_collectors_antiquities');
 
   const EInvoiceTaxTreatment(this.code);
 
@@ -140,35 +142,6 @@ class ApprovedTaxClassification {
       return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_treatment']);
     }
 
-    if (treatment == EInvoiceTaxTreatment.reverseChargeEuService13b1) {
-      return const EInvoiceTaxClassificationResult.unresolved(<String>[
-        'e_invoice_reverse_charge_supplier_establishment_country_iso',
-        'e_invoice_reverse_charge_supplier_establishment_basis',
-        'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
-        'e_invoice_reverse_charge_recipient_status',
-        'e_invoice_reverse_charge_recipient_establishment_country_iso',
-        'e_invoice_reverse_charge_service_kind',
-        'e_invoice_reverse_charge_place_of_supply_basis',
-        'e_invoice_reverse_charge_place_of_supply_country_iso',
-        'e_invoice_reverse_charge_taxability',
-        'e_invoice_reverse_charge_evidence_source_ref',
-      ]);
-    }
-    if (treatment == EInvoiceTaxTreatment.reverseChargeDomesticConstruction13b2_4_5) {
-      return const EInvoiceTaxClassificationResult.unresolved(<String>[
-        'e_invoice_reverse_charge_service_kind',
-        'e_invoice_reverse_charge_place_of_supply_basis',
-        'e_invoice_reverse_charge_place_of_supply_country_iso',
-        'e_invoice_reverse_charge_taxability',
-        'e_invoice_reverse_charge_recipient_status',
-        'e_invoice_reverse_charge_recipient_13b5_basis',
-        'e_invoice_reverse_charge_ust1tg_certificate_ref',
-        'e_invoice_reverse_charge_ust1tg_scope',
-        'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
-        'e_invoice_reverse_charge_ust1tg_issued_on',
-        'e_invoice_reverse_charge_ust1tg_valid_through',
-      ]);
-    }
     final EInvoiceTaxLegalBasis? legalBasis = EInvoiceTaxLegalBasis.fromCode(legalBasisCode);
     if (legalBasis == null) {
       return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_legal_basis']);
@@ -221,28 +194,39 @@ class ApprovedTaxClassification {
         expectedRate = 0;
         expectedReason = null;
         expectedReasonCode = 'VATEX-EU-G';
-      case EInvoiceTaxTreatment.marginScheme25aUnmapped:
+      case EInvoiceTaxTreatment.marginScheme25aSecondHand:
         expectedCategory = EInvoiceTaxCategory.exempt;
         expectedBasis = EInvoiceTaxLegalBasis.ustg25a;
         expectedRate = 0;
-        final Map<String, String> statutoryNotes = <String, String>{
-          'VATEX-EU-F': 'Gebrauchtgegenstände/Sonderregelung',
-          'VATEX-EU-I': 'Kunstgegenstände/Sonderregelung',
-          'VATEX-EU-J': 'Sammlungsstücke und Antiquitäten/Sonderregelung',
-        };
-        final String? requiredNote = statutoryNotes[exemptionReasonCode];
-        if (requiredNote == null) {
-          return const EInvoiceTaxClassificationResult.unresolved(<String>['e_invoice_exemption_reason_code']);
-        }
-        if (exemptionReasonText != requiredNote) {
-          return const EInvoiceTaxClassificationResult.unresolved(<String>['e_invoice_exemption_reason_text']);
-        }
-        expectedReason = requiredNote;
-        expectedReasonCode = exemptionReasonCode;
-        invoiceNote = requiredNote;
+        expectedReason = 'Gebrauchtgegenstände/Sonderregelung';
+        expectedReasonCode = 'VATEX-EU-F';
+        invoiceNote = expectedReason;
+      case EInvoiceTaxTreatment.marginScheme25aArt:
+        expectedCategory = EInvoiceTaxCategory.exempt;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg25a;
+        expectedRate = 0;
+        expectedReason = 'Kunstgegenstände/Sonderregelung';
+        expectedReasonCode = 'VATEX-EU-I';
+        invoiceNote = expectedReason;
+      case EInvoiceTaxTreatment.marginScheme25aCollectorsAntiquities:
+        expectedCategory = EInvoiceTaxCategory.exempt;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg25a;
+        expectedRate = 0;
+        expectedReason = 'Sammlungsstücke und Antiquitäten/Sonderregelung';
+        expectedReasonCode = 'VATEX-EU-J';
+        invoiceNote = expectedReason;
       case EInvoiceTaxTreatment.reverseChargeEuService13b1:
+        expectedCategory = EInvoiceTaxCategory.reverseCharge;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg3a2_13b1;
+        expectedRate = 0;
+        expectedReason = 'Steuerschuldnerschaft des Leistungsempfängers';
+        expectedReasonCode = 'VATEX-EU-AE';
       case EInvoiceTaxTreatment.reverseChargeDomesticConstruction13b2_4_5:
-        return const EInvoiceTaxClassificationResult.unresolved(<String>['tax_treatment']);
+        expectedCategory = EInvoiceTaxCategory.reverseCharge;
+        expectedBasis = EInvoiceTaxLegalBasis.ustg13b2_4_5;
+        expectedRate = 0;
+        expectedReason = 'Steuerschuldnerschaft des Leistungsempfängers';
+        expectedReasonCode = 'VATEX-EU-AE';
     }
 
     final List<String> fields = <String>[];

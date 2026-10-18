@@ -39,6 +39,7 @@ class EInvoicePartySnapshot {
     this.iban,
     this.endpointId,
     this.endpointScheme,
+    this.companyLegalForm,
   });
 
   final String name;
@@ -60,6 +61,9 @@ class EInvoicePartySnapshot {
   /// no approved source exists. Never invented; validation fails closed.
   final String? endpointId;
   final String? endpointScheme;
+
+  /// BT-33 additional legal information required for §19 UStG invoices.
+  final String? companyLegalForm;
 }
 
 /// Immutable line with canonical cent amounts and explicit classification.
@@ -242,6 +246,12 @@ class EInvoiceSnapshotBuilder {
       );
     }
     final List<_PreDiscountLine> prepared = <_PreDiscountLine>[];
+    _validateReverseChargeEvidence(
+      posRows: posRows,
+      companyRow: companyRow,
+      customerRow: customerRow,
+      deliveryDate: deliveryDate,
+    );
     for (var index = 0; index < posRows.length; index++) {
       prepared.add(
         _prepareLine(
@@ -289,7 +299,15 @@ class EInvoiceSnapshotBuilder {
       outputFormat: outputFormat,
       issueDate: issueDate,
       currency: 'EUR',
-      seller: _sellerFromCompany(companyRow),
+      seller: _sellerFromCompany(
+        companyRow,
+        companyLegalForm:
+            lines.any(
+              (EInvoiceLineSnapshot line) => line.classification.treatment == EInvoiceTaxTreatment.kleinunternehmer19,
+            )
+            ? ApprovedTaxClassification.kleinunternehmerReason
+            : null,
+      ),
       buyer: _buyerFromCustomer(customerRow, buyerReference: buyerReference),
       lines: List<EInvoiceLineSnapshot>.unmodifiable(lines),
       taxBreakdowns: _buildTaxBreakdowns(lines),
@@ -463,6 +481,156 @@ class EInvoiceSnapshotBuilder {
     }
   }
 
+  void _validateReverseChargeEvidence({
+    required List<Map<String, Object?>> posRows,
+    required Map<String, Object?> companyRow,
+    required Map<String, Object?> customerRow,
+    required String? deliveryDate,
+  }) {
+    const Set<String> reverseChargeTreatments = <String>{
+      'reverse_charge_eu_service_13b_1',
+      'reverse_charge_domestic_construction_13b_2_4_5',
+    };
+    final bool hasReverseCharge = posRows.any(
+      (Map<String, Object?> row) => reverseChargeTreatments.contains(_text(row['tax_treatment'])),
+    );
+    if (!hasReverseCharge) return;
+
+    final List<String> fields = <String>[];
+    void requireOneOf(int index, Map<String, Object?> row, String field, Set<String> accepted) {
+      final String? value = _text(row[field]);
+      if (value == null || !accepted.contains(value)) fields.add('position[$index].$field');
+    }
+
+    void requireText(int index, Map<String, Object?> row, String field) {
+      if (_text(row[field]) == null) fields.add('position[$index].$field');
+    }
+
+    void requireCountry(int index, Map<String, Object?> row, String field, String expected) {
+      final String? value = _text(row[field])?.toUpperCase();
+      if (value != expected) fields.add('position[$index].$field');
+    }
+
+    void requireCountryCode(int index, Map<String, Object?> row, String field) {
+      final String? value = _text(row[field])?.toUpperCase();
+      if (value == null || !RegExp(r'^[A-Z]{2}$').hasMatch(value)) fields.add('position[$index].$field');
+    }
+
+    final String? sellerCountry = _text(companyRow['land'])?.toUpperCase();
+    final String? buyerCountry = _text(customerRow['land'])?.toUpperCase();
+    final String? buyerVatId = _text(customerRow['ust_idnr']);
+    final String? sellerVatId = _text(companyRow['ust_idnr']) ?? _text(companyRow['ust_id']);
+    for (var index = 0; index < posRows.length; index++) {
+      final Map<String, Object?> row = posRows[index];
+      final String? treatment = _text(row['tax_treatment']);
+      if (!reverseChargeTreatments.contains(treatment)) {
+        fields.add('position[$index].tax_treatment');
+        continue;
+      }
+
+      if (treatment == 'reverse_charge_eu_service_13b_1') {
+        final String? supplierCountry = _text(row['e_invoice_reverse_charge_supplier_establishment_country_iso'])
+            ?.toUpperCase();
+        requireOneOf(index, row, 'e_invoice_reverse_charge_supplier_establishment_basis', <String>{
+          'seat_or_management',
+          'fixed_establishment',
+        });
+        requireOneOf(index, row, 'e_invoice_reverse_charge_supplier_german_fixed_establishment_status', <String>{
+          'none',
+          'exists_not_involved',
+        });
+        requireOneOf(index, row, 'e_invoice_reverse_charge_recipient_status', <String>{'entrepreneur_for_business'});
+        requireCountry(index, row, 'e_invoice_reverse_charge_recipient_establishment_country_iso', 'DE');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_service_kind', <String>{
+          'general_b2b_service_3a_2_no_exception',
+        });
+        requireOneOf(index, row, 'e_invoice_reverse_charge_place_of_supply_basis', <String>{
+          'recipient_business_establishment_3a_2',
+          'recipient_fixed_establishment_3a_2',
+        });
+        requireCountry(index, row, 'e_invoice_reverse_charge_place_of_supply_country_iso', 'DE');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_taxability', <String>{'taxable_in_germany_under_3a_2'});
+        requireText(index, row, 'e_invoice_reverse_charge_evidence_source_ref');
+        // No persisted assessment resolver is supplied in this serializer
+        // slice. A non-empty reference is not proof that a source record
+        // exists or matches the captured eligibility facts.
+        fields.add('position[$index].e_invoice_reverse_charge_evidence_source_ref');
+        if (supplierCountry == null || !_euMemberCountryCodes.contains(supplierCountry) || supplierCountry == 'DE') {
+          fields.add('position[$index].e_invoice_reverse_charge_supplier_establishment_country_iso');
+        }
+        if (sellerCountry == null || sellerCountry != supplierCountry) fields.add('unternehmen.land');
+        if (buyerCountry != 'DE') fields.add('kunden.land');
+        if (sellerVatId == null) fields.add('unternehmen.ust_idnr');
+        if (buyerVatId == null) fields.add('kunden.ust_idnr');
+      } else {
+        requireCountryCode(index, row, 'e_invoice_reverse_charge_supplier_establishment_country_iso');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_supplier_establishment_basis', <String>{
+          'seat_or_management',
+          'fixed_establishment',
+        });
+        requireOneOf(index, row, 'e_invoice_reverse_charge_supplier_german_fixed_establishment_status', <String>{
+          'none',
+          'exists_not_involved',
+          'exists_participating',
+          'unknown',
+        });
+        requireOneOf(index, row, 'e_invoice_reverse_charge_recipient_status', <String>{'entrepreneur'});
+        requireCountry(index, row, 'e_invoice_reverse_charge_recipient_establishment_country_iso', 'DE');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_service_kind', <String>{'construction_service_13b_2_4'});
+        requireOneOf(index, row, 'e_invoice_reverse_charge_place_of_supply_basis', <String>{
+          'german_immovable_property_13b_2_4',
+        });
+        requireCountry(index, row, 'e_invoice_reverse_charge_place_of_supply_country_iso', 'DE');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_taxability', <String>{'taxable_in_germany_under_13b_2_4'});
+        requireText(index, row, 'e_invoice_reverse_charge_evidence_source_ref');
+        // Assessment/certificate resolution belongs to the later v28 input
+        // persistence slice; block output until those real records are wired.
+        fields.add('position[$index].e_invoice_reverse_charge_evidence_source_ref');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_recipient_13b5_basis', <String>{'valid_ust1tg_certificate'});
+        requireText(index, row, 'e_invoice_reverse_charge_ust1tg_certificate_ref');
+        fields.add('position[$index].e_invoice_reverse_charge_ust1tg_certificate_ref');
+        requireOneOf(index, row, 'e_invoice_reverse_charge_ust1tg_scope', <String>{'construction_13b_2_4'});
+        requireText(index, row, 'e_invoice_reverse_charge_ust1tg_recipient_vat_id');
+        requireText(index, row, 'e_invoice_reverse_charge_ust1tg_issued_on');
+        requireText(index, row, 'e_invoice_reverse_charge_ust1tg_valid_through');
+        if (buyerCountry != 'DE') fields.add('kunden.land');
+        if (sellerVatId == null) fields.add('unternehmen.ust_idnr');
+        if (buyerVatId == null) fields.add('kunden.ust_idnr');
+        if (_text(row['e_invoice_reverse_charge_ust1tg_recipient_vat_id']) != buyerVatId || buyerVatId == null) {
+          fields.add('position[$index].e_invoice_reverse_charge_ust1tg_recipient_vat_id');
+        }
+        final DateTime? serviceDay = _isoDay(deliveryDate);
+        final DateTime? issuedOn = _isoDay(row['e_invoice_reverse_charge_ust1tg_issued_on']);
+        final DateTime? validThrough = _isoDay(row['e_invoice_reverse_charge_ust1tg_valid_through']);
+        if (serviceDay == null) fields.add('leistungsdatum');
+        if (issuedOn == null ||
+            validThrough == null ||
+            serviceDay == null ||
+            issuedOn.isAfter(serviceDay) ||
+            validThrough.isBefore(serviceDay)) {
+          fields.add('position[$index].e_invoice_reverse_charge_ust1tg_issued_on');
+          fields.add('position[$index].e_invoice_reverse_charge_ust1tg_valid_through');
+        }
+      }
+    }
+
+    if (fields.isNotEmpty) {
+      throw EInvoiceSourceException(
+        code: 'unresolvedTaxClassification',
+        messageDe: 'Steuerangaben für die Steuerschuldnerschaft sind unvollständig oder widersprüchlich',
+        messageEn: 'Reverse-charge evidence is incomplete or contradictory',
+        fields: List<String>.unmodifiable(fields.toSet()),
+      );
+    }
+  }
+
+  DateTime? _isoDay(Object? value) {
+    final String? text = _text(value);
+    if (text == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(text)) return null;
+    final DateTime? parsed = DateTime.tryParse(text);
+    return parsed != null && parsed.toIso8601String().substring(0, 10) == text ? parsed : null;
+  }
+
   /// Distributes an optional document discount across lines with the
   /// canonical proportional allocator and derives final per-line tax.
   ///
@@ -622,7 +790,7 @@ class EInvoiceSnapshotBuilder {
     return List<EInvoiceTaxBreakdownSnapshot>.unmodifiable(sorted);
   }
 
-  EInvoicePartySnapshot _sellerFromCompany(Map<String, Object?> row) {
+  EInvoicePartySnapshot _sellerFromCompany(Map<String, Object?> row, {String? companyLegalForm}) {
     final String? street = row['strasse']?.toString().trim().isEmpty ?? true
         ? null
         : [
@@ -643,6 +811,7 @@ class EInvoiceSnapshotBuilder {
       iban: _text(row['iban']),
       endpointId: vatId,
       endpointScheme: vatId == null ? null : '9930',
+      companyLegalForm: companyLegalForm,
     );
   }
 

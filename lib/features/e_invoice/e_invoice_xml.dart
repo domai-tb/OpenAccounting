@@ -275,8 +275,12 @@ class EInvoiceXmlSerializer {
         '      <cac:PartyTaxScheme><cbc:CompanyID>${_escape(party.vatId!)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>',
       );
     }
+    final String companyLegalForm = party.companyLegalForm == null
+        ? ''
+        : '<cbc:CompanyLegalForm>${_escape(party.companyLegalForm!)}</cbc:CompanyLegalForm>';
     xml.writeln(
-      '      <cac:PartyLegalEntity><cbc:RegistrationName>${_escape(party.name)}</cbc:RegistrationName></cac:PartyLegalEntity>',
+      '      <cac:PartyLegalEntity><cbc:RegistrationName>${_escape(party.name)}</cbc:RegistrationName>'
+      '$companyLegalForm</cac:PartyLegalEntity>',
     );
     xml.writeln('    </cac:Party>');
     xml.writeln('  </cac:$tag>');

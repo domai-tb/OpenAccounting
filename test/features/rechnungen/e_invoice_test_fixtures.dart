@@ -86,6 +86,58 @@ Map<String, Object?> validCustomer() => <String, Object?>{
   'land': 'DE',
 };
 
+Map<String, Object?> euService13b1PositionWithoutResolvedAssessment() => <String, Object?>{
+  'bezeichnung': 'EU-B2B-Beratung',
+  'menge': 1,
+  'einzelpreis': 100,
+  'ust_satz': 0,
+  'tax_treatment': 'reverse_charge_eu_service_13b_1',
+  'tax_legal_basis': 'ustg_3a_2_13b_1',
+  'e_invoice_reverse_charge_evidence_source_ref': 'dangling-assessment-13b1-not-found',
+  'e_invoice_tax_category_code': 'AE',
+  'e_invoice_exemption_reason_code': 'VATEX-EU-AE',
+  'e_invoice_exemption_reason_text': 'Steuerschuldnerschaft des Leistungsempfängers',
+  'e_invoice_reverse_charge_supplier_establishment_country_iso': 'AT',
+  'e_invoice_reverse_charge_supplier_establishment_basis': 'seat_or_management',
+  'e_invoice_reverse_charge_supplier_german_fixed_establishment_status': 'none',
+  'e_invoice_reverse_charge_recipient_status': 'entrepreneur_for_business',
+  'e_invoice_reverse_charge_recipient_establishment_country_iso': 'DE',
+  'e_invoice_reverse_charge_service_kind': 'general_b2b_service_3a_2_no_exception',
+  'e_invoice_reverse_charge_place_of_supply_basis': 'recipient_business_establishment_3a_2',
+  'e_invoice_reverse_charge_place_of_supply_country_iso': 'DE',
+  'e_invoice_reverse_charge_taxability': 'taxable_in_germany_under_3a_2',
+  'position': 0,
+};
+
+Map<String, Object?> construction13b2PositionWithoutResolvedCertificate() => <String, Object?>{
+  'bezeichnung': 'Bauleistung am deutschen Grundstück',
+  'menge': 1,
+  'einzelpreis': 100,
+  'ust_satz': 0,
+  'tax_treatment': 'reverse_charge_domestic_construction_13b_2_4_5',
+  'tax_legal_basis': 'ustg_13b_2_4_5',
+  'e_invoice_tax_category_code': 'AE',
+  'e_invoice_exemption_reason_code': 'VATEX-EU-AE',
+  'e_invoice_exemption_reason_text': 'Steuerschuldnerschaft des Leistungsempfängers',
+  'e_invoice_reverse_charge_supplier_establishment_country_iso': 'AT',
+  'e_invoice_reverse_charge_supplier_establishment_basis': 'seat_or_management',
+  'e_invoice_reverse_charge_supplier_german_fixed_establishment_status': 'none',
+  'e_invoice_reverse_charge_recipient_status': 'entrepreneur',
+  'e_invoice_reverse_charge_recipient_establishment_country_iso': 'DE',
+  'e_invoice_reverse_charge_service_kind': 'construction_service_13b_2_4',
+  'e_invoice_reverse_charge_place_of_supply_basis': 'german_immovable_property_13b_2_4',
+  'e_invoice_reverse_charge_place_of_supply_country_iso': 'DE',
+  'e_invoice_reverse_charge_taxability': 'taxable_in_germany_under_13b_2_4',
+  'e_invoice_reverse_charge_evidence_source_ref': 'dangling-assessment-13b2-not-found',
+  'e_invoice_reverse_charge_recipient_13b5_basis': 'valid_ust1tg_certificate',
+  'e_invoice_reverse_charge_ust1tg_scope': 'construction_13b_2_4',
+  'e_invoice_reverse_charge_ust1tg_certificate_ref': 'dangling-ust1tg-certificate-not-found',
+  'e_invoice_reverse_charge_ust1tg_recipient_vat_id': 'DE987654321',
+  'e_invoice_reverse_charge_ust1tg_issued_on': '2025-01-01',
+  'e_invoice_reverse_charge_ust1tg_valid_through': '2026-12-31',
+  'position': 0,
+};
+
 List<Map<String, Object?>> standardPositions() => <Map<String, Object?>>[
   <String, Object?>{
     'bezeichnung': 'Beratung',
