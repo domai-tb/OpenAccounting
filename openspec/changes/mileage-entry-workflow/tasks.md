@@ -55,7 +55,7 @@ Do not implement dependent application code until a separate fresh independent r
 
 ## Contract and dependency gates — open
 
-- [ ] Obtain a fresh independent review of the exact revised spec commit. Do not begin dependent code work before approval.
+- [x] Obtain a fresh independent review of the spec contract: Round 5 approved commit `d6d441c4c4e0779c83282f5fb16b824630d89688`. This approval is spec-only and does not close the inventory or shared migration-version gates.
 - [ ] Resolve the inventory dependency with both owners: `profile-data-portability` is 46 names/v13 while `customer-data-disclosure-export` is 55 names/v19. The common inventory and version-aware presence rules remain unaccepted; keep mileage migration and complete-export claims blocked.
 - [ ] Resolve the inherited `db` requirement's version conflict: its v8-to-v9 scenario creates mileage tables while its Table Definitions require those tables at v13. This shared maintained-spec edit is outside this revision; keep migration work blocked until the owner reconciles it.
 - [ ] After the review and inventory gates close, implement only against this contract and update each matrix row from planned/missing to evidence-backed status after running its named test.

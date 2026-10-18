@@ -4,7 +4,7 @@ Feature map §35 asks for dated business-mileage records containing purpose, dis
 
 The mileage tables are required from schema v13. The current proposal for v23 adds structured eligibility facts and lifecycle enforcement to those existing tables. No part of this design asserts that the current runtime has v23 enforcement or the accepted posting integration.
 
-The change's proposed table contract is 55 known application-table names at v19: 39 legacy tables plus 16 feature-managed tables, including `feature_table_state`. The active inventory dependencies disagree: `profile-data-portability` is at 46 names/v13, while `customer-data-disclosure-export` is at 55 names/v19. This mismatch remains open. Mileage migration work and complete-export claims stay blocked until both owners accept the same inventory and version-aware presence rules.
+The change's proposed table contract is 55 known application-table names at v19: 39 legacy tables plus 16 feature-managed tables, including `feature_table_state`. The `profile-data-portability` and `customer-data-disclosure-export` changes are archived, but their maintained inventory requirements still conflict: one declares 46 names at v13 and the other 55 names at v19. This mismatch remains open. Mileage migration work and complete-export claims stay blocked until the maintained requirements agree on one inventory and version-aware presence rules.
 
 ## Goals / Non-Goals
 
@@ -88,10 +88,10 @@ Provide a `Neue Fahrt` primary action and a searchable, filterable trip table wi
 
 | Dependency | Baseline evidence | Status | Gate |
 |---|---|---|---|
-| `profile-data-portability` inventory | Active change declares 46 application-table names through v13. | **Open; conflicts with customer export.** | Owner must accept the common 55-name v19 inventory and mileage presence rules. |
-| `customer-data-disclosure-export` inventory | Active change declares 55 application-table names through v19. | **Open; conflicts with portability.** | Owner must accept the same common 55-name v19 inventory and mileage presence rules. |
+| `profile-data-portability` inventory | Archived change declares 46 application-table names through v13; its maintained inventory requirement remains in conflict. | **Open; conflicts with customer export.** | Owner must align the maintained requirement to the common 55-name v19 inventory and mileage presence rules. |
+| `customer-data-disclosure-export` inventory | Archived change declares 55 application-table names through v19; its maintained inventory requirement remains in conflict. | **Open; conflicts with portability.** | Owner must align the maintained requirement to the same common 55-name v19 inventory and mileage presence rules. |
 | Inherited maintained `db` migration scenario | `V8-to-v9 migration adds shared markers and mileage tables` conflicts with the same requirement's minimum-version rule that makes mileage tables required at v13. | **Open; not edited in this scoped revision.** | The shared-spec owner must reconcile the version before migration behavior is implemented or tested. |
-| Mileage schema v23 | Current baseline is v22; current mileage tables are required from v13. | **Not implemented in this revision.** | Fresh independent review must approve the revised contract; inventory owner agreement must also be recorded before migration work. |
+| Mileage schema v23 | Current baseline is v22; current mileage tables are required from v13. | **Not implemented in this revision; contract independently approved at `d6d441c`.** | Inventory owners must align the maintained requirements, and the shared DB version conflict must be resolved before migration work. |
 | Mileage posting integration | Account mapping and atomic canonical posting wiring are still required. | **Open.** | Debit travel expense, credit private contribution, no cash/VAT leg; trip date in an open period; source idempotency key `(mileage_trip, trip UUID)`. |
 
 ## Open Questions

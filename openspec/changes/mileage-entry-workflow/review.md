@@ -185,12 +185,12 @@ None.
 
 ---
 
-## Revised contract review gate — Round 4 is stale
+## Independent Spec Review — Round 5
 
-- **Revision date:** 2026-10-18
-- **Review state:** `PENDING`; no independent review has evaluated this revision.
-- **Scope changed since Round 4:** explicit private-vehicle business-trip policy and eligibility fields; official source/version/effective dates; explicit half-up cents rule and source-scope caveat; fail-closed exclusions; corrected 55/v19 versus 46/v13 dependency ledger; complete mapping of 46 scenarios; 37 missing tests marked unverified; tasks and verification status rewritten.
-- **Historical verdict:** Round 4 `APPROVE` applies only to the artifacts it reviewed and does not approve this revision. Treat its verdict as stale until a fresh independent reviewer accepts or revises this contract.
-- **Required review checks:** assess the legal/source scope caveat and whether the product policy is explicit enough; verify the class/rate/date/exclusion and rounding contract is internally consistent; verify migration and export gates; verify all 46 scenario rows align with the two specs; verify no missing test is called green; verify the pending-task and verification wording matches the contract; assess the inherited v8-to-v9 versus v13 migration-version conflict.
-- **Dependency gates:** `profile-data-portability` remains 46 names/v13 and `customer-data-disclosure-export` remains 55 names/v19. The mismatch is explicitly unresolved in the design and DB delta. The maintained `db` requirement also retains a v8-to-v9 mileage-table scenario alongside its v13 minimum. Do not approve migration or complete-export readiness until the inventory owners and shared-spec owner reconcile these contracts.
-- **Implementation gate:** dependent code must remain unstarted until a separate fresh independent review approves the fixed revision. This review artifact records the gate; it is not the approval.
+- **Reviewed revision:** `d6d441c4c4e0779c83282f5fb16b824630d89688` on `codex/spec-mileage-policy-2026-10-18`.
+- **Reviewer:** fresh-context independent reviewer; reviewer identity is not included in this handoff.
+- **Scope:** the revised mileage policy contract and its source/scope caveats, eligibility fields and fail-closed rules, posting/correction boundaries, DB migration/export gates, 46-scenario mapping, and task/verification evidence. This was a spec-only review; it does not establish implementation, migration execution, runtime, or test evidence.
+- **Verdict:** `APPROVE`.
+- **Finding addressed:** proposal, design, and the DB delta scenario described archived change directories as active. This follow-up updates those status references and records that the maintained inventory requirements still conflict. It does not change the approved policy contract or remove migration/export gates.
+- **Dependency gates remain open:** the archived `profile-data-portability` and `customer-data-disclosure-export` proposals declare 46 names/v13 and 55 names/v19 respectively, while their maintained inventory requirements still conflict. The maintained `db` requirement also has a v8-to-v9 mileage-table scenario alongside its v13 minimum. Migration and complete-export readiness remain blocked until the inventory and shared-spec owners reconcile those contracts.
+- **Approval boundary:** Round 5 approves the spec contract at the reviewed revision; it does not approve implementation or close the inventory and migration-version dependencies. The wording-only follow-up preserves the reviewed policy and gates.

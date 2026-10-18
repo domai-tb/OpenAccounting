@@ -35,7 +35,7 @@ Database triggers SHALL enforce the initial state, every allowed transition, and
 - **THEN** it rejects the insert and creates no row
 
 #### Scenario: Gate mileage migration until dependencies agree
-- **GIVEN** the active `profile-data-portability` contract declares 46 names at v13 and `customer-data-disclosure-export` declares 55 names at v19
+- **GIVEN** the archived `profile-data-portability` change declares 46 names at v13 and the archived `customer-data-disclosure-export` change declares 55 names at v19, while their maintained inventory requirements still conflict
 - **AND** the inherited shared `db` requirement contains a v8-to-v9 mileage-table scenario while its inventory requires mileage tables at v13
 - **WHEN** the mileage migration release gate is evaluated
 - **THEN** the v23 mileage migration remains blocked until both inventory owners accept the same 55-name v19 inventory and version-aware presence rules and the shared `db` owner resolves the version conflict
