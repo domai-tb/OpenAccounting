@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "engine": {
+    "name": "KoSIT Validator standalone CLI",
+    "version": "1.6.3",
+    "javaMinimum": "11",
+    "source": "https://repo1.maven.org/maven2/org/kosit/validator/1.6.3/validator-1.6.3-standalone.jar",
+    "sha256": "799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9"
+  },
+  "profiles": [
+    {
+      "output": "xrechnung",
+      "syntax": "UBL 2.1 Invoice",
+      "profile": "EN16931 + XRechnung 3.0.2",
+      "scenario": "EN16931 XRechnung (UBL Invoice)",
+      "configTag": "v2026-08-31",
+      "configCommit": "b436fc4bf05ad501ab5cbb4a53fdffee3d4e18be",
+      "cenSchematron": "1.3.16",
+      "xrechnungSchematron": "2.6.0"
+    },
+    {
+      "output": "zugferd",
+      "syntax": "UN/CEFACT CII D22B",
+      "profile": "EN16931",
+      "scenario": "ZUGFeRD 2.5.2 EN16931 (CII D22B)",
+      "facturXVersion": "1.09.2",
+      "rulesTag": "v1.4.0.04",
+      "rulesCommit": "97ba0f3d4ef2abed5780e9490d5c3a2be832ab1d"
+    }
+  ],
+  "sources": [
+    {
+      "name": "XRechnung validator configuration",
+      "tag": "v2026-08-31",
+      "commit": "b436fc4bf05ad501ab5cbb4a53fdffee3d4e18be",
+      "archive": "https://github.com/itplr-kosit/validator-configuration-xrechnung/releases/download/v2026-08-31/xrechnung-3.0.2-validator-configuration-2026-08-31.zip",
+      "archiveSha256": "2530cd107c414511c5d0462ec10f886910395abfca820db82e83d70bf01221a8",
+      "license": "Apache-2.0; CEN artefacts use EUPL-1.2"
+    },
+    {
+      "name": "FNFE-MPE France_RFE Factur-X EN16931",
+      "tag": "v1.4.0.04",
+      "commit": "97ba0f3d4ef2abed5780e9490d5c3a2be832ab1d",
+      "archive": "https://github.com/fnfempe/France_RFE/archive/refs/tags/v1.4.0.04.tar.gz",
+      "archiveSha256": "0314dec4b3bb2d677f253165ee72812d093604f7f346c9cf64f3357b32a56c45",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "OASIS UBL",
+      "version": "2.1",
+      "source": "https://docs.oasis-open.org/ubl/os-UBL-2.1/UBL-2.1.zip",
+      "notice": "OASIS copyright and redistribution notices are retained in bundled schema files."
+    },
+    {
+      "name": "CEN EN16931 validation artefacts",
+      "version": "1.3.16",
+      "source": "https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/tag/validation-1.3.16",
+      "license": "EUPL-1.2"
+    }
+  ],
+  "runtimeFiles": [
+    {
+      "path": "resources/default-report.xsl",
+      "sha256": "9f5411fef66e0c8bbd1e9ead3003b7453c4cca32446bd81d57098984721842aa"
+    },
+    {
+      "path": "resources/facturx/en16931/1xsd/Factur-X_1.09.2_EN16931_urn_un_unece_uncefact_data_standard_QualifiedDataType_100.xsd",
+      "sha256": "4bd1753b1f078ecc50468ec90e505a63a72c6c1f2449a893f37c72a2e933fe04"
+    },
+    {
+      "path": "resources/facturx/en16931/1xsd/Factur-X_1.09.2_EN16931_urn_un_unece_uncefact_data_standard_ReusableAggregateBusinessInformationEntity_100.xsd",
+      "sha256": "d6bf8e38c3d5595c670655ccb7ee89655ae244943aaf09a31758160caabc7894"
+    },
+    {
+      "path": "resources/facturx/en16931/1xsd/Factur-X_1.09.2_EN16931_urn_un_unece_uncefact_data_standard_UnqualifiedDataType_100.xsd",
+      "sha256": "60ee4d11da40c7ec42a4da1fb77b5d7bbffcdce42afd863fcd9da9334765315c"
+    },
+    {
+      "path": "resources/facturx/en16931/1xsd/Factur-X_EN16931.xsd",
+      "sha256": "cb98b34e59398fcd8d48f29963a3fd6f4c49af9a8307569f4a1ced634f1aa885"
+    },
+    {
+      "path": "resources/facturx/en16931/2xslt/FACTUR-X_EN16931.xslt",
+      "sha256": "979f7e0210c727f1049ff55a93498531ba83a8ed2207d0d5247cd2d80c9c3d1a"
+    },
+    {
+      "path": "resources/facturx/en16931/2xslt/FACTUR-X_EN16931_codedb.xml",
+      "sha256": "70339a41d71b02bb97683f8eea04acbd764e077a88a446b32860d89c3351b62f"
+    },
+    {
+      "path": "resources/facturx/en16931/schematron/FACTUR-X_EN16931.sch",
+      "sha256": "62009ac7b1130397d0d1fa60c2f1a4171bb3e9be71a8a9316ff197ddba60bdfb"
+    },
+    {
+      "path": "resources/facturx/en16931/schematron/FACTUR-X_EN16931_codedb.xml",
+      "sha256": "70339a41d71b02bb97683f8eea04acbd764e077a88a446b32860d89c3351b62f"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/CCTS_CCT_SchemaModule-2.1.xsd",
+      "sha256": "5f348a1738ab6a5a0b4755bc923f94cd65ee8ac7ba1909dea44d1d3f1571fe46"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-CommonAggregateComponents-2.1.xsd",
+      "sha256": "7a5f82fb0a1138837278df6cef514b565995a4d7083f20b5d2652e47109837c1"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-CommonBasicComponents-2.1.xsd",
+      "sha256": "4da82535342b1a59e6e7c4c1fe27b3df6470d13f13d0e29fcde00970a9511d73"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-CommonExtensionComponents-2.1.xsd",
+      "sha256": "54ab369625ec2304c35d5465701acd9a111081970c1e83d92361bf4faa712ecf"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-CommonSignatureComponents-2.1.xsd",
+      "sha256": "41b0efdfe56a45b51410c2cac02936135d16d87ec36b6f10d57dd2abadfdfe1d"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-CoreComponentParameters-2.1.xsd",
+      "sha256": "612772ecc23f8a4da5f44f2eaa57c6e51bd513af8bd224654daca8d63190f1ed"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-ExtensionContentDataType-2.1.xsd",
+      "sha256": "a4d5414f9a20775b71ad894de106308773967987f403e94474b298b60e07597b"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-QualifiedDataTypes-2.1.xsd",
+      "sha256": "56439edeab628f544b81dab7d9f4dbd725dbe513aa0818e7c6e2f4abc5a7e4e0"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-SignatureAggregateComponents-2.1.xsd",
+      "sha256": "c61ea298b65b7c5c76699bcdb0f72ab84408e34daea03bbc074ce00810e0c3d5"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-SignatureBasicComponents-2.1.xsd",
+      "sha256": "6b46806770c1f9e3adb8e97e99704b79fdebfa9144969ba0d9607f8397c2143d"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-UnqualifiedDataTypes-2.1.xsd",
+      "sha256": "a8360a731baf8fd310b6bd96b7b2e06a12b08bb1000e5ca743884c7e011689ff"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-XAdESv132-2.1.xsd",
+      "sha256": "75d320c911b13fe76c5770ae141b3d5106a43982bc4ad9ad44167e28305b2d42"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-XAdESv141-2.1.xsd",
+      "sha256": "1fa4625e9cefcb7a9abb5ac1b64315547450031eece8a55bd584e4ba4b79dbc1"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/common/UBL-xmldsig-core-schema-2.1.xsd",
+      "sha256": "d682988d938b582c6a0c0fad1aecb51105607dc2ec66423cd6b9962ec2f1a199"
+    },
+    {
+      "path": "resources/ubl/2.1/xsd/maindoc/UBL-Invoice-2.1.xsd",
+      "sha256": "6dbd74d85d0abec223a13d6b8a7196041b0a4e8171ce80f7029fcfd2c0c7c716"
+    },
+    {
+      "path": "resources/ubl/2.1/xsl/EN16931-UBL-validation.xsl",
+      "sha256": "759f2d2e830c7fd1d5a6e8b4f61e5dbafc7a7805862c4ae1c749eeac6adde698"
+    },
+    {
+      "path": "resources/xrechnung-report.xsl",
+      "sha256": "5c3c4c3c43c251e90e31b9d69d580e11dea3d7e473dc8c5df23036fdc3bb13d6"
+    },
+    {
+      "path": "resources/xrechnung/3.0.2/xsl/XRechnung-UBL-validation.xsl",
+      "sha256": "c34a838cbbd761861b73f7b4337ac8cd1fc8b6dc0c7284af75b732137c70c0c9"
+    },
+    {
+      "path": "scenarios.xml",
+      "sha256": "6a8309a7ff74a42d7d611120c4091a5869f8021eb5f50af7607abbbb6244cbc1"
+    },
+    {
+      "path": "validator-1.6.3-standalone.jar",
+      "sha256": "799e64befca97d4080e03608c80b85dd5a5ecc5f4ae4f35d1116ec2855b9a7c9"
+    }
+  ],
+  "licenseFiles": [
+    {
+      "path": "licenses/LICENSE-Apache-2.0-FNFE-MPE.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "licenses/LICENSE-Apache-2.0-xrechnung-config.txt",
+      "sha256": "73f2898ad26e1fcb9ec4649cdf8466ea0bda47644b7c12efc10a703bdfb94a9f"
+    },
+    {
+      "path": "licenses/LICENSE-EUPL-1.2.txt",
+      "sha256": "2b34b3c73958c06d9d61851447dc2f647f092ba5e268033192334f3ae882a159"
+    },
+    {
+      "path": "licenses/LICENSE.validator.txt",
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+    },
+    {
+      "path": "licenses/NOTICE-validator.txt",
+      "sha256": "3735bf6f303d0fac4c26435ce58b53e86c7883feb3e1f8e7519709b856ddfb58"
+    },
+    {
+      "path": "licenses/NOTICE-xrechnung-config.txt",
+      "sha256": "aaba5a88c905a8d421877698396755abb3b9563b7655bfb02b76d634c9e861e4"
+    }
+  ]
+}

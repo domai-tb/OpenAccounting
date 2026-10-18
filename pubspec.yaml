@@ -50,3 +50,13 @@ flutter:
   generate: true
   assets:
     - assets/branding/openaccounting_icon.png
+    - assets/e_invoice_validator/
+    - assets/e_invoice_validator/licenses/
+    - assets/e_invoice_validator/resources/
+    - assets/e_invoice_validator/resources/facturx/en16931/1xsd/
+    - assets/e_invoice_validator/resources/facturx/en16931/2xslt/
+    - assets/e_invoice_validator/resources/facturx/en16931/schematron/
+    - assets/e_invoice_validator/resources/ubl/2.1/xsd/common/
+    - assets/e_invoice_validator/resources/ubl/2.1/xsd/maindoc/
+    - assets/e_invoice_validator/resources/ubl/2.1/xsl/
+    - assets/e_invoice_validator/resources/xrechnung/3.0.2/xsl/
