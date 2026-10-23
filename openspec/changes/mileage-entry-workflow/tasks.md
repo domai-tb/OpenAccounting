@@ -6,21 +6,22 @@ The prior contract's 24 implementation tasks were marked complete before this re
 
 ## Revised-contract implementation — core slice complete; follow-ups open
 
-The Round 6 independent review approved the corrected contract at baseline HEAD `335056f0533ea7d6a38f8e0d624bb9a6e1308594` (recorded in `review.md`). The authorized core v25 migration, role-configuration service, transactional posting, EÜR source reader, profile/schema inventories, and bank-import selector are implemented and covered by focused runtime runs. The 65-row test matrix remains the source of scenario status; correction handling remains fail-closed pending an accounting reversal/replacement operation, while the exhaustive schema/version matrix, full unsafe-role matrix, other bank-specific selectors, and user-facing account/mapping UI remain open. The policy-boundary assertion task remains separate from those scenario rows.
+The Round 6 independent review approved the corrected contract at baseline HEAD `335056f0533ea7d6a38f8e0d624bb9a6e1308594` (recorded in `review.md`). The authorized core v25 migration, role-configuration service, transactional posting, EÜR source reader, profile/schema inventories, and bank-import selector are implemented and covered by focused runtime runs. The 65-row test matrix remains the source of scenario status; correction handling remains fail-closed pending an accounting reversal/replacement operation, while the exhaustive schema/version matrix, full unsafe-role matrix, other bank-specific selectors, user-facing Sachkonto creation, and mileage role-settings UI remain open. The policy-boundary assertion task remains separate from those scenario rows.
 
 ### Completed bounded implementation checkpoints
 
 - [x] Generate stable UUIDv4 trip IDs and verify persisted identity plus exact integer distance in `test_record_a_business_trip` (2026-10-18 focused run; see `verify.md`).
+- [x] Add the localized mileage entry workspace at `/banking?view=mileage`, preserving existing Banking routes and query parameters; wire record/edit/calculate/post actions through `AppServices` and `MileageEntryUseCases` (2026-10-18 focused run; see `verify.md`).
 - [x] Add regression coverage that v22 unknown calculated trips are demoted while posted facts are preserved, and that the additive v24 correction also repairs v23 profiles; the focused mileage migration tests pass (see `verify.md`).
 - [x] Reject `NULL` in all seven required calculation-snapshot columns through direct SQL, and guard `postTripWithPort` against untrusted eligibility/policy snapshots before invoking the posting port (see `verify.md`).
 - [x] Fail current-v25 startup closed without recreating a missing mapping or period-closure table, and repair an older permissive correction trigger; see the named migration regressions in `verify.md`.
 - [x] Reject malformed v25 mileage mapping primary-key, role-check, foreign-key, and closure date/range schemas in migration and customer-disclosure health checks; see `verify.md`.
 - [x] Keep direct SQL correction application and posted-trip terminal transitions fail-closed when given a fabricated accounting event ID; the accounting reversal/replacement operation remains unimplemented and open (see `verify.md`).
 
-### `mileage-entry` tests (7 missing scenarios; 1 existing-test assertion task)
+### `mileage-entry` tests (5 missing scenarios; 1 existing-test assertion task)
 
-- [ ] Add `test_mileage_form_is_keyboard_operable_and_localized` in `test/features/mileage/mileage_entry_workflow_test.dart`.
-- [ ] Add `test_posting_is_unavailable_without_each_prerequisite` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [x] Add `test_mileage_form_is_keyboard_operable_and_localized` in `test/features/mileage/mileage_entry_workflow_test.dart` (2026-10-18 focused run; see `verify.md`).
+- [x] Add `test_posting_is_unavailable_without_each_prerequisite` in `test/features/mileage/mileage_entry_workflow_test.dart` (2026-10-18 focused run; see `verify.md`).
 - [ ] Add `test_prepare_replacement_correction_without_accounting_changes` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_apply_accepted_replacement_correction_atomically` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_undo_posted_trip_through_correction` in `test/features/mileage/mileage_entry_workflow_test.dart`.
@@ -81,10 +82,20 @@ The Round 6 independent review approved the corrected contract at baseline HEAD 
 - [x] Verify category edits do not change historical EÜR values or mileage provenance in `test/features/accounting/euer_test.dart` (`settlement EÜR includes mileage once and keeps stored mapping after category edits`; 2026-10-18; see `verify.md`).
 - [ ] Add `euer_rejects_incomplete_mileage_source_group` in `test/features/accounting/euer_test.dart`.
 - [x] Verify the bank-import selector retains bank/cash accounts and excludes Sachkonto in `test/features/bank_import/import_mode_test.dart` (`bank-import selector keeps bank and cash accounts but excludes Sachkonto`; see `verify.md`).
-- [ ] Add user-facing Sachkonto creation and mileage role-settings UI/localization/route coverage; this remains the next bounded slice.
+- [ ] Add user-facing Sachkonto creation for explicit mileage roles; this remains open for a later bounded slice.
+- [ ] Add localized mileage role-settings UI and account/category selection; this remains open for a later bounded slice.
 
 ## Evidence discipline
 
-- `test-plan.md` is the row-by-row 65-scenario index: the earlier six-file focused FVM run passed 97 tests, and the latest three-file implementation-review regression run passed 68 tests on 2026-10-18. The matrix still has missing and partial scenarios covering policy boundaries, correction workflow, exhaustive schema-version inventory, incomplete EÜR groups, and user-facing configuration; the exact current matrix is maintained in `test-plan.md`.
+- `test-plan.md` is the row-by-row 65-scenario index: the earlier six-file focused FVM run passed 97 tests, the latest three-file implementation-review regression run passed 68 tests, and the routed mileage workspace run passed 28 tests on 2026-10-18. The matrix still has missing and partial scenarios covering policy boundaries, correction workflow, exhaustive schema-version inventory, incomplete EÜR groups, and user-facing account/role settings; the exact current matrix is maintained in `test-plan.md`.
 - Structural OpenSpec validation and formatting checks do not prove runtime behavior, migrations, posting, or correction semantics.
 - Do not mark tests complete from a proposed test name, prior review, or historical run.
+
+## 2026-10-22 mileage workspace regression slice
+
+- [x] Reject whole-kilometer distances above 9,999,999,999 before converting to hundredths, including the large input `184467440737095517`.
+- [x] Require deliberate trip-kind, vehicle-source, and vehicle-class selection for new trips; no eligible defaults are preselected.
+- [x] Preserve successful save, calculate, and post commits when the follow-up list refresh fails; after a committed post, use the effective displayed state to disable both edit and post retries.
+- [x] Add trip search and lifecycle-state filtering with a reset action.
+- [x] Keep posting prerequisite errors visible in the selected trip card while the prerequisite guard remains fail-closed.
+- These bounded workspace regressions are covered in `test-plan.md` and `verify.md`; the broader 65-scenario matrix and its documented gaps remain open.

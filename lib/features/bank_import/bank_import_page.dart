@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/app_scope.dart';
+import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/router/typed_workspace_search.dart';
 import 'package:openaccounting/features/bank_import/banking_usecase.dart';
 import 'package:openaccounting/core/localization.dart';
@@ -25,6 +26,8 @@ import 'package:openaccounting/features/bank_import/bank_import_service.dart';
 import 'package:openaccounting/features/bank_import/bank_transaction_selection.dart';
 import 'package:openaccounting/features/bank_import/bank_history_review_dialog.dart';
 import 'package:openaccounting/features/bank_import/bank_import_mode_repository.dart';
+import 'package:openaccounting/features/mileage/mileage_entry_usecases.dart';
+import 'package:openaccounting/features/mileage/mileage_entry_workspace.dart';
 import 'package:openaccounting/features/bank_import/bank_rules_view.dart';
 import 'package:openaccounting/features/bank_import/bank_templates_view.dart';
 import 'package:openaccounting/features/bank_import/bank_import_failure_payload.dart';
@@ -57,7 +60,8 @@ enum _BankImportView {
   rules,
   templates,
   quickBookings,
-  transactions;
+  transactions,
+  mileage;
 
   static _BankImportView fromQueryValue(String? value) => switch (value) {
     'history' => history,
@@ -65,6 +69,7 @@ enum _BankImportView {
     'templates' => templates,
     'quick-bookings' => quickBookings,
     'transactions' => transactions,
+    'mileage' => mileage,
     _ => import,
   };
 
@@ -75,6 +80,7 @@ enum _BankImportView {
     templates => 'templates',
     quickBookings => 'quick-bookings',
     transactions => 'transactions',
+    mileage => 'mileage',
   };
 }
 
@@ -151,6 +157,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
   int _transactionSelectionRequest = 0;
   bool _hasTransactionSelection = false;
   _BankImportStage _stage = _BankImportStage.upload;
+  bool _bankingDataLoaded = false;
   bool _isLoading = true;
   bool _historyLoading = false;
   bool _isBusy = false;
@@ -184,10 +191,17 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     return BankingUseCase(ref.read(appDatabaseProvider).executor);
   }
 
+  MileageEntryUseCases get _mileage {
+    final AppScope? scope = AppScope.maybeOf(context);
+    if (scope != null) return scope.services.mileageEntry;
+    return ref.read(appServicesProvider).mileageEntry;
+  }
+
   @override
   void initState() {
     super.initState();
     _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
+    _isLoading = _view != _BankImportView.mileage;
     _pathController = TextEditingController();
     _resolveTransactionSelection();
     _selectedTemplate = widget.initialTemplate;
@@ -197,15 +211,20 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _fileBytes = utf8.encode(initialContent);
       _pathController.text = widget.initialFileName;
     }
-    unawaited(_loadPageData());
+    if (_view != _BankImportView.mileage) unawaited(_loadPageData());
   }
 
   @override
   void didUpdateWidget(covariant BankImportPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.routeUri != oldWidget.routeUri) {
+      final _BankImportView previousView = _view;
       _view = _BankImportView.fromQueryValue(widget.routeUri?.queryParameters['view']);
       _resolveTransactionSelection();
+      if (previousView == _BankImportView.mileage && _view != _BankImportView.mileage && !_bankingDataLoaded) {
+        _isLoading = true;
+        unawaited(_loadPageData());
+      }
     }
   }
 
@@ -358,6 +377,7 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
       _historyError = null;
       _pageDataError = dataError;
       _quickBookingOptionsError = quickBookingOptionsError;
+      _bankingDataLoaded = true;
       _errorMessage = dataError;
       _isLoading = false;
     });
@@ -2037,11 +2057,14 @@ LIMIT 100
     );
   }
 
+  Widget _buildMileageView() => MileageEntryWorkspace(useCases: _mileage);
+
   @override
   Widget build(BuildContext context) {
     if (_view == _BankImportView.transactions) return _buildTransactionList();
-    final Widget content = _view == _BankImportView.transactions
-        ? _buildTransactionList()
+    final bool isMileage = _view == _BankImportView.mileage;
+    final Widget content = isMileage
+        ? _buildMileageView()
         : _isLoading
         ? const Center(child: CircularProgressIndicator())
         : switch (_view) {
@@ -2055,9 +2078,10 @@ LIMIT 100
             _BankImportView.templates => BankTemplatesView(useCase: _banking),
             _BankImportView.quickBookings => _buildQuickBookingsView(),
             _BankImportView.transactions => _buildTransactionList(),
+            _BankImportView.mileage => _buildMileageView(),
             _BankImportView.import => _buildImportView(),
           };
-    final Widget pageContent = _hasTransactionSelection
+    final Widget pageContent = !isMileage && _hasTransactionSelection
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
@@ -2069,12 +2093,14 @@ LIMIT 100
     return AppPage(
       maxWidth: 1400,
       header: AppPageHeader(
-        title: _l10n.sidebarBanking,
-        subtitle: switch (_view) {
-          _BankImportView.history => _l10n.bankHeaderSubtitleHistory,
-          _BankImportView.transactions => _l10n.bankHeaderSubtitleTransactions,
-          _ => _l10n.bankHeaderSubtitleImport,
-        },
+        title: isMileage ? _l10n.bankViewMileage : _l10n.sidebarBanking,
+        subtitle: isMileage
+            ? _l10n.mileageSubtitle
+            : switch (_view) {
+                _BankImportView.history => _l10n.bankHeaderSubtitleHistory,
+                _BankImportView.transactions => _l10n.bankHeaderSubtitleTransactions,
+                _ => _l10n.bankHeaderSubtitleImport,
+              },
         showFilterToolbar: false,
         actions: <Widget>[
           PopupMenuButton<_BankImportView>(
@@ -2094,6 +2120,7 @@ LIMIT 100
                 value: _BankImportView.quickBookings,
                 child: Text(_l10n.quickBookingsTitle),
               ),
+              PopupMenuItem<_BankImportView>(value: _BankImportView.mileage, child: Text(_l10n.bankViewMileage)),
             ],
           ),
         ],

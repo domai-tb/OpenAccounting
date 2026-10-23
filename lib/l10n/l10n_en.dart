@@ -1587,6 +1587,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bankViewTemplates => 'Templates';
 
   @override
+  String get bankViewMileage => 'Business mileage';
+
+  @override
   String get bankHistoryDetail => 'Details';
 
   @override
@@ -1694,6 +1697,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickBookingsTitle => 'Quick bookings';
+
+  @override
+  String get mileageSubtitle => 'Record business trips, calculate eligible amounts, and review posting status.';
+
+  @override
+  String get mileageNewTrip => 'New trip';
+
+  @override
+  String get mileageEditTrip => 'Edit trip';
+
+  @override
+  String get mileageTripListTitle => 'Mileage trips';
+
+  @override
+  String get mileageNoTrips => 'No mileage trips have been recorded.';
+
+  @override
+  String get mileageTripDate => 'Trip date';
+
+  @override
+  String get mileageDateHint => 'YYYY-MM-DD';
+
+  @override
+  String get mileagePurpose => 'Purpose';
+
+  @override
+  String get mileageDistance => 'Distance (km)';
+
+  @override
+  String get mileageBusinessContext => 'Business context';
+
+  @override
+  String get mileageTripKind => 'Trip kind';
+
+  @override
+  String get mileageVehicleSource => 'Vehicle source';
+
+  @override
+  String get mileageVehicleClass => 'Vehicle class';
+
+  @override
+  String get mileageKindBusinessTrip => 'Business trip';
+
+  @override
+  String get mileageKindCommuting => 'Commuting';
+
+  @override
+  String get mileageKindEksAllowance => 'EKS allowance';
+
+  @override
+  String get mileageKindOther => 'Other';
+
+  @override
+  String get mileageKindUnknown => 'Unknown';
+
+  @override
+  String get mileageSourcePrivate => 'Private';
+
+  @override
+  String get mileageSourceCompany => 'Company vehicle';
+
+  @override
+  String get mileageSourceUnknown => 'Unknown';
+
+  @override
+  String get mileageClassKraftwagen => 'Car (Kraftwagen)';
+
+  @override
+  String get mileageClassOtherMotorVehicle => 'Other motor vehicle';
+
+  @override
+  String get mileageClassUnsupported => 'Unsupported vehicle';
+
+  @override
+  String get mileageClassUnknown => 'Unknown';
+
+  @override
+  String get mileageStateUnresolved => 'Unresolved';
+
+  @override
+  String get mileageStateCalculated => 'Calculated';
+
+  @override
+  String get mileageStatePosted => 'Posted';
+
+  @override
+  String get mileageStateCorrected => 'Corrected';
+
+  @override
+  String get mileageStateVoided => 'Voided';
+
+  @override
+  String get mileageSave => 'Save trip';
+
+  @override
+  String get mileageUpdate => 'Update trip';
+
+  @override
+  String get mileageEdit => 'Edit';
+
+  @override
+  String get mileageCalculate => 'Calculate';
+
+  @override
+  String get mileagePost => 'Post expense';
+
+  @override
+  String get mileageAmount => 'Calculated amount';
+
+  @override
+  String get mileageInvalidDate => 'Enter a valid date in YYYY-MM-DD format.';
+
+  @override
+  String get mileagePurposeRequired => 'Enter a purpose.';
+
+  @override
+  String get mileageDistanceInvalid => 'Enter a distance greater than zero using at most two decimal places.';
+
+  @override
+  String get mileageContextRequired => 'Enter the business context.';
+
+  @override
+  String get mileageLoadError => 'Mileage trips could not be loaded.';
+
+  @override
+  String get mileageSaveError => 'The trip could not be saved. Check its details and try again.';
+
+  @override
+  String get mileageCalculateError => 'The trip could not be calculated. It remains unchanged.';
+
+  @override
+  String get mileageIneligible => 'This trip is not eligible under the current mileage policy and remains unresolved.';
+
+  @override
+  String get mileageCalculated => 'The eligible amount was calculated.';
+
+  @override
+  String get mileagePostingUnavailable =>
+      'Posting is unavailable. Check account roles and ensure the trip date is open.';
+
+  @override
+  String get mileagePosted => 'The mileage expense was posted.';
+
+  @override
+  String get mileageSaved => 'Trip saved.';
+
+  @override
+  String get mileageUpdated => 'Trip updated.';
 
   @override
   String get quickBookingNew => 'New quick booking';

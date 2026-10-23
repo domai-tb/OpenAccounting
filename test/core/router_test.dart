@@ -116,6 +116,30 @@ void main() {
       await db.close();
     });
 
+    testWidgets('mileage workspace route keeps existing banking views and query parameters', (tester) async {
+      final AppDatabase db = await _configuredDb();
+      final router = createRouter(db);
+      await tester.pumpWidget(_wrap(router, db));
+      await tester.pumpAndSettle();
+
+      router.go('/banking?view=mileage&account=17&tag=one&tag=two');
+      await tester.pumpAndSettle();
+      expect(find.text('Geschäftliche Fahrten'), findsOneWidget);
+      expect(router.routeInformationProvider.value.uri.queryParameters['view'], 'mileage');
+
+      await tester.tap(find.byIcon(Icons.menu).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Verlauf').last);
+      await tester.pumpAndSettle();
+
+      final Uri historyUri = router.routeInformationProvider.value.uri;
+      expect(historyUri.path, '/banking');
+      expect(historyUri.queryParameters['view'], 'history');
+      expect(historyUri.queryParameters['account'], '17');
+      expect(historyUri.queryParametersAll['tag'], <String>['one', 'two']);
+      await db.close();
+    });
+
     testWidgets('shell route renders sidebar 240px expanded', (tester) async {
       final db = await _configuredDb();
       final router = createRouter(db);

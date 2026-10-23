@@ -8,6 +8,8 @@ import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
 class MileageEntryUseCases {
   MileageEntryUseCases(this.repo, {MileagePostingPort? postingPort}) : postingPort = postingPort ?? repo;
 
+  Future<List<MileageTrip>> listTrips() => repo.listTrips();
+
   final MileageEntryRepository repo;
   final MileagePostingPort postingPort;
 

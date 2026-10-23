@@ -1595,6 +1595,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankViewTemplates => 'Vorlagen';
 
   @override
+  String get bankViewMileage => 'Geschäftliche Fahrten';
+
+  @override
   String get bankHistoryDetail => 'Details';
 
   @override
@@ -1702,6 +1705,156 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quickBookingsTitle => 'Schnellbuchungen';
+
+  @override
+  String get mileageSubtitle =>
+      'Geschäftliche Fahrten erfassen, erstattungsfähige Beträge berechnen und den Buchungsstatus prüfen.';
+
+  @override
+  String get mileageNewTrip => 'Neue Fahrt';
+
+  @override
+  String get mileageEditTrip => 'Fahrt bearbeiten';
+
+  @override
+  String get mileageTripListTitle => 'Fahrten';
+
+  @override
+  String get mileageNoTrips => 'Es wurden noch keine Fahrten erfasst.';
+
+  @override
+  String get mileageTripDate => 'Fahrtdatum';
+
+  @override
+  String get mileageDateHint => 'JJJJ-MM-TT';
+
+  @override
+  String get mileagePurpose => 'Zweck';
+
+  @override
+  String get mileageDistance => 'Entfernung (km)';
+
+  @override
+  String get mileageBusinessContext => 'Geschäftlicher Zusammenhang';
+
+  @override
+  String get mileageTripKind => 'Fahrtart';
+
+  @override
+  String get mileageVehicleSource => 'Fahrzeugquelle';
+
+  @override
+  String get mileageVehicleClass => 'Fahrzeugklasse';
+
+  @override
+  String get mileageKindBusinessTrip => 'Geschäftliche Fahrt';
+
+  @override
+  String get mileageKindCommuting => 'Arbeitsweg';
+
+  @override
+  String get mileageKindEksAllowance => 'EKS-Pauschale';
+
+  @override
+  String get mileageKindOther => 'Sonstige';
+
+  @override
+  String get mileageKindUnknown => 'Unbekannt';
+
+  @override
+  String get mileageSourcePrivate => 'Privatfahrzeug';
+
+  @override
+  String get mileageSourceCompany => 'Firmenfahrzeug';
+
+  @override
+  String get mileageSourceUnknown => 'Unbekannt';
+
+  @override
+  String get mileageClassKraftwagen => 'Kraftwagen';
+
+  @override
+  String get mileageClassOtherMotorVehicle => 'Anderes Kraftfahrzeug';
+
+  @override
+  String get mileageClassUnsupported => 'Nicht unterstütztes Fahrzeug';
+
+  @override
+  String get mileageClassUnknown => 'Unbekannt';
+
+  @override
+  String get mileageStateUnresolved => 'Ungeklärt';
+
+  @override
+  String get mileageStateCalculated => 'Berechnet';
+
+  @override
+  String get mileageStatePosted => 'Gebucht';
+
+  @override
+  String get mileageStateCorrected => 'Korrigiert';
+
+  @override
+  String get mileageStateVoided => 'Storniert';
+
+  @override
+  String get mileageSave => 'Fahrt speichern';
+
+  @override
+  String get mileageUpdate => 'Fahrt ändern';
+
+  @override
+  String get mileageEdit => 'Bearbeiten';
+
+  @override
+  String get mileageCalculate => 'Berechnen';
+
+  @override
+  String get mileagePost => 'Aufwand buchen';
+
+  @override
+  String get mileageAmount => 'Berechneter Betrag';
+
+  @override
+  String get mileageInvalidDate => 'Datum im Format JJJJ-MM-TT eingeben.';
+
+  @override
+  String get mileagePurposeRequired => 'Zweck eingeben.';
+
+  @override
+  String get mileageDistanceInvalid => 'Eine Entfernung größer als null mit höchstens zwei Dezimalstellen eingeben.';
+
+  @override
+  String get mileageContextRequired => 'Geschäftlichen Zusammenhang eingeben.';
+
+  @override
+  String get mileageLoadError => 'Fahrten konnten nicht geladen werden.';
+
+  @override
+  String get mileageSaveError => 'Die Fahrt konnte nicht gespeichert werden. Angaben prüfen und erneut versuchen.';
+
+  @override
+  String get mileageCalculateError => 'Die Fahrt konnte nicht berechnet werden. Sie bleibt unverändert.';
+
+  @override
+  String get mileageIneligible =>
+      'Diese Fahrt ist nach der aktuellen Kilometerpauschale nicht berechtigt und bleibt ungeklärt.';
+
+  @override
+  String get mileageCalculated => 'Der erstattungsfähige Betrag wurde berechnet.';
+
+  @override
+  String get mileagePostingUnavailable =>
+      'Buchung nicht verfügbar. Kontenrollen prüfen und sicherstellen, dass das Fahrtdatum offen ist.';
+
+  @override
+  String get mileagePosted => 'Der Fahrtkostenaufwand wurde gebucht.';
+
+  @override
+  String get mileageSaved => 'Fahrt gespeichert.';
+
+  @override
+  String get mileageUpdated => 'Fahrt aktualisiert.';
 
   @override
   String get quickBookingNew => 'Neue Schnellbuchung';

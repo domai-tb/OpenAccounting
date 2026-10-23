@@ -3056,6 +3056,12 @@ abstract class AppLocalizations {
   /// **'Vorlagen'**
   String get bankViewTemplates;
 
+  /// No description provided for @bankViewMileage.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftliche Fahrten'**
+  String get bankViewMileage;
+
   /// No description provided for @bankHistoryDetail.
   ///
   /// In de, this message translates to:
@@ -3271,6 +3277,300 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Schnellbuchungen'**
   String get quickBookingsTitle;
+
+  /// No description provided for @mileageSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftliche Fahrten erfassen, erstattungsfähige Beträge berechnen und den Buchungsstatus prüfen.'**
+  String get mileageSubtitle;
+
+  /// No description provided for @mileageNewTrip.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Fahrt'**
+  String get mileageNewTrip;
+
+  /// No description provided for @mileageEditTrip.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt bearbeiten'**
+  String get mileageEditTrip;
+
+  /// No description provided for @mileageTripListTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrten'**
+  String get mileageTripListTitle;
+
+  /// No description provided for @mileageNoTrips.
+  ///
+  /// In de, this message translates to:
+  /// **'Es wurden noch keine Fahrten erfasst.'**
+  String get mileageNoTrips;
+
+  /// No description provided for @mileageTripDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrtdatum'**
+  String get mileageTripDate;
+
+  /// No description provided for @mileageDateHint.
+  ///
+  /// In de, this message translates to:
+  /// **'JJJJ-MM-TT'**
+  String get mileageDateHint;
+
+  /// No description provided for @mileagePurpose.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweck'**
+  String get mileagePurpose;
+
+  /// No description provided for @mileageDistance.
+  ///
+  /// In de, this message translates to:
+  /// **'Entfernung (km)'**
+  String get mileageDistance;
+
+  /// No description provided for @mileageBusinessContext.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftlicher Zusammenhang'**
+  String get mileageBusinessContext;
+
+  /// No description provided for @mileageTripKind.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrtart'**
+  String get mileageTripKind;
+
+  /// No description provided for @mileageVehicleSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrzeugquelle'**
+  String get mileageVehicleSource;
+
+  /// No description provided for @mileageVehicleClass.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrzeugklasse'**
+  String get mileageVehicleClass;
+
+  /// No description provided for @mileageKindBusinessTrip.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftliche Fahrt'**
+  String get mileageKindBusinessTrip;
+
+  /// No description provided for @mileageKindCommuting.
+  ///
+  /// In de, this message translates to:
+  /// **'Arbeitsweg'**
+  String get mileageKindCommuting;
+
+  /// No description provided for @mileageKindEksAllowance.
+  ///
+  /// In de, this message translates to:
+  /// **'EKS-Pauschale'**
+  String get mileageKindEksAllowance;
+
+  /// No description provided for @mileageKindOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Sonstige'**
+  String get mileageKindOther;
+
+  /// No description provided for @mileageKindUnknown.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekannt'**
+  String get mileageKindUnknown;
+
+  /// No description provided for @mileageSourcePrivate.
+  ///
+  /// In de, this message translates to:
+  /// **'Privatfahrzeug'**
+  String get mileageSourcePrivate;
+
+  /// No description provided for @mileageSourceCompany.
+  ///
+  /// In de, this message translates to:
+  /// **'Firmenfahrzeug'**
+  String get mileageSourceCompany;
+
+  /// No description provided for @mileageSourceUnknown.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekannt'**
+  String get mileageSourceUnknown;
+
+  /// No description provided for @mileageClassKraftwagen.
+  ///
+  /// In de, this message translates to:
+  /// **'Kraftwagen'**
+  String get mileageClassKraftwagen;
+
+  /// No description provided for @mileageClassOtherMotorVehicle.
+  ///
+  /// In de, this message translates to:
+  /// **'Anderes Kraftfahrzeug'**
+  String get mileageClassOtherMotorVehicle;
+
+  /// No description provided for @mileageClassUnsupported.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht unterstütztes Fahrzeug'**
+  String get mileageClassUnsupported;
+
+  /// No description provided for @mileageClassUnknown.
+  ///
+  /// In de, this message translates to:
+  /// **'Unbekannt'**
+  String get mileageClassUnknown;
+
+  /// No description provided for @mileageStateUnresolved.
+  ///
+  /// In de, this message translates to:
+  /// **'Ungeklärt'**
+  String get mileageStateUnresolved;
+
+  /// No description provided for @mileageStateCalculated.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechnet'**
+  String get mileageStateCalculated;
+
+  /// No description provided for @mileageStatePosted.
+  ///
+  /// In de, this message translates to:
+  /// **'Gebucht'**
+  String get mileageStatePosted;
+
+  /// No description provided for @mileageStateCorrected.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrigiert'**
+  String get mileageStateCorrected;
+
+  /// No description provided for @mileageStateVoided.
+  ///
+  /// In de, this message translates to:
+  /// **'Storniert'**
+  String get mileageStateVoided;
+
+  /// No description provided for @mileageSave.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt speichern'**
+  String get mileageSave;
+
+  /// No description provided for @mileageUpdate.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt ändern'**
+  String get mileageUpdate;
+
+  /// No description provided for @mileageEdit.
+  ///
+  /// In de, this message translates to:
+  /// **'Bearbeiten'**
+  String get mileageEdit;
+
+  /// No description provided for @mileageCalculate.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechnen'**
+  String get mileageCalculate;
+
+  /// No description provided for @mileagePost.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufwand buchen'**
+  String get mileagePost;
+
+  /// No description provided for @mileageAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechneter Betrag'**
+  String get mileageAmount;
+
+  /// No description provided for @mileageInvalidDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum im Format JJJJ-MM-TT eingeben.'**
+  String get mileageInvalidDate;
+
+  /// No description provided for @mileagePurposeRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Zweck eingeben.'**
+  String get mileagePurposeRequired;
+
+  /// No description provided for @mileageDistanceInvalid.
+  ///
+  /// In de, this message translates to:
+  /// **'Eine Entfernung größer als null mit höchstens zwei Dezimalstellen eingeben.'**
+  String get mileageDistanceInvalid;
+
+  /// No description provided for @mileageContextRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Geschäftlichen Zusammenhang eingeben.'**
+  String get mileageContextRequired;
+
+  /// No description provided for @mileageLoadError.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrten konnten nicht geladen werden.'**
+  String get mileageLoadError;
+
+  /// No description provided for @mileageSaveError.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Fahrt konnte nicht gespeichert werden. Angaben prüfen und erneut versuchen.'**
+  String get mileageSaveError;
+
+  /// No description provided for @mileageCalculateError.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Fahrt konnte nicht berechnet werden. Sie bleibt unverändert.'**
+  String get mileageCalculateError;
+
+  /// No description provided for @mileageIneligible.
+  ///
+  /// In de, this message translates to:
+  /// **'Diese Fahrt ist nach der aktuellen Kilometerpauschale nicht berechtigt und bleibt ungeklärt.'**
+  String get mileageIneligible;
+
+  /// No description provided for @mileageCalculated.
+  ///
+  /// In de, this message translates to:
+  /// **'Der erstattungsfähige Betrag wurde berechnet.'**
+  String get mileageCalculated;
+
+  /// No description provided for @mileagePostingUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchung nicht verfügbar. Kontenrollen prüfen und sicherstellen, dass das Fahrtdatum offen ist.'**
+  String get mileagePostingUnavailable;
+
+  /// No description provided for @mileagePosted.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Fahrtkostenaufwand wurde gebucht.'**
+  String get mileagePosted;
+
+  /// No description provided for @mileageSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt gespeichert.'**
+  String get mileageSaved;
+
+  /// No description provided for @mileageUpdated.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt aktualisiert.'**
+  String get mileageUpdated;
 
   /// No description provided for @quickBookingNew.
   ///
