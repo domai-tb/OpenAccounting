@@ -16,6 +16,7 @@ import 'e_invoice_test_fixtures.dart'
         invalidEInvoiceTestOfflineXmlValidation,
         unavailableEInvoiceTestOfflineXmlValidation,
         fakePdfBytes,
+        fakePdfBytesWithCii,
         standardPositions,
         standardTotals,
         validCompany,
@@ -23,6 +24,86 @@ import 'e_invoice_test_fixtures.dart'
         validCustomer,
         euService13b1PositionWithoutResolvedAssessment,
         validSnapshot;
+
+void _expectSection6aRejected({required String expectedField, String? destinationCountry, String? evidenceSourceRef}) {
+  final Map<String, Object?> customer = validCustomer()
+    ..['land'] = 'FR'
+    ..['ust_idnr'] = 'FR12345678901';
+  final Map<String, Object?> position = <String, Object?>{
+    'bezeichnung': 'Lieferung nach Frankreich',
+    'menge': 1,
+    'einzelpreis': 100,
+    'ust_satz': 0,
+    'tax_treatment': 'intra_community_supply_6a',
+    'tax_legal_basis': 'ustg_4_1b_6a',
+    'e_invoice_tax_category_code': 'K',
+    'e_invoice_exemption_reason_code': 'VATEX-EU-IC',
+    'e_invoice_exemption_reason_text': 'Steuerfreie innergemeinschaftliche Lieferung',
+    'e_invoice_intra_community_destination_country_iso': destinationCountry,
+    'e_invoice_intra_community_supply_evidence_source_ref': evidenceSourceRef,
+    'position': 0,
+  };
+  expect(
+    () => const EInvoiceSnapshotBuilder().buildFinalization(
+      documentNumber: 'RE-2026-0001',
+      outputFormat: EInvoiceOutputFormat.xrechnung,
+      issueDate: '2026-03-15',
+      companyRow: validCompany(),
+      customerRow: customer,
+      posRows: <Map<String, Object?>>[position],
+      preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+      eingabemodus: 'netto',
+      deliveryDate: '2026-03-10',
+    ),
+    throwsA(
+      predicate(
+        (Object? error) =>
+            error is EInvoiceSourceException &&
+            error.code == 'incompleteCrossBorderTaxEvidence' &&
+            error.fields.contains(expectedField),
+      ),
+    ),
+  );
+}
+
+void _expectSection6Rejected({required String expectedField, String? destinationCountry, String? evidenceSourceRef}) {
+  final Map<String, Object?> customer = validCustomer()..['land'] = 'US';
+  final Map<String, Object?> position = <String, Object?>{
+    'bezeichnung': 'Ausfuhrlieferung',
+    'menge': 1,
+    'einzelpreis': 100,
+    'ust_satz': 0,
+    'tax_treatment': 'export_supply_6',
+    'tax_legal_basis': 'ustg_4_1a_6',
+    'e_invoice_tax_category_code': 'G',
+    'e_invoice_exemption_reason_code': 'VATEX-EU-G',
+    'e_invoice_exemption_reason_text': null,
+    'e_invoice_export_destination_country_iso': destinationCountry,
+    'e_invoice_export_evidence_source_ref': evidenceSourceRef,
+    'position': 0,
+  };
+  expect(
+    () => const EInvoiceSnapshotBuilder().buildFinalization(
+      documentNumber: 'RE-2026-0001',
+      outputFormat: EInvoiceOutputFormat.xrechnung,
+      issueDate: '2026-03-15',
+      companyRow: validCompany(),
+      customerRow: customer,
+      posRows: <Map<String, Object?>>[position],
+      preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+      eingabemodus: 'netto',
+      deliveryDate: '2026-03-10',
+    ),
+    throwsA(
+      predicate(
+        (Object? error) =>
+            error is EInvoiceSourceException &&
+            error.code == 'incompleteCrossBorderTaxEvidence' &&
+            error.fields.contains(expectedField),
+      ),
+    ),
+  );
+}
 
 void main() {
   group('ZUGFeRD and XRechnung e-invoicing', () {
@@ -43,12 +124,13 @@ void main() {
           );
         },
       );
+      final FinalizationSnapshot zugferdSnapshot = validSnapshot(format: EInvoiceOutputFormat.zugferd);
       final String ubl = await service.xrechnungXml(
         validSnapshot(buyerReference: 'LEITWEG-123', format: EInvoiceOutputFormat.xrechnung),
       );
       final ZugferdHybridArtifact hybrid = await service.hybridFromPdf(
-        snapshot: validSnapshot(format: EInvoiceOutputFormat.zugferd),
-        pdfBytes: fakePdfBytes,
+        snapshot: zugferdSnapshot,
+        pdfBytes: fakePdfBytesWithCii(const EInvoiceXmlSerializer().zugferdCii(zugferdSnapshot)),
       );
 
       expect(ubl, contains('<Invoice'));
@@ -162,12 +244,13 @@ void main() {
     test('generates_hybrid_pdf_with_validated_zugferd_metadata', () async {
       const EInvoiceService service = eInvoiceTestService;
       final FinalizationSnapshot snapshot = validSnapshot(format: EInvoiceOutputFormat.zugferd);
+      final List<int> pdfBytes = fakePdfBytesWithCii(const EInvoiceXmlSerializer().zugferdCii(snapshot));
 
       final EInvoiceValidationResult validation = service.validate(snapshot, EInvoiceOutputFormat.zugferd);
       expect(validation.valid, isTrue);
-      final ZugferdHybridArtifact hybrid = await service.hybridFromPdf(snapshot: snapshot, pdfBytes: fakePdfBytes);
+      final ZugferdHybridArtifact hybrid = await service.hybridFromPdf(snapshot: snapshot, pdfBytes: pdfBytes);
 
-      expect(hybrid.pdfBytes, fakePdfBytes);
+      expect(hybrid.pdfBytes, pdfBytes);
       expect(hybrid.documentNumber, 'RE-2026-0001');
       expect(hybrid.ciiXml.contains('CrossIndustryInvoice'), isTrue);
       expect(hybrid.ciiXml.contains('urn:cen.eu:en16931:2017'), isTrue);
@@ -747,43 +830,35 @@ void main() {
       );
     });
 
-    test('maps_section_6a_to_k_with_vatex_and_cross_border_evidence', () {
-      final Map<String, Object?> customer = validCustomer()
-        ..['land'] = 'FR'
-        ..['ust_idnr'] = 'FR12345678901';
-      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
-        documentNumber: 'RE-2026-0001',
-        outputFormat: EInvoiceOutputFormat.xrechnung,
-        issueDate: '2026-03-15',
-        companyRow: validCompany(),
-        customerRow: customer,
-        posRows: <Map<String, Object?>>[
-          <String, Object?>{
-            'bezeichnung': 'Lieferung nach Frankreich',
-            'menge': 1,
-            'einzelpreis': 100,
-            'ust_satz': 0,
-            'tax_treatment': 'intra_community_supply_6a',
-            'tax_legal_basis': 'ustg_4_1b_6a',
-            'e_invoice_tax_category_code': 'K',
-            'e_invoice_exemption_reason_code': 'VATEX-EU-IC',
-            'e_invoice_exemption_reason_text': 'Steuerfreie innergemeinschaftliche Lieferung',
-            'position': 0,
-          },
-        ],
-        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
-        eingabemodus: 'netto',
-        deliveryDate: '2026-03-10',
-      );
+    test('section_6a_missing_or_unknown_supply_destination_fails_closed', () {
+      for (final String? destinationCountry in <String?>[null, 'ZZ']) {
+        _expectSection6aRejected(
+          expectedField: 'position[0].e_invoice_intra_community_destination_country_iso',
+          destinationCountry: destinationCountry,
+        );
+      }
+    });
 
-      expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.intraCommunitySupply);
-      expect(snapshot.taxBreakdowns.single.classification.exemptionReasonCode, 'VATEX-EU-IC');
-      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
-      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
-      expect(ubl, contains('<cbc:ID>K</cbc:ID>'));
-      expect(ubl, contains('<cbc:TaxExemptionReasonCode>VATEX-EU-IC</cbc:TaxExemptionReasonCode>'));
-      expect(cii, contains('<ram:CategoryCode>K</ram:CategoryCode>'));
-      expect(cii, contains('<ram:ExemptionReasonCode>VATEX-EU-IC</ram:ExemptionReasonCode>'));
+    test('section_6a_german_supply_destination_fails_closed', () {
+      _expectSection6aRejected(
+        expectedField: 'position[0].e_invoice_intra_community_destination_country_iso',
+        destinationCountry: 'DE',
+      );
+    });
+
+    test('section_6a_non_eu_supply_destination_fails_closed', () {
+      _expectSection6aRejected(
+        expectedField: 'position[0].e_invoice_intra_community_destination_country_iso',
+        destinationCountry: 'US',
+      );
+    });
+
+    test('section_6a_other_eu_destination_without_resolved_transport_evidence_fails_closed', () {
+      _expectSection6aRejected(
+        expectedField: 'position[0].e_invoice_intra_community_supply_evidence_source_ref',
+        destinationCountry: 'FR',
+        evidenceSourceRef: 'dangling-supply-evidence',
+      );
     });
 
     test('section_6a_requires_party_vat_ids_and_delivery_date', () {
@@ -824,37 +899,36 @@ void main() {
       );
     });
 
-    test('maps_section_6_export_to_g_with_destination_country_evidence', () {
-      final Map<String, Object?> customer = validCustomer()..['land'] = 'US';
-      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
-        documentNumber: 'RE-2026-0001',
-        outputFormat: EInvoiceOutputFormat.xrechnung,
-        issueDate: '2026-03-15',
-        companyRow: validCompany(),
-        customerRow: customer,
-        posRows: <Map<String, Object?>>[
-          <String, Object?>{
-            'bezeichnung': 'Ausfuhrlieferung',
-            'menge': 1,
-            'einzelpreis': 100,
-            'ust_satz': 0,
-            'tax_treatment': 'export_supply_6',
-            'tax_legal_basis': 'ustg_4_1a_6',
-            'e_invoice_tax_category_code': 'G',
-            'e_invoice_exemption_reason_code': 'VATEX-EU-G',
-            'e_invoice_exemption_reason_text': null,
-            'position': 0,
-          },
-        ],
-        preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
-        eingabemodus: 'netto',
-      );
+    test('section_6_export_customer_billing_country_alone_does_not_establish_destination_fails_closed', () {
+      _expectSection6Rejected(expectedField: 'position[0].e_invoice_export_destination_country_iso');
+    });
 
-      expect(snapshot.lines.single.classification.category, EInvoiceTaxCategory.export);
-      expect(const EInvoiceXmlSerializer().xrechnungUbl(snapshot), contains('<cbc:ID>G</cbc:ID>'));
-      expect(
-        const EInvoiceXmlSerializer().zugferdCii(snapshot),
-        contains('<ram:ExemptionReasonCode>VATEX-EU-G</ram:ExemptionReasonCode>'),
+    test('section_6_export_missing_or_unknown_destination_fails_closed', () {
+      _expectSection6Rejected(
+        expectedField: 'position[0].e_invoice_export_destination_country_iso',
+        destinationCountry: 'ZZ',
+      );
+    });
+
+    test('section_6_export_german_destination_fails_closed', () {
+      _expectSection6Rejected(
+        expectedField: 'position[0].e_invoice_export_destination_country_iso',
+        destinationCountry: 'DE',
+      );
+    });
+
+    test('section_6_export_eu_destination_fails_closed', () {
+      _expectSection6Rejected(
+        expectedField: 'position[0].e_invoice_export_destination_country_iso',
+        destinationCountry: 'FR',
+      );
+    });
+
+    test('section_6_export_without_resolved_line_bound_movement_evidence_fails_closed', () {
+      _expectSection6Rejected(
+        expectedField: 'position[0].e_invoice_export_evidence_source_ref',
+        destinationCountry: 'US',
+        evidenceSourceRef: 'dangling-export-evidence',
       );
     });
 

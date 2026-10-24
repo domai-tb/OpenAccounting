@@ -274,6 +274,7 @@ class EInvoiceSnapshotBuilder {
     );
     _validateCrossBorderEvidence(
       lines: lines,
+      posRows: posRows,
       companyRow: companyRow,
       customerRow: customerRow,
       deliveryDate: deliveryDate,
@@ -418,6 +419,7 @@ class EInvoiceSnapshotBuilder {
 
   void _validateCrossBorderEvidence({
     required List<EInvoiceLineSnapshot> lines,
+    required List<Map<String, Object?>> posRows,
     required Map<String, Object?> companyRow,
     required Map<String, Object?> customerRow,
     required String? deliveryDate,
@@ -431,13 +433,20 @@ class EInvoiceSnapshotBuilder {
     if (!intraCommunity && !export) return;
 
     final List<String> fields = <String>[];
-    for (var index = 0; index < lines.length; index++) {
-      final EInvoiceTaxTreatment treatment = lines[index].classification.treatment;
+    final Map<int, List<Map<String, Object?>>> sourceRowsByPosition = <int, List<Map<String, Object?>>>{};
+    for (var index = 0; index < posRows.length; index++) {
+      final Map<String, Object?> row = posRows[index];
+      final int position = _asInt(row['position']) ?? index;
+      sourceRowsByPosition.putIfAbsent(position, () => <Map<String, Object?>>[]).add(row);
+    }
+
+    for (final EInvoiceLineSnapshot line in lines) {
+      final EInvoiceTaxTreatment treatment = line.classification.treatment;
       if (intraCommunity && treatment != EInvoiceTaxTreatment.intraCommunitySupply6a) {
-        fields.add('position[$index].tax_treatment');
+        fields.add('position[${line.position}].tax_treatment');
       }
       if (export && treatment != EInvoiceTaxTreatment.exportSupply6) {
-        fields.add('position[$index].tax_treatment');
+        fields.add('position[${line.position}].tax_treatment');
       }
     }
 
@@ -454,8 +463,24 @@ class EInvoiceSnapshotBuilder {
       }
       if (_text(customerRow['ust_idnr']) == null) fields.add('kunden.ust_idnr');
       if (deliveryDate?.trim().isNotEmpty != true) fields.add('leistungsdatum');
-      if (buyerCountry == null || !_euMemberCountryCodes.contains(buyerCountry) || buyerCountry == 'DE') {
-        fields.add('kunden.land');
+
+      for (final EInvoiceLineSnapshot line in lines) {
+        if (line.classification.treatment != EInvoiceTaxTreatment.intraCommunitySupply6a) continue;
+        final String prefix = 'position[${line.position}].';
+        final List<Map<String, Object?>>? sourceRows = sourceRowsByPosition[line.position];
+        final String? destinationCountry = sourceRows?.length == 1
+            ? _text(sourceRows!.single['e_invoice_intra_community_destination_country_iso'])?.toUpperCase()
+            : null;
+        if (destinationCountry == null ||
+            !RegExp(r'^[A-Z]{2}$').hasMatch(destinationCountry) ||
+            destinationCountry == 'DE' ||
+            !_euMemberCountryCodes.contains(destinationCountry)) {
+          fields.add('${prefix}e_invoice_intra_community_destination_country_iso');
+        }
+
+        // A source-reference string is not eligibility evidence. This boundary has no resolver yet,
+        // so all §6a output stays fail-closed until v28 binds a real record to this invoice line.
+        fields.add('${prefix}e_invoice_intra_community_supply_evidence_source_ref');
       }
     }
 
@@ -466,8 +491,22 @@ class EInvoiceSnapshotBuilder {
           _text(companyRow['tax_representative_vat_id']) == null) {
         fields.add('unternehmen.ust_idnr');
       }
-      if (buyerCountry != null && _euMemberCountryCodes.contains(buyerCountry)) {
-        fields.add('kunden.land');
+      for (final EInvoiceLineSnapshot line in lines) {
+        if (line.classification.treatment != EInvoiceTaxTreatment.exportSupply6) continue;
+        final String prefix = 'position[${line.position}].';
+        final List<Map<String, Object?>>? sourceRows = sourceRowsByPosition[line.position];
+        final String? destinationCountry = sourceRows?.length == 1
+            ? _text(sourceRows!.single['e_invoice_export_destination_country_iso'])?.toUpperCase()
+            : null;
+        if (destinationCountry == null ||
+            !RegExp(r'^[A-Z]{2}$').hasMatch(destinationCountry) ||
+            destinationCountry == 'ZZ' ||
+            _euMemberCountryCodes.contains(destinationCountry)) {
+          fields.add('${prefix}e_invoice_export_destination_country_iso');
+        }
+
+        // No v28 movement actor or evidence resolver exists, so even a nonempty reference cannot enable G.
+        fields.add('${prefix}e_invoice_export_evidence_source_ref');
       }
     }
 

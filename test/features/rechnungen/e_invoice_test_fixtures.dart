@@ -1,5 +1,6 @@
 // ignore_for_file: file_names
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:openaccounting/core/db/database.dart';
@@ -175,6 +176,25 @@ FinalizationSnapshot validSnapshot({
     buyerReference: buyerReference,
     deliveryDate: deliveryDate,
   );
+}
+
+List<int> fakePdfBytesWithCii(String ciiXml) {
+  final List<int> ciiBytes = utf8.encode(ciiXml);
+  return <int>[
+    ...utf8.encode(
+      '%PDF-1.4\n'
+      '/EmbeddedFiles\n'
+      '/AFRelationship/Alternative\n'
+      'factur-x.xml\n'
+      '<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>\n'
+      '<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>\n'
+      '<pdfaid:part>3</pdfaid:part>\n'
+      '<pdfaid:conformance>B</pdfaid:conformance>\n'
+      '/DestOutputProfile\n'
+      '/Params << /Size ${ciiBytes.length} >>\n',
+    ),
+    ...ciiBytes,
+  ];
 }
 
 final List<int> fakePdfBytes = <int>[37, 80, 68, 70, 45, 49, 46, 52, 10, 37, 10];

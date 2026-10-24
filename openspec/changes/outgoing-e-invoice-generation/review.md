@@ -455,4 +455,42 @@ None.
 No contract or implementation artifacts were edited. This independent Round 8 review was appended to `review.md` only.
 
 Verdict: Ship.
+
+## Round 11 Author Evidence
+
+- **Independent verdict:** `APPROVE_WITH_CHANGES`.
+- **Required condition:** State that v24 is the pre-v25 starting schema baseline while v25 mileage is in flight on the current `dev` tree; preserve the serialized order v25 mileage → v26 cashbook opening/events source → v27 cashbook close evidence → v28 e-invoice typed tax evidence.
+- **CHANGES_APPLIED:** yes.
+- **Author scope:** contract-only wording in `proposal.md`, `design.md`, `specs/outgoing-e-invoice-generation/spec.md`, and `tasks.md`, plus this author-evidence entry. No source, test, or maintained-spec files were changed.
+- **Review base:** uncommitted `dev` diff based on HEAD `81948b3ca3e90d9372f7f964527cc77c55f74ff8`.
+- **Overall status:** The OpenSpec change remains incomplete at 106/138 tasks; the later persistence and implementation work remains open.
 Not checked: Application runtime behavior, actual serializer output, test execution, and validator packaging on supported platforms.
+
+## Round 12 Author Evidence (2026-10-23)
+
+- **Independent verdict:** `REVISE`.
+- **Reviewer-reported review snapshot:** base/HEAD `c3e3f51e038de63751f47aac4dd1f86b9b6b431e`; reviewed-file aggregate SHA-256 `20851d99136e478856afcd91cbf7466ab64e9a78cb8d7f14a901ed73c0d3418f`; scoped binary diff SHA-256 `6ba7221ad825fa7debfb8b1a46d9b3beaf3c249914fb271290995e192709948b`. These identify the pre-correction review snapshot and do not fingerprint the corrected artifacts.
+- **Corrected contract input fingerprint (author-computed, unreviewed):** base/HEAD `c3e3f51e038de63751f47aac4dd1f86b9b6b431e`; aggregate SHA-256 `9e7f7254361a052502a5811308ddaf5af2abf71025d47e21d82e70338c065285`, computed over the sorted relative paths and bytes for `proposal.md`, `design.md`, `tasks.md`, `test-plan.md`, and all four delta specs with NUL separators; scoped binary diff SHA-256 `bb10494bc7ac26719ca02c9d45870ddccee795df132afeedc496f5527ef7ac3e` over those same paths. This identifies the corrected contract inputs only; it does not supersede Round 12's `REVISE` or imply approval.
+- **Findings:** (1) `specs/outgoing-e-invoice-generation/spec.md` encoded the supplier-carried scenario and following G scenarios with literal `\n` text, so they were not separate Markdown scenarios. (2) The current builder still permits G using a third-country billing address without an explicit per-position destination, movement actor, resolved line-bound evidence, or §6(2) foreign-buyer verification; this is an implementation gap, not approval. (3) `verify.md` claimed 32 passed and 7 failed (39 total), while the current test file contains 42 top-level tests without a skip or name filter, and the latest independent review was absent from this file.
+- **Author correction status:** The G scenarios have been restored as separate Markdown blocks, preserving both supplier/supplier-agent and qualified foreign-buyer/buyer-agent routes and their fail-closed cases. The exact current full-file run completed with 35 passed, 7 failed, and 0 skipped across 42 declarations; it exited 1 and is recorded with test/source hashes and all failure names in `verify.md`. The test evidence does not change the `REVISE` verdict or provide contract approval.
+- **K positive output:** Still blocked until v28 input capture and a real immutable evidence resolver verify the qualifying buyer, the valid foreign EU VAT ID used, goods, date, actual destination, movement, and this invoice line/supply. A non-empty source reference is not evidence and must not produce positive K output.
+- **Gate:** Round 12 remains `REVISE`. No G production work may proceed until a fresh independent semantic review approves the corrected contract; positive K remains blocked on its real resolver prerequisite.
+
+
+## Round 13 Author Evidence (2026-10-23)
+
+- **Independent verdict:** `REVISE`; this amendment is awaiting a fresh independent semantic review.
+- **Reviewer-reported pre-amendment snapshot:** base/HEAD `c3e3f51e038de63751f47aac4dd1f86b9b6b431e`; corrected aggregate SHA-256 `9e7f7254361a052502a5811308ddaf5af2abf71025d47e21d82e70338c065285`; scoped diff SHA-256 `bb10494bc7ac26719ca02c9d45870ddccee795df132afeedc496f5527ef7ac3e`. These identify the reviewed pre-amendment inputs only.
+- **Corrected pre-approval input snapshot:** base/HEAD `c3e3f51e038de63751f47aac4dd1f86b9b6b431e`; scoped binary diff SHA-256 `f9bcdf12ec8f00075c0bee1e2387ecbae3b0b9b4b049dbd647f1288ac1b94e72`. The reviewer independently reproduced this scoped diff for the corrected contract review; no aggregate fingerprint is claimed here.
+- **Finding:** The §6a contract did not explicitly require §6a(1)(3): the buyer’s intra-Community acquisition must be subject to VAT rules in the actual destination Member State. The reviewer accepted the G supplier-carried and qualified buyer-carried route contract and the separate Markdown scenarios; that acceptance does not approve implementation or the K amendment.
+- **Author amendment:** The §6a requirement, design, v28 task, test plan, and verification ledger now name the typed destination-state acquisition-tax treatment and require the immutable resolver to verify it for this buyer and these goods. Missing, unknown, not-subject, or unverified treatment fails closed. This field means applicability of destination-state VAT rules, not actual tax charged or paid; UStAE Abschnitt 6a.1(18) recognizes the buyer-used valid foreign VAT ID as evidence and does not require actual taxation. Sources: [UStG §6a(1)](https://www.gesetze-im-internet.de/ustg_1980/__6a.html) and [UStAE Abschnitt 6a.1(17)–(18)](https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Steuerarten/Umsatzsteuer/Umsatzsteuer-Anwendungserlass/Umsatzsteuer-Anwendungserlass-31-12-2025.pdf?__blob=publicationFile&v=2).
+- **Implementation gate:** Positive K remains blocked until v28 captures the typed treatment and a real immutable resolver verifies the buyer, valid foreign EU VAT ID used, goods, delivery date, actual destination, movement, and exact invoice-line/supply binding. G production remains blocked until a fresh independent review approves the corrected contract.
+
+
+## Round 13 Corrected Contract Approval (2026-10-23)
+
+- **Independent verdict:** `APPROVE` for the Round 13 contract amendment; implementation and positive K/G output are not approved. The initial Round 13 `REVISE` recorded above applies to the pre-amendment input.
+- **Reviewer snapshot identifiers:** base/HEAD `c3e3f51e038de63751f47aac4dd1f86b9b6b431e`; independently reproduced scoped diff SHA-256 `f9bcdf12ec8f00075c0bee1e2387ecbae3b0b9b4b049dbd647f1288ac1b94e72`; reviewer manifest fingerprint `ce3177020be20a6d394ce93b2b8ac56b8d1aaf1438cb5f397a5fd2363816e6cc`. The earlier author aggregate is omitted because it was not reproduced.
+- **Approval scope:** the §6a(1)(3) typed predicate is explicit: the resolver must verify that this buyer’s acquisition of the line goods is subject to VAT rules in the actual destination Member State. This means applicability of those rules, not actual tax charged or paid. The approved G contract retains supplier-carried movement under §6(1)(1) and qualified foreign-buyer-carried movement under §6(1)(2) plus §6(2), with actual line destination and resolved movement evidence.
+- **Post-approval wording synchronization:** the proposal K summary and positive K test-plan row were updated to state the approved §6a(1)(3) predicate and no-actual-tax-paid condition. These edits preserve the approved semantics.
+- **Implementation status:** this approval does not approve production implementation, positive K or G output, or the v28 persistence/resolver design. Positive K/G remain blocked until their real immutable line-bound evidence path is implemented.
