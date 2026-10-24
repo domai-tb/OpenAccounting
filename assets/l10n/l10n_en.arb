@@ -1228,6 +1228,7 @@
   "customerZugferdDefaultTitle": "Preselect ZUGFeRD for new invoices",
   "customerZugferdDefaultDescription": "This sets the starting format; you can choose another format for each invoice.",
   "eInvoiceReadinessValid": "E-invoice validated",
+  "eInvoiceReadinessXmlPresent": "CII XML present; PDF/A-3b conformance not verified",
   "eInvoiceReadinessInvalid": "E-invoice invalid – check details",
   "eInvoiceReadinessNotValidated": "Not yet validated",
   "eInvoiceReadinessUnavailable": "Validation unavailable",
@@ -1366,5 +1367,19 @@
   "dashboardUnavailable": "Unavailable",
   "dashboardQuickLinkInvalidLabel": "invalid",
   "dashboardQuickLinkLabel": "Label",
-  "dashboardQuickLinkRoute": "Route"
+  "dashboardQuickLinkRoute": "Route",
+  "mileageRoleSettingsTitle": "Posting roles",
+  "mileageRoleSettingsDescription": "Select a reviewed ledger account and EÜR category for each mileage posting role. Both roles are required before mileage can be posted.",
+  "mileageRoleTravelExpense": "Travel expense",
+  "mileageRolePrivateContribution": "Private contribution",
+  "mileageRoleAccount": "Ledger account",
+  "mileageRoleCategory": "EÜR category",
+  "mileageRoleSelectAccount": "Select a ledger account",
+  "mileageRoleSelectCategory": "Select a category",
+  "mileageRoleSave": "Save posting roles",
+  "mileageRoleSaved": "Mileage posting roles saved.",
+  "mileageRoleLoadError": "Mileage posting roles and account/category options could not be loaded.",
+  "mileageRoleSaveError": "Mileage posting roles could not be saved. Check the selected account and reviewed category mappings.",
+  "mileageRoleNoSachkonten": "Create a Sachkonto before configuring mileage posting.",
+  "mileageRoleNoCategories": "No eligible reviewed category is available for this role."
 }

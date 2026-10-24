@@ -5438,6 +5438,12 @@ abstract class AppLocalizations {
   /// **'E-Rechnung geprüft und gültig'**
   String get eInvoiceReadinessValid;
 
+  /// No description provided for @eInvoiceReadinessXmlPresent.
+  ///
+  /// In de, this message translates to:
+  /// **'CII-XML vorhanden; PDF/A-3b-Konformität nicht geprüft'**
+  String get eInvoiceReadinessXmlPresent;
+
   /// No description provided for @eInvoiceReadinessInvalid.
   ///
   /// In de, this message translates to:
@@ -6145,6 +6151,90 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Route'**
   String get dashboardQuickLinkRoute;
+
+  /// No description provided for @mileageRoleSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsrollen'**
+  String get mileageRoleSettingsTitle;
+
+  /// No description provided for @mileageRoleSettingsDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordnen Sie für jede Reisekostenbuchung ein geprüftes Sachkonto und eine EÜR-Kategorie zu. Beide Rollen sind erforderlich, bevor Fahrten gebucht werden können.'**
+  String get mileageRoleSettingsDescription;
+
+  /// No description provided for @mileageRoleTravelExpense.
+  ///
+  /// In de, this message translates to:
+  /// **'Reisekosten'**
+  String get mileageRoleTravelExpense;
+
+  /// No description provided for @mileageRolePrivateContribution.
+  ///
+  /// In de, this message translates to:
+  /// **'Privateinlage'**
+  String get mileageRolePrivateContribution;
+
+  /// No description provided for @mileageRoleAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Sachkonto'**
+  String get mileageRoleAccount;
+
+  /// No description provided for @mileageRoleCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'EÜR-Kategorie'**
+  String get mileageRoleCategory;
+
+  /// No description provided for @mileageRoleSelectAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Sachkonto auswählen'**
+  String get mileageRoleSelectAccount;
+
+  /// No description provided for @mileageRoleSelectCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie auswählen'**
+  String get mileageRoleSelectCategory;
+
+  /// No description provided for @mileageRoleSave.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsrollen speichern'**
+  String get mileageRoleSave;
+
+  /// No description provided for @mileageRoleSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Reisekosten-Buchungsrollen gespeichert.'**
+  String get mileageRoleSaved;
+
+  /// No description provided for @mileageRoleLoadError.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsrollen und Konto-/Kategorieoptionen konnten nicht geladen werden.'**
+  String get mileageRoleLoadError;
+
+  /// No description provided for @mileageRoleSaveError.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsrollen konnten nicht gespeichert werden. Prüfen Sie das Konto und die geprüften Kategoriezuordnungen.'**
+  String get mileageRoleSaveError;
+
+  /// No description provided for @mileageRoleNoSachkonten.
+  ///
+  /// In de, this message translates to:
+  /// **'Legen Sie ein Sachkonto an, bevor Sie Reisekosten konfigurieren.'**
+  String get mileageRoleNoSachkonten;
+
+  /// No description provided for @mileageRoleNoCategories.
+  ///
+  /// In de, this message translates to:
+  /// **'Für diese Rolle ist keine passende geprüfte Kategorie verfügbar.'**
+  String get mileageRoleNoCategories;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

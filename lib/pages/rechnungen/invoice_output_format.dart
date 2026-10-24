@@ -137,6 +137,7 @@ class InvoiceOutputFormatSelector extends StatelessWidget {
   Widget _readinessRow(BuildContext context, AppLocalizations l10n) {
     final (AppStatus status, String label, IconData icon) = switch (readiness) {
       EInvoiceReadiness.valid => (AppStatus.paid, l10n.eInvoiceReadinessValid, Icons.check_circle_outline),
+      EInvoiceReadiness.xmlPresent => (AppStatus.info, l10n.eInvoiceReadinessXmlPresent, Icons.info_outline),
       EInvoiceReadiness.invalid => (AppStatus.warning, l10n.eInvoiceReadinessInvalid, Icons.error_outline),
       EInvoiceReadiness.unavailable => (AppStatus.neutral, l10n.eInvoiceReadinessUnavailable, Icons.cloud_off_outlined),
       EInvoiceReadiness.notValidated => (AppStatus.info, l10n.eInvoiceReadinessNotValidated, Icons.help_outline),

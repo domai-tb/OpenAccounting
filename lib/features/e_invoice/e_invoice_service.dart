@@ -9,9 +9,11 @@ import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
 
-/// Readiness derived from validated artifacts only. Never claimed from schema
-/// validation alone and never without generation succeeding first.
-enum EInvoiceReadiness { notValidated, valid, invalid, unavailable }
+/// Readiness shown for generated invoice artifacts.
+///
+/// `xmlPresent` means the ZUGFeRD CII companion exists; it does not claim that
+/// the PDF/A-3b container has passed formal conformance validation.
+enum EInvoiceReadiness { notValidated, valid, xmlPresent, invalid, unavailable }
 
 /// Structurally checked ZUGFeRD hybrid PDF and its exact embedded CII XML.
 class ZugferdHybridArtifact {
@@ -67,8 +69,10 @@ class EInvoiceService {
 
   /// Applies the available validation rules to [snapshot] for [format].
   ///
-  /// The production bundle is unavailable until pinned local artifacts are
-  /// packaged and verified, so production calls fail closed.
+  /// Applies snapshot-level validation before serialization.
+  ///
+  /// Serialized XML is independently checked by the packaged offline validator
+  /// before any artifact is returned or written.
   EInvoiceValidationResult validate(FinalizationSnapshot snapshot, EInvoiceOutputFormat format) {
     if (!bundle.available) {
       return const EInvoiceValidationResult.unavailable(<EInvoiceDiagnostic>[

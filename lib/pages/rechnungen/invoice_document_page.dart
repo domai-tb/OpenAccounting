@@ -342,8 +342,9 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
     return invoice.typ.trim().toLowerCase() == 'rechnung' && invoice.lieferantId == null;
   }
 
-  /// Readiness derived from validated artifacts only. XRechnung shows as not
-  /// yet validated until this session exports it; legacy rows resolve to PDF.
+  /// Status based on the evidence available for each persisted output.
+  /// A ZUGFeRD sidecar establishes that the CII companion is present only;
+  /// formal PDF/A-3b conformance remains unverified.
   EInvoiceReadiness _readiness(RechnungItem invoice) {
     if (invoice.istEntwurfDokument) return EInvoiceReadiness.notValidated;
     switch (parseEInvoiceOutputFormat(invoice.ausgabeformat)) {
@@ -353,7 +354,7 @@ class _InvoiceDocumentPageState extends ConsumerState<InvoiceDocumentPage> {
             : EInvoiceReadiness.notValidated;
       case EInvoiceOutputFormat.zugferd:
         if (!const EInvoiceService().validatorAvailable) return EInvoiceReadiness.unavailable;
-        return _zugferdXmlExists(invoice.id) ? EInvoiceReadiness.valid : EInvoiceReadiness.invalid;
+        return _zugferdXmlExists(invoice.id) ? EInvoiceReadiness.xmlPresent : EInvoiceReadiness.invalid;
       case EInvoiceOutputFormat.xrechnung:
         if (_exportValidationForId == invoice.id && _exportValidationFailure != null) {
           return const EInvoiceService().readiness(_exportValidationFailure);

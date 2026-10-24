@@ -1228,6 +1228,7 @@
   "customerZugferdDefaultTitle": "ZUGFeRD für neue Rechnungen vorauswählen",
   "customerZugferdDefaultDescription": "Legt das Startformat fest; das Format kann für jede Rechnung geändert werden.",
   "eInvoiceReadinessValid": "E-Rechnung geprüft und gültig",
+  "eInvoiceReadinessXmlPresent": "CII-XML vorhanden; PDF/A-3b-Konformität nicht geprüft",
   "eInvoiceReadinessInvalid": "E-Rechnung fehlerhaft – Details prüfen",
   "eInvoiceReadinessNotValidated": "Noch nicht geprüft",
   "eInvoiceReadinessUnavailable": "Prüfung nicht verfügbar",
@@ -1366,5 +1367,19 @@
   "dashboardUnavailable": "Nicht verfügbar",
   "dashboardQuickLinkInvalidLabel": "ungültig",
   "dashboardQuickLinkLabel": "Bezeichnung",
-  "dashboardQuickLinkRoute": "Route"
+  "dashboardQuickLinkRoute": "Route",
+  "mileageRoleSettingsTitle": "Buchungsrollen",
+  "mileageRoleSettingsDescription": "Ordnen Sie für jede Reisekostenbuchung ein geprüftes Sachkonto und eine EÜR-Kategorie zu. Beide Rollen sind erforderlich, bevor Fahrten gebucht werden können.",
+  "mileageRoleTravelExpense": "Reisekosten",
+  "mileageRolePrivateContribution": "Privateinlage",
+  "mileageRoleAccount": "Sachkonto",
+  "mileageRoleCategory": "EÜR-Kategorie",
+  "mileageRoleSelectAccount": "Sachkonto auswählen",
+  "mileageRoleSelectCategory": "Kategorie auswählen",
+  "mileageRoleSave": "Buchungsrollen speichern",
+  "mileageRoleSaved": "Reisekosten-Buchungsrollen gespeichert.",
+  "mileageRoleLoadError": "Buchungsrollen und Konto-/Kategorieoptionen konnten nicht geladen werden.",
+  "mileageRoleSaveError": "Buchungsrollen konnten nicht gespeichert werden. Prüfen Sie das Konto und die geprüften Kategoriezuordnungen.",
+  "mileageRoleNoSachkonten": "Legen Sie ein Sachkonto an, bevor Sie Reisekosten konfigurieren.",
+  "mileageRoleNoCategories": "Für diese Rolle ist keine passende geprüfte Kategorie verfügbar."
 }

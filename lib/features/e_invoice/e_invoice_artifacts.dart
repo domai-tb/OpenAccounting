@@ -28,8 +28,9 @@ class EInvoicePinnedVersions {
   /// Human-readable bundle identity shown in UI and release metadata.
   static const String xrechnungBundleLabel = '3.0.2 Summer 2026';
 
-  /// KoSIT validator engine running the configuration (Linux proof pending,
-  /// Windows/macOS blocked per E2; never claim runs without platform evidence).
+  /// KoSIT validator engine used by the packaged offline XML validator.
+  /// Linux real-engine evidence exists; Windows/macOS Java packaging and
+  /// runtime evidence remain open. This version does not imply PDF/A proof.
   static const String kositValidatorVersion = '1.6.3';
 
   /// Pinned validator configuration release (commit `b436fc4`).
@@ -42,15 +43,15 @@ class EInvoicePinnedVersions {
   static const String xrechnungSchematronVersion = '2.6.0';
 }
 
-/// Availability of the offline validation artifacts.
+/// Availability of the packaged, hash-pinned offline XML validation assets.
 ///
-/// The production bundle stays unavailable until the official validator is
-/// actually packaged and verified on each supported desktop platform.
+/// This does not imply that a Java runtime is available on every platform or
+/// that generated ZUGFeRD PDFs have passed formal PDF/A-3b validation.
 class PinnedArtifactBundle {
   const PinnedArtifactBundle({this.available = false, this.reason});
 
-  /// No validator artifacts are currently packaged.
-  static const PinnedArtifactBundle packaged = PinnedArtifactBundle();
+  /// Local assets are hash-checked by EInvoiceOfflineXmlValidator before output.
+  static const PinnedArtifactBundle packaged = PinnedArtifactBundle(available: true);
 
   final bool available;
   final String? reason;

@@ -2811,6 +2811,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eInvoiceReadinessValid => 'E-invoice validated';
 
   @override
+  String get eInvoiceReadinessXmlPresent => 'CII XML present; PDF/A-3b conformance not verified';
+
+  @override
   String get eInvoiceReadinessInvalid => 'E-invoice invalid – check details';
 
   @override
@@ -3179,4 +3182,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardQuickLinkRoute => 'Route';
+
+  @override
+  String get mileageRoleSettingsTitle => 'Posting roles';
+
+  @override
+  String get mileageRoleSettingsDescription =>
+      'Select a reviewed ledger account and EÜR category for each mileage posting role. Both roles are required before mileage can be posted.';
+
+  @override
+  String get mileageRoleTravelExpense => 'Travel expense';
+
+  @override
+  String get mileageRolePrivateContribution => 'Private contribution';
+
+  @override
+  String get mileageRoleAccount => 'Ledger account';
+
+  @override
+  String get mileageRoleCategory => 'EÜR category';
+
+  @override
+  String get mileageRoleSelectAccount => 'Select a ledger account';
+
+  @override
+  String get mileageRoleSelectCategory => 'Select a category';
+
+  @override
+  String get mileageRoleSave => 'Save posting roles';
+
+  @override
+  String get mileageRoleSaved => 'Mileage posting roles saved.';
+
+  @override
+  String get mileageRoleLoadError => 'Mileage posting roles and account/category options could not be loaded.';
+
+  @override
+  String get mileageRoleSaveError =>
+      'Mileage posting roles could not be saved. Check the selected account and reviewed category mappings.';
+
+  @override
+  String get mileageRoleNoSachkonten => 'Create a Sachkonto before configuring mileage posting.';
+
+  @override
+  String get mileageRoleNoCategories => 'No eligible reviewed category is available for this role.';
 }

@@ -2822,6 +2822,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eInvoiceReadinessValid => 'E-Rechnung geprüft und gültig';
 
   @override
+  String get eInvoiceReadinessXmlPresent => 'CII-XML vorhanden; PDF/A-3b-Konformität nicht geprüft';
+
+  @override
   String get eInvoiceReadinessInvalid => 'E-Rechnung fehlerhaft – Details prüfen';
 
   @override
@@ -3191,4 +3194,48 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dashboardQuickLinkRoute => 'Route';
+
+  @override
+  String get mileageRoleSettingsTitle => 'Buchungsrollen';
+
+  @override
+  String get mileageRoleSettingsDescription =>
+      'Ordnen Sie für jede Reisekostenbuchung ein geprüftes Sachkonto und eine EÜR-Kategorie zu. Beide Rollen sind erforderlich, bevor Fahrten gebucht werden können.';
+
+  @override
+  String get mileageRoleTravelExpense => 'Reisekosten';
+
+  @override
+  String get mileageRolePrivateContribution => 'Privateinlage';
+
+  @override
+  String get mileageRoleAccount => 'Sachkonto';
+
+  @override
+  String get mileageRoleCategory => 'EÜR-Kategorie';
+
+  @override
+  String get mileageRoleSelectAccount => 'Sachkonto auswählen';
+
+  @override
+  String get mileageRoleSelectCategory => 'Kategorie auswählen';
+
+  @override
+  String get mileageRoleSave => 'Buchungsrollen speichern';
+
+  @override
+  String get mileageRoleSaved => 'Reisekosten-Buchungsrollen gespeichert.';
+
+  @override
+  String get mileageRoleLoadError => 'Buchungsrollen und Konto-/Kategorieoptionen konnten nicht geladen werden.';
+
+  @override
+  String get mileageRoleSaveError =>
+      'Buchungsrollen konnten nicht gespeichert werden. Prüfen Sie das Konto und die geprüften Kategoriezuordnungen.';
+
+  @override
+  String get mileageRoleNoSachkonten => 'Legen Sie ein Sachkonto an, bevor Sie Reisekosten konfigurieren.';
+
+  @override
+  String get mileageRoleNoCategories => 'Für diese Rolle ist keine passende geprüfte Kategorie verfügbar.';
 }
