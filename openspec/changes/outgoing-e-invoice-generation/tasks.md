@@ -62,9 +62,9 @@ Tax-contract revision note: the delivered base ledger was 96/128 complete. Tasks
 
 ## 5. Version-pinned e-invoice formats
 
-- [ ] 5.1 Write failing test for "Generate supported pinned format": validates_supported_xml_against_exact_local_pinned_artifacts in test/features/rechnungen/e_invoice_validator_test.dart (assert it fails for the right reason).
-- [ ] 5.2 Implement the required application behavior for "Generate supported pinned format" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [ ] 5.3 Refactor the related implementation; targeted tests and the full suite stay green.
+- [ ] 5.1 Complete the positive supported-format regression. The attempted real KoSIT run remains blocked by missing persisted seller contact point and telephone fields; see verify.md.
+- [ ] 5.2 Complete supported XRechnung generation only after seller contact data has an accepted persisted source. Keep output fail-closed until then.
+- [ ] 5.3 Refactor and run targeted plus full-suite validation after the seller contact prerequisite is implemented.
 - [x] 5.4 Write failing test for "Unsupported or unavailable validation bundle": unavailable_or_corrupt_bundle_rejects_output_without_compliance_claim in test/features/rechnungen/e_invoice_validator_test.dart (assert it fails for the right reason).
 - [x] 5.5 Implement the required application behavior for "Unsupported or unavailable validation bundle" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [x] 5.6 Refactor the related implementation; targeted tests and the full suite stay green.

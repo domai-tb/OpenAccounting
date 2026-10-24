@@ -282,6 +282,11 @@ class EInvoiceXmlSerializer {
       '      <cac:PartyLegalEntity><cbc:RegistrationName>${_escape(party.name)}</cbc:RegistrationName>'
       '$companyLegalForm</cac:PartyLegalEntity>',
     );
+    if (tag == 'AccountingSupplierParty' && party.email?.isNotEmpty == true) {
+      xml.writeln('      <cac:Contact>');
+      xml.writeln('        <cbc:ElectronicMail>${_escape(party.email!)}</cbc:ElectronicMail>');
+      xml.writeln('      </cac:Contact>');
+    }
     xml.writeln('    </cac:Party>');
     xml.writeln('  </cac:$tag>');
   }

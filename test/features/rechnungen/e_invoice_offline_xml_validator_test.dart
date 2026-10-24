@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
@@ -127,6 +128,25 @@ void main() {
       expect(result.status, EInvoiceOfflineXmlValidationStatus.unavailable);
     });
 
+    test('fails closed when a required local artifact is missing or has changed', () async {
+      const String schemaPath = 'assets/e_invoice_validator/resources/ubl/2.1/xsd/maindoc/UBL-Invoice-2.1.xsd';
+      for (final _TestValidatorAssetBundle assetBundle in <_TestValidatorAssetBundle>[
+        _TestValidatorAssetBundle(schemaPath, missing: true),
+        _TestValidatorAssetBundle(schemaPath, missing: false),
+      ]) {
+        final EInvoiceOfflineXmlValidator isolatedValidator = EInvoiceOfflineXmlValidator(assetBundle: assetBundle);
+        addTearDown(isolatedValidator.dispose);
+
+        final EInvoiceOfflineXmlValidationResult result = await isolatedValidator.validateXml(
+          format: EInvoiceOutputFormat.xrechnung,
+          xml: await _fixture('xrechnung_valid_01_01a.xml'),
+        );
+
+        expect(result.status, EInvoiceOfflineXmlValidationStatus.unavailable);
+        expect(result.valid, isFalse);
+      }
+    });
+
     test('fails closed when Java is missing', () async {
       final EInvoiceOfflineXmlValidator missingJava = EInvoiceOfflineXmlValidator(
         javaExecutable: 'openaccounting-test-java-that-does-not-exist',
@@ -147,4 +167,18 @@ void main() {
 Future<String> _fixture(String fileName) {
   final String path = p.join('test', 'fixtures', 'e_invoice', 'offline_validator', fileName);
   return File(path).readAsString();
+}
+
+class _TestValidatorAssetBundle extends CachingAssetBundle {
+  _TestValidatorAssetBundle(this.path, {required this.missing});
+
+  final String path;
+  final bool missing;
+
+  @override
+  Future<ByteData> load(String key) {
+    if (key != path) return rootBundle.load(key);
+    if (missing) return Future<ByteData>.error(StateError('Missing test asset'));
+    return Future<ByteData>.value(ByteData(0));
+  }
 }

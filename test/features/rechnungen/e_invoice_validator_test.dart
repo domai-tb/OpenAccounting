@@ -20,10 +20,10 @@ import 'e_invoice_test_fixtures.dart'
         validSnapshot;
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Version-pinned formats and business-rule validation', () {
-    test('validates_supported_xml_against_exact_local_pinned_artifacts', () {
-      expect(EInvoicePinnedVersions.zugferdVersion, '2.5.2');
-      expect(EInvoicePinnedVersions.zugferdProfile, 'EN16931');
+    test('rejects seller email without contact point and telephone using pinned rules', () async {
       expect(EInvoicePinnedVersions.xrechnungVersion, '3.0');
       expect(EInvoicePinnedVersions.xrechnungSyntax, 'UBL 2.1');
       expect(EInvoicePinnedVersions.xrechnungBundleVersion, '3.0.2');
@@ -31,26 +31,84 @@ void main() {
       expect(EInvoicePinnedVersions.xrechnungConfigVersion, 'v2026-08-31');
       expect(EInvoicePinnedVersions.cenSchematronVersion, '1.3.16');
       expect(EInvoicePinnedVersions.xrechnungSchematronVersion, '2.6.0');
+      expect(PinnedArtifactBundle.packaged.available, isTrue);
 
-      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      final Map<String, Object?> company = validCompany()..['email'] = 'seller@example.de';
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: company,
+        customerRow: validCustomer(),
+        posRows: standardPositions(),
+        preview: standardTotals(),
+        eingabemodus: 'netto',
+        buyerReference: 'LEITWEG-123',
+        deliveryDate: '2026-03-10',
+      );
+      final String xml = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+
+      expect(xml.contains('3.0.2'), isFalse);
+      expect(xml.contains('xrechnung_3.0'), isTrue);
+      expect(xml, contains('<cac:Contact>'));
+      expect(xml, contains('<cbc:ElectronicMail>seller@example.de</cbc:ElectronicMail>'));
+
+      const EInvoiceService service = EInvoiceService();
+      await expectLater(
+        service.xrechnungXml(snapshot),
+        throwsA(
+          isA<EInvoiceExportValidationException>()
+              .having(
+                (error) => error.offlineXmlResult?.engineVersion,
+                'engineVersion',
+                'KoSIT Validator ${EInvoicePinnedVersions.kositValidatorVersion}',
+              )
+              .having(
+                (error) => error.offlineXmlResult?.diagnostics.map((finding) => finding.code),
+                'diagnostic codes',
+                allOf(contains('BR-DE-5'), contains('BR-DE-6'), contains('BR-DE-27')),
+              )
+              .having(
+                (error) => error.offlineXmlResult?.diagnostics.map((finding) => finding.message).join(' '),
+                'missing seller contact fields',
+                allOf(contains('BT-41'), contains('BT-42')),
+              ),
+        ),
+      );
+    });
+
+    test('rejects missing seller contact with the official BR-DE-2 diagnostic', () async {
+      const EInvoiceService service = EInvoiceService();
       final FinalizationSnapshot snapshot = validSnapshot(
         buyerReference: 'LEITWEG-123',
         format: EInvoiceOutputFormat.xrechnung,
       );
-      // Bundle identity is release metadata; the XML carries only the
-      // normative format version, never the bundle version.
-      expect(serializer.xrechnungUbl(snapshot).contains('3.0.2'), isFalse);
-      expect(serializer.xrechnungUbl(snapshot).contains('xrechnung_3.0'), isTrue);
-      expect(
-        PinnedArtifactBundle.packaged.releaseIdentity(EInvoiceOutputFormat.xrechnung),
-        contains('Bundle 3.0.2 Summer 2026'),
+
+      await expectLater(
+        service.xrechnungXml(snapshot),
+        throwsA(
+          isA<EInvoiceExportValidationException>()
+              .having(
+                (error) => error.offlineXmlResult?.engineVersion,
+                'engineVersion',
+                'KoSIT Validator ${EInvoicePinnedVersions.kositValidatorVersion}',
+              )
+              .having(
+                (error) => error.offlineXmlResult?.diagnostics.map((finding) => finding.code),
+                'diagnostic codes',
+                contains('BR-DE-2'),
+              )
+              .having(
+                (error) => error.offlineXmlResult?.diagnostics.map((finding) => finding.message).join(' '),
+                'diagnostic message',
+                contains('BG-6'),
+              ),
+        ),
       );
-      const EInvoiceService service = eInvoiceTestService;
-      expect(service.validate(snapshot, EInvoiceOutputFormat.xrechnung).valid, isTrue);
     });
 
     test('unavailable_or_corrupt_bundle_rejects_output_without_compliance_claim', () async {
-      const EInvoiceService service = EInvoiceService();
+      const EInvoiceService service = EInvoiceService(bundle: PinnedArtifactBundle());
       final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
 
       final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
