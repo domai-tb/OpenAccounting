@@ -227,7 +227,7 @@ void main() {
 
     // ── Task 7: Stable opening marker, idempotent, unrelated rows untouched ──
 
-    test('test_setup_onboarding_integrity_4_1_opening_marker_is_stable_and_idempotent', () async {
+    test('test_setup_onboarding_integrity_4_1_conflicting_opening_retry_is_rejected', () async {
       await wizard.completeWizard(
         companyName: 'Marker GmbH',
         accounts: [const BankAccount(name: 'Giro', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX')],
@@ -260,8 +260,46 @@ void main() {
         <Object?>[today, 'Barverkauf', 1, '100.00', BelegTyp.einnahme, kasseId],
       );
 
-      // re-run setup with new amount — must update same stable row, not duplicate or clobber unrelated
-      await repo.ensureKassenKonto(betrag: '750.00');
+      final List<Map<String, Object?>> sourcesBeforeRetry = await db.executor.runSelect(
+        'SELECT id, unternehmen_id, konto_id, journal_id, effective_date, amount_cents, currency_code, source_reference '
+        'FROM account_opening_balance_sources WHERE konto_id = ?',
+        <Object?>[kasseId],
+      );
+      expect(sourcesBeforeRetry, hasLength(1));
+      final List<Map<String, Object?>> journalBeforeRetry = await db.executor.runSelect(
+        'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable, is_opening_balance '
+        'FROM journal WHERE konto_id = ? ORDER BY id',
+        <Object?>[kasseId],
+      );
+      final List<Map<String, Object?>> saldoBeforeRetry = await db.executor.runSelect(
+        'SELECT id, saldo FROM konten WHERE id = ?',
+        <Object?>[kasseId],
+      );
+
+      // An exact retry remains idempotent. A different opening amount must be rejected without mutation.
+      await repo.ensureKassenKonto(betrag: '500.00');
+      await expectLater(repo.ensureKassenKonto(betrag: '750.00'), throwsA(isA<SetupException>()));
+
+      expect(
+        await db.executor.runSelect(
+          'SELECT id, unternehmen_id, konto_id, journal_id, effective_date, amount_cents, currency_code, source_reference '
+          'FROM account_opening_balance_sources WHERE konto_id = ?',
+          <Object?>[kasseId],
+        ),
+        equals(sourcesBeforeRetry),
+      );
+      expect(
+        await db.executor.runSelect(
+          'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ, konto_id, immutable, is_opening_balance '
+          'FROM journal WHERE konto_id = ? ORDER BY id',
+          <Object?>[kasseId],
+        ),
+        equals(journalBeforeRetry),
+      );
+      expect(
+        await db.executor.runSelect('SELECT id, saldo FROM konten WHERE id = ?', <Object?>[kasseId]),
+        equals(saldoBeforeRetry),
+      );
 
       final List<Map<String, Object?>> openingRows2 = await db.executor.runSelect(
         'SELECT id, betrag, is_opening_balance FROM journal WHERE is_opening_balance = 1',
@@ -269,7 +307,7 @@ void main() {
       );
       expect(openingRows2.length, 1, reason: 'exactly one opening entry must remain after rerun');
       expect((openingRows2.single['id']! as num).toInt(), openingId, reason: 'opening id stable');
-      expect((openingRows2.single['betrag']! as num).toDouble(), closeTo(750.00, 0.001));
+      expect((openingRows2.single['betrag']! as num).toDouble(), closeTo(500.00, 0.001));
       expect(openingRows2.single['is_opening_balance'], 1);
 
       final List<Map<String, Object?>> unrelated = await db.executor.runSelect(
@@ -294,7 +332,7 @@ void main() {
       final int jahr = DateTime.now().year;
       final result = await euer.generate(jahr: jahr);
       // opening (Eroeffnung) forced to zeile 12 must still be 0 or only 100 from Barverkauf, not 850
-      // Barverkauf is Einnahme 100 on same kategorie, opening 750 must be excluded => zeile 12 = 100
+      // Barverkauf is Einnahme 100 on same kategorie; the rejected 750 retry leaves opening 500 excluded.
       expect(result.zeile(12), '100.00', reason: 'Eroeffnung must be excluded even when forced to revenue kategorie');
       expect(result.gewinn, '100.00');
     });

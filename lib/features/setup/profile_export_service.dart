@@ -165,6 +165,7 @@ class ProfileExportService {
     'mileage_trip_corrections',
     'mileage_posting_account_mapping',
     'mileage_posting_period_closures',
+    'account_opening_balance_sources',
     'anlage_afa_jahreswerte',
     'master_data_import_templates',
     'inventuren',
@@ -193,7 +194,13 @@ class ProfileExportService {
     'statutory_timing_rules': 19,
     'mileage_posting_account_mapping': 25,
     'mileage_posting_period_closures': 25,
+    'account_opening_balance_sources': 26,
   };
+
+  static final List<String> _knownFeatureTables = <String>{
+    ..._featureTables,
+    ..._featureTableVersions.keys,
+  }.toList(growable: false);
 
   /// Columns that are never serialized. Values are reported only as
   /// `omitted_secret` exclusions identified by record ID and field.
@@ -272,6 +279,10 @@ class ProfileExportService {
     final List<String> featureTables = _featureTables
         .where((String table) => health.schemaVersion >= (_featureTableVersions[table] ?? 0))
         .toList(growable: false);
+    final List<String> versionPendingTables = _featureTableVersions.entries
+        .where((MapEntry<String, int> entry) => health.schemaVersion < entry.value)
+        .map((MapEntry<String, int> entry) => entry.key)
+        .toList(growable: false);
     final List<ProfileExportExclusion> exclusions = <ProfileExportExclusion>[];
     final List<Map<String, Object?>> omittedFields = <Map<String, Object?>>[];
     final List<_EvidenceFile> evidence = <_EvidenceFile>[];
@@ -279,52 +290,27 @@ class ProfileExportService {
     final Map<String, String> recordPayloads = <String, String>{};
     for (final String table in <String>[...AppDatabase.allTableNames, ...featureTables]) {
       final _ExportTable snapshot = tables[table]!;
+      final bool invalidOpeningSourceSchema =
+          table == 'account_opening_balance_sources' &&
+          (health.missingTables.contains(table) || health.malformedTables.contains(table));
+      if (invalidOpeningSourceSchema) {
+        counts[table] = 0;
+        continue;
+      }
       counts[table] = snapshot.rows.length;
       if (!snapshot.present) {
         continue;
       }
       final StringBuffer buffer = StringBuffer();
       for (final Map<String, Object?> row in snapshot.rows) {
-        final Map<String, Object?> exported = Map<String, Object?>.from(row);
-        final Set<String>? omitted = _omittedColumns[table];
-        if (omitted != null) {
-          for (final String column in omitted) {
-            if (_isOmittedValue(exported[column])) {
-              omittedFields.add(<String, Object?>{
-                'record_type': table,
-                'record_id': _recordId(table, exported),
-                'field': column,
-                'reason': reasonOmittedSecret,
-              });
-            }
-            exported.remove(column);
-          }
-        }
-        for (final (String, String) artifact in _artifactColumns) {
-          if (artifact.$1 != table || !exported.containsKey(artifact.$2)) {
-            continue;
-          }
-          final String recordId = _recordId(table, exported);
-          final Object? raw = exported[artifact.$2];
-          if (!_hasValue(raw)) {
-            exported[artifact.$2] = null;
-            continue;
-          }
-          final _ArtifactResolution resolution = _resolveArtifact(
-            table: table,
-            recordId: recordId,
-            field: artifact.$2,
-            raw: raw.toString(),
-            resolvedRoot: resolvedRoot,
-          );
-          if (resolution.exclusion != null) {
-            exclusions.add(resolution.exclusion!);
-            exported[artifact.$2] = null;
-          } else {
-            evidence.add(resolution.evidence!);
-            exported[artifact.$2] = resolution.evidence!.archivePath;
-          }
-        }
+        final Map<String, Object?> exported = _serializeRecord(
+          table: table,
+          row: row,
+          resolvedRoot: resolvedRoot,
+          exclusions: exclusions,
+          omittedFields: omittedFields,
+          evidence: evidence,
+        );
         buffer.writeln(jsonEncode(exported));
       }
       recordPayloads['records/$table.jsonl'] = buffer.toString();
@@ -339,12 +325,20 @@ class ProfileExportService {
       'profile_label': profileLabel,
       'created_at': _clock().toUtc().toIso8601String(),
       'complete': complete,
+      'outcome': complete ? 'complete' : 'incomplete',
       'record_counts': counts,
       'table_presence': <String, Object?>{
-        for (final String table in <String>[...AppDatabase.allTableNames, ...featureTables])
+        for (final String table in <String>[...AppDatabase.allTableNames, ...featureTables, ...versionPendingTables])
           table: <String, Object?>{
             'present': tables[table]!.present,
-            if (_markerState(tables, table) != null) 'state': _markerState(tables, table),
+            if (versionPendingTables.contains(table))
+              'state': 'version_pending'
+            else if (health.missingTables.contains(table))
+              'state': 'missing'
+            else if (health.malformedTables.contains(table))
+              'state': 'malformed'
+            else if (_markerState(tables, table) != null)
+              'state': _markerState(tables, table),
           },
       },
       'evidence': <Map<String, Object?>>[
@@ -458,6 +452,57 @@ class ProfileExportService {
       exclusions: exclusions,
       recordCounts: counts,
     );
+  }
+
+  Map<String, Object?> _serializeRecord({
+    required String table,
+    required Map<String, Object?> row,
+    required String resolvedRoot,
+    required List<ProfileExportExclusion> exclusions,
+    required List<Map<String, Object?>> omittedFields,
+    required List<_EvidenceFile> evidence,
+  }) {
+    final Map<String, Object?> exported = Map<String, Object?>.from(row);
+    final Set<String>? omitted = _omittedColumns[table];
+    if (omitted != null) {
+      for (final String column in omitted) {
+        if (_isOmittedValue(exported[column])) {
+          omittedFields.add(<String, Object?>{
+            'record_type': table,
+            'record_id': _recordId(table, exported),
+            'field': column,
+            'reason': reasonOmittedSecret,
+          });
+        }
+        exported.remove(column);
+      }
+    }
+    for (final (String, String) artifact in _artifactColumns) {
+      if (artifact.$1 != table || !exported.containsKey(artifact.$2)) {
+        continue;
+      }
+      final String recordId = _recordId(table, exported);
+      final Object? raw = exported[artifact.$2];
+      if (!_hasValue(raw)) {
+        exported[artifact.$2] = null;
+        continue;
+      }
+      final _ArtifactResolution resolution = _resolveArtifact(
+        table: table,
+        recordId: recordId,
+        field: artifact.$2,
+        raw: raw.toString(),
+        resolvedRoot: resolvedRoot,
+      );
+      if (resolution.exclusion != null) {
+        exclusions.add(resolution.exclusion!);
+        exported[artifact.$2] = null;
+      } else {
+        evidence.add(resolution.evidence!);
+        exported[artifact.$2] = resolution.evidence!.archivePath;
+      }
+    }
+    return exported;
   }
 
   /// Read-only preflight gate for Settings and tests.
@@ -677,7 +722,7 @@ class ProfileExportService {
     );
     final Set<String> actual = <String>{for (final sqlite.Row row in names) row['name'].toString()};
     final Map<String, _ExportTable> tables = <String, _ExportTable>{};
-    for (final String table in <String>[...AppDatabase.allTableNames, ..._featureTables]) {
+    for (final String table in <String>[...AppDatabase.allTableNames, ..._knownFeatureTables]) {
       if (!actual.contains(table)) {
         tables[table] = const _ExportTable(columns: <String>[], rows: <Map<String, Object?>>[], present: false);
         continue;
@@ -701,7 +746,7 @@ class ProfileExportService {
     );
     final Set<String> actual = <String>{for (final Map<String, Object?> row in names) row['name'].toString()};
     final Map<String, _ExportTable> tables = <String, _ExportTable>{};
-    for (final String table in <String>[...AppDatabase.allTableNames, ..._featureTables]) {
+    for (final String table in <String>[...AppDatabase.allTableNames, ..._knownFeatureTables]) {
       if (!actual.contains(table)) {
         tables[table] = const _ExportTable(columns: <String>[], rows: <Map<String, Object?>>[], present: false);
         continue;
@@ -722,7 +767,7 @@ class ProfileExportService {
   }
 
   void _assertExportInventoryComplete(Set<String> actual, Map<String, _ExportTable> tables) {
-    final Set<String> declared = <String>{...AppDatabase.allTableNames, ..._featureTables};
+    final Set<String> declared = <String>{...AppDatabase.allTableNames, ..._knownFeatureTables};
     final List<String> unhandledRecognized = <String>[
       for (final String table in actual)
         if (declared.contains(table) && tables[table]?.present != true) table,

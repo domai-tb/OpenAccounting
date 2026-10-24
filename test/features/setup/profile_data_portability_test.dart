@@ -7,6 +7,7 @@ import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/features/setup/profile_data_section.dart';
 import 'package:openaccounting/features/setup/profile_export_service.dart';
+import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:path/path.dart' as p;
 
 Future<AppDatabase> _openProfile(String prefix) async {
@@ -757,6 +758,193 @@ CREATE TABLE dokument_email_versuche (
       expect(result.complete, isFalse);
       expect(await _exportTableNames(db), isNot(contains('feature_table_state')));
       expect(await runner.getUserVersion(), 12);
+    });
+
+    test('test_v25_profile_does_not_require_v26_opening_source_table', () async {
+      final AppDatabase db = await _openProfile('profile_export_v25_');
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_update');
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_delete');
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_replace');
+      await db.executor.runCustom('ALTER TABLE tagesabschluesse DROP COLUMN zaehlung_json');
+      await db.executor.runCustom('ALTER TABLE tagesabschluesse DROP COLUMN integrity_hash');
+      await db.executor.runCustom('DROP TABLE account_opening_balance_sources');
+      await db.executor.runCustom('PRAGMA user_version = 25');
+
+      final MigrationRunner runner = MigrationRunner(
+        executor: db.executor,
+        profileDir: db.profileDir!,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      final SchemaHealthReport health = await runner.inspectSchemaHealth();
+      expect(health.schemaVersion, 25);
+      expect(health.isHealthy, isTrue);
+      expect(health.missingTables, isNot(contains('account_opening_balance_sources')));
+
+      final ProfileExportService service = ProfileExportService(
+        executor: db.executor,
+        profileDir: db.profileDir!,
+        profileLabel: 'Muster GmbH',
+      );
+      final ProfileExportReadiness readiness = await service.checkExportReadiness();
+      expect(readiness.eligibility, ProfileExportEligibility.incomplete);
+      expect(readiness.schemaVersion, 25);
+      expect(readiness.state, 'version_pending');
+
+      final Directory outDir = await Directory.systemTemp.createTemp('profile_export_v25_out_');
+      addTearDown(() async {
+        if (outDir.existsSync()) {
+          await outDir.delete(recursive: true);
+        }
+      });
+      final String destination = p.join(outDir.path, 'profil_export.zip');
+      final ProfileExportResult result = await service.exportProfile(destinationPath: destination);
+      expect(result.status, ProfileExportStatus.incomplete);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      expect(manifest['complete'], isFalse);
+      expect(manifest['outcome'], 'incomplete');
+      final Map<String, Object?> tablePresence = Map<String, Object?>.from(manifest['table_presence']! as Map);
+      expect(tablePresence['account_opening_balance_sources'], <String, Object?>{
+        'present': false,
+        'state': 'version_pending',
+      });
+      expect(await service.listEntries(destination), isNot(contains('records/account_opening_balance_sources.jsonl')));
+      expect(await runner.getUserVersion(), 25);
+    });
+
+    test('test_v26_profile_export_preserves_opening_source_rows', () async {
+      final AppDatabase db = await _openProfile('profile_export_v26_source_');
+      final MigrationRunner runner = MigrationRunner(
+        executor: db.executor,
+        profileDir: db.profileDir!,
+        requiredTables: AppDatabase.allTableNames,
+      );
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_update');
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_delete');
+      await db.executor.runCustom('DROP TRIGGER tagesabschluesse_finalized_no_replace');
+      await db.executor.runCustom('ALTER TABLE tagesabschluesse DROP COLUMN zaehlung_json');
+      await db.executor.runCustom('ALTER TABLE tagesabschluesse DROP COLUMN integrity_hash');
+      await runner.setUserVersion(26);
+      expect(await runner.getUserVersion(), 26);
+      final SchemaHealthReport v26Health = await runner.inspectSchemaHealth();
+      expect(v26Health.isHealthy, isTrue, reason: 'v26 schema is missing=${v26Health.missingTables}');
+
+      final ProfileExportService service = ProfileExportService(
+        executor: db.executor,
+        profileDir: db.profileDir!,
+        profileLabel: 'Muster GmbH',
+      );
+      final Directory outDir = await Directory.systemTemp.createTemp('profile_export_v26_source_out_');
+      addTearDown(() async {
+        if (outDir.existsSync()) {
+          await outDir.delete(recursive: true);
+        }
+      });
+
+      const String sourceEntry = 'records/account_opening_balance_sources.jsonl';
+      final String emptyDestination = p.join(outDir.path, 'empty_source_export.zip');
+      final ProfileExportResult emptyResult = await service.exportProfile(destinationPath: emptyDestination);
+      expect(emptyResult.status, ProfileExportStatus.incomplete);
+      expect(await service.listEntries(emptyDestination), contains(sourceEntry));
+      expect(utf8.decode(await service.readEntry(emptyDestination, sourceEntry)), isEmpty);
+      final Map<String, Object?> emptyManifest = await service.readManifest(emptyDestination);
+      expect(emptyManifest['complete'], isFalse);
+      expect(emptyManifest['outcome'], 'incomplete');
+      final Map<String, Object?> emptyCounts = Map<String, Object?>.from(emptyManifest['record_counts']! as Map);
+      expect((emptyCounts['account_opening_balance_sources']! as num).toInt(), 0);
+
+      final SetupRepository setup = SetupRepository(db.executor);
+      await setup.saveUnternehmen(name: 'Profile Source Test GmbH');
+      await setup.ensureKassenKonto(betrag: '125.00');
+      final List<Map<String, Object?>> expectedSourceRows = await db.executor.runSelect(
+        'SELECT * FROM account_opening_balance_sources ORDER BY id',
+        const <Object?>[],
+      );
+      expect(expectedSourceRows, hasLength(1));
+
+      final String populatedDestination = p.join(outDir.path, 'populated_source_export.zip');
+      final ProfileExportResult populatedResult = await service.exportProfile(destinationPath: populatedDestination);
+      expect(populatedResult.status, ProfileExportStatus.incomplete);
+      expect(await service.listEntries(populatedDestination), contains(sourceEntry));
+      final String sourceJsonl = utf8.decode(await service.readEntry(populatedDestination, sourceEntry));
+      final List<String> sourceLines = sourceJsonl.trim().split('\n');
+      expect(sourceLines, hasLength(1));
+      expect(Map<String, Object?>.from(jsonDecode(sourceLines.single) as Map), expectedSourceRows.single);
+      final Map<String, Object?> populatedManifest = await service.readManifest(populatedDestination);
+      expect(populatedManifest['complete'], isFalse);
+      expect(populatedManifest['outcome'], 'incomplete');
+      final Map<String, Object?> populatedCounts = Map<String, Object?>.from(
+        populatedManifest['record_counts']! as Map,
+      );
+      expect((populatedCounts['account_opening_balance_sources']! as num).toInt(), 1);
+    });
+
+    test('test_missing_v26_source_schema_blocks_complete_export', () async {
+      const String sourceTable = 'account_opening_balance_sources';
+      const String sourceEntry = 'records/account_opening_balance_sources.jsonl';
+      final Directory outDir = await Directory.systemTemp.createTemp('profile_export_missing_source_out_');
+      addTearDown(() async {
+        if (outDir.existsSync()) {
+          await outDir.delete(recursive: true);
+        }
+      });
+
+      final AppDatabase missingDb = await _openProfile('profile_export_missing_source_');
+      await missingDb.executor.runCustom('DROP TABLE $sourceTable');
+      final ProfileExportService missingService = ProfileExportService(
+        executor: missingDb.executor,
+        profileDir: missingDb.profileDir!,
+        profileLabel: 'Muster GmbH',
+      );
+      final ProfileExportReadiness missingReadiness = await missingService.checkExportReadiness();
+      expect(missingReadiness.eligibility, ProfileExportEligibility.incomplete);
+      expect(missingReadiness.table, sourceTable);
+      expect(missingReadiness.state, 'missing');
+
+      final String missingDestination = p.join(outDir.path, 'missing_source_export.zip');
+      final ProfileExportResult missingResult = await missingService.exportProfile(destinationPath: missingDestination);
+      expect(missingResult.status, ProfileExportStatus.incomplete);
+      final Map<String, Object?> missingManifest = await missingService.readManifest(missingDestination);
+      final Map<String, Object?> missingPresence = Map<String, Object?>.from(missingManifest['table_presence']! as Map);
+      expect(missingPresence[sourceTable], <String, Object?>{'present': false, 'state': 'missing'});
+      expect(await missingService.listEntries(missingDestination), isNot(contains(sourceEntry)));
+      expect(
+        await missingDb.executor.runSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+          const <Object?>[sourceTable],
+        ),
+        isEmpty,
+      );
+
+      final AppDatabase malformedDb = await _openProfile('profile_export_malformed_source_');
+      await malformedDb.executor.runCustom('DROP TABLE $sourceTable');
+      await malformedDb.executor.runCustom('CREATE TABLE $sourceTable (id INTEGER PRIMARY KEY)');
+      final ProfileExportService malformedService = ProfileExportService(
+        executor: malformedDb.executor,
+        profileDir: malformedDb.profileDir!,
+        profileLabel: 'Muster GmbH',
+      );
+      final ProfileExportReadiness malformedReadiness = await malformedService.checkExportReadiness();
+      expect(malformedReadiness.eligibility, ProfileExportEligibility.incomplete);
+      expect(malformedReadiness.table, sourceTable);
+      expect(malformedReadiness.state, 'malformed');
+
+      final String malformedDestination = p.join(outDir.path, 'malformed_source_export.zip');
+      final ProfileExportResult malformedResult = await malformedService.exportProfile(
+        destinationPath: malformedDestination,
+      );
+      expect(malformedResult.status, ProfileExportStatus.incomplete);
+      final Map<String, Object?> malformedManifest = await malformedService.readManifest(malformedDestination);
+      final Map<String, Object?> malformedPresence = Map<String, Object?>.from(
+        malformedManifest['table_presence']! as Map,
+      );
+      expect(malformedPresence[sourceTable], <String, Object?>{'present': true, 'state': 'malformed'});
+      expect(await malformedService.listEntries(malformedDestination), isNot(contains(sourceEntry)));
+      final SchemaHealthReport afterExport = await MigrationRunner(
+        executor: malformedDb.executor,
+        profileDir: malformedDb.profileDir!,
+        requiredTables: AppDatabase.allTableNames,
+      ).inspectSchemaHealth();
+      expect(afterExport.malformedTables, contains(sourceTable));
     });
 
     test('test_profile_data_portability_023_missing_payment_table_is_detected_before_startup', () async {

@@ -125,9 +125,10 @@ class CustomerDisclosureResult {
 /// export. All paths are stable foreign keys; free-text matches are never
 /// traversed. Version rules follow the landed runtime migrations
 /// (payment table at v8, category history at v9, shared markers and mileage
-/// tables at v13); the supported export schema is [MigrationRunner.currentVersion].
+/// tables at v13, mileage posting at v25, and cashbook opening sources at v26);
+/// the supported export schema is [MigrationRunner.currentVersion].
 class CustomerDisclosureInventory {
-  /// The v19 inventory remains 55 names; mileage posting adds two names at v25.
+  /// The v19 inventory remains 55 names; mileage posting adds two at v25 and cashbook adds one at v26.
   static const Set<String> knownTableNames = <String>{
     ...AppDatabase.allTableNames,
     'feature_table_state',
@@ -138,6 +139,7 @@ class CustomerDisclosureInventory {
     'mileage_trip_corrections',
     'mileage_posting_account_mapping',
     'mileage_posting_period_closures',
+    'account_opening_balance_sources',
     'category_mapping_history',
     'master_data_import_templates',
     'anlage_afa_jahreswerte',
@@ -154,6 +156,7 @@ class CustomerDisclosureInventory {
     'mileage_trip_corrections': 13,
     'mileage_posting_account_mapping': 25,
     'mileage_posting_period_closures': 25,
+    'account_opening_balance_sources': 26,
     'master_data_import_templates': 16,
     'anlage_afa_jahreswerte': 17,
     'inventuren': 18,
@@ -839,16 +842,18 @@ class CustomerDataDisclosureExportService {
       final List<String> columns = <String>[
         for (final Map<String, Object?> row in schemaColumns) row['name']! as String,
       ];
-      final sqlite.ResultSet result = snapshot.select('SELECT * FROM "$table"');
+      final bool openingSourceTable = table == 'account_opening_balance_sources';
+      final sqlite.ResultSet? result = openingSourceTable ? null : snapshot.select('SELECT * FROM "$table"');
       final bool mileageSchemaTable =
           table == 'mileage_posting_account_mapping' || table == 'mileage_posting_period_closures';
-      final String? createSql = mileageSchemaTable
+      final String? createSql = mileageSchemaTable || openingSourceTable
           ? snapshot
                 .select("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '$table'")
                 .first['sql']
                 ?.toString()
           : null;
-      final List<Map<String, Object?>> foreignKeys = table == 'mileage_posting_account_mapping'
+      final bool captureForeignKeys = table == 'mileage_posting_account_mapping' || openingSourceTable;
+      final List<Map<String, Object?>> foreignKeys = captureForeignKeys
           ? <Map<String, Object?>>[
               for (final sqlite.Row row in snapshot.select('PRAGMA foreign_key_list("$table")'))
                 <String, Object?>{
@@ -859,6 +864,32 @@ class CustomerDataDisclosureExportService {
                 },
             ]
           : const <Map<String, Object?>>[];
+      final List<_SnapUniqueIndex> uniqueIndexes = <_SnapUniqueIndex>[];
+      if (openingSourceTable) {
+        for (final sqlite.Row index in snapshot.select('PRAGMA index_list("$table")')) {
+          if (_asInt(index['unique']) != 1) continue;
+          final String name = index['name'].toString().replaceAll('"', '""');
+          final List<sqlite.Row> keyColumns = <sqlite.Row>[
+            for (final sqlite.Row column in snapshot.select('PRAGMA index_xinfo("$name")'))
+              if (_asInt(column['key']) == 1) column,
+          ];
+          uniqueIndexes.add(
+            _SnapUniqueIndex(
+              columns: <String>[for (final sqlite.Row column in keyColumns) column['name']?.toString() ?? ''],
+              collations: <String>[for (final sqlite.Row column in keyColumns) column['coll']?.toString() ?? ''],
+              partial: _asInt(index['partial']) != 0,
+            ),
+          );
+        }
+      }
+      final List<Map<String, Object?>> triggers = openingSourceTable
+          ? <Map<String, Object?>>[
+              for (final sqlite.Row row in snapshot.select(
+                "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = '$table' ORDER BY name",
+              ))
+                <String, Object?>{'name': row['name'], 'sql': row['sql']},
+            ]
+          : const <Map<String, Object?>>[];
       tables[table] = _SnapTable(
         columns: columns,
         schemaColumns: schemaColumns,
@@ -866,10 +897,14 @@ class CustomerDataDisclosureExportService {
             table == 'dokument_email_versuche' && _hasUniqueColumnIndex(snapshot, table, 'idempotenz_schluessel'),
         createSql: createSql,
         foreignKeys: foreignKeys,
-        rows: <Map<String, Object?>>[
-          for (final sqlite.Row row in result)
-            <String, Object?>{for (final String column in result.columnNames) column: _jsonSafe(row[column])},
-        ],
+        uniqueIndexes: uniqueIndexes,
+        triggers: triggers,
+        rows: result == null
+            ? const <Map<String, Object?>>[]
+            : <Map<String, Object?>>[
+                for (final sqlite.Row row in result)
+                  <String, Object?>{for (final String column in result.columnNames) column: _jsonSafe(row[column])},
+              ],
         present: true,
       );
     }
@@ -981,6 +1016,8 @@ class _SnapTable {
     this.hasUniqueAttemptKey = false,
     this.createSql,
     this.foreignKeys = const <Map<String, Object?>>[],
+    this.uniqueIndexes = const <_SnapUniqueIndex>[],
+    this.triggers = const <Map<String, Object?>>[],
   });
   final List<String> columns;
   final List<Map<String, Object?>> schemaColumns;
@@ -989,6 +1026,36 @@ class _SnapTable {
   final bool hasUniqueAttemptKey;
   final String? createSql;
   final List<Map<String, Object?>> foreignKeys;
+  final List<_SnapUniqueIndex> uniqueIndexes;
+  final List<Map<String, Object?>> triggers;
+
+  Map<String, bool> get uniqueIndexesByColumns {
+    final Map<String, bool> indexes = <String, bool>{};
+    for (final _SnapUniqueIndex index in uniqueIndexes) {
+      final String columns = index.columns.join(',');
+      if (indexes.containsKey(columns)) return const <String, bool>{};
+      indexes[columns] = index.partial;
+    }
+    return indexes;
+  }
+
+  bool get hasCanonicalUniqueIndexCollations {
+    for (final _SnapUniqueIndex index in uniqueIndexes) {
+      if (index.columns.join(',') == 'source_reference' &&
+          (index.collations.length != 1 || index.collations.single.toUpperCase() != 'BINARY')) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+class _SnapUniqueIndex {
+  const _SnapUniqueIndex({required this.columns, required this.collations, required this.partial});
+
+  final List<String> columns;
+  final List<String> collations;
+  final bool partial;
 }
 
 class _CustomerSnapshot {
@@ -1055,7 +1122,7 @@ class _DisclosureCollector {
     }
   }
 
-  /// Version-aware inventory check against the shared 46-name contract.
+  /// Version-aware inventory check against the shared table inventory.
   /// Records one exclusion per failing table; never creates or repairs.
   void checkSchemaHealth(_CustomerSnapshot snapshot) {
     _validateLazyMarkerInventory(snapshot);
@@ -1129,7 +1196,16 @@ class _DisclosureCollector {
       }
       if (snapshot.userVersion >= 25 && present) {
         final _SnapTable tableSnapshot = snapshot.tables[table]!;
-        final bool mileageConstraintsValid = switch (table) {
+        final bool specialConstraintsValid = switch (table) {
+          'account_opening_balance_sources' =>
+            tableSnapshot.hasCanonicalUniqueIndexCollations &&
+                MigrationRunner.hasAccountOpeningBalanceSourceSchema(
+                  tableSql: tableSnapshot.createSql,
+                  columns: tableSnapshot.schemaColumns,
+                  foreignKeys: tableSnapshot.foreignKeys,
+                  uniqueIndexes: tableSnapshot.uniqueIndexesByColumns,
+                  triggers: tableSnapshot.triggers,
+                ),
           'mileage_posting_account_mapping' => MigrationRunner.hasMileagePostingMappingSchema(
             tableSql: tableSnapshot.createSql ?? '',
             columns: tableSnapshot.schemaColumns,
@@ -1141,7 +1217,7 @@ class _DisclosureCollector {
           ),
           _ => true,
         };
-        if (!mileageConstraintsValid) {
+        if (!specialConstraintsValid) {
           tableHealth[table] = 'malformed';
           _fail('malformed_schema', recordType: table, field: 'table');
           continue;

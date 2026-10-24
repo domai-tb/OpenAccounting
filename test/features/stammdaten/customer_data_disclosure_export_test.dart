@@ -12,6 +12,7 @@ import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/core/db/migrations.dart';
 import 'package:openaccounting/features/recurring/buchungsvorlagen_repository.dart';
 import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
+import 'package:openaccounting/features/setup/setup_repository.dart';
 import 'package:openaccounting/pages/stammdaten/customer_data_disclosure_export.dart';
 import 'package:openaccounting/pages/stammdaten/customer_disclosure_export_action.dart';
 import 'package:openaccounting/pages/stammdaten/kunden_repository.dart';
@@ -938,6 +939,137 @@ CREATE TABLE mileage_posting_period_closures (
       expect(observedHealth, everyElement('malformed'));
     });
 
+    test('test_v25_customer_disclosure_treats_opening_source_as_pending', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_v25_opening_source_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Kunde AG');
+      await env.db.executor.runCustom('DROP TABLE account_opening_balance_sources');
+      await env.db.executor.runCustom('PRAGMA user_version = 25');
+
+      final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+      final String destination = p.join(env.outDir.path, 'kunde_v25.zip');
+      final CustomerDisclosureResult result = await service.exportCustomer(
+        customerId: customerId,
+        destinationPath: destination,
+      );
+
+      expect(result.status, CustomerDisclosureExportStatus.incomplete);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      expect((manifest['table_health']! as Map)['account_opening_balance_sources'], 'version_pending');
+      expect(await service.listEntries(destination), isNot(contains('records/account_opening_balance_sources.jsonl')));
+    });
+
+    test('test_v26_customer_disclosure_checks_but_does_not_project_opening_sources', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_v26_opening_source_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Kunde AG');
+      final SetupRepository setup = SetupRepository(env.db.executor);
+      await setup.saveUnternehmen(name: 'Opening Source Disclosure Test GmbH');
+      await setup.runInTransaction<void>(
+        (SetupRepository transactionRepository) => transactionRepository.ensureKassenKonto(betrag: '125.00'),
+      );
+      await env.db.executor.runCustom('PRAGMA user_version = 26');
+
+      final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+      final String destination = p.join(env.outDir.path, 'kunde_v26.zip');
+      final CustomerDisclosureResult result = await service.exportCustomer(
+        customerId: customerId,
+        destinationPath: destination,
+      );
+
+      expect(result.status, CustomerDisclosureExportStatus.incomplete);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      expect((manifest['table_health']! as Map)['account_opening_balance_sources'], 'ok');
+      expect(await service.listEntries(destination), isNot(contains('records/account_opening_balance_sources.jsonl')));
+    });
+
+    test('test_v26_customer_disclosure_rejects_malformed_opening_source_schema', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_v26_malformed_opening_source_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Kunde AG');
+      await env.db.executor.runCustom('DROP TRIGGER account_opening_balance_sources_no_replace');
+      await env.db.executor.runCustom('PRAGMA user_version = 26');
+
+      final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+      final String destination = p.join(env.outDir.path, 'kunde_v26_malformed.zip');
+      final CustomerDisclosureResult result = await service.exportCustomer(
+        customerId: customerId,
+        destinationPath: destination,
+      );
+
+      expect(result.status, CustomerDisclosureExportStatus.incomplete);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      expect((manifest['table_health']! as Map)['account_opening_balance_sources'], 'malformed');
+      expect(await service.listEntries(destination), isNot(contains('records/account_opening_balance_sources.jsonl')));
+    });
+
+    test('test_v26_customer_disclosure_rejects_nocase_opening_source_unique_index', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_v26_nocase_opening_source_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Kunde AG');
+      final List<Map<String, Object?>> tableRows = await env.db.executor.runSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+        const <Object?>['account_opening_balance_sources'],
+      );
+      expect(tableRows, hasLength(1));
+      final String originalTableSql = tableRows.single['sql']! as String;
+      const String sourceReferenceDeclaration = 'source_reference TEXT NOT NULL';
+      expect(originalTableSql, contains(sourceReferenceDeclaration));
+      final String nocaseTableSql = originalTableSql.replaceFirst(
+        sourceReferenceDeclaration,
+        'source_reference TEXT COLLATE NOCASE NOT NULL',
+      );
+      expect(nocaseTableSql, isNot(originalTableSql));
+
+      final List<Map<String, Object?>> triggerRows = await env.db.executor.runSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ? ORDER BY name",
+        const <Object?>['account_opening_balance_sources'],
+      );
+      expect(triggerRows, hasLength(3));
+      await env.db.executor.runCustom('DROP TABLE account_opening_balance_sources');
+      await env.db.executor.runCustom(nocaseTableSql);
+      for (final Map<String, Object?> trigger in triggerRows) {
+        await env.db.executor.runCustom(trigger['sql']! as String);
+      }
+
+      final List<Map<String, Object?>> uniqueIndexes = (await env.db.executor.runSelect(
+        'PRAGMA index_list(account_opening_balance_sources)',
+        const <Object?>[],
+      )).where((Map<String, Object?> index) => ((index['unique'] as num?)?.toInt() ?? 0) == 1).toList();
+      expect(uniqueIndexes, hasLength(3));
+      final List<String> sourceReferenceCollations = <String>[];
+      for (final Map<String, Object?> index in uniqueIndexes) {
+        final String indexName = (index['name']! as String).replaceAll('"', '""');
+        final List<Map<String, Object?>> fields = await env.db.executor.runSelect(
+          'PRAGMA index_xinfo("$indexName")',
+          const <Object?>[],
+        );
+        final List<Map<String, Object?>> keyFields = fields
+            .where((Map<String, Object?> field) => ((field['key'] as num?)?.toInt() ?? 0) == 1)
+            .toList();
+        if (keyFields.map((Map<String, Object?> field) => field['name']).join(',') == 'source_reference') {
+          sourceReferenceCollations.add(keyFields.single['coll']!.toString());
+        }
+      }
+      expect(sourceReferenceCollations, <String>['NOCASE']);
+
+      final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+      final String destination = p.join(env.outDir.path, 'kunde_v26_nocase.zip');
+      final CustomerDisclosureResult result = await service.exportCustomer(
+        customerId: customerId,
+        destinationPath: destination,
+      );
+
+      expect(result.status, CustomerDisclosureExportStatus.incomplete);
+      final Map<String, Object?> manifest = await service.readManifest(destination);
+      expect((manifest['table_health']! as Map)['account_opening_balance_sources'], 'malformed');
+      expect(await service.listEntries(destination), isNot(contains('records/account_opening_balance_sources.jsonl')));
+    });
+
     test('test_customer_data_disclosure_export_016_mileage_and_category_tables_remain_outside_custo', () async {
       final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb('disclosure_016_');
       final int customerId = await _seedCustomer(env.db, 'Kunde AG');
@@ -1560,11 +1692,11 @@ CREATE TABLE mileage_posting_period_closures (
       final Directory secondProfileDir = await Directory.systemTemp.createTemp('disclosure_057_second_');
       final Directory outDir = await Directory.systemTemp.createTemp('disclosure_057_out_');
       final AppDatabase firstDb = AppDatabase.forTesting(
-        NativeDatabase(File(p.join(firstProfileDir.path, 'profile.db'))),
+        NativeDatabase(File(p.join(firstProfileDir.path, 'profile.db')), enableMigrations: false),
         profileDir: firstProfileDir.path,
       );
       final AppDatabase secondDb = AppDatabase.forTesting(
-        NativeDatabase(File(p.join(secondProfileDir.path, 'profile.db'))),
+        NativeDatabase(File(p.join(secondProfileDir.path, 'profile.db')), enableMigrations: false),
         profileDir: secondProfileDir.path,
       );
       addTearDown(() async {

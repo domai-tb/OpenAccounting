@@ -74,7 +74,7 @@ void main() {
     test('test_localization_settings_and_data_protection_2_1_a_backup_can_be_created_and_restored', () async {
       // Create a file-based test database with some data.
       final dbPath = '${tmpDir.path}/test.db';
-      final db = AppDatabase.forTesting(drift_native.NativeDatabase(File(dbPath)));
+      final db = AppDatabase.forTesting(drift_native.NativeDatabase(File(dbPath), enableMigrations: false));
       await db.ensureOpen();
 
       // Insert a test invoice.
@@ -103,7 +103,9 @@ void main() {
 
       // Verify restored database has the data.
       expect(File(restorePath).existsSync(), isTrue);
-      final restoredDb = AppDatabase.forTesting(drift_native.NativeDatabase(File(restorePath)));
+      final restoredDb = AppDatabase.forTesting(
+        drift_native.NativeDatabase(File(restorePath), enableMigrations: false),
+      );
       await restoredDb.ensureOpen();
 
       final rows = await restoredDb.executor.runSelect(
@@ -125,7 +127,7 @@ void main() {
       // contract, since UnternehmenRepository._ensureSchema has a GC issue
       // with re-opening the executor when called on a fresh instance.
       final dbPath = '${tmpDir.path}/smtp_test.db';
-      final nativeDb = drift_native.NativeDatabase(File(dbPath));
+      final nativeDb = drift_native.NativeDatabase(File(dbPath), enableMigrations: false);
       final db = AppDatabase.forTesting(nativeDb);
       await db.ensureOpen();
 

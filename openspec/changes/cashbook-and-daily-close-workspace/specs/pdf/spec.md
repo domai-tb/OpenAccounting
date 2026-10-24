@@ -2,11 +2,11 @@
 
 ### Requirement: Tagesabschluss PDF
 
-The system SHALL generate a daily cash close PDF (Tagesabschluss) only from a complete account/date result and one stored version-1 `zaehlung_json` snapshot whose canonical UTF-8 SHA-256 `integrity_hash` has been verified under the accounting contract. The opening source SHALL be supplied by `account-opening-balance-source` after its v24 contract receives fresh independent approval and is implemented; until then PDF generation SHALL remain unavailable. The PDF SHALL show the date, explicit company and cash account, expected amount, actual counted amount, counted-minus-expected difference, explanation, currency, and source reference from that stored snapshot only. It SHALL NOT query or sum journal rows, derive a balance or difference, recalculate tax, reinterpret legacy fields, alter the close, or create accounting effects. The digest SHALL be described only as an integrity check and SHALL NOT be represented as an authenticated signature, signer identity, or proof that a person approved the close. PDF generation SHALL remain unavailable when the source result, snapshot, or digest is absent, unknown, malformed, changed, or unverified.
+The system SHALL generate a daily cash close PDF (Tagesabschluss) only from a complete account/date result backed by one matching v26 setup opening source and one stored v1 `zaehlung_json` snapshot whose canonical UTF-8 SHA-256 `integrity_hash` has been verified under the accounting contract. The v27 close-evidence schema and source completeness SHALL be implemented before PDF generation is available. The PDF SHALL show the date, explicit company and cash account, expected amount, actual counted amount, counted-minus-expected difference, explanation, currency, and source reference from that stored snapshot only. It SHALL NOT query or sum journal rows, derive a balance or difference, recalculate tax, reinterpret legacy fields, alter the close, or create accounting effects. The digest SHALL be described only as an integrity check and SHALL NOT be represented as an authenticated signature, signer identity, or proof that a person approved the close. PDF generation SHALL remain unavailable when the source result, snapshot, or digest is absent, unknown, malformed, changed, or unverified.
 
 #### Scenario: Tagesabschluss generation
 
-- **GIVEN** `account-opening-balance-source` is independently approved and implemented at v24, and one finalized close has a complete account/date result and a stored version-1 snapshot matching its integrity digest
+- **GIVEN** one complete v26 setup opening source is implemented for the account, and one finalized close has a complete account/date result and a stored version-1 snapshot matching its integrity digest
 - **WHEN** the Tagesabschluss PDF is rendered
 - **THEN** the PDF SHALL show the date, expected amount, actual counted amount, counted-minus-expected difference, company, cash account, currency, source reference, and explanation from the stored snapshot
 - **AND** it SHALL describe the digest only as an integrity check without claiming signer identity or authentication.
@@ -20,7 +20,7 @@ The system SHALL generate a daily cash close PDF (Tagesabschluss) only from a co
 
 #### Scenario: Incomplete or legacy close has no PDF
 
-- **GIVEN** the v24 opening-source prerequisite is unapproved or unavailable, or a close is a legacy row, lacks required evidence or an integrity digest, or has an unavailable/unverified balance source
+- **GIVEN** the v26 opening source or v27 close-evidence support is unavailable, or a close is a legacy row, lacks required evidence or an integrity digest, or has an unavailable/unverified balance source
 - **WHEN** PDF generation is requested
 - **THEN** generation SHALL return a localized unavailable result
 - **AND** no incomplete PDF artifact SHALL be written.

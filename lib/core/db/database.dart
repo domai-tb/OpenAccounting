@@ -35,7 +35,10 @@ class AppDatabase {
       _ownsExecutor = true;
 
   AppDatabase.forProfile(String profileDirectory)
-    : this(drift_native.NativeDatabase(File(p.join(profileDirectory, 'openinvoices.db'))), profileDirectory);
+    : this(
+        drift_native.NativeDatabase(File(p.join(profileDirectory, 'openinvoices.db')), enableMigrations: false),
+        profileDirectory,
+      );
 
   final QueryExecutor _executor;
   final String? profileDir;

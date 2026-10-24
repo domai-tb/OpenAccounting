@@ -90,3 +90,48 @@ CHANGES_APPLIED: n/a
 - The design now identifies the bank-import and global-search changes as archived and preserves their established Banking route/query behavior.
 - The separate setup worker confirmed the v24 prerequisite name `account-opening-balance-source`; its independent review is pending. The cashbook proposal, design, deltas, tasks, and verification record now keep cash writes, balances, closes, and PDFs blocked until that contract is independently approved and implemented. No setup or maintained/shared spec was edited.
 - Round 2's `VERDICT: REVISE` applies to commit `51dbddc` and is now stale because the proposal, design, and delta specs were edited to address its findings. Round 3 independent review is pending; no reviewer acceptance is claimed, and implementation tasks remain unchecked.
+
+---
+
+## Independent Review Round 4 — current uncommitted contract diff
+
+- **Reviewed checkout**: branch `dev`, based on HEAD `81948b3ca3e90d9372f7f964527cc77c55f74ff8`. The review inspected the current uncommitted diff; this verdict does not apply to a committed revision.
+- **Reviewer context**: fresh independent reviewer `review_cashbook_round4`; this section records the reviewer result as artifact author.
+- **Review scope and findings**:
+  1. The v26 opening-source inventory is table 58 after the 57 v25 names, including mileage tables 56 and 57.
+  2. The relevant test-plan rows now reference the v27 daily-close evidence requirement.
+  3. Strict change validation and diff-check are clean.
+  4. Scenario mapping is 46/46; 139 implementation tasks remain unchecked.
+
+### Verdict
+
+VERDICT: APPROVE
+
+This approval is contract-only for the reviewed uncommitted diff. Implementation remains open; all 139 implementation tasks remain unchecked.
+
+---
+
+## Independent Review Round 5 — v26 implementation slice
+
+- **Reviewer**: independent reviewer `/root/review_cashbook_v26_retry`.
+- **Reviewed checkout**: branch `dev` at HEAD `5272cbaf128cb5feb6c6bb7674e85e92cd3d7ff9`.
+- **V26 slice SHA-256**: `b2cb6d5675e6975709a56df5d3fa3b35c16ae23302e3706ea93931d25bed407f`, over the v26 migration/setup diff, the two named tests, and the reviewed cashbook spec and evidence files.
+- **Review scope note**: The shared worktree also has unrelated mileage, router, e-invoice, and other cashbook changes, so it is not isolated as a whole.
+
+### Findings
+
+> **Must fix**
+>
+> 1. **High — schema health accepts weakened constraints** ([migrations.dart](/home/ubuntu/projects/OpenAccounting/lib/core/db/migrations.dart:392)). The v26 validator checks only the prefixes of the `effective_date` and `currency_code` GLOB patterns. A schema with checks such as `GLOB '[0-9]'` and `GLOB '[A-Z]'`, plus the expected columns, keys, and triggers, can pass validation. The migration repair check can then skip repair, and health can report the profile healthy. Compare the complete required patterns and add tests for weakened date and currency constraints. If left as is, malformed v26 schemas can be certified as healthy.
+>
+> 2. **Medium — an existing integration test expects conflicting retries to rewrite the opening** ([setup-onboarding-integrity_test.dart](/home/ubuntu/projects/OpenAccounting/test/integration/audit/setup-onboarding-integrity_test.dart:264)). The test creates a 500.00 opening, then calls setup with 750.00 and expects the journal amount to change ([assertion](/home/ubuntu/projects/OpenAccounting/test/integration/audit/setup-onboarding-integrity_test.dart:272)). The current code rejects that amount ([setup_repository.dart](/home/ubuntu/projects/OpenAccounting/lib/features/setup/setup_repository.dart:165)), as the revised contract requires ([cashbook spec](/home/ubuntu/projects/OpenAccounting/openspec/changes/cashbook-and-daily-close-workspace/specs/cashbook-and-daily-close-workspace/spec.md:51)). Update the old test to expect rejection and verify the source, journal, and balance stay unchanged. As written, that integration test will fail.
+>
+> The other requested checks look sound by inspection. The changed-balance retry test covers a later receipt changing saldo from 125.00 to 150.00, then verifies the exact retry preserves the source, journal, movement, and current saldo ([retry test](/home/ubuntu/projects/OpenAccounting/test/features/setup/cashbook_opening_source_test.dart:40)). Creation still rejects prior journal rows and nonzero or unparseable initial saldo ([setup_repository.dart](/home/ubuntu/projects/OpenAccounting/lib/features/setup/setup_repository.dart:179)); the existing legacy test has both nonzero saldo and a journal row, so it does not isolate the saldo-only check.
+>
+> The named setup test and task evidence cover 11 injected write failures across company insertion, new-account creation, existing-account association, category, journal, saldo, and source insertion; each checks the full relevant state for rollback ([test plan](/home/ubuntu/projects/OpenAccounting/openspec/changes/cashbook-and-daily-close-workspace/test-plan.md:58)). Migration tests cover v25 history preservation without backfill, fresh/upgraded schema parity, and uniqueness and immutability ([migration tests](/home/ubuntu/projects/OpenAccounting/test/db/cashbook_and_daily_close_workspace_migration_test.dart:26)). The v26 version inventory and migration dispatch are present. The health-check constraint gap above remains.
+
+### Verdict
+
+VERDICT: REVISE
+
+The reviewer did not run Flutter or Dart commands. `verify.md` records six setup tests passing after the retry repair at this base HEAD, and nine migration/setup tests passing at an earlier base HEAD; it also records that the full suite was not run. The unchanged integration test above was not covered by those focused runs.

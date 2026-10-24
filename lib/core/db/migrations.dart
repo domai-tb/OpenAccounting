@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 25;
+  static const int currentVersion = 27;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -80,6 +80,9 @@ class MigrationRunner {
       if (actualTables.contains('mileage_trips') && !await _hasMileageTripPostingGuard()) {
         malformedTables.add('mileage_trips');
       }
+    }
+    if (version >= 27 && actualTables.contains('tagesabschluesse') && !(await _hasDailyCloseEvidenceSchema())) {
+      malformedTables.add('tagesabschluesse');
     }
     malformedTables.sort();
     final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
@@ -155,6 +158,9 @@ class MigrationRunner {
     }
     if (table == 'forderung_zahlungen') {
       return _receivableFeatureHasRequiredConstraints();
+    }
+    if (table == 'account_opening_balance_sources') {
+      return _hasAccountOpeningBalanceSourceSchema();
     }
     return true;
   }
@@ -311,6 +317,141 @@ class MigrationRunner {
     return false;
   }
 
+  Future<bool> _hasAccountOpeningBalanceSourceTable() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'account_opening_balance_sources'",
+      const <Object?>[],
+    );
+    return rows.length == 1;
+  }
+
+  Future<bool> _hasAccountOpeningBalanceSourceSchema() async {
+    final List<Map<String, Object?>> tableRows = await executor.runSelect(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_opening_balance_sources'",
+      const <Object?>[],
+    );
+    if (tableRows.length != 1) return false;
+
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(account_opening_balance_sources)',
+      const <Object?>[],
+    );
+    final List<Map<String, Object?>> foreignKeys = await executor.runSelect(
+      'PRAGMA foreign_key_list(account_opening_balance_sources)',
+      const <Object?>[],
+    );
+    final List<Map<String, Object?>> indexes = await executor.runSelect(
+      'PRAGMA index_list(account_opening_balance_sources)',
+      const <Object?>[],
+    );
+    final Map<String, bool> uniqueIndexes = <String, bool>{};
+    for (final Map<String, Object?> index in indexes) {
+      if (_asInt(index['unique']) != 1) continue;
+      final String name = index['name']?.toString() ?? '';
+      if (name.isEmpty) continue;
+      final String quotedName = name.replaceAll('"', '""');
+      final List<Map<String, Object?>> fields = await executor.runSelect(
+        'PRAGMA index_xinfo("$quotedName")',
+        const <Object?>[],
+      );
+      final List<Map<String, Object?>> keyFields = fields
+          .where((Map<String, Object?> field) => _asInt(field['key']) == 1)
+          .toList();
+      final String columnSet = keyFields.map((Map<String, Object?> field) => field['name'].toString()).join(',');
+      if (columnSet == 'source_reference' && keyFields.single['coll']?.toString().toUpperCase() != 'BINARY') {
+        return false;
+      }
+      uniqueIndexes[columnSet] = _asInt(index['partial']) != 0;
+    }
+    final List<Map<String, Object?>> triggers = await executor.runSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ? ORDER BY name",
+      const <Object?>['account_opening_balance_sources'],
+    );
+    return hasAccountOpeningBalanceSourceSchema(
+      tableSql: tableRows.single['sql']?.toString(),
+      columns: columns,
+      foreignKeys: foreignKeys,
+      uniqueIndexes: uniqueIndexes,
+      triggers: triggers,
+    );
+  }
+
+  static bool hasAccountOpeningBalanceSourceSchema({
+    required String? tableSql,
+    required List<Map<String, Object?>> columns,
+    required List<Map<String, Object?>> foreignKeys,
+    required Map<String, bool> uniqueIndexes,
+    required List<Map<String, Object?>> triggers,
+  }) {
+    if (tableSql == null) return false;
+    const Map<String, String> requiredTypes = <String, String>{
+      'id': 'INTEGER',
+      'unternehmen_id': 'INTEGER',
+      'konto_id': 'INTEGER',
+      'journal_id': 'INTEGER',
+      'effective_date': 'TEXT',
+      'amount_cents': 'INTEGER',
+      'currency_code': 'TEXT',
+      'source_reference': 'TEXT',
+    };
+    if (columns.length != requiredTypes.length) return false;
+    for (final MapEntry<String, String> required in requiredTypes.entries) {
+      final Iterable<Map<String, Object?>> found = columns.where(
+        (Map<String, Object?> column) => column['name'] == required.key,
+      );
+      if (found.length != 1 || found.single['type'].toString().toUpperCase() != required.value) {
+        return false;
+      }
+      if (required.key == 'id') {
+        if (_asInt(found.single['pk']) != 1) return false;
+      } else if (_asInt(found.single['notnull']) != 1 || _asInt(found.single['pk']) != 0) {
+        return false;
+      }
+    }
+
+    final Set<String> actualForeignKeys = <String>{
+      for (final Map<String, Object?> foreignKey in foreignKeys)
+        '${foreignKey['table']}:${foreignKey['from']}:${foreignKey['to']}:${foreignKey['on_delete'].toString().toUpperCase()}',
+    };
+    if (actualForeignKeys.length != 3 ||
+        !actualForeignKeys.containsAll(const <String>{
+          'unternehmen:unternehmen_id:id:RESTRICT',
+          'konten:konto_id:id:RESTRICT',
+          'journal:journal_id:id:RESTRICT',
+        })) {
+      return false;
+    }
+
+    if (uniqueIndexes.length != 3 ||
+        uniqueIndexes.values.contains(true) ||
+        !uniqueIndexes.keys.toSet().containsAll(const <String>{
+          'unternehmen_id,konto_id',
+          'journal_id',
+          'source_reference',
+        })) {
+      return false;
+    }
+
+    final String normalizedTableSql = _normalizeSqlDdl(tableSql);
+    const String requiredEffectiveDateConstraint =
+        "effective_date text not null check (effective_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')";
+    const String requiredCurrencyCodeConstraint =
+        "currency_code text not null check (currency_code glob '[A-Z][A-Z][A-Z]')";
+    if (!normalizedTableSql.contains(requiredEffectiveDateConstraint) ||
+        !normalizedTableSql.contains("check (typeof(amount_cents) = 'integer' and amount_cents >= 0)") ||
+        !normalizedTableSql.contains(requiredCurrencyCodeConstraint) ||
+        !normalizedTableSql.contains('check (length(trim(source_reference)) > 0)') ||
+        !normalizedTableSql.contains('unique (source_reference)')) {
+      return false;
+    }
+
+    return MigrationRunner._hasExpectedTriggers(triggers, <String, String>{
+      'account_opening_balance_sources_no_update': _accountOpeningBalanceSourceTriggersSql[0],
+      'account_opening_balance_sources_no_delete': _accountOpeningBalanceSourceTriggersSql[1],
+      'account_opening_balance_sources_no_replace': _accountOpeningBalanceSourceTriggersSql[2],
+    });
+  }
+
   Future<bool> hasAnyTables() async {
     final rows = await executor.runSelect(
       "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
@@ -338,6 +479,9 @@ class MigrationRunner {
     }
 
     await _verifyPaymentTableRequiredAtVersion(version);
+    if (version >= 26 && !(await _hasAccountOpeningBalanceSourceTable())) {
+      throw StateError('account_opening_balance_sources is required from schema version 26; refusing to recreate it');
+    }
 
     if (version == currentVersion && hasTables) {
       await _verifyRequiredTables();
@@ -345,7 +489,9 @@ class MigrationRunner {
       if (await _receivableFeatureNeedsRepair() ||
           await _postingSchemaNeedsRepair() ||
           await _mileageLifecycleNeedsRepair() ||
-          await _mileagePostingNeedsRepair()) {
+          await _mileagePostingNeedsRepair() ||
+          !(await _hasAccountOpeningBalanceSourceSchema()) ||
+          !(await _hasDailyCloseEvidenceSchema())) {
         await _repairCurrentFeature(afterFeatureSchemaDdl);
         return true;
       }
@@ -385,6 +531,17 @@ class MigrationRunner {
           for (var v = version + 1; v <= currentVersion; v++) {
             await _migrateTo(v, createSchema);
             if (v == currentVersion) {
+              if (version >= 26) {
+                if (!(await _hasAccountOpeningBalanceSourceTable())) {
+                  throw StateError(
+                    'account_opening_balance_sources is required from schema version 26; refusing to recreate it',
+                  );
+                }
+                await _migrateAccountOpeningBalanceSource();
+              }
+              if (!(await _hasAccountOpeningBalanceSourceSchema())) {
+                throw StateError('Cashbook-Eröffnungsquellen konnten vor dem Versionswechsel nicht verifiziert werden');
+              }
               await _runFeatureDdlCallback(afterFeatureSchemaDdl);
             }
           }
@@ -437,6 +594,8 @@ class MigrationRunner {
       await _migrateStocktake();
       await _migratePostingGroups();
       await _migrateMileagePosting();
+      await _migrateAccountOpeningBalanceSource(allowCreate: true);
+      await _migrateDailyCloseEvidence();
       await _migrateAccountHolder();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
@@ -592,6 +751,12 @@ class MigrationRunner {
     if (version == 25) {
       await _migrateMileagePosting();
     }
+    if (version == 26) {
+      await _migrateAccountOpeningBalanceSource(allowCreate: true);
+    }
+    if (version == 27) {
+      await _migrateDailyCloseEvidence();
+    }
   }
 
   Future<void> _migrateMileageLifecycle() async {
@@ -701,6 +866,73 @@ WHERE state = 'calculated'
       ),
     );
     await _verifyMileagePostingSchema();
+  }
+
+  Future<void> _migrateAccountOpeningBalanceSource({bool allowCreate = false}) async {
+    if (!allowCreate && !(await _hasAccountOpeningBalanceSourceTable())) {
+      throw StateError('account_opening_balance_sources is required from schema version 26; refusing to recreate it');
+    }
+    final List<Map<String, Object?>> prerequisites = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('unternehmen', 'konten', 'journal')",
+      const <Object?>[],
+    );
+    if (prerequisites.length != 3) {
+      throw StateError('Cashbook-Eröffnungsquellen benötigen Unternehmen, Konten und Journal');
+    }
+
+    await executor.runCustom(_accountOpeningBalanceSourcesTableSql);
+    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_update');
+    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_delete');
+    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_replace');
+    for (final String trigger in _accountOpeningBalanceSourceTriggersSql) {
+      await executor.runCustom(trigger);
+    }
+    if (!await _hasAccountOpeningBalanceSourceSchema()) {
+      throw StateError('Cashbook-Eröffnungsquellen konnten nicht verifiziert werden');
+    }
+  }
+
+  Future<void> _migrateDailyCloseEvidence() async {
+    await _addColumnIfMissing('tagesabschluesse', 'zaehlung_json', 'TEXT');
+    await _addColumnIfMissing('tagesabschluesse', 'integrity_hash', 'TEXT');
+    await executor.runCustom('DROP TRIGGER IF EXISTS tagesabschluesse_finalized_no_update');
+    await executor.runCustom('DROP TRIGGER IF EXISTS tagesabschluesse_finalized_no_delete');
+    await executor.runCustom('DROP TRIGGER IF EXISTS tagesabschluesse_finalized_no_replace');
+    for (final String trigger in _dailyCloseEvidenceTriggersSql) {
+      await executor.runCustom(trigger);
+    }
+    if (!await _hasDailyCloseEvidenceSchema()) {
+      throw StateError('Tagesabschluss-Evidenz konnte nicht verifiziert werden');
+    }
+  }
+
+  Future<bool> _hasDailyCloseEvidenceSchema() async {
+    const Map<String, String> requiredTypes = <String, String>{'zaehlung_json': 'TEXT', 'integrity_hash': 'TEXT'};
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(tagesabschluesse)',
+      const <Object?>[],
+    );
+    for (final MapEntry<String, String> required in requiredTypes.entries) {
+      final Iterable<Map<String, Object?>> found = columns.where(
+        (Map<String, Object?> column) => column['name'] == required.key,
+      );
+      if (found.length != 1 ||
+          found.single['type'].toString().toUpperCase() != required.value ||
+          _asInt(found.single['notnull']) != 0 ||
+          _asInt(found.single['pk']) != 0) {
+        return false;
+      }
+    }
+
+    final List<Map<String, Object?>> triggers = await executor.runSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ? ORDER BY name",
+      const <Object?>['tagesabschluesse'],
+    );
+    return _hasExpectedTriggers(triggers, <String, String>{
+      'tagesabschluesse_finalized_no_update': _dailyCloseEvidenceTriggersSql[0],
+      'tagesabschluesse_finalized_no_delete': _dailyCloseEvidenceTriggersSql[1],
+      'tagesabschluesse_finalized_no_replace': _dailyCloseEvidenceTriggersSql[2],
+    });
   }
 
   Future<void> _verifyMileagePostingSchema() async {
@@ -895,6 +1127,9 @@ WHERE state = 'calculated'
   Future<void> _repairCurrentFeature(Future<void> Function(QueryExecutor executor)? callback) async {
     await executor.runCustom('BEGIN');
     try {
+      if (await getUserVersion() >= 26 && !(await _hasAccountOpeningBalanceSourceTable())) {
+        throw StateError('account_opening_balance_sources is required from schema version 26; refusing to recreate it');
+      }
       await _migrateReceivableFeature();
       await _migratePostingGroups();
       await _migrateAccountHolder();
@@ -902,6 +1137,8 @@ WHERE state = 'calculated'
       await _migrateEInvoiceOutputFormat();
       await _migrateMileageLifecycle();
       await _migrateMileagePosting();
+      await _migrateAccountOpeningBalanceSource();
+      await _migrateDailyCloseEvidence();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -1973,6 +2210,40 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
       ? int.tryParse(v) ?? -1
       : -1;
 
+  static String _normalizeSqlDdl(String sql) {
+    final List<String> literals = <String>[];
+    final String normalized = sql
+        .replaceAllMapped(RegExp("'(?:''|[^'])*'"), (Match match) {
+          literals.add(match.group(0)!);
+          return '\u0000${literals.length - 1}\u0000';
+        })
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ');
+    return normalized.replaceAllMapped(
+      RegExp('\u0000(\\d+)\u0000'),
+      (Match match) => literals[int.parse(match.group(1)!)],
+    );
+  }
+
+  static String _normalizeTriggerSql(String sql) =>
+      _normalizeSqlDdl(sql)
+          .trim()
+          .replaceFirst(RegExp('^create trigger if not exists '), 'create trigger ')
+          .replaceFirst(RegExp(r';$'), '');
+
+  static bool _hasExpectedTriggers(List<Map<String, Object?>> actual, Map<String, String> expectedSqlByName) {
+    if (actual.length != expectedSqlByName.length) return false;
+    final Map<String, String> actualSqlByName = <String, String>{
+      for (final Map<String, Object?> trigger in actual)
+        trigger['name'].toString(): _normalizeTriggerSql(trigger['sql']?.toString() ?? ''),
+    };
+    if (actualSqlByName.length != expectedSqlByName.length) return false;
+    for (final MapEntry<String, String> expected in expectedSqlByName.entries) {
+      if (actualSqlByName[expected.key] != _normalizeTriggerSql(expected.value)) return false;
+    }
+    return true;
+  }
+
   Future<void> _addColumnIfMissing(String table, String name, String definition) async {
     final columns = await executor.runSelect('PRAGMA table_info($table)', const <Object?>[]);
     if (columns.any((column) => column['name'] == name)) return;
@@ -2052,6 +2323,7 @@ const Set<String> _featureOwnedTables = <String>{
   'statutory_timing_rules',
   'dokument_email_templates',
   'dokument_email_versuche',
+  'account_opening_balance_sources',
 };
 
 const Map<String, int> _featureTableVersions = <String, int>{
@@ -2069,6 +2341,7 @@ const Map<String, int> _featureTableVersions = <String, int>{
   'settlement_groups': 19,
   'settlement_allocations': 19,
   'statutory_timing_rules': 19,
+  'account_opening_balance_sources': 26,
 };
 
 // shortcut: subset check covers load-bearing columns only; extend when the exporter reads additional columns.
@@ -2140,6 +2413,7 @@ const Map<String, Set<String>> _declaredRelationshipIdColumns = <String, Set<Str
   'settlement_allocations': <String>{'forderung_id'},
   'mileage_posting_account_mapping': <String>{'konto_id', 'kategorie_id'},
   'dokument_email_versuche': <String>{'dokument_id', 'mahnung_id'},
+  'account_opening_balance_sources': <String>{'unternehmen_id', 'konto_id', 'journal_id'},
 };
 
 const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
@@ -2261,6 +2535,16 @@ const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
     'erstellt_am',
     'abgeschlossen_am',
     'fehler_kategorie',
+  },
+  'account_opening_balance_sources': <String>{
+    'id',
+    'unternehmen_id',
+    'konto_id',
+    'journal_id',
+    'effective_date',
+    'amount_cents',
+    'currency_code',
+    'source_reference',
   },
 };
 
@@ -2387,6 +2671,82 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       OR (state = 'cancelled' AND accounting_correction_id IS NULL AND applied_at IS NULL))
 )''';
 
+const List<String> _dailyCloseEvidenceTriggersSql = <String>[
+  '''
+CREATE TRIGGER IF NOT EXISTS tagesabschluesse_finalized_no_update
+BEFORE UPDATE ON tagesabschluesse
+WHEN OLD.integrity_hash IS NOT NULL OR OLD.signatur IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'finalized daily close is immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS tagesabschluesse_finalized_no_delete
+BEFORE DELETE ON tagesabschluesse
+WHEN OLD.integrity_hash IS NOT NULL OR OLD.signatur IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'finalized daily close is immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS tagesabschluesse_finalized_no_replace
+BEFORE INSERT ON tagesabschluesse
+WHEN EXISTS (
+  SELECT 1 FROM tagesabschluesse
+  WHERE id = NEW.id AND (integrity_hash IS NOT NULL OR signatur IS NOT NULL)
+)
+BEGIN
+  SELECT RAISE(ABORT, 'finalized daily close is immutable');
+END
+''',
+];
+
+const String _accountOpeningBalanceSourcesTableSql = '''
+CREATE TABLE IF NOT EXISTS account_opening_balance_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  unternehmen_id INTEGER NOT NULL REFERENCES unternehmen(id) ON DELETE RESTRICT,
+  konto_id INTEGER NOT NULL REFERENCES konten(id) ON DELETE RESTRICT,
+  journal_id INTEGER NOT NULL REFERENCES journal(id) ON DELETE RESTRICT,
+  effective_date TEXT NOT NULL CHECK (effective_date GLOB
+    '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  amount_cents INTEGER NOT NULL CHECK (typeof(amount_cents) = 'integer' AND amount_cents >= 0),
+  currency_code TEXT NOT NULL CHECK (currency_code GLOB '[A-Z][A-Z][A-Z]'),
+  source_reference TEXT NOT NULL CHECK (length(trim(source_reference)) > 0),
+  UNIQUE (unternehmen_id, konto_id),
+  UNIQUE (journal_id),
+  UNIQUE (source_reference)
+)''';
+
+const List<String> _accountOpeningBalanceSourceTriggersSql = <String>[
+  '''
+CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_update
+BEFORE UPDATE ON account_opening_balance_sources
+BEGIN
+  SELECT RAISE(ABORT, 'account opening sources are immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_delete
+BEFORE DELETE ON account_opening_balance_sources
+BEGIN
+  SELECT RAISE(ABORT, 'account opening sources are immutable');
+END
+''',
+  '''
+CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_replace
+BEFORE INSERT ON account_opening_balance_sources
+WHEN EXISTS (
+  SELECT 1 FROM account_opening_balance_sources
+  WHERE id = NEW.id
+    OR (unternehmen_id = NEW.unternehmen_id AND konto_id = NEW.konto_id)
+    OR journal_id = NEW.journal_id
+    OR source_reference = NEW.source_reference COLLATE NOCASE
+)
+BEGIN
+  SELECT RAISE(ABORT, 'account opening sources are immutable');
+END
+''',
+];
 const String _mileagePostingAccountMappingTableSql = '''
 CREATE TABLE IF NOT EXISTS mileage_posting_account_mapping (
   role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),
