@@ -47,6 +47,48 @@ class MileageEntryUseCases {
     return trip;
   }
 
+  Future<({String correctionId, MileageTrip replacementTrip})> prepareReplacementCorrection({
+    required String sourceTripId,
+    required String reason,
+    required String tripDate,
+    required String purpose,
+    required int distanceHundredthsKm,
+    required String businessContext,
+    required MileageTripKind tripKind,
+    required MileageVehicleSource vehicleSource,
+    required MileageVehicleClass vehicleClass,
+  }) async {
+    _requireDate(tripDate);
+    _requireText(reason, 'reason');
+    _requireText(purpose, 'purpose');
+    _requireText(businessContext, 'businessContext');
+    if (distanceHundredthsKm < 1 || distanceHundredthsKm > 999999999999) {
+      throw ArgumentError('distance out of range');
+    }
+    final String now = DateTime.now().toUtc().toIso8601String();
+    final MileageTrip replacementTrip = MileageTrip(
+      id: _newUuidV4(),
+      tripDate: tripDate,
+      purpose: purpose.trim(),
+      businessContext: businessContext.trim(),
+      distanceHundredthsKm: distanceHundredthsKm,
+      tripKind: tripKind,
+      vehicleSource: vehicleSource,
+      vehicleClass: vehicleClass,
+      state: MileageTripState.unresolved,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final String correctionId = _newUuidV4();
+    await repo.prepareReplacementCorrection(
+      sourceTripId: sourceTripId,
+      correctionId: correctionId,
+      replacementTrip: replacementTrip,
+      reason: reason.trim(),
+    );
+    return (correctionId: correctionId, replacementTrip: replacementTrip);
+  }
+
   Future<MileageTrip> editTripFacts(
     String id, {
     String? purpose,

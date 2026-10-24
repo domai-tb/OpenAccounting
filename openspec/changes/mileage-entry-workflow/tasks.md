@@ -18,16 +18,16 @@ The Round 6 independent review approved the corrected contract at baseline HEAD 
 - [x] Reject malformed v25 mileage mapping primary-key, role-check, foreign-key, and closure date/range schemas in migration and customer-disclosure health checks; see `verify.md`.
 - [x] Keep direct SQL correction application and posted-trip terminal transitions fail-closed when given a fabricated accounting event ID; the accounting reversal/replacement operation remains unimplemented and open (see `verify.md`).
 
-### `mileage-entry` tests (5 missing scenarios; 1 existing-test assertion task)
+### `mileage-entry` tests (4 missing scenarios; policy-boundary assertion verified)
 
 - [x] Add `test_mileage_form_is_keyboard_operable_and_localized` in `test/features/mileage/mileage_entry_workflow_test.dart` (2026-10-18 focused run; see `verify.md`).
 - [x] Add `test_posting_is_unavailable_without_each_prerequisite` in `test/features/mileage/mileage_entry_workflow_test.dart` (2026-10-18 focused run; see `verify.md`).
-- [ ] Add `test_prepare_replacement_correction_without_accounting_changes` in `test/features/mileage/mileage_entry_workflow_test.dart`.
+- [x] Add `test_prepare_replacement_correction_without_accounting_changes` in `test/features/mileage/mileage_entry_workflow_test.dart` (2026-10-24 focused run; see `verify.md`).
 - [ ] Add `test_apply_accepted_replacement_correction_atomically` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_undo_posted_trip_through_correction` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_correction_apply_is_unavailable_without_accepted_operation` in `test/features/mileage/mileage_entry_workflow_test.dart`.
 - [ ] Add `test_failed_or_repeated_correction_is_safe` in `test/features/mileage/mileage_entry_workflow_test.dart`.
-- [ ] Separately extend and rerun existing `test_calculate_from_an_approved_policy` to assert the v1 effective-date boundary, both supported vehicle classes and rates, exact integer half-up cent rounding, and every fail-closed eligibility exclusion. The current test predates this contract and does not establish these assertions; this is not a missing scenario row.
+- [x] Separately extend and rerun existing `test_calculate_from_an_approved_policy` to assert the v1 effective-date boundary, both supported vehicle classes and rates, exact integer half-up cent rounding, and every fail-closed eligibility exclusion (2026-10-24 focused run; see `verify.md`).
 
 ### `db` tests (remaining planned scenarios; see each checkbox below)
 

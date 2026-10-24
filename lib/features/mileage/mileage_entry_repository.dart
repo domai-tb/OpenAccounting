@@ -52,8 +52,10 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
 )''', const <Object?>[]);
   }
 
-  Future<void> insertTrip(MileageTrip trip) async {
-    await executor.runInsert(
+  Future<void> insertTrip(MileageTrip trip) => _insertTrip(executor, trip);
+
+  Future<void> _insertTrip(QueryExecutor target, MileageTrip trip) async {
+    await target.runInsert(
       'INSERT INTO mileage_trips (id, trip_date, purpose, business_context, trip_kind, vehicle_source, vehicle_class, '
       'distance_hundredths_km, state, policy_id, policy_source, policy_version, '
       'policy_effective_from, policy_effective_to, calculated_amount, calculated_at, '
@@ -81,6 +83,48 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
         trip.updatedAt,
       ],
     );
+  }
+
+  Future<void> prepareReplacementCorrection({
+    required String sourceTripId,
+    required String correctionId,
+    required MileageTrip replacementTrip,
+    required String reason,
+  }) async {
+    final TransactionExecutor transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      final List<Map<String, Object?>> sourceRows = await transaction.runSelect(
+        'SELECT state FROM mileage_trips WHERE id = ?',
+        <Object?>[sourceTripId],
+      );
+      if (sourceRows.isEmpty) throw StateError('not found');
+      if (sourceRows.single['state'] != MileageTripState.posted.name) throw StateError('not posted');
+
+      await _insertTrip(transaction, replacementTrip);
+      await transaction.runInsert(
+        'INSERT INTO mileage_trip_corrections '
+        '(id, trip_id, kind, replacement_trip_id, reason, state, accounting_correction_id, created_at, applied_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          correctionId,
+          sourceTripId,
+          'replace',
+          replacementTrip.id,
+          reason,
+          'draft',
+          null,
+          replacementTrip.createdAt,
+          null,
+        ],
+      );
+      await transaction.send();
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(error, stackTrace);
+    }
   }
 
   Future<List<MileageTrip>> listTrips() async {
@@ -212,4 +256,12 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       postingEventId: r['posting_event_id']?.toString(),
     );
   }
+}
+
+class _NoopTransactionUser extends QueryExecutorUser {
+  @override
+  int get schemaVersion => 0;
+
+  @override
+  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {}
 }

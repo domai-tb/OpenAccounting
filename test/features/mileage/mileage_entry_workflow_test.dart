@@ -157,7 +157,108 @@ void main() {
       expect(rows.first.purpose, 'Kundenbesuch');
     });
 
-    test('test_calculate_from_an_approved_policy', () {
+    test('test_prepare_replacement_correction_without_accounting_changes', () async {
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(source.id);
+
+      final MileageTrip postedBefore = (await repo.getById(source.id))!;
+      final int journalCountBefore =
+          ((await db.executor.runSelect('SELECT COUNT(*) AS count FROM journal WHERE source_kind = ?', const <Object?>[
+                    'mileage_trip',
+                  ])).single['count']!
+                  as num)
+              .toInt();
+      final ({String correctionId, MileageTrip replacementTrip}) prepared = await useCases.prepareReplacementCorrection(
+        sourceTripId: source.id,
+        reason: 'Korrektur der Strecke',
+        tripDate: '2026-03-15',
+        purpose: 'Korrigierter Kundenbesuch',
+        distanceHundredthsKm: 1200,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+
+      expect(prepared.replacementTrip.id, isNot(source.id));
+      expect(prepared.replacementTrip.tripDate, '2026-03-15');
+      expect(prepared.replacementTrip.purpose, 'Korrigierter Kundenbesuch');
+      expect(prepared.replacementTrip.distanceHundredthsKm, 1200);
+      expect(prepared.replacementTrip.state, MileageTripState.unresolved);
+      expect(prepared.replacementTrip.policyId, isNull);
+      expect(prepared.replacementTrip.calculatedAmount, isNull);
+      expect(prepared.replacementTrip.postingEventId, isNull);
+
+      final MileageTrip postedAfter = (await repo.getById(source.id))!;
+      expect(postedAfter.tripDate, postedBefore.tripDate);
+      expect(postedAfter.purpose, postedBefore.purpose);
+      expect(postedAfter.distanceHundredthsKm, postedBefore.distanceHundredthsKm);
+      expect(postedAfter.state, MileageTripState.posted);
+      expect(postedAfter.postingEventId, postedBefore.postingEventId);
+
+      final List<Map<String, Object?>> corrections = await db.executor.runSelect(
+        'SELECT id, kind, replacement_trip_id, reason, state, accounting_correction_id, applied_at '
+        'FROM mileage_trip_corrections WHERE trip_id = ?',
+        <Object?>[source.id],
+      );
+      expect(corrections, hasLength(1));
+      expect(corrections.single['id'], prepared.correctionId);
+      expect(corrections.single['kind'], 'replace');
+      expect(corrections.single['replacement_trip_id'], prepared.replacementTrip.id);
+      expect(corrections.single['reason'], 'Korrektur der Strecke');
+      expect(corrections.single['state'], 'draft');
+      expect(corrections.single['accounting_correction_id'], isNull);
+      expect(corrections.single['applied_at'], isNull);
+
+      final int journalCountAfter =
+          ((await db.executor.runSelect('SELECT COUNT(*) AS count FROM journal WHERE source_kind = ?', const <Object?>[
+                    'mileage_trip',
+                  ])).single['count']!
+                  as num)
+              .toInt();
+      expect(journalCountAfter, journalCountBefore);
+      final List<Map<String, Object?>> replacementLegs = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ?',
+        <Object?>['mileage_trip', prepared.replacementTrip.id],
+      );
+      expect(replacementLegs, isEmpty);
+
+      final MileageTrip unresolved = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-16',
+        purpose: 'Nicht gebuchte Fahrt',
+        distanceHundredthsKm: 500,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await expectLater(
+        () => useCases.prepareReplacementCorrection(
+          sourceTripId: unresolved.id,
+          reason: 'Nicht zulässig',
+          tripDate: '2026-03-17',
+          purpose: 'Ersatzfahrt',
+          distanceHundredthsKm: 600,
+          businessContext: 'Projekt',
+          tripKind: MileageTripKind.businessTrip,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: MileageVehicleClass.kraftwagen,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('test_calculate_from_an_approved_policy', () async {
       expect(
         useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4525, vehicleClass: MileageVehicleClass.kraftwagen),
         1358,
@@ -170,6 +271,10 @@ void main() {
         200,
       );
       expect(
+        useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4, vehicleClass: MileageVehicleClass.kraftwagen),
+        1,
+      );
+      expect(
         useCases.calculateApprovedAmountCents(distanceHundredthsKm: 5, vehicleClass: MileageVehicleClass.kraftwagen),
         2,
       );
@@ -180,6 +285,126 @@ void main() {
         ),
         throwsArgumentError,
       );
+
+      final List<({String date, MileageVehicleClass vehicleClass, num amount})> boundaryCases =
+          <({String date, MileageVehicleClass vehicleClass, num amount})>[
+            (date: '2025-01-01', vehicleClass: MileageVehicleClass.kraftwagen, amount: 3.0),
+            (date: '2026-12-31', vehicleClass: MileageVehicleClass.otherMotorVehicle, amount: 2.0),
+          ];
+      for (final fact in boundaryCases) {
+        final MileageTrip trip = await useCases.recordBusinessTrip(
+          tripDate: fact.date,
+          purpose: 'Kundenbesuch',
+          distanceHundredthsKm: 1000,
+          businessContext: 'Projekt',
+          tripKind: MileageTripKind.businessTrip,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: fact.vehicleClass,
+        );
+        final MileageTrip calculated = await useCases.calculateTrip(trip.id);
+        expect(calculated.state, MileageTripState.calculated);
+        expect(num.parse(calculated.calculatedAmount!), fact.amount);
+        expect(calculated.policyId, 'DE-private-business-travel/1');
+        expect(calculated.policyVersion, '1');
+        expect(calculated.policyEffectiveFrom, '2025-01-01');
+        expect(calculated.policyEffectiveTo, '2026-12-31');
+        expect(calculated.calculatedAt, isNotNull);
+      }
+
+      final List<
+        ({String date, MileageTripKind tripKind, MileageVehicleSource vehicleSource, MileageVehicleClass vehicleClass})
+      >
+      excludedFacts =
+          <
+            ({
+              String date,
+              MileageTripKind tripKind,
+              MileageVehicleSource vehicleSource,
+              MileageVehicleClass vehicleClass,
+            })
+          >[
+            (
+              date: '2024-12-31',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2027-01-01',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.commuting,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.eksAllowance,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.other,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.unknown,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.company,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.unknown,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.unsupported,
+            ),
+            (
+              date: '2026-03-14',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.unknown,
+            ),
+          ];
+      for (final fact in excludedFacts) {
+        final MileageTrip trip = await useCases.recordBusinessTrip(
+          tripDate: fact.date,
+          purpose: 'Fahrt',
+          distanceHundredthsKm: 1000,
+          businessContext: 'Projekt',
+          tripKind: fact.tripKind,
+          vehicleSource: fact.vehicleSource,
+          vehicleClass: fact.vehicleClass,
+        );
+        final MileageTrip result = await useCases.calculateTrip(trip.id);
+        expect(result.state, MileageTripState.unresolved);
+        expect(result.policyId, isNull);
+        expect(result.policySource, isNull);
+        expect(result.policyVersion, isNull);
+        expect(result.policyEffectiveFrom, isNull);
+        expect(result.policyEffectiveTo, isNull);
+        expect(result.calculatedAmount, isNull);
+        expect(result.calculatedAt, isNull);
+        expect(result.postingEventId, isNull);
+      }
     });
 
     test('test_keep_an_unresolved_trip_out_of_accounting', () async {
