@@ -258,6 +258,121 @@ void main() {
       );
     });
 
+    test('test_correction_apply_is_unavailable_without_accepted_operation', () async {
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(source.id);
+      final ({String correctionId, MileageTrip replacementTrip}) prepared = await useCases.prepareReplacementCorrection(
+        sourceTripId: source.id,
+        reason: 'Korrektur der Strecke',
+        tripDate: '2026-03-15',
+        purpose: 'Korrigierter Kundenbesuch',
+        distanceHundredthsKm: 1200,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      final List<Map<String, Object?>> tripsBefore = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips ORDER BY id',
+        const <Object?>[],
+      );
+      final List<Map<String, Object?>> correctionsBefore = await db.executor.runSelect(
+        'SELECT * FROM mileage_trip_corrections ORDER BY id',
+        const <Object?>[],
+      );
+      final List<Map<String, Object?>> journalBefore = await db.executor.runSelect(
+        'SELECT * FROM journal ORDER BY id',
+        const <Object?>[],
+      );
+
+      await expectLater(
+        () => useCases.applyCorrection(prepared.correctionId),
+        throwsA(
+          isA<StateError>().having(
+            (StateError error) => error.message,
+            'message',
+            contains('correction operation unavailable'),
+          ),
+        ),
+      );
+
+      expect(await db.executor.runSelect('SELECT * FROM mileage_trips ORDER BY id', const <Object?>[]), tripsBefore);
+      expect(
+        await db.executor.runSelect('SELECT * FROM mileage_trip_corrections ORDER BY id', const <Object?>[]),
+        correctionsBefore,
+      );
+      expect(await db.executor.runSelect('SELECT * FROM journal ORDER BY id', const <Object?>[]), journalBefore);
+      expect((await repo.getById(source.id))!.state, MileageTripState.posted);
+      expect((await repo.getById(prepared.replacementTrip.id))!.state, MileageTripState.unresolved);
+    });
+
+    test('test_failed_or_repeated_correction_is_safe', () async {
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(source.id);
+      final ({String correctionId, MileageTrip replacementTrip}) prepared = await useCases.prepareReplacementCorrection(
+        sourceTripId: source.id,
+        reason: 'Korrektur der Strecke',
+        tripDate: '2026-03-15',
+        purpose: 'Korrigierter Kundenbesuch',
+        distanceHundredthsKm: 1200,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      final List<Map<String, Object?>> tripsBefore = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips ORDER BY id',
+        const <Object?>[],
+      );
+      final List<Map<String, Object?>> correctionsBefore = await db.executor.runSelect(
+        'SELECT * FROM mileage_trip_corrections ORDER BY id',
+        const <Object?>[],
+      );
+      final List<Map<String, Object?>> journalBefore = await db.executor.runSelect(
+        'SELECT * FROM journal ORDER BY id',
+        const <Object?>[],
+      );
+      final Matcher unavailable = throwsA(
+        isA<StateError>().having(
+          (StateError error) => error.message,
+          'message',
+          contains('correction operation unavailable'),
+        ),
+      );
+
+      await expectLater(() => useCases.applyCorrection(prepared.correctionId), unavailable);
+      await expectLater(() => useCases.applyCorrection(prepared.correctionId), unavailable);
+
+      expect(await db.executor.runSelect('SELECT * FROM mileage_trips ORDER BY id', const <Object?>[]), tripsBefore);
+      expect(
+        await db.executor.runSelect('SELECT * FROM mileage_trip_corrections ORDER BY id', const <Object?>[]),
+        correctionsBefore,
+      );
+      expect(await db.executor.runSelect('SELECT * FROM journal ORDER BY id', const <Object?>[]), journalBefore);
+      expect((await repo.getById(source.id))!.state, MileageTripState.posted);
+      expect((await repo.getById(prepared.replacementTrip.id))!.state, MileageTripState.unresolved);
+    });
+
     test('test_calculate_from_an_approved_policy', () async {
       expect(
         useCases.calculateApprovedAmountCents(distanceHundredthsKm: 4525, vehicleClass: MileageVehicleClass.kraftwagen),

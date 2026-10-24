@@ -89,6 +89,11 @@ class MileageEntryUseCases {
     return (correctionId: correctionId, replacementTrip: replacementTrip);
   }
 
+  Future<void> applyCorrection(String correctionId) async {
+    _requireText(correctionId, 'correctionId');
+    throw StateError('mileage correction operation unavailable');
+  }
+
   Future<MileageTrip> editTripFacts(
     String id, {
     String? purpose,
