@@ -232,14 +232,16 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                 ],
               ),
             ),
-            if (cashbook) ...<Widget>[
-              const SizedBox(height: 16),
+            if (cashbook && hasSelection && !_balanceLoading && result?.complete != true)
               AppCard(
                 child: Text(
                   l10n.cashbookMovementsUnavailable,
                   key: const ValueKey<String>('cashbook-movements-unavailable'),
                 ),
               ),
+            if (cashbook && result?.complete == true) ...<Widget>[
+              const SizedBox(height: 16),
+              _cashbookEvents(l10n, locale, result!.movements),
             ],
             const SizedBox(height: 16),
             if (_balanceLoading) const Center(child: CircularProgressIndicator()),
@@ -288,6 +290,69 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _cashbookEvents(AppLocalizations l10n, String locale, List<CashbookMovementEvidence> movements) {
+    final NumberFormat numberFormat = NumberFormat.decimalPattern(locale);
+    return AppCard(
+      child: Column(
+        key: const ValueKey<String>('cashbook-event-list'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(l10n.cashbookEventsTitle, style: Theme.of(context).textTheme.titleMedium),
+          if (movements.isEmpty)
+            Padding(padding: const EdgeInsets.only(top: 12), child: Text(l10n.cashbookEventsEmpty)),
+          for (final CashbookMovementEvidence movement in movements)
+            Padding(
+              key: ValueKey<String>('cashbook-event-${movement.postingGroupId}'),
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    movement.description!,
+                    key: ValueKey<String>('cashbook-event-description-${movement.postingGroupId}'),
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Text(
+                    '${l10n.tagesabschlussDate}: ${formatDate(movement.effectiveAt!, locale: locale)}',
+                    key: ValueKey<String>('cashbook-event-date-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventDirection}: ${movement.direction == CashbookMovementDirection.income ? l10n.cashbookEventIncome : l10n.cashbookEventExpense}',
+                    key: ValueKey<String>('cashbook-event-direction-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventAmount}: ${_formatCents(movement.amountCents!, movement.currencyCode!, locale)}',
+                    key: ValueKey<String>('cashbook-event-amount-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventAmountBasis}: ${movement.amountBasis == CashbookMovementAmountBasis.committedCashEffect ? l10n.cashbookPostedCashAmountBasis : l10n.cashbookEventAmountBasisUnavailable}',
+                    key: ValueKey<String>('cashbook-event-amount-basis-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventCategory}: ${movement.allocations.map((CashbookAllocationEvidence allocation) => allocation.categoryName).toSet().join(', ')}',
+                    key: ValueKey<String>('cashbook-event-category-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventTaxTreatment}: ${movement.allocations.map((CashbookAllocationEvidence allocation) => allocation.taxRate == null ? l10n.cashbookEventTaxNotRecorded : '${numberFormat.format(allocation.taxRate)}%').toSet().join(', ')}',
+                    key: ValueKey<String>('cashbook-event-tax-${movement.postingGroupId}'),
+                  ),
+                  Text(
+                    '${l10n.cashbookEventPosting}: #${movement.postingGroupId} · ${movement.sourceReference}',
+                    key: ValueKey<String>('cashbook-event-posting-${movement.postingGroupId}'),
+                  ),
+                  if (movement.receiptReference != null)
+                    Text(
+                      '${l10n.documentReceipt}: ${movement.receiptReference}',
+                      key: ValueKey<String>('cashbook-event-receipt-${movement.postingGroupId}'),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

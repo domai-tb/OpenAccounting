@@ -32,12 +32,14 @@ void main() {
 
     expect(router.routeInformationProvider.value.uri.queryParameters['view'], 'cashbook');
     expect(find.text('Kassenbuch'), findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('cashbook-movements-unavailable')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('cashbook-movements-unavailable')), findsNothing);
     expect(find.text('Wähle Unternehmen, Kassenkonto und Datum, um eine Saldenvorschau anzufordern.'), findsOneWidget);
 
     await _selectCashbookAccountAndDate(tester);
 
     expect(find.text('Vollständig'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('cashbook-event-list')), findsOneWidget);
+    expect(find.text('Für dieses Datum sind keine gebuchten Kassenbewegungen vorhanden.'), findsOneWidget);
     expect(find.text('Kassenbestand zum Stichtag'), findsOneWidget);
     expect(
       find.byWidgetPredicate((Widget widget) => widget is Text && RegExp('100[,.]00').hasMatch(widget.data ?? '')),

@@ -285,13 +285,14 @@ class CashbookBalanceSource {
     required String accountCurrency,
   }) async {
     final List<Map<String, Object?>> rows = await executor.runSelect(
-      'SELECT id, datum, betrag, konto_id, soll, haben, soll_konto_id, haben_konto_id, gruppe_id, immutable, '
-      'legacy_unverified, source_kind, source_id, reversal_of_group_id FROM journal '
-      'WHERE gruppe_id = ? OR id = ? ORDER BY id',
+      'SELECT id, datum, betrag, beschreibung, kategorie_id, beleg_id, konto_id, soll, haben, soll_konto_id, '
+      'haben_konto_id, gruppe_id, immutable, legacy_unverified, source_kind, source_id, reversal_of_group_id '
+      'FROM journal WHERE gruppe_id = ? OR id = ? ORDER BY id',
       <Object?>[rootId, rootId],
     );
     if (rows.length < 2) throw const _IncompleteCashbookHistory();
     final List<int> groupAccountEffects = <int>[];
+    final Set<int> receiptIds = <int>{};
     var totalDebitCents = BigInt.zero;
     var totalCreditCents = BigInt.zero;
     var hasRoot = false;
@@ -310,6 +311,8 @@ class CashbookBalanceSource {
       final int? amountCents = _moneyCents(row['betrag']);
       final int? debitAccountId = _positiveInt(row['soll_konto_id']);
       final int? creditAccountId = _positiveInt(row['haben_konto_id']);
+      final Object? rawReceiptId = row['beleg_id'];
+      final int? receiptId = rawReceiptId == null ? null : _positiveInt(rawReceiptId);
       if (id == null ||
           rowGroupId != rootId ||
           rowAccountId == null ||
@@ -317,6 +320,7 @@ class CashbookBalanceSource {
           kind != 'cash_payment' ||
           rowSourceId == null ||
           rowSourceId.trim().isEmpty ||
+          (rawReceiptId != null && receiptId == null) ||
           _integer(row['immutable']) != 1 ||
           _integer(row['legacy_unverified']) != 0 ||
           debitCents == null ||
@@ -331,6 +335,7 @@ class CashbookBalanceSource {
           (creditCents > 0 && creditAccountId != rowAccountId)) {
         throw const _IncompleteCashbookHistory();
       }
+      if (receiptId != null) receiptIds.add(receiptId);
       if (groupDate != null && groupDate != date) throw const _IncompleteCashbookHistory();
       if (sourceId != null && sourceId != rowSourceId) throw const _IncompleteCashbookHistory();
       groupDate = date;
@@ -347,6 +352,11 @@ class CashbookBalanceSource {
     if (parsedGroupDate == null || !_sameLocalDate(parsedGroupDate, candidateDate)) {
       throw const _IncompleteCashbookHistory();
     }
+    final int effectCents = groupAccountEffects.fold<int>(0, (int sum, int amount) => sum + amount);
+    if (effectCents == 0) throw const _IncompleteCashbookHistory();
+    final Map<String, Object?> root = rows.firstWhere((Map<String, Object?> row) => _positiveInt(row['id']) == rootId);
+    final String? description = root['beschreibung'] as String?;
+    if (description == null || description.trim().isEmpty) throw const _IncompleteCashbookHistory();
     final List<Map<String, Object?>> settlementRows = await executor.runSelect(
       'SELECT id, source_kind, source_id, signed_amount_cents, settlement_date, unapplied_cents, '
       'group_root_journal_id FROM settlement_groups WHERE source_kind = ? AND source_id = ?',
@@ -358,9 +368,7 @@ class CashbookBalanceSource {
     final int? settlementRootId = _positiveInt(settlement['group_root_journal_id']);
     final int? signedAmountCents = _integer(settlement['signed_amount_cents']);
     final int? unappliedCents = _integer(settlement['unapplied_cents']);
-    final int? rootAmountCents = _moneyCents(
-      rows.firstWhere((Map<String, Object?> row) => _positiveInt(row['id']) == rootId)['betrag'],
-    );
+    final int? rootAmountCents = _moneyCents(root['betrag']);
     if (settlementId == null ||
         settlement['source_kind'] != 'cash_payment' ||
         settlement['source_id'] != sourceId ||
@@ -368,24 +376,56 @@ class CashbookBalanceSource {
         settlement['settlement_date'] != groupDate ||
         signedAmountCents == null ||
         rootAmountCents != signedAmountCents ||
+        signedAmountCents != effectCents ||
         unappliedCents == null) {
       throw const _IncompleteCashbookHistory();
     }
     final List<Map<String, Object?>> allocationRows = await executor.runSelect(
-      'SELECT applied_cents FROM settlement_allocations WHERE group_id = ? ORDER BY id',
+      'SELECT a.applied_cents, a.kategorie_id, a.ust_satz, k.bezeichnung AS category_name '
+      'FROM settlement_allocations AS a LEFT JOIN kategorien AS k ON k.id = a.kategorie_id '
+      'WHERE a.group_id = ? ORDER BY a.id',
       <Object?>[settlementId],
     );
     if (allocationRows.isEmpty) throw const _IncompleteCashbookHistory();
     var allocatedMagnitude = BigInt.zero;
+    final List<CashbookAllocationEvidence> allocations = <CashbookAllocationEvidence>[];
     for (final Map<String, Object?> allocation in allocationRows) {
       final int? appliedCents = _integer(allocation['applied_cents']);
-      if (appliedCents == null || appliedCents == 0) throw const _IncompleteCashbookHistory();
+      final int? categoryId = _positiveInt(allocation['kategorie_id']);
+      final String? categoryName = allocation['category_name'] as String?;
+      final Object? rawTaxRate = allocation['ust_satz'];
+      final num? taxRate = rawTaxRate == null
+          ? null
+          : rawTaxRate is num
+          ? rawTaxRate
+          : num.tryParse(rawTaxRate.toString());
+      if (appliedCents == null ||
+          appliedCents == 0 ||
+          categoryId == null ||
+          categoryName == null ||
+          categoryName.trim().isEmpty ||
+          (rawTaxRate != null && taxRate == null) ||
+          (taxRate != null && (taxRate < 0 || taxRate > 100))) {
+        throw const _IncompleteCashbookHistory();
+      }
       allocatedMagnitude += BigInt.from(appliedCents).abs();
+      allocations.add(CashbookAllocationEvidence(categoryName: categoryName, taxRate: taxRate));
     }
     if (allocatedMagnitude + BigInt.from(unappliedCents).abs() != BigInt.from(signedAmountCents).abs()) {
       throw const _IncompleteCashbookHistory();
     }
-    final int effectCents = groupAccountEffects.fold<int>(0, (int sum, int amount) => sum + amount);
+    String? receiptReference;
+    if (receiptIds.length > 1) throw const _IncompleteCashbookHistory();
+    if (receiptIds.isNotEmpty) {
+      final int receiptId = receiptIds.single;
+      final List<Map<String, Object?>> receipts = await executor.runSelect(
+        'SELECT belegnummer FROM belege WHERE id = ?',
+        <Object?>[receiptId],
+      );
+      if (receipts.length != 1) throw const _IncompleteCashbookHistory();
+      final String? receiptNumber = receipts.single['belegnummer']?.toString();
+      receiptReference = receiptNumber == null || receiptNumber.trim().isEmpty ? '#$receiptId' : receiptNumber.trim();
+    }
     return CashbookMovementEvidence(
       postingGroupId: rootId.toString(),
       sourceReference: sourceId,
@@ -398,6 +438,11 @@ class CashbookBalanceSource {
       kind: CashbookMovementKind.cashPayment,
       balanced: true,
       linkedToAccount: true,
+      direction: effectCents > 0 ? CashbookMovementDirection.income : CashbookMovementDirection.expense,
+      amountBasis: CashbookMovementAmountBasis.committedCashEffect,
+      allocations: List<CashbookAllocationEvidence>.unmodifiable(allocations),
+      description: description.trim(),
+      receiptReference: receiptReference,
     );
   }
 

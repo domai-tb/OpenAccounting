@@ -88,6 +88,18 @@ class CashbookOpeningBalance {
 }
 
 /// A candidate from the balanced cash-posting boundary.
+enum CashbookMovementDirection { income, expense }
+
+enum CashbookMovementAmountBasis { committedCashEffect }
+
+/// One stored allocation belonging to a verified committed cash movement.
+class CashbookAllocationEvidence {
+  const CashbookAllocationEvidence({required this.categoryName, this.taxRate});
+
+  final String categoryName;
+  final num? taxRate;
+}
+
 class CashbookMovementEvidence {
   const CashbookMovementEvidence({
     required this.postingGroupId,
@@ -102,6 +114,11 @@ class CashbookMovementEvidence {
     required this.balanced,
     required this.linkedToAccount,
     this.openingIdentity,
+    this.direction,
+    this.amountBasis,
+    this.allocations = const <CashbookAllocationEvidence>[],
+    this.description,
+    this.receiptReference,
   });
 
   final String? postingGroupId;
@@ -119,9 +136,12 @@ class CashbookMovementEvidence {
   final CashbookMovementKind kind;
   final bool balanced;
   final bool linkedToAccount;
-
-  /// Set only when the source identifies this row as the supplied opening event itself.
   final String? openingIdentity;
+  final CashbookMovementDirection? direction;
+  final CashbookMovementAmountBasis? amountBasis;
+  final List<CashbookAllocationEvidence> allocations;
+  final String? description;
+  final String? receiptReference;
 }
 
 /// One account/date balance, or an unavailable result with no usable amount.
@@ -134,6 +154,7 @@ class CashbookBalanceResult {
     required this.currencyCode,
     required this.sourceReference,
     required this.sourceReferences,
+    required this.movements,
     required this.complete,
     required this.unavailableReason,
   });
@@ -146,6 +167,7 @@ class CashbookBalanceResult {
     required String currencyCode,
     required String sourceReference,
     required List<String> sourceReferences,
+    List<CashbookMovementEvidence> movements = const <CashbookMovementEvidence>[],
   }) {
     return CashbookBalanceResult._(
       companyId: companyId,
@@ -155,6 +177,7 @@ class CashbookBalanceResult {
       currencyCode: currencyCode,
       sourceReference: sourceReference,
       sourceReferences: List<String>.unmodifiable(sourceReferences),
+      movements: List<CashbookMovementEvidence>.unmodifiable(movements),
       complete: true,
       unavailableReason: null,
     );
@@ -177,6 +200,7 @@ class CashbookBalanceResult {
       currencyCode: currencyCode,
       sourceReference: sourceReference,
       sourceReferences: List<String>.unmodifiable(sourceReferences),
+      movements: const <CashbookMovementEvidence>[],
       complete: false,
       unavailableReason: reason,
     );
@@ -191,6 +215,7 @@ class CashbookBalanceResult {
   final String currencyCode;
   final String sourceReference;
   final List<String> sourceReferences;
+  final List<CashbookMovementEvidence> movements;
   final bool complete;
   final CashbookBalanceUnavailableReason? unavailableReason;
 }
@@ -332,6 +357,7 @@ class CashbookBalanceCalculator {
 
     BigInt balance = BigInt.from(opening.balanceCents);
     final Set<String> postingGroupIds = <String>{};
+    final List<CashbookMovementEvidence> includedMovements = <CashbookMovementEvidence>[];
 
     for (final CashbookMovementEvidence movement in candidates) {
       if (movement.effectiveAt != null && movement.effectiveAt!.isAfter(asOfDate)) {
@@ -403,6 +429,7 @@ class CashbookBalanceCalculator {
       if (balance < _minimumCents || balance > _maximumCents) {
         return unavailable(CashbookBalanceUnavailableReason.balanceOverflow);
       }
+      includedMovements.add(movement);
     }
 
     sourceReferences.sort();
@@ -414,6 +441,7 @@ class CashbookBalanceCalculator {
       currencyCode: request.currencyCode,
       sourceReference: _sourceReference(request, sourceReferences),
       sourceReferences: sourceReferences,
+      movements: includedMovements,
     );
   }
 

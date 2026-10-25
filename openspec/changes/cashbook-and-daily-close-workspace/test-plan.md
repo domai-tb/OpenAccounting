@@ -14,9 +14,9 @@
 | specs/accounting/spec.md → Tagesabschluss | Concurrent finalization is serialized | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_concurrent_finalization_is_serialized | 🔴 red |
 | specs/accounting/spec.md → Tagesabschluss | Ambiguous legacy close identity | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_ambiguous_legacy_close_identity | 🔴 red |
 | specs/accounting/spec.md → Tagesabschluss | Expected cash source is unavailable | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_expected_cash_source_is_unavailable | 🔴 red |
-| specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Approved cash event appears in the cashbook | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_approved_cash_event_appears_in_the_cashbook | 🔴 red |
+| specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Approved cash event appears in the cashbook | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_approved_cash_event_appears_in_the_cashbook | 🟢 green |
 | specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Missing posting contract blocks cash entry | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_missing_posting_contract_blocks_cash_entry | 🔴 red |
-| specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Imported or legacy row is not treated as cash | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_imported_or_legacy_row_is_not_treated_as_cash | 🔴 red |
+| specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Imported or legacy row is not treated as cash | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_imported_or_legacy_row_is_not_treated_as_cash | 🟢 green |
 | specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Committed cash event cannot be silently rewritten | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_committed_cash_event_cannot_be_silently_rewritten | 🔴 red |
 | specs/cashbook-and-daily-close-workspace/spec.md → Setup opening source has one durable account-scoped identity | Setup opening source commits atomically | test/features/setup/cashbook_opening_source_test.dart | test_setup_opening_source_commits_atomically | 🟢 green |
 | specs/cashbook-and-daily-close-workspace/spec.md → Setup opening source has one durable account-scoped identity | Setup retry preserves opening source identity | test/features/setup/cashbook_opening_source_test.dart | test_setup_retry_preserves_opening_source_identity | 🟢 green |
@@ -54,7 +54,7 @@
 
 ## Coverage Notes
 
-- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Fifteen of 46 rows are green, including the routed Tagesabschluss creation UI scenario; the other 31 rows remain red.
+- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Seventeen of 46 rows are green, including the routed Tagesabschluss creation and approved committed-cash-event listing scenarios; the other 29 rows remain red.
 - The atomicity row passed with 11 deterministic SQLite abort-trigger failures across company creation, new-account creation, existing-account association, category creation, journal insertion, saldo update, and source insertion. New and existing Kasse paths each assert that complete company, account, category, journal, and source state is unchanged after failure.
 - The retry row passes after a later committed `Einnahme` changes Kasse saldo from `125.00` to `150.00`: an exact `125.00` setup retry preserves the opening source, opening journal, later movement, and current saldo; a conflicting `150.00` opening retry remains rejected without changing them.
 - The supplementary v26 implementation-review regressions below passed at base HEAD `5272cbaf128cb5feb6c6bb7674e85e92cd3d7ff9`; they do not change the 46 mapped delta-spec scenario rows.
@@ -62,7 +62,7 @@
 - The supplementary v26 migration regression `test_v26_schema_health_rejects_partial_opening_source_unique_index` checks that a partial unique `journal_id` index cannot satisfy the canonical source identity constraint.
 - The migration source-reference regressions `test_v26_schema_health_rejects_nocase_opening_source_unique_index` and `test_opening_source_case_only_insert_or_replace_preserves_original` cover BINARY-index health enforcement and preservation of original evidence on case-only REPLACE conflicts; both passed in the four-file focused suite (86/86). With the pre-insert collation guard temporarily disabled, the case-only REPLACE test failed because the insert succeeded (row id 2); restoring the guard passed the test 1/1.
 - The customer-disclosure collation regression `test_v26_customer_disclosure_rejects_nocase_opening_source_unique_index` maps to the existing v26 schema-check scenario. Its fixture uses the canonical three unique indexes with only `source_reference` collated NOCASE. A deliberate red run with the collation guard disabled returned `complete` instead of `incomplete`; after restoring the guard, the focused test passed 1/1.
-- Remaining red scenarios include v27 evidence, report, database, AppServices, close finalization, and full typed cash-event history. The supplementary cashbook route tests below cover only the available account/date balance preview and do not satisfy the committed-event listing scenario.
+- Remaining red scenarios include v27 evidence, report, database, AppServices, cash entry, committed-event rewrite protection, close finalization, and PDFs. The supplementary cashbook route tests below cover balance-preview navigation and complete/incomplete states; the approved committed-event listing is separately covered by the green mapped scenario at row 17. The imported/legacy scenario at row 19 is green, while tasks 2.7–2.8 remain open because the source rejection predated this slice and no red-before run was captured.
 - Tests are planned for the repository’s Flutter test infrastructure and focused fixtures for the affected feature and persistence boundaries.
 
 ### Supplementary account/date balance core checks
@@ -97,7 +97,7 @@ These tests supplement the delta-spec scenarios above with SQLite-backed source 
 
 ### Supplementary routed cashbook balance-preview checks
 
-These widget tests cover the bounded read-only route slice. They do not implement typed movement rows or change the status of the mapped committed-cash-event scenario.
+These widget tests cover route navigation and complete/incomplete balance-preview states. The typed committed-cash-event listing is covered separately by the mapped approved-event test at row 17.
 
 | Test File | Test Name | Current Result |
 |-----------|-----------|----------------|

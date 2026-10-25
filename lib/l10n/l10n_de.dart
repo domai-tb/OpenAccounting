@@ -1254,7 +1254,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cashbookSubtitle =>
-      'Schreibgeschützte Saldenvorschau. Kassenbewegungen sind in der aktuellen Datenquelle nicht verfügbar.';
+      'Schreibgeschützte Kassenhistorie aus gebuchten Kassenbewegungen und verifizierter Saldenvorschau.';
 
   @override
   String get cashbookBalance => 'Kassenbestand zum Stichtag';
@@ -1268,7 +1268,46 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cashbookMovementsUnavailable =>
-      'Kassenbewegungen nicht verfügbar: Die Quelle liefert derzeit nur Salden und keine typisierten Bewegungszeilen.';
+      'Kassenbewegungen werden nur bei vollständigem, verifiziertem Kassenbestand angezeigt.';
+
+  @override
+  String get cashbookEventsTitle => 'Kassenbewegungen';
+
+  @override
+  String get cashbookEventsEmpty => 'Für dieses Datum sind keine gebuchten Kassenbewegungen vorhanden.';
+
+  @override
+  String get cashbookEventDirection => 'Richtung';
+
+  @override
+  String get cashbookEventIncome => 'Einnahme';
+
+  @override
+  String get cashbookEventExpense => 'Ausgabe';
+
+  @override
+  String get cashbookEventAmount => 'Betrag';
+
+  @override
+  String get cashbookEventAmountBasis => 'Betragsgrundlage';
+
+  @override
+  String get cashbookPostedCashAmountBasis => 'Gebuchte Kassenwirkung';
+
+  @override
+  String get cashbookEventAmountBasisUnavailable => 'Nicht verfügbar';
+
+  @override
+  String get cashbookEventCategory => 'Kategorie';
+
+  @override
+  String get cashbookEventTaxTreatment => 'Steuerbehandlung';
+
+  @override
+  String get cashbookEventTaxNotRecorded => 'Steuersatz nicht hinterlegt';
+
+  @override
+  String get cashbookEventPosting => 'Buchungsidentität';
 
   @override
   String get tagesabschlussTitle => 'Tagesabschluss';

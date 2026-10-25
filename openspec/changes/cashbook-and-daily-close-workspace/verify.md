@@ -2,7 +2,7 @@
 
 ### Task Completion
 - [ ] All tasks marked `[x]` in tasks.md
-- Remaining open tasks: 97 remain unchecked. Refactor tasks 0.4, 0.7, 0.10, 0.13, 0.16, 0.19, 0.22, 0.25, 0.28, 0.31, 0.34, and 0.37 were completed against the named focused suites. The v26 case-only `INSERT OR REPLACE` and disclosure-collation regressions have fresh deliberate red→green evidence below. The broad suite was not run under this scoped delegation, so no full-suite result is claimed. The account/date source now reads the verified v26 opening and committed cash-payment groups through AppServices, and `/banking?view=close` requires explicit company/account/date selections. Cashbook writers, close finalization, and PDFs remain open under their later tasks.
+- Remaining open tasks: 95 remain unchecked. Refactor tasks 0.4, 0.7, 0.10, 0.13, 0.16, 0.19, 0.22, 0.25, 0.28, 0.31, 0.34, and 0.37 were completed against the named focused suites. The v26 case-only `INSERT OR REPLACE` and disclosure-collation regressions have fresh deliberate red→green evidence below. The broad suite was not run under this scoped delegation, so no full-suite result is claimed. The account/date source now reads the verified v26 opening and committed cash-payment groups through AppServices, and `/banking?view=close` requires explicit company/account/date selections. Cashbook writers, close finalization, and PDFs remain open under their later tasks.
 
 ### TDD Integrity
 - [ ] Every test-plan.md entry exists as a real test (or documented `N/A — non-executable` with its check run green)
@@ -11,7 +11,7 @@
 - [ ] Zero skipped/pending/commented-out tests
 - [ ] No test weakened or deleted without REMOVED requirement
 
-Fifteen of the 46 mapped delta-spec scenario rows are green for migration/setup, schema parity, profile portability, customer disclosure, routed Tagesabschluss creation, and the three account/date balance scenarios; the remaining 31 are 🔴 red and open. The supplementary v26/v27 trigger-semantics and `INSERT OR REPLACE` regressions are green. The standalone account/date calculator suite passed all 10 tests, and the new SQLite-backed source/route focused run passed all 5 tests. A broader Flutter test invocation was interrupted after 34 tests at the parent agent's direction; it is not a complete suite result, so the overall post-implementation TDD gate remains incomplete.
+Seventeen of the 46 mapped delta-spec scenario rows are green for migration/setup, schema parity, profile portability, customer disclosure, routed Tagesabschluss creation, the approved committed-cash-event listing, and the three account/date balance scenarios; the remaining 29 are 🔴 red and open. The supplementary v26/v27 trigger-semantics and `INSERT OR REPLACE` regressions are green. The standalone account/date calculator suite passed all 10 tests, and the new SQLite-backed source/route focused run passed all 5 tests. A broader Flutter test invocation was interrupted after 34 tests at the parent agent's direction; it is not a complete suite result, so the overall post-implementation TDD gate remains incomplete.
 
 ### Evidence
 
@@ -36,7 +36,7 @@ Fifteen of the 46 mapped delta-spec scenario rows are green for migration/setup,
 - Scoped analysis: `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter analyze lib/core/router/app_router.dart lib/features/accounting/tagesabschluss_page.dart lib/features/bank_import/bank_import_page.dart lib/l10n/l10n.dart lib/l10n/l10n_de.dart lib/l10n/l10n_en.dart test/features/accounting/cashbook_and_daily_close_workspace_test.dart` → `No issues found!`.
 - `git diff --check` over the cashbook route, page, Banking menu, ARBs, generated localization, focused widget test, and three change evidence files → passed.
 - Strict OpenSpec validation: `openspec validate cashbook-and-daily-close-workspace --type change --strict --json` → valid, zero issues.
-- The two new route tests are supplementary UI evidence only. Typed committed movement listing, cash entry, close finalization, PDFs, full-suite acceptance, and independent review remain open.
+- The two original route tests are supplementary evidence for balance-preview navigation and complete/incomplete states. The approved typed committed-event listing has its own green mapped scenario and dedicated routed test below. Cash entry, close finalization, PDFs, full-suite acceptance, and independent review remain open.
 
 - Production-source red run: `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter test --dart-define=platform=vm test/features/cashbook/account_date_balance_source_test.dart` → failed at runtime because `AppServices` had no `cashbookBalanceSource` getter.
 - Routed selector red run: `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter test --dart-define=platform=vm test/features/accounting/cashbook_and_daily_close_workspace_test.dart --plain-name test_tagesabschluss_creation` → failed because the close page had no `daily-close-company` selector.
@@ -129,6 +129,15 @@ The Round 5 v26 implementation review is recorded as `VERDICT: REVISE`, and its 
 - Scoped `git diff --check` for `migrations.dart`, the migration test, and cashbook `tasks.md`, `test-plan.md`, `verify.md`, and `review.md` → passed.
 - The red run used Flutter 3.47.2 from `/home/ubuntu/fvm`. A prior attempt with a temporary cache was stopped during SDK download before tests loaded; it produced no test result.
 
+### Read-only typed committed cash-event listing
+
+- Red before the projection: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart --plain-name test_approved_cash_event_appears_in_the_cashbook` → failed at the intended assertion: the canonical posted event had no `cashbook-event-2` row.
+- Green focused run: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart test/features/accounting/cashbook_and_daily_close_workspace_test.dart test/features/cashbook/account_date_balance_source_test.dart test/features/cashbook/account_date_balance_test.dart` → passed, 19/19. It covers the committed income row, unavailable legacy/import history, the existing complete/incomplete workspace states, source isolation, and balance calculation.
+- The approved-event widget fixture calls `PostingGroupService.postSettlement`. The production source reads the verified journal root, settlement allocation/category/tax fields, and an existing optional `beleg_id`/receipt number; the balance result exposes movements only after its complete-history calculation succeeds. The page performs no cash-event SQL or writes and shows no event rows for an unavailable result.
+- Receipt-link fixture attempt: `ReceiptInboxRepository.associate` failed with the existing GoBD trigger, `Dieser Journaleintrag ist unveränderlich`, because it updates `journal.beleg_id` after the canonical writer seals the group. The listing reads a valid existing receipt link if one is present; this slice adds no link mutation. Atomic cash-and-receipt writing remains open under task 9.
+- Scoped analysis: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter analyze lib/features/accounting/tagesabschluss_page.dart lib/features/cashbook/account_date_balance.dart lib/features/cashbook/cashbook_balance_source.dart lib/l10n/l10n.dart lib/l10n/l10n_de.dart lib/l10n/l10n_en.dart test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart test/features/accounting/cashbook_and_daily_close_workspace_test.dart test/features/cashbook/account_date_balance_source_test.dart` → `No issues found!`.
+- The imported/legacy route test now passes, but tasks 2.7–2.8 remain unchecked: the existing source already rejected ungrouped journal rows, so this slice did not capture the required pre-change red run for that scenario. Tasks 2.3 and 2.9 also remain open because the full-suite gate was not run.
+
 ### Review Integrity
 
 Round 7 independently accepted task 0.16c for the reviewed scoped diff. The checkboxes below remain the full-change review gate.
@@ -148,4 +157,4 @@ Rounds 1 and 2 remain historical `VERDICT: REVISE`; Round 4 approved the revised
 
 DECISION: FAIL
 
-❌ FAIL — this bounded production balance slice and its focused tests/analysis are green, while 97 tasks, the full-suite gate, and fresh independent approval remain open.
+❌ FAIL — this bounded production balance slice and its focused tests/analysis are green, while 95 tasks, the full-suite gate, and fresh independent approval remain open.

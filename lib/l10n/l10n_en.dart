@@ -1246,8 +1246,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cashbookTitle => 'Cashbook';
 
   @override
-  String get cashbookSubtitle =>
-      'Read-only cash balance preview. Cash movements are unavailable from the current source.';
+  String get cashbookSubtitle => 'Read-only cash history from committed cash movements and a verified balance preview.';
 
   @override
   String get cashbookBalance => 'Cash balance as of date';
@@ -1261,7 +1260,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cashbookMovementsUnavailable =>
-      'Cash movements are unavailable: the current source provides balances but no typed movement rows.';
+      'Cash movements are shown only when the selected balance and history are complete and verified.';
+
+  @override
+  String get cashbookEventsTitle => 'Cash movements';
+
+  @override
+  String get cashbookEventsEmpty => 'There are no committed cash movements for this date.';
+
+  @override
+  String get cashbookEventDirection => 'Direction';
+
+  @override
+  String get cashbookEventIncome => 'Income';
+
+  @override
+  String get cashbookEventExpense => 'Expense';
+
+  @override
+  String get cashbookEventAmount => 'Amount';
+
+  @override
+  String get cashbookEventAmountBasis => 'Amount basis';
+
+  @override
+  String get cashbookPostedCashAmountBasis => 'Committed cash effect';
+
+  @override
+  String get cashbookEventAmountBasisUnavailable => 'Unavailable';
+
+  @override
+  String get cashbookEventCategory => 'Category';
+
+  @override
+  String get cashbookEventTaxTreatment => 'Tax treatment';
+
+  @override
+  String get cashbookEventTaxNotRecorded => 'Tax rate not recorded';
+
+  @override
+  String get cashbookEventPosting => 'Posting identity';
 
   @override
   String get tagesabschlussTitle => 'Daily cash close';

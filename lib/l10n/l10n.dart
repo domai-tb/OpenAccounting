@@ -2423,7 +2423,7 @@ abstract class AppLocalizations {
   /// No description provided for @cashbookSubtitle.
   ///
   /// In de, this message translates to:
-  /// **'Schreibgeschützte Saldenvorschau. Kassenbewegungen sind in der aktuellen Datenquelle nicht verfügbar.'**
+  /// **'Schreibgeschützte Kassenhistorie aus gebuchten Kassenbewegungen und verifizierter Saldenvorschau.'**
   String get cashbookSubtitle;
 
   /// No description provided for @cashbookBalance.
@@ -2447,8 +2447,86 @@ abstract class AppLocalizations {
   /// No description provided for @cashbookMovementsUnavailable.
   ///
   /// In de, this message translates to:
-  /// **'Kassenbewegungen nicht verfügbar: Die Quelle liefert derzeit nur Salden und keine typisierten Bewegungszeilen.'**
+  /// **'Kassenbewegungen werden nur bei vollständigem, verifiziertem Kassenbestand angezeigt.'**
   String get cashbookMovementsUnavailable;
+
+  /// No description provided for @cashbookEventsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbewegungen'**
+  String get cashbookEventsTitle;
+
+  /// No description provided for @cashbookEventsEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Für dieses Datum sind keine gebuchten Kassenbewegungen vorhanden.'**
+  String get cashbookEventsEmpty;
+
+  /// No description provided for @cashbookEventDirection.
+  ///
+  /// In de, this message translates to:
+  /// **'Richtung'**
+  String get cashbookEventDirection;
+
+  /// No description provided for @cashbookEventIncome.
+  ///
+  /// In de, this message translates to:
+  /// **'Einnahme'**
+  String get cashbookEventIncome;
+
+  /// No description provided for @cashbookEventExpense.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgabe'**
+  String get cashbookEventExpense;
+
+  /// No description provided for @cashbookEventAmount.
+  ///
+  /// In de, this message translates to:
+  /// **'Betrag'**
+  String get cashbookEventAmount;
+
+  /// No description provided for @cashbookEventAmountBasis.
+  ///
+  /// In de, this message translates to:
+  /// **'Betragsgrundlage'**
+  String get cashbookEventAmountBasis;
+
+  /// No description provided for @cashbookPostedCashAmountBasis.
+  ///
+  /// In de, this message translates to:
+  /// **'Gebuchte Kassenwirkung'**
+  String get cashbookPostedCashAmountBasis;
+
+  /// No description provided for @cashbookEventAmountBasisUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht verfügbar'**
+  String get cashbookEventAmountBasisUnavailable;
+
+  /// No description provided for @cashbookEventCategory.
+  ///
+  /// In de, this message translates to:
+  /// **'Kategorie'**
+  String get cashbookEventCategory;
+
+  /// No description provided for @cashbookEventTaxTreatment.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuerbehandlung'**
+  String get cashbookEventTaxTreatment;
+
+  /// No description provided for @cashbookEventTaxNotRecorded.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuersatz nicht hinterlegt'**
+  String get cashbookEventTaxNotRecorded;
+
+  /// No description provided for @cashbookEventPosting.
+  ///
+  /// In de, this message translates to:
+  /// **'Buchungsidentität'**
+  String get cashbookEventPosting;
 
   /// No description provided for @tagesabschlussTitle.
   ///

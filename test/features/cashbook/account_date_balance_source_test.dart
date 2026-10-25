@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/features/accounting/money.dart' as money;
+import 'package:openaccounting/features/accounting/posting_group_service.dart';
 import 'package:openaccounting/features/cashbook/account_date_balance.dart';
 
 void main() {
@@ -227,41 +228,26 @@ Future<void> _seedCashPayment(
     'INSERT INTO konten (id, name, kontoart, waehrung, unternehmen_id, saldo) VALUES (?, ?, ?, ?, ?, ?)',
     <Object?>[counterAccountId, 'Gegenkonto $counterAccountId', 'Sachkonto', 'EUR', companyId, '0.00'],
   );
-  final String dateKey = _dateKey(date);
-  final int amountCents = money.parseScaled(amount, scale: 2);
-  final int cashLeg = await db.executor.runInsert(
-    'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, konto_id, soll, haben, soll_konto_id, '
-    'immutable, legacy_unverified, source_kind, source_id) VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, 0, ?, ?)',
-    <Object?>[dateKey, 'Kasseneinnahme', amount, 'Einnahme', accountId, amount, accountId, 'cash_payment', sourceId],
+  final int categoryId = await db.executor.runInsert(
+    'INSERT INTO kategorien (bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, mapping_status, '
+    'catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, 1, ?, ?, ?)',
+    <Object?>['Kassenumsatz', '8400', '4400', 12, 'catalog_verified', 'TEST', '2026-test.1'],
   );
-  final int contraLeg = await db.executor.runInsert(
-    'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, konto_id, soll, haben, haben_konto_id, '
-    'immutable, legacy_unverified, source_kind, source_id) VALUES (?, ?, ?, ?, ?, 0, ?, ?, 0, 0, ?, ?)',
-    <Object?>[
-      dateKey,
-      'Kasseneinnahme',
-      '-$amount',
-      'Einnahme',
-      counterAccountId,
-      amount,
-      counterAccountId,
-      'cash_payment',
-      sourceId,
+  await PostingGroupService(db.executor).postSettlement(
+    sourceKind: PostingSource.cashPayment,
+    sourceId: sourceId,
+    signedAmountCents: money.parseScaled(amount, scale: 2),
+    settlementDate: _dateKey(date),
+    bankKontoId: accountId,
+    counterKontoId: counterAccountId,
+    allocations: <SettlementAllocationInput>[
+      SettlementAllocationInput(
+        appliedCents: money.parseScaled(amount, scale: 2),
+        kategorieId: categoryId,
+        euerZeile: 12,
+      ),
     ],
-  );
-  await db.executor.runUpdate('UPDATE journal SET gruppe_id = ?, immutable = 1 WHERE id IN (?, ?)', <Object?>[
-    cashLeg,
-    cashLeg,
-    contraLeg,
-  ]);
-  final int settlementGroupId = await db.executor.runInsert(
-    'INSERT INTO settlement_groups (source_kind, source_id, signed_amount_cents, settlement_date, '
-    'unapplied_cents, group_root_journal_id) VALUES (?, ?, ?, ?, 0, ?)',
-    <Object?>['cash_payment', sourceId, amountCents, dateKey, cashLeg],
-  );
-  await db.executor.runInsert(
-    'INSERT INTO settlement_allocations (group_id, applied_cents, settlement_date, direction) VALUES (?, ?, ?, ?)',
-    <Object?>[settlementGroupId, amountCents, dateKey, 'einnahme'],
+    beschreibung: 'Kasseneinnahme',
   );
 }
 

@@ -74,8 +74,8 @@
 
 ## 2. cashbook-and-daily-close-workspace: Cashbook view uses typed committed cash events
 
-- [ ] 2.1 Write failing test `test_approved_cash_event_appears_in_the_cashbook` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Approved cash event appears in the cashbook"; assert it fails for the right reason.
-- [ ] 2.2 Implement the specified behavior for "Approved cash event appears in the cashbook" to pass 2.1.
+- [x] 2.1 Write failing test `test_approved_cash_event_appears_in_the_cashbook` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Approved cash event appears in the cashbook"; assert it fails for the right reason.
+- [x] 2.2 Implement the specified behavior for "Approved cash event appears in the cashbook" to pass 2.1.
 - [ ] 2.3 Refactor the affected code; keep the focused and full suites green.
 - [ ] 2.4 Write failing test `test_missing_posting_contract_blocks_cash_entry` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Missing posting contract blocks cash entry"; assert it fails for the right reason.
 - [ ] 2.5 Implement the specified behavior for "Missing posting contract blocks cash entry" to pass 2.4.
@@ -195,6 +195,7 @@
 ## Scoped implementation progress: read-only cashbook balance preview
 
 - Added the `/banking?view=cashbook` route and localized Banking-menu entry. The workspace reuses `CashbookBalanceSource.resolve` through the existing AppServices contract and displays only a complete account/date balance result with its source metadata. Incomplete results remain unavailable with no amount or zero fallback.
-- The screen identifies itself as a read-only balance preview and explicitly reports that typed movement rows are unavailable. The approved committed-cash-event listing and posting tasks remain unchecked because the existing route contract does not expose typed rows. No cash posting, close finalization, PDF, schema, migration, or service-wiring behavior was added.
+- The cashbook route now lists typed rows only for verified committed cash events in the selected complete account/date result; an incomplete result shows no rows. Tasks 2.1–2.2 cover the approved event listing and are complete. No cash posting, committed-event editing, close finalization, PDF, schema, migration, or service-wiring behavior was added.
+- The imported/legacy scenario test is green because the existing source already rejected ungrouped rows. Tasks 2.7–2.8 remain open because no red-before run was captured for that pre-existing behavior; cash entry and committed-event rewrite protection remain open under 2.4–2.6 and 2.10–2.12.
 - Preserved the existing `/banking?view=close` dispatch and default daily-close page behavior. The cashbook header links to that existing close view; existing bank-import view values continue to preserve query state.
 - Added a routed red/green widget test for menu navigation and a complete balance preview, plus a fail-closed incomplete-source test. Focused evidence is recorded in `verify.md`; the full-suite and independent-review gates remain open.
