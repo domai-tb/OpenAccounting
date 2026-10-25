@@ -3548,6 +3548,78 @@ abstract class AppLocalizations {
   /// **'Bearbeiten'**
   String get mileageEdit;
 
+  /// No description provided for @mileageCorrectTrip.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt korrigieren'**
+  String get mileageCorrectTrip;
+
+  /// No description provided for @mileageUndoTrip.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt rückgängig machen'**
+  String get mileageUndoTrip;
+
+  /// No description provided for @mileageApplyCorrection.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrektur anwenden'**
+  String get mileageApplyCorrection;
+
+  /// No description provided for @mileageCorrectionReason.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrekturgrund'**
+  String get mileageCorrectionReason;
+
+  /// No description provided for @mileageCorrectionReasonRequired.
+  ///
+  /// In de, this message translates to:
+  /// **'Grund der Korrektur eingeben.'**
+  String get mileageCorrectionReasonRequired;
+
+  /// No description provided for @mileageCorrectionConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrtkorrektur anwenden?'**
+  String get mileageCorrectionConfirmTitle;
+
+  /// No description provided for @mileageCorrectionConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Ursprüngliche Fahrt und Buchung bleiben unverändert. Eine verknüpfte Stornierung und Ersatzbuchung werden gemeinsam angewendet.'**
+  String get mileageCorrectionConfirmMessage;
+
+  /// No description provided for @mileageUndoConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrt wirklich rückgängig machen?'**
+  String get mileageUndoConfirmTitle;
+
+  /// No description provided for @mileageUndoConfirmMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrtangaben und ursprüngliche Buchung bleiben erhalten. Eine verknüpfte Stornobuchung wird erfasst.'**
+  String get mileageUndoConfirmMessage;
+
+  /// No description provided for @mileageCorrectionPrepared.
+  ///
+  /// In de, this message translates to:
+  /// **'Ersatzfahrt vorbereitet. Betrag prüfen und Korrektur anwenden.'**
+  String get mileageCorrectionPrepared;
+
+  /// No description provided for @mileageCorrectionApplied.
+  ///
+  /// In de, this message translates to:
+  /// **'Fahrtkorrektur angewendet.'**
+  String get mileageCorrectionApplied;
+
+  /// No description provided for @mileageCorrectionUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Korrektur nicht möglich. Buchungsrollen und Fahrtdatum prüfen und erneut versuchen.'**
+  String get mileageCorrectionUnavailable;
+
   /// No description provided for @mileageCalculate.
   ///
   /// In de, this message translates to:

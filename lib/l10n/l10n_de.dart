@@ -1843,6 +1843,45 @@ class AppLocalizationsDe extends AppLocalizations {
   String get mileageEdit => 'Bearbeiten';
 
   @override
+  String get mileageCorrectTrip => 'Fahrt korrigieren';
+
+  @override
+  String get mileageUndoTrip => 'Fahrt rückgängig machen';
+
+  @override
+  String get mileageApplyCorrection => 'Korrektur anwenden';
+
+  @override
+  String get mileageCorrectionReason => 'Korrekturgrund';
+
+  @override
+  String get mileageCorrectionReasonRequired => 'Grund der Korrektur eingeben.';
+
+  @override
+  String get mileageCorrectionConfirmTitle => 'Fahrtkorrektur anwenden?';
+
+  @override
+  String get mileageCorrectionConfirmMessage =>
+      'Ursprüngliche Fahrt und Buchung bleiben unverändert. Eine verknüpfte Stornierung und Ersatzbuchung werden gemeinsam angewendet.';
+
+  @override
+  String get mileageUndoConfirmTitle => 'Fahrt wirklich rückgängig machen?';
+
+  @override
+  String get mileageUndoConfirmMessage =>
+      'Fahrtangaben und ursprüngliche Buchung bleiben erhalten. Eine verknüpfte Stornobuchung wird erfasst.';
+
+  @override
+  String get mileageCorrectionPrepared => 'Ersatzfahrt vorbereitet. Betrag prüfen und Korrektur anwenden.';
+
+  @override
+  String get mileageCorrectionApplied => 'Fahrtkorrektur angewendet.';
+
+  @override
+  String get mileageCorrectionUnavailable =>
+      'Korrektur nicht möglich. Buchungsrollen und Fahrtdatum prüfen und erneut versuchen.';
+
+  @override
   String get mileageCalculate => 'Berechnen';
 
   @override

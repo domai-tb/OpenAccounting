@@ -1,4 +1,6 @@
 // ignore_for_file: prefer_single_quotes
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,6 +32,48 @@ class _FailingListMileageEntryRepository extends MileageEntryRepository {
       throw StateError('trip list refresh failed');
     }
     return super.listTrips();
+  }
+}
+
+class _FailOnceMileageEntryRepository extends MileageEntryRepository {
+  _FailOnceMileageEntryRepository(super.executor);
+
+  bool failNextApply = true;
+
+  @override
+  Future<void> applyCorrection(String correctionId) async {
+    if (failNextApply) {
+      failNextApply = false;
+      throw StateError('simulated correction apply failure');
+    }
+    await super.applyCorrection(correctionId);
+  }
+}
+
+class _GatedUndoPreparationRepository extends MileageEntryRepository {
+  _GatedUndoPreparationRepository(super.executor);
+
+  final Completer<void> preparationStarted = Completer<void>();
+  final Completer<void> releasePreparation = Completer<void>();
+  final Completer<void> preparationFinished = Completer<void>();
+  bool correctionApplicationAttempted = false;
+
+  @override
+  Future<void> prepareUndoCorrection({
+    required String sourceTripId,
+    required String correctionId,
+    required String reason,
+  }) async {
+    preparationStarted.complete();
+    await releasePreparation.future;
+    await super.prepareUndoCorrection(sourceTripId: sourceTripId, correctionId: correctionId, reason: reason);
+    preparationFinished.complete();
+  }
+
+  @override
+  Future<void> applyCorrection(String correctionId) async {
+    correctionApplicationAttempted = true;
+    await super.applyCorrection(correctionId);
   }
 }
 
@@ -1461,6 +1505,295 @@ END''');
         <Object?>[trip.id],
       );
       expect(retryPostingRows, hasLength(2));
+    });
+
+    testWidgets('posted mileage corrections are accessible in both locales and preserve source facts', (tester) async {
+      await configureMileagePostingRoles();
+
+      Future<MileageTrip> createPostedTrip({required String tripDate, required String purpose}) async {
+        final MileageTrip trip = await useCases.recordBusinessTrip(
+          tripDate: tripDate,
+          purpose: purpose,
+          distanceHundredthsKm: 1000,
+          businessContext: 'Original project',
+          tripKind: MileageTripKind.businessTrip,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: MileageVehicleClass.kraftwagen,
+        );
+        await useCases.calculateTrip(trip.id);
+        await useCases.postTrip(trip.id);
+        return trip;
+      }
+
+      final MileageTrip correctSource = await createPostedTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Original customer visit',
+      );
+      final MileageTrip undoSource = await createPostedTrip(
+        tripDate: '2026-03-15',
+        purpose: 'Duplicate customer visit',
+      );
+      final List<Map<String, Object?>> sourceBefore = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[correctSource.id],
+      );
+      final List<Map<String, Object?>> originalJournal = await db.executor.runSelect(
+        'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', correctSource.id],
+      );
+      final _FailOnceMileageEntryRepository correctionRepo = _FailOnceMileageEntryRepository(db.executor);
+      final MileageEntryUseCases correctionUseCases = MileageEntryUseCases(correctionRepo);
+
+      Future<void> pumpWorkspace(Locale locale, {MileageEntryUseCases? workspaceUseCases}) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: locale,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: MileageEntryWorkspace(
+                useCases: workspaceUseCases ?? useCases,
+                bankAccounts: appServices.bankAccounts,
+                categoryWorkspace: appServices.categoryWorkspace,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await pumpWorkspace(const Locale('en'), workspaceUseCases: correctionUseCases);
+      expect(find.byType(MileageEntryWorkspace), findsOneWidget);
+      final Finder workspaceScrollable = find
+          .descendant(of: find.byType(MileageEntryWorkspace), matching: find.byType(Scrollable))
+          .first;
+      Future<void> reveal(Finder target) async {
+        await tester.scrollUntilVisible(target, 400, scrollable: workspaceScrollable);
+        await tester.pumpAndSettle();
+      }
+
+      final Finder correctButton = find.byKey(ValueKey<String>('mileage-correct-${correctSource.id}'));
+      final Finder undoButton = find.byKey(ValueKey<String>('mileage-undo-${undoSource.id}'));
+      await reveal(correctButton);
+      await reveal(undoButton);
+      expect(correctButton, findsOneWidget);
+      expect(undoButton, findsOneWidget);
+      expect(find.descendant(of: correctButton, matching: find.text('Correct trip')), findsOneWidget);
+      expect(find.descendant(of: undoButton, matching: find.text('Undo trip')), findsOneWidget);
+
+      await tester.ensureVisible(correctButton);
+      await tester.tap(correctButton);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey<String>('mileage-purpose')), 'Corrected customer visit');
+      await tester.enterText(find.byKey(const ValueKey<String>('mileage-distance')), '12.50');
+      await tester.enterText(find.byKey(const ValueKey<String>('mileage-business-context')), 'Corrected project');
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('mileage-correction-reason')),
+        'The original distance was entered incorrectly',
+      );
+      final Finder saveButton = find.byKey(const ValueKey<String>('mileage-save'));
+      await reveal(saveButton);
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+
+      final Map<String, Object?> pendingCorrection = (await db.executor.runSelect(
+        "SELECT id, replacement_trip_id FROM mileage_trip_corrections WHERE trip_id = ? AND kind = 'replace'",
+        <Object?>[correctSource.id],
+      )).single;
+      final String replacementTripId = '${pendingCorrection['replacement_trip_id']}';
+      final Finder applyButton = find.byKey(ValueKey<String>('mileage-apply-correction-$replacementTripId'));
+      final Finder postButton = find.byKey(ValueKey<String>('mileage-post-$replacementTripId'));
+      await reveal(applyButton);
+      expect(find.text('Corrected customer visit'), findsOneWidget);
+      expect(postButton, findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await pumpWorkspace(const Locale('en'), workspaceUseCases: correctionUseCases);
+      await reveal(applyButton);
+      expect(applyButton, findsOneWidget);
+      expect(postButton, findsNothing);
+      await tester.tap(applyButton);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('original trip and posting remain unchanged'), findsOneWidget);
+      await tester.tap(find.text('Apply correction').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Correction unavailable. Check account roles and trip date, then retry.'), findsOneWidget);
+      expect(
+        (await db.executor.runSelect('SELECT state FROM mileage_trip_corrections WHERE id = ?', <Object?>[
+          pendingCorrection['id'],
+        ])).single['state'],
+        'draft',
+      );
+      expect(
+        await db.executor.runSelect('SELECT id FROM journal WHERE source_kind = ? AND source_id = ?', <Object?>[
+          'mileage_correction',
+          pendingCorrection['id'],
+        ]),
+        isEmpty,
+      );
+
+      await reveal(applyButton);
+      await tester.tap(applyButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply correction').last);
+      await tester.pumpAndSettle();
+
+      final List<Map<String, Object?>> sourceAfter = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[correctSource.id],
+      );
+      expect(sourceAfter.single['trip_date'], sourceBefore.single['trip_date']);
+      expect(sourceAfter.single['purpose'], sourceBefore.single['purpose']);
+      expect(sourceAfter.single['business_context'], sourceBefore.single['business_context']);
+      expect(sourceAfter.single['distance_hundredths_km'], sourceBefore.single['distance_hundredths_km']);
+      expect(sourceAfter.single['trip_kind'], sourceBefore.single['trip_kind']);
+      expect(sourceAfter.single['vehicle_source'], sourceBefore.single['vehicle_source']);
+      expect(sourceAfter.single['vehicle_class'], sourceBefore.single['vehicle_class']);
+      expect(sourceAfter.single['calculated_amount'], sourceBefore.single['calculated_amount']);
+      expect(sourceAfter.single['posting_event_id'], sourceBefore.single['posting_event_id']);
+      expect(sourceAfter.single['state'], 'corrected');
+      expect(
+        await db.executor.runSelect(
+          'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+          <Object?>['mileage_trip', correctSource.id],
+        ),
+        originalJournal,
+      );
+      final Map<String, Object?> correction = (await db.executor.runSelect(
+        'SELECT id, state, replacement_trip_id FROM mileage_trip_corrections WHERE trip_id = ? AND kind = ?',
+        <Object?>[correctSource.id, 'replace'],
+      )).single;
+      expect(correction['state'], 'applied');
+      expect(
+        (await db.executor.runSelect(
+          'SELECT state, purpose, distance_hundredths_km, trip_kind, vehicle_source, vehicle_class '
+          'FROM mileage_trips WHERE id = ?',
+          <Object?>[correction['replacement_trip_id']],
+        )).single,
+        <String, Object?>{
+          'state': 'posted',
+          'purpose': 'Corrected customer visit',
+          'distance_hundredths_km': 1250,
+          'trip_kind': 'business_trip',
+          'vehicle_source': 'private',
+          'vehicle_class': 'kraftwagen',
+        },
+      );
+      expect(
+        await db.executor.runSelect('SELECT id FROM journal WHERE source_kind = ? AND source_id = ?', <Object?>[
+          'mileage_correction',
+          correction['id'],
+        ]),
+        hasLength(4),
+      );
+
+      await pumpWorkspace(const Locale('de'), workspaceUseCases: correctionUseCases);
+      final Finder localizedCorrection = find.byKey(
+        ValueKey<String>('mileage-correct-${correction['replacement_trip_id']}'),
+      );
+      final Finder localizedUndo = find.byKey(ValueKey<String>('mileage-undo-${undoSource.id}'));
+      await reveal(localizedCorrection);
+      await reveal(localizedUndo);
+      expect(find.descendant(of: localizedCorrection, matching: find.text('Fahrt korrigieren')), findsOneWidget);
+      expect(find.descendant(of: localizedUndo, matching: find.text('Fahrt rückgängig machen')), findsOneWidget);
+      await tester.tap(localizedUndo);
+      await tester.pumpAndSettle();
+      expect(find.text('Korrekturgrund'), findsOneWidget);
+      expect(find.text('Fahrt wirklich rückgängig machen?'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(ValueKey<String>('mileage-undo-reason-${undoSource.id}')),
+        'Fahrt doppelt erfasst',
+      );
+      await tester.tap(find.text('Fahrt rückgängig machen').last);
+      await tester.pumpAndSettle();
+
+      final Map<String, Object?> undone = (await db.executor.runSelect(
+        'SELECT trip_date, purpose, business_context, distance_hundredths_km, trip_kind, vehicle_source, vehicle_class, '
+        'posting_event_id, state '
+        'FROM mileage_trips WHERE id = ?',
+        <Object?>[undoSource.id],
+      )).single;
+      expect(undone['trip_date'], undoSource.tripDate);
+      expect(undone['purpose'], undoSource.purpose);
+      expect(undone['business_context'], undoSource.businessContext);
+      expect(undone['distance_hundredths_km'], undoSource.distanceHundredthsKm);
+      expect(undone['trip_kind'], mileageTripKindStorageValue(undoSource.tripKind));
+      expect(undone['vehicle_source'], mileageVehicleSourceStorageValue(undoSource.vehicleSource));
+      expect(undone['vehicle_class'], mileageVehicleClassStorageValue(undoSource.vehicleClass));
+      expect(undone['posting_event_id'], isNotEmpty);
+      expect(undone['state'], 'voided');
+      final Map<String, Object?> undoCorrection = (await db.executor.runSelect(
+        'SELECT id, state, reason FROM mileage_trip_corrections WHERE trip_id = ? AND kind = ?',
+        <Object?>[undoSource.id, 'void'],
+      )).single;
+      expect(undoCorrection['state'], 'applied');
+      expect(undoCorrection['reason'], 'Fahrt doppelt erfasst');
+      expect(
+        await db.executor.runSelect(
+          'SELECT id, reversal_of_group_id FROM journal WHERE source_kind = ? AND source_id = ?',
+          <Object?>['mileage_correction', undoCorrection['id']],
+        ),
+        hasLength(2),
+      );
+    });
+
+    testWidgets('undo preparation locks actions and ignores completion after workspace disposal', (tester) async {
+      await configureMileagePostingRoles();
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-16',
+        purpose: 'Undo busy state test',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Undo busy project',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await useCases.postTrip(source.id);
+
+      final _GatedUndoPreparationRepository gatedRepo = _GatedUndoPreparationRepository(db.executor);
+      final MileageEntryUseCases gatedUseCases = MileageEntryUseCases(gatedRepo);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MileageEntryWorkspace(
+              useCases: gatedUseCases,
+              bankAccounts: appServices.bankAccounts,
+              categoryWorkspace: appServices.categoryWorkspace,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final Finder scrollable = find
+          .descendant(of: find.byType(MileageEntryWorkspace), matching: find.byType(Scrollable))
+          .first;
+      final Finder undoButton = find.byKey(ValueKey<String>('mileage-undo-${source.id}'));
+      await tester.scrollUntilVisible(undoButton, 400, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      await tester.tap(undoButton);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(ValueKey<String>('mileage-undo-reason-${source.id}')), 'Duplicate entry');
+      await tester.tap(find.text('Undo trip').last);
+      await tester.pumpAndSettle();
+
+      expect(gatedRepo.preparationStarted.isCompleted, isTrue);
+      expect(tester.widget<OutlinedButton>(undoButton).onPressed, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      gatedRepo.releasePreparation.complete();
+      await gatedRepo.preparationFinished.future;
+      await tester.pump();
+      expect(gatedRepo.correctionApplicationAttempted, isFalse);
+      final Map<String, Object?> pendingUndo = (await db.executor.runSelect(
+        'SELECT state FROM mileage_trip_corrections WHERE trip_id = ? AND kind = ?',
+        <Object?>[source.id, 'void'],
+      )).single;
+      expect(pendingUndo['state'], 'draft');
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('mileage posting role settings save explicit eligible pairs through production route', (tester) async {

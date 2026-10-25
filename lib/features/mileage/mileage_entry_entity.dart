@@ -57,6 +57,16 @@ MileageVehicleClass mileageVehicleClassFromStorage(String value) => switch (valu
   _ => MileageVehicleClass.unknown,
 };
 
+enum MileageCorrectionKind { replacement, undo }
+
+class MileageCorrectionLink {
+  const MileageCorrectionLink({required this.id, required this.kind, required this.sourceTripId});
+
+  final String id;
+  final MileageCorrectionKind kind;
+  final String sourceTripId;
+}
+
 class MileageTrip {
   const MileageTrip({
     required this.id,
@@ -78,6 +88,7 @@ class MileageTrip {
     this.calculatedAmount,
     this.calculatedAt,
     this.postingEventId,
+    this.pendingCorrection,
   });
 
   final String id;
@@ -99,6 +110,7 @@ class MileageTrip {
   final String? calculatedAmount;
   final String? calculatedAt;
   final String? postingEventId;
+  final MileageCorrectionLink? pendingCorrection;
 
   static MileageTripState stateFrom(String raw) {
     return MileageTripState.values.firstWhere(

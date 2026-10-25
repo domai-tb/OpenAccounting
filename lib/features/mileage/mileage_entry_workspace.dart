@@ -32,6 +32,8 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
   final TextEditingController _purposeController = TextEditingController();
   final TextEditingController _distanceController = TextEditingController();
   final TextEditingController _contextController = TextEditingController();
+  final TextEditingController _correctionReasonController = TextEditingController();
+  final TextEditingController _undoReasonController = TextEditingController();
 
   List<MileageTrip> _trips = <MileageTrip>[];
   List<BankAccount> _mileageRoleAccounts = <BankAccount>[];
@@ -44,15 +46,20 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
   String? _roleSettingsNotice;
   bool _isRoleSettingsLoading = true;
   bool _isRoleSettingsSaving = false;
-  final Set<String> _confirmedPostedTripIds = <String>{};
+  final Map<String, MileageTripState> _confirmedTripStates = <String, MileageTripState>{};
+  final Map<String, String> _replacementCorrectionIds = <String, String>{};
+  final Map<String, String> _replacementSourceTripIds = <String, String>{};
+  final Map<String, String> _undoCorrectionIds = <String, String>{};
   String _searchQuery = '';
   MileageTripState? _stateFilter;
   String? _selectedTripId;
+  String? _correctionSourceTripId;
   String? _errorMessage;
   String? _noticeMessage;
   bool _showForm = true;
   bool _isLoading = true;
   bool _isBusy = false;
+  bool _pendingCorrectionStateReady = false;
   MileageTripKind? _tripKind;
   MileageVehicleSource? _vehicleSource;
   MileageVehicleClass? _vehicleClass;
@@ -73,17 +80,25 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     _purposeController.dispose();
     _distanceController.dispose();
     _contextController.dispose();
+    _correctionReasonController.dispose();
+    _undoReasonController.dispose();
     super.dispose();
   }
 
   Future<void> _loadTrips({bool showLoading = false}) async {
-    if (showLoading && mounted) setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() {
+        if (showLoading) _isLoading = true;
+      });
+    }
     try {
       final List<MileageTrip> trips = await widget.useCases.listTrips();
       if (!mounted) return;
       setState(() {
         _trips = trips;
-        _confirmedPostedTripIds.clear();
+        _restorePendingCorrectionLinks(trips);
+        _pendingCorrectionStateReady = true;
+        _confirmedTripStates.clear();
         _isLoading = false;
         _errorMessage = null;
       });
@@ -360,20 +375,24 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     required String? notice,
     String? actionError,
     bool hideForm = false,
-    bool posted = false,
+    Map<String, MileageTripState> committedStates = const <String, MileageTripState>{},
   }) async {
     final List<MileageTrip>? refreshedTrips = await _refreshTripsAfterCommit();
     if (!mounted) return;
     setState(() {
       if (refreshedTrips == null) {
         _trips = _mergeTrip(trip);
-        if (posted) _confirmedPostedTripIds.add(trip.id);
+        _confirmedTripStates.addAll(committedStates);
       } else {
         _trips = refreshedTrips;
-        _confirmedPostedTripIds.clear();
+        _restorePendingCorrectionLinks(refreshedTrips);
+        _pendingCorrectionStateReady = true;
+        _confirmedTripStates.clear();
       }
       if (hideForm) {
         _selectedTripId = trip.id;
+        _correctionSourceTripId = null;
+        _correctionReasonController.clear();
         _showForm = false;
       }
       _isBusy = false;
@@ -392,8 +411,24 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     return merged;
   }
 
-  MileageTripState _displayState(MileageTrip trip) =>
-      _confirmedPostedTripIds.contains(trip.id) ? MileageTripState.posted : trip.state;
+  void _restorePendingCorrectionLinks(List<MileageTrip> trips) {
+    _replacementCorrectionIds.clear();
+    _replacementSourceTripIds.clear();
+    _undoCorrectionIds.clear();
+    for (final MileageTrip trip in trips) {
+      final MileageCorrectionLink? link = trip.pendingCorrection;
+      if (link == null) continue;
+      switch (link.kind) {
+        case MileageCorrectionKind.replacement:
+          _replacementCorrectionIds[trip.id] = link.id;
+          _replacementSourceTripIds[trip.id] = link.sourceTripId;
+        case MileageCorrectionKind.undo:
+          _undoCorrectionIds[link.sourceTripId] = link.id;
+      }
+    }
+  }
+
+  MileageTripState _displayState(MileageTrip trip) => _confirmedTripStates[trip.id] ?? trip.state;
 
   List<MileageTrip> get _visibleTrips {
     final String query = _searchQuery.trim().toLowerCase();
@@ -422,9 +457,11 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     _purposeController.clear();
     _distanceController.clear();
     _contextController.clear();
+    _correctionReasonController.clear();
     _formKey = GlobalKey<FormState>();
     setState(() {
       _selectedTripId = null;
+      _correctionSourceTripId = null;
       _tripKind = null;
       _vehicleSource = null;
       _vehicleClass = null;
@@ -441,9 +478,32 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     _purposeController.text = trip.purpose;
     _distanceController.text = _formatDistance(trip.distanceHundredthsKm);
     _contextController.text = trip.businessContext;
+    _correctionReasonController.clear();
     _formKey = GlobalKey<FormState>();
     setState(() {
       _selectedTripId = trip.id;
+      _correctionSourceTripId = null;
+      _tripKind = trip.tripKind;
+      _vehicleSource = trip.vehicleSource;
+      _vehicleClass = trip.vehicleClass;
+      _showForm = true;
+      _errorMessage = null;
+      _noticeMessage = null;
+    });
+    _scrollToTop();
+  }
+
+  void _startReplacementCorrection(MileageTrip trip) {
+    if (_displayState(trip) != MileageTripState.posted) return;
+    _dateController.text = trip.tripDate;
+    _purposeController.text = trip.purpose;
+    _distanceController.text = _formatDistance(trip.distanceHundredthsKm);
+    _contextController.text = trip.businessContext;
+    _correctionReasonController.clear();
+    _formKey = GlobalKey<FormState>();
+    setState(() {
+      _selectedTripId = null;
+      _correctionSourceTripId = trip.id;
       _tripKind = trip.tripKind;
       _vehicleSource = trip.vehicleSource;
       _vehicleClass = trip.vehicleClass;
@@ -468,6 +528,50 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
       _noticeMessage = null;
     });
     final String? selectedId = _selectedTripId;
+    final String? correctionSourceId = _correctionSourceTripId;
+    if (correctionSourceId != null) {
+      try {
+        final ({String correctionId, MileageTrip replacementTrip}) prepared = await widget.useCases
+            .prepareReplacementCorrection(
+              sourceTripId: correctionSourceId,
+              reason: _correctionReasonController.text.trim(),
+              tripDate: _dateController.text.trim(),
+              purpose: _purposeController.text.trim(),
+              distanceHundredthsKm: distanceHundredthsKm,
+              businessContext: _contextController.text.trim(),
+              tripKind: tripKind,
+              vehicleSource: vehicleSource,
+              vehicleClass: vehicleClass,
+            );
+        _replacementCorrectionIds[prepared.replacementTrip.id] = prepared.correctionId;
+        _replacementSourceTripIds[prepared.replacementTrip.id] = correctionSourceId;
+        try {
+          final MileageTrip calculated = await widget.useCases.calculateTrip(prepared.replacementTrip.id);
+          final bool ineligible = calculated.state == MileageTripState.unresolved;
+          await _completeCommittedAction(
+            calculated,
+            hideForm: true,
+            actionError: ineligible ? _l10n.mileageIneligible : null,
+            notice: _l10n.mileageCorrectionPrepared,
+          );
+        } catch (_) {
+          await _completeCommittedAction(
+            prepared.replacementTrip,
+            hideForm: true,
+            actionError: _l10n.mileageCalculateError,
+            notice: _l10n.mileageCorrectionPrepared,
+          );
+        }
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _isBusy = false;
+          _errorMessage = _l10n.mileageSaveError;
+        });
+      }
+      return;
+    }
+
     late final MileageTrip trip;
     try {
       trip = selectedId == null
@@ -527,11 +631,16 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
     await _completeCommittedAction(
       calculated,
       actionError: ineligible ? _l10n.mileageIneligible : null,
-      notice: ineligible ? null : _l10n.mileageCalculated,
+      notice: ineligible
+          ? null
+          : _replacementCorrectionIds.containsKey(trip.id)
+          ? _l10n.mileageCorrectionPrepared
+          : _l10n.mileageCalculated,
     );
   }
 
   Future<void> _postTrip(MileageTrip trip) async {
+    if (!_pendingCorrectionStateReady || _replacementCorrectionIds.containsKey(trip.id)) return;
     setState(() {
       _isBusy = true;
       _selectedTripId = trip.id;
@@ -548,7 +657,143 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
       });
       return;
     }
-    await _completeCommittedAction(trip, posted: true, notice: _l10n.mileagePosted);
+    await _completeCommittedAction(
+      trip,
+      committedStates: <String, MileageTripState>{trip.id: MileageTripState.posted},
+      notice: _l10n.mileagePosted,
+    );
+  }
+
+  Future<void> _applyReplacementCorrection(MileageTrip trip) async {
+    final String? correctionId = _replacementCorrectionIds[trip.id];
+    final String? sourceTripId = _replacementSourceTripIds[trip.id];
+    if (correctionId == null || sourceTripId == null || _displayState(trip) != MileageTripState.calculated) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(_l10n.mileageCorrectionConfirmTitle),
+        content: Text(_l10n.mileageCorrectionConfirmMessage),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(_l10n.actionCancel)),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(_l10n.mileageApplyCorrection),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _commitCorrection(correctionId, trip, sourceTripId: sourceTripId);
+  }
+
+  Future<void> _undoTrip(MileageTrip trip) async {
+    if (!mounted || _isBusy) return;
+    final String? existingCorrectionId = _undoCorrectionIds[trip.id];
+    if (existingCorrectionId != null) {
+      await _commitCorrection(existingCorrectionId, trip, sourceTripId: trip.id, undo: true);
+      return;
+    }
+    _undoReasonController.clear();
+    final GlobalKey<FormState> reasonFormKey = GlobalKey<FormState>();
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(_l10n.mileageUndoConfirmTitle),
+        content: SingleChildScrollView(
+          child: Form(
+            key: reasonFormKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(_l10n.mileageUndoConfirmMessage),
+                const SizedBox(height: 12),
+                TextFormField(
+                  key: ValueKey<String>('mileage-undo-reason-${trip.id}'),
+                  controller: _undoReasonController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(labelText: _l10n.mileageCorrectionReason),
+                  validator: _validateCorrectionReason,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(_l10n.actionCancel)),
+          FilledButton(
+            onPressed: () {
+              if (reasonFormKey.currentState?.validate() ?? false) {
+                Navigator.of(dialogContext).pop(true);
+              }
+            },
+            child: Text(_l10n.mileageUndoTrip),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final String reason = _undoReasonController.text.trim();
+    setState(() {
+      _isBusy = true;
+      _selectedTripId = trip.id;
+      _errorMessage = null;
+      _noticeMessage = null;
+    });
+
+    late final String correctionId;
+    try {
+      correctionId = await widget.useCases.prepareUndoCorrection(sourceTripId: trip.id, reason: reason);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isBusy = false;
+        _selectedTripId = trip.id;
+        _errorMessage = _l10n.mileageCorrectionUnavailable;
+        _noticeMessage = null;
+      });
+      return;
+    }
+    if (!mounted) return;
+    _undoCorrectionIds[trip.id] = correctionId;
+    await _commitCorrection(correctionId, trip, sourceTripId: trip.id, undo: true);
+  }
+
+  Future<void> _commitCorrection(
+    String correctionId,
+    MileageTrip trip, {
+    required String sourceTripId,
+    bool undo = false,
+  }) async {
+    setState(() {
+      _isBusy = true;
+      _selectedTripId = trip.id;
+      _errorMessage = null;
+      _noticeMessage = null;
+    });
+    try {
+      await widget.useCases.applyCorrection(correctionId);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isBusy = false;
+        _errorMessage = _l10n.mileageCorrectionUnavailable;
+      });
+      return;
+    }
+    if (undo) {
+      _undoCorrectionIds.remove(sourceTripId);
+    } else {
+      _replacementCorrectionIds.remove(trip.id);
+      _replacementSourceTripIds.remove(trip.id);
+    }
+    await _completeCommittedAction(
+      trip,
+      committedStates: undo
+          ? <String, MileageTripState>{sourceTripId: MileageTripState.voided}
+          : <String, MileageTripState>{sourceTripId: MileageTripState.corrected, trip.id: MileageTripState.posted},
+      notice: _l10n.mileageCorrectionApplied,
+    );
   }
 
   bool _canEdit(MileageTrip trip) {
@@ -564,6 +809,9 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
         '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
     return canonical == value;
   }
+
+  String? _validateCorrectionReason(String? value) =>
+      value == null || value.trim().isEmpty ? _l10n.mileageCorrectionReasonRequired : null;
 
   String? _validateDate(String? value) {
     final String raw = value?.trim() ?? '';
@@ -625,6 +873,7 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
 
   Widget _buildForm() {
     final bool editing = _selectedTripId != null;
+    final bool correcting = _correctionSourceTripId != null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -634,7 +883,11 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                editing ? _l10n.mileageEditTrip : _l10n.mileageNewTrip,
+                correcting
+                    ? _l10n.mileageCorrectTrip
+                    : editing
+                    ? _l10n.mileageEditTrip
+                    : _l10n.mileageNewTrip,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
@@ -711,6 +964,16 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
                 ],
                 onChanged: _isBusy ? null : (MileageVehicleClass? value) => setState(() => _vehicleClass = value),
               ),
+              if (correcting)
+                TextFormField(
+                  key: const ValueKey<String>('mileage-correction-reason'),
+                  controller: _correctionReasonController,
+                  enabled: !_isBusy,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(labelText: _l10n.mileageCorrectionReason),
+                  validator: _validateCorrectionReason,
+                ),
               const SizedBox(height: 16),
               Row(
                 children: <Widget>[
@@ -722,7 +985,7 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
                       label: Text(editing ? _l10n.mileageUpdate : _l10n.mileageSave),
                     ),
                   ),
-                  if (editing) ...<Widget>[
+                  if (editing || correcting) ...<Widget>[
                     const SizedBox(width: 8),
                     OutlinedButton(onPressed: _isBusy ? null : _startNewTrip, child: Text(_l10n.actionCancel)),
                   ],
@@ -738,7 +1001,10 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
   Widget _buildTripCard(MileageTrip trip) {
     final MileageTripState state = _displayState(trip);
     final bool canCalculate = state == MileageTripState.unresolved;
-    final bool canPost = state == MileageTripState.calculated;
+    final bool isReplacement = _replacementCorrectionIds.containsKey(trip.id);
+    final bool canPost = state == MileageTripState.calculated && !isReplacement && _pendingCorrectionStateReady;
+    final bool hasPendingReplacement = _replacementSourceTripIds.values.contains(trip.id);
+    final bool hasPendingUndo = _undoCorrectionIds.containsKey(trip.id);
     final String actionKeySuffix = '-${trip.id}';
     return Card(
       child: Padding(
@@ -783,12 +1049,43 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
                   icon: const Icon(Icons.calculate_outlined),
                   label: Text(_l10n.mileageCalculate),
                 ),
-                FilledButton.icon(
-                  key: ValueKey<String>('mileage-post$actionKeySuffix'),
-                  onPressed: _isBusy || !canPost ? null : () => _postTrip(trip),
-                  icon: const Icon(Icons.post_add),
-                  label: Text(_l10n.mileagePost),
-                ),
+                if (isReplacement)
+                  FilledButton.icon(
+                    key: ValueKey<String>('mileage-apply-correction-${trip.id}'),
+                    onPressed: _isBusy || state != MileageTripState.calculated
+                        ? null
+                        : () => _applyReplacementCorrection(trip),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(_l10n.mileageApplyCorrection),
+                  )
+                else
+                  FilledButton.icon(
+                    key: ValueKey<String>('mileage-post$actionKeySuffix'),
+                    onPressed: _isBusy || !canPost ? null : () => _postTrip(trip),
+                    icon: const Icon(Icons.post_add),
+                    label: Text(_l10n.mileagePost),
+                  ),
+                if (state == MileageTripState.posted && hasPendingUndo)
+                  FilledButton.icon(
+                    key: ValueKey<String>('mileage-retry-correction$actionKeySuffix'),
+                    onPressed: _isBusy ? null : () => _undoTrip(trip),
+                    icon: const Icon(Icons.replay),
+                    label: Text(_l10n.mileageApplyCorrection),
+                  )
+                else if (state == MileageTripState.posted && !hasPendingReplacement)
+                  OutlinedButton.icon(
+                    key: ValueKey<String>('mileage-correct$actionKeySuffix'),
+                    onPressed: _isBusy ? null : () => _startReplacementCorrection(trip),
+                    icon: const Icon(Icons.edit_note),
+                    label: Text(_l10n.mileageCorrectTrip),
+                  ),
+                if (state == MileageTripState.posted && !hasPendingUndo && !hasPendingReplacement)
+                  OutlinedButton.icon(
+                    key: ValueKey<String>('mileage-undo$actionKeySuffix'),
+                    onPressed: _isBusy ? null : () => _undoTrip(trip),
+                    icon: const Icon(Icons.undo),
+                    label: Text(_l10n.mileageUndoTrip),
+                  ),
               ],
             ),
           ],

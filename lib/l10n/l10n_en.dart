@@ -1834,6 +1834,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mileageEdit => 'Edit';
 
   @override
+  String get mileageCorrectTrip => 'Correct trip';
+
+  @override
+  String get mileageUndoTrip => 'Undo trip';
+
+  @override
+  String get mileageApplyCorrection => 'Apply correction';
+
+  @override
+  String get mileageCorrectionReason => 'Reason for correction';
+
+  @override
+  String get mileageCorrectionReasonRequired => 'Enter a reason for the correction.';
+
+  @override
+  String get mileageCorrectionConfirmTitle => 'Apply mileage correction?';
+
+  @override
+  String get mileageCorrectionConfirmMessage =>
+      'The original trip and posting remain unchanged. A linked reversal and replacement posting are applied together.';
+
+  @override
+  String get mileageUndoConfirmTitle => 'Undo mileage trip?';
+
+  @override
+  String get mileageUndoConfirmMessage =>
+      'The original trip facts and posting stay unchanged. A linked reversal will be recorded.';
+
+  @override
+  String get mileageCorrectionPrepared => 'Replacement prepared. Review the amount, then apply the correction.';
+
+  @override
+  String get mileageCorrectionApplied => 'Mileage correction applied.';
+
+  @override
+  String get mileageCorrectionUnavailable => 'Correction unavailable. Check account roles and trip date, then retry.';
+
+  @override
   String get mileageCalculate => 'Calculate';
 
   @override

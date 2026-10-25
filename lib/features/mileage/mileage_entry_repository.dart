@@ -199,8 +199,16 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
 
   Future<List<MileageTrip>> listTrips() async {
     final List<Map<String, Object?>> rows = await executor.runSelect(
-      'SELECT * FROM mileage_trips ORDER BY trip_date DESC, id DESC',
-      const <Object?>[],
+      'SELECT mileage_trips.*, pending_correction.id AS pending_correction_id, '
+      'pending_correction.kind AS pending_correction_kind, '
+      'pending_correction.trip_id AS pending_correction_source_trip_id '
+      'FROM mileage_trips '
+      'LEFT JOIN mileage_trip_corrections AS pending_correction '
+      'ON pending_correction.state = ? AND '
+      '((pending_correction.kind = ? AND pending_correction.replacement_trip_id = mileage_trips.id) '
+      'OR (pending_correction.kind = ? AND pending_correction.trip_id = mileage_trips.id)) '
+      'ORDER BY mileage_trips.trip_date DESC, mileage_trips.id DESC',
+      const <Object?>['draft', 'replace', 'void'],
     );
     return <MileageTrip>[for (final Map<String, Object?> r in rows) _fromRow(r)];
   }
@@ -324,7 +332,23 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       calculatedAmount: r['calculated_amount']?.toString(),
       calculatedAt: r['calculated_at']?.toString(),
       postingEventId: r['posting_event_id']?.toString(),
+      pendingCorrection: _pendingCorrectionFromRow(r),
     );
+  }
+
+  MileageCorrectionLink? _pendingCorrectionFromRow(Map<String, Object?> row) {
+    final String? id = row['pending_correction_id']?.toString();
+    if (id == null) return null;
+    final String? sourceTripId = row['pending_correction_source_trip_id']?.toString();
+    final MileageCorrectionKind kind = switch (row['pending_correction_kind']?.toString()) {
+      'replace' => MileageCorrectionKind.replacement,
+      'void' => MileageCorrectionKind.undo,
+      _ => throw StateError('Pending mileage correction has an invalid kind'),
+    };
+    if (sourceTripId == null || sourceTripId.isEmpty) {
+      throw StateError('Pending mileage correction has no source trip');
+    }
+    return MileageCorrectionLink(id: id, kind: kind, sourceTripId: sourceTripId);
   }
 }
 
