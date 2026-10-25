@@ -18,12 +18,21 @@ class InvoiceMoneyValidationException extends ArgumentError {
 }
 
 class VorschauResult {
-  const VorschauResult({required this.nettoCents, required this.ustCents, required this.bruttoCents, this.rabattCents});
+  const VorschauResult({
+    required this.nettoCents,
+    required this.ustCents,
+    required this.bruttoCents,
+    this.rabattCents,
+    this.positionTotals = const <VorschauPositionTotals>[],
+  });
 
   final int nettoCents;
   final int ustCents;
   final int bruttoCents;
   final int? rabattCents;
+
+  /// Canonical after-discount amounts keyed by each persisted invoice line.
+  final List<VorschauPositionTotals> positionTotals;
 
   /// Presentation values are produced only after all arithmetic is complete.
   num get nettoBetrag => nettoCents / 100.0;
@@ -35,6 +44,21 @@ class VorschauResult {
   String get ustBetragString => money.fromCents(ustCents);
   String get bruttoBetragString => money.fromCents(bruttoCents);
   String? get rabattBetragString => rabattCents == null ? null : money.fromCents(rabattCents!);
+}
+
+/// Final canonical money for one position from the invoice calculator.
+class VorschauPositionTotals {
+  const VorschauPositionTotals({
+    required this.position,
+    required this.nettoCents,
+    required this.ustCents,
+    required this.bruttoCents,
+  });
+
+  final int position;
+  final int nettoCents;
+  final int ustCents;
+  final int bruttoCents;
 }
 
 /// One calculator for preview and every invoice persistence path.
@@ -180,6 +204,7 @@ class VorschauService {
     var netto = 0;
     var ust = 0;
     var brutto = 0;
+    final List<VorschauPositionTotals> positionTotals = <VorschauPositionTotals>[];
     for (final MapEntry<int, int> entry in netByRate.entries) {
       final int rate = entry.key;
       final List<int> lineIndexes = <int>[
@@ -216,13 +241,28 @@ class VorschauService {
           position.position,
           const <String>['brutto_betrag'],
         );
+        positionTotals.add(
+          VorschauPositionTotals(
+            position: position.position ?? index,
+            nettoCents: lineNet,
+            ustCents: lineVat,
+            bruttoCents: lineGross,
+          ),
+        );
         netto = _addCurrency(netto, lineNet, index, position.position, const <String>['netto_betrag']);
         ust = _addCurrency(ust, lineVat, index, position.position, const <String>['ust_betrag']);
         brutto = _addCurrency(brutto, lineGross, index, position.position, const <String>['brutto_betrag']);
       }
     }
 
-    return VorschauResult(nettoCents: netto, ustCents: ust, bruttoCents: brutto, rabattCents: appliedDiscount);
+    positionTotals.sort((a, b) => a.position.compareTo(b.position));
+    return VorschauResult(
+      nettoCents: netto,
+      ustCents: ust,
+      bruttoCents: brutto,
+      rabattCents: appliedDiscount,
+      positionTotals: List<VorschauPositionTotals>.unmodifiable(positionTotals),
+    );
   }
 
   static int _lineAmountCents(int unitPrice, int quantity, int discountPercent, int lineIndex, int? position) {

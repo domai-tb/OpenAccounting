@@ -185,8 +185,9 @@ class EInvoiceXmlSerializer {
       xml.writeln('    </cac:Item>');
       xml.writeln('    <cac:Price>');
       xml.writeln(
-        '      <cbc:PriceAmount currencyID="${snapshot.currency}">${_escape(line.unitPriceText)}</cbc:PriceAmount>',
+        '      <cbc:PriceAmount currencyID="${snapshot.currency}">${_escape(line.netUnitPriceText)}</cbc:PriceAmount>',
       );
+      xml.writeln('      <cbc:BaseQuantity unitCode="H87">${_escape(line.priceBaseQuantityText)}</cbc:BaseQuantity>');
       xml.writeln('    </cac:Price>');
       xml.writeln('  </cac:InvoiceLine>');
     }
@@ -203,16 +204,14 @@ class EInvoiceXmlSerializer {
       '      <ram:SpecifiedTradeProduct><ram:Name>${_escape(line.description)}</ram:Name></ram:SpecifiedTradeProduct>',
     );
     xml.writeln('      <ram:SpecifiedLineTradeAgreement>');
-    // Stored unit price: net block for netto input, gross block for brutto.
     if (line.unitPriceIsGross) {
       xml.writeln(
-        '        <ram:GrossPriceProductTradePrice><ram:ChargeAmount>${_escape(line.unitPriceText)}</ram:ChargeAmount></ram:GrossPriceProductTradePrice>',
-      );
-    } else {
-      xml.writeln(
-        '        <ram:NetPriceProductTradePrice><ram:ChargeAmount>${_escape(line.unitPriceText)}</ram:ChargeAmount></ram:NetPriceProductTradePrice>',
+        '        <ram:GrossPriceProductTradePrice><ram:ChargeAmount>${_escape(line.unitPriceText)}</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">${_escape(line.priceBaseQuantityText)}</ram:BasisQuantity></ram:GrossPriceProductTradePrice>',
       );
     }
+    xml.writeln(
+      '        <ram:NetPriceProductTradePrice><ram:ChargeAmount>${_escape(line.netUnitPriceText)}</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">${_escape(line.priceBaseQuantityText)}</ram:BasisQuantity></ram:NetPriceProductTradePrice>',
+    );
     xml.writeln('      </ram:SpecifiedLineTradeAgreement>');
     xml.writeln(
       '      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="H87">${_escape(line.quantityText)}</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>',

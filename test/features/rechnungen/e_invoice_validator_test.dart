@@ -198,6 +198,7 @@ void main() {
             description: 'Beratung',
             quantityText: '2',
             unitPriceText: '100.0000',
+            netUnitPriceText: '100.0000',
             unitPriceIsGross: false,
             netCents: 20000,
             taxCents: 3800,

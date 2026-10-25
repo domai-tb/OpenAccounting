@@ -5,8 +5,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_offline_xml_validator.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_datasource.dart';
+import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_repository.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_usecases.dart';
 
@@ -41,9 +43,77 @@ void main() {
         kundeId: customerId,
         leistungsdatum: '2026-03-10',
       );
+      await _ensureTaxEvidenceColumns(db);
+      await _setTaxEvidence(db, invoiceId, treatment: 'standard_19', legalBasis: 'ustg_12_1', category: 'S');
       await useCases.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE');
       return invoiceId;
     }
+
+    Future<int> finalizeSection25aPdfInvoice({required bool includeTaxEvidence}) async {
+      final int customerId = await addEInvoiceCustomer(db);
+      final int invoiceId = await createEInvoiceDraft(
+        RechnungenDataSource(db.executor, profileDir: profileDir.path),
+        kundeId: customerId,
+        leistungsdatum: '2026-03-10',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(
+            bezeichnung: 'Differenzbesteuerte Ware',
+            menge: 1,
+            einzelpreis: 107.60,
+            gesamt: 107.60,
+            ustSatz: 0,
+            position: 8,
+          ),
+        ],
+      );
+      if (includeTaxEvidence) {
+        await _ensureTaxEvidenceColumns(db);
+        await _setTaxEvidence(
+          db,
+          invoiceId,
+          treatment: 'margin_scheme_25a_second_hand',
+          legalBasis: 'ustg_25a',
+          category: 'E',
+          reasonCode: 'VATEX-EU-F',
+          reasonText: 'Gebrauchtgegenstände/Sonderregelung',
+        );
+      }
+      await useCases.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE');
+      return invoiceId;
+    }
+
+    Future<FinalizationSnapshot> readCommittedSnapshot(int invoiceId) {
+      return RechnungenDataSource(db.executor, profileDir: profileDir.path).readCommittedEInvoiceSnapshot(invoiceId);
+    }
+
+    test('committed_reader_preserves_persisted_25a_payable_amount', () async {
+      final int invoiceId = await finalizeSection25aPdfInvoice(includeTaxEvidence: true);
+
+      final FinalizationSnapshot snapshot = await readCommittedSnapshot(invoiceId);
+
+      expect(snapshot.lines.single.position, 8);
+      expect(snapshot.lines.single.netCents, 10760);
+      expect(snapshot.lines.single.taxCents, 0);
+      expect(snapshot.lines.single.grossCents, 10760);
+      expect(snapshot.netCents, 10760);
+      expect(snapshot.taxCents, 0);
+      expect(snapshot.grossCents, 10760);
+      expect(snapshot.taxBreakdowns.single.netCents, 10760);
+      expect(snapshot.taxBreakdowns.single.taxCents, 0);
+    });
+
+    test('committed_reader_fails_closed_when_tax_evidence_is_absent', () async {
+      final int invoiceId = await finalizeSection25aPdfInvoice(includeTaxEvidence: false);
+
+      await expectLater(
+        readCommittedSnapshot(invoiceId),
+        throwsA(
+          isA<EInvoiceSourceException>()
+              .having((error) => error.code, 'error code', 'unresolvedTaxClassification')
+              .having((error) => error.fields, 'missing evidence fields', contains('position[0].tax_treatment')),
+        ),
+      );
+    });
 
     test('standalone_export_uses_committed_snapshot_without_mutation', () async {
       final int invoiceId = await finalizePdfInvoice();
@@ -230,4 +300,42 @@ void main() {
       expect(exportDir.listSync(), isEmpty);
     });
   });
+}
+
+Future<void> _ensureTaxEvidenceColumns(AppDatabase db) async {
+  const List<String> columns = <String>[
+    'tax_treatment',
+    'tax_legal_basis',
+    'e_invoice_tax_category_code',
+    'e_invoice_exemption_reason_code',
+    'e_invoice_exemption_reason_text',
+  ];
+  final List<Map<String, Object?>> schema = await db.executor.runSelect(
+    'PRAGMA table_info(rechnungspositionen)',
+    const <Object?>[],
+  );
+  final Set<String> existing = <String>{
+    for (final Map<String, Object?> column in schema) column['name']?.toString() ?? '',
+  };
+  for (final String column in columns) {
+    if (existing.contains(column)) continue;
+    await db.executor.runCustom('ALTER TABLE rechnungspositionen ADD COLUMN $column TEXT');
+  }
+}
+
+Future<void> _setTaxEvidence(
+  AppDatabase db,
+  int invoiceId, {
+  required String treatment,
+  required String legalBasis,
+  required String category,
+  String? reasonCode,
+  String? reasonText,
+}) async {
+  final int updated = await db.executor.runUpdate(
+    'UPDATE rechnungspositionen SET tax_treatment = ?, tax_legal_basis = ?, e_invoice_tax_category_code = ?, '
+    'e_invoice_exemption_reason_code = ?, e_invoice_exemption_reason_text = ? WHERE rechnung_id = ?',
+    <Object?>[treatment, legalBasis, category, reasonCode, reasonText, invoiceId],
+  );
+  if (updated != 1) throw StateError('Expected to update one synthetic tax-evidence row, updated $updated');
 }

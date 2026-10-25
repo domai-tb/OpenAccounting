@@ -163,6 +163,34 @@ void main() {
     expect(preview.bruttoCents, 17);
   });
 
+  test('test_preview_returns_position_keyed_canonical_totals_for_mixed_tax_lines', () {
+    final VorschauResult preview = VorschauService.calculate(
+      eingabemodus: 'netto',
+      positionen: const <RechnungPositionItem>[
+        RechnungPositionItem(
+          bezeichnung: '§25a Ware',
+          menge: 1,
+          einzelpreis: 107.60,
+          gesamt: 107.60,
+          ustSatz: 0,
+          position: 8,
+        ),
+        RechnungPositionItem(bezeichnung: 'Beratung', menge: 1, einzelpreis: 50, gesamt: 50, position: 2),
+      ],
+    );
+
+    expect(preview.nettoCents, 15760);
+    expect(preview.ustCents, 950);
+    expect(preview.bruttoCents, 16710);
+    expect(preview.positionTotals.map((VorschauPositionTotals amount) => amount.position), <int>[2, 8]);
+    expect(
+      preview.positionTotals.map(
+        (VorschauPositionTotals amount) => (amount.nettoCents, amount.ustCents, amount.bruttoCents),
+      ),
+      <(int, int, int)>[(5000, 950, 5950), (10760, 0, 10760)],
+    );
+  });
+
   test('test_gross_mode_rounds_net_per_position_before_summing', () {
     const List<RechnungPositionItem> positions = <RechnungPositionItem>[
       RechnungPositionItem(bezeichnung: 'First', menge: 1, einzelpreis: 0.03, gesamt: 0.03),

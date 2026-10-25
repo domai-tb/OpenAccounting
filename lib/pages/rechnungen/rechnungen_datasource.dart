@@ -9,6 +9,7 @@ import 'package:openaccounting/features/documents/correction_artifact_writer.dar
 import 'package:openaccounting/features/e_invoice/e_invoice_output_format.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_service.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
+import 'package:openaccounting/features/e_invoice/e_invoice_tax_classification.dart';
 import 'package:openaccounting/features/pdf/pdf_generator.dart';
 import 'package:openaccounting/features/pdf/pdf_models.dart';
 import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
@@ -26,6 +27,32 @@ class RechnungenDataSource {
   final String? profileDir;
   final CorrectionArtifactWriter correctionArtifactWriter;
   final EInvoiceService eInvoiceService;
+
+  static const List<String> _eInvoiceEvidenceColumns = <String>[
+    'tax_treatment',
+    'tax_legal_basis',
+    'e_invoice_tax_category_code',
+    'e_invoice_exemption_reason_code',
+    'e_invoice_exemption_reason_text',
+    'e_invoice_intra_community_destination_country_iso',
+    'e_invoice_intra_community_supply_evidence_source_ref',
+    'e_invoice_reverse_charge_supplier_establishment_country_iso',
+    'e_invoice_reverse_charge_supplier_establishment_basis',
+    'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+    'e_invoice_reverse_charge_recipient_status',
+    'e_invoice_reverse_charge_recipient_establishment_country_iso',
+    'e_invoice_reverse_charge_service_kind',
+    'e_invoice_reverse_charge_place_of_supply_basis',
+    'e_invoice_reverse_charge_place_of_supply_country_iso',
+    'e_invoice_reverse_charge_taxability',
+    'e_invoice_reverse_charge_evidence_source_ref',
+    'e_invoice_reverse_charge_recipient_13b5_basis',
+    'e_invoice_reverse_charge_ust1tg_certificate_ref',
+    'e_invoice_reverse_charge_ust1tg_scope',
+    'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+    'e_invoice_reverse_charge_ust1tg_issued_on',
+    'e_invoice_reverse_charge_ust1tg_valid_through',
+  ];
 
   bool get correctionArtifactTransactionAvailable => profileDir?.trim().isNotEmpty ?? false;
 
@@ -643,55 +670,7 @@ WHERE id = ?
           (!isOutgoingInvoice || typ.trim().toLowerCase() != 'rechnung')) {
         throw StateError('Strukturierte E-Rechnung nur für gewöhnliche Ausgangsrechnungen zulässig');
       }
-      const List<String> eInvoiceEvidenceColumns = <String>[
-        'tax_treatment',
-        'tax_legal_basis',
-        'e_invoice_tax_category_code',
-        'e_invoice_exemption_reason_code',
-        'e_invoice_exemption_reason_text',
-        'e_invoice_intra_community_destination_country_iso',
-        'e_invoice_intra_community_supply_evidence_source_ref',
-        'e_invoice_reverse_charge_supplier_establishment_country_iso',
-        'e_invoice_reverse_charge_supplier_establishment_basis',
-        'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
-        'e_invoice_reverse_charge_recipient_status',
-        'e_invoice_reverse_charge_recipient_establishment_country_iso',
-        'e_invoice_reverse_charge_service_kind',
-        'e_invoice_reverse_charge_place_of_supply_basis',
-        'e_invoice_reverse_charge_place_of_supply_country_iso',
-        'e_invoice_reverse_charge_taxability',
-        'e_invoice_reverse_charge_evidence_source_ref',
-        'e_invoice_reverse_charge_recipient_13b5_basis',
-        'e_invoice_reverse_charge_ust1tg_certificate_ref',
-        'e_invoice_reverse_charge_ust1tg_scope',
-        'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
-        'e_invoice_reverse_charge_ust1tg_issued_on',
-        'e_invoice_reverse_charge_ust1tg_valid_through',
-      ];
-      final List<Map<String, Object?>> positionSchema = await transaction.runSelect(
-        'PRAGMA table_info(rechnungspositionen)',
-        const <Object?>[],
-      );
-      final Set<String> availablePositionColumns = <String>{
-        for (final Map<String, Object?> column in positionSchema) column['name']?.toString() ?? '',
-      };
-      final List<String> selectedPositionColumns = <String>[
-        'artikel_id',
-        'bezeichnung',
-        'menge',
-        'einzelpreis',
-        'gesamt',
-        'ust_satz',
-        'rabatt_prozent',
-        'position',
-        for (final String column in eInvoiceEvidenceColumns)
-          if (availablePositionColumns.contains(column)) column,
-      ];
-      final posRows = await transaction.runSelect(
-        'SELECT ${selectedPositionColumns.join(', ')} FROM rechnungspositionen WHERE rechnung_id = ? '
-        'ORDER BY position, id',
-        <Object?>[rechnungId],
-      );
+      final List<Map<String, Object?>> posRows = await _selectEInvoicePositionRows(transaction, rechnungId);
       final positionen = posRows
           .map(
             (r) => RechnungPositionItem(
@@ -1073,6 +1052,89 @@ WHERE id = ? AND ist_entwurf = 1
     };
   }
 
+  EInvoiceCanonicalTotals _eInvoiceCanonicalTotals({
+    required VorschauResult preview,
+    required List<Map<String, Object?>> posRows,
+  }) {
+    final Map<int, Map<String, Object?>> rowsByPosition = <int, Map<String, Object?>>{};
+    for (var index = 0; index < posRows.length; index++) {
+      final int position = _asInt(posRows[index]['position']) ?? index;
+      if (rowsByPosition.containsKey(position)) _throwCanonicalEInvoiceTotalsMismatch();
+      rowsByPosition[position] = posRows[index];
+    }
+    final List<EInvoiceCanonicalPositionAmounts> positionTotals = <EInvoiceCanonicalPositionAmounts>[];
+    var disclosureNetCents = 0;
+    var disclosureTaxCents = 0;
+    var disclosureGrossCents = 0;
+    for (final VorschauPositionTotals amounts in preview.positionTotals) {
+      final Map<String, Object?>? row = rowsByPosition.remove(amounts.position);
+      if (row == null) _throwCanonicalEInvoiceTotalsMismatch();
+      final EInvoiceCanonicalPositionAmounts canonical = EInvoiceCanonicalPositionAmounts(
+        position: amounts.position,
+        netCents: amounts.nettoCents,
+        taxCents: amounts.ustCents,
+        grossCents: amounts.bruttoCents,
+      );
+      positionTotals.add(canonical);
+      final bool section25a = switch (EInvoiceTaxTreatment.fromCode(row['tax_treatment']?.toString())) {
+        EInvoiceTaxTreatment.marginScheme25aSecondHand ||
+        EInvoiceTaxTreatment.marginScheme25aArt ||
+        EInvoiceTaxTreatment.marginScheme25aCollectorsAntiquities => true,
+        _ => false,
+      };
+      disclosureNetCents += section25a ? canonical.grossCents : canonical.netCents;
+      disclosureTaxCents += section25a ? 0 : canonical.taxCents;
+      disclosureGrossCents += canonical.grossCents;
+    }
+    if (rowsByPosition.isNotEmpty) _throwCanonicalEInvoiceTotalsMismatch();
+    return EInvoiceCanonicalTotals(
+      netCents: preview.nettoCents,
+      taxCents: preview.ustCents,
+      grossCents: preview.bruttoCents,
+      positionTotals: List<EInvoiceCanonicalPositionAmounts>.unmodifiable(positionTotals),
+      disclosureTotals: EInvoiceDisclosureTotals(
+        netCents: disclosureNetCents,
+        taxCents: disclosureTaxCents,
+        grossCents: disclosureGrossCents,
+      ),
+    );
+  }
+
+  Future<List<Map<String, Object?>>> _selectEInvoicePositionRows(QueryExecutor queryExecutor, int rechnungId) async {
+    final List<Map<String, Object?>> schema = await queryExecutor.runSelect(
+      'PRAGMA table_info(rechnungspositionen)',
+      const <Object?>[],
+    );
+    final Set<String> availableColumns = <String>{
+      for (final Map<String, Object?> column in schema) column['name']?.toString() ?? '',
+    };
+    final List<String> selectedColumns = <String>[
+      'artikel_id',
+      'bezeichnung',
+      'menge',
+      'einzelpreis',
+      'gesamt',
+      'ust_satz',
+      'rabatt_prozent',
+      'position',
+      for (final String column in _eInvoiceEvidenceColumns)
+        if (availableColumns.contains(column)) column,
+    ];
+    return queryExecutor.runSelect(
+      'SELECT ${selectedColumns.join(', ')} FROM rechnungspositionen WHERE rechnung_id = ? ORDER BY position, id',
+      <Object?>[rechnungId],
+    );
+  }
+
+  Never _throwCanonicalEInvoiceTotalsMismatch() {
+    throw const EInvoiceSourceException(
+      code: 'canonicalPositionTotalsMismatch',
+      messageDe: 'Kanonische E-Rechnungssummen passen nicht zu den Positionen',
+      messageEn: 'Canonical e-invoice totals do not match the invoice positions',
+      fields: ['positionen', 'netto_betrag', 'ust_betrag', 'brutto_betrag'],
+    );
+  }
+
   /// Materializes the canonical finalization snapshot for structured output.
   ///
   /// Returns null for plain PDF finalization. For ZUGFeRD and XRechnung the
@@ -1112,11 +1174,7 @@ WHERE id = ? AND ist_entwurf = 1
       companyRow: companyRow,
       customerRow: customerRows.isEmpty ? const <String, Object?>{} : customerRows.single,
       posRows: posRows,
-      preview: EInvoiceCanonicalTotals(
-        netCents: preview.nettoCents,
-        taxCents: preview.ustCents,
-        grossCents: preview.bruttoCents,
-      ),
+      preview: _eInvoiceCanonicalTotals(preview: preview, posRows: posRows),
       eingabemodus: eingabemodus,
       deliveryDate: invoice['leistungsdatum']?.toString(),
       documentDiscountPercent: rabattProzent == 0 ? null : rabattProzent,
@@ -1979,14 +2037,7 @@ WHERE r.id = ?
       messageDe: 'Gespeicherter Kundenschnappschuss fehlt',
       messageEn: 'Stored customer snapshot is missing',
     );
-    final List<Map<String, Object?>> posRows = await executor.runSelect(
-      '''
-SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, rabatt_prozent, position
-FROM rechnungspositionen
-WHERE rechnung_id = ?
-ORDER BY position, id''',
-      <Object?>[rechnungId],
-    );
+    final List<Map<String, Object?>> posRows = await _selectEInvoicePositionRows(executor, rechnungId);
     final List<RechnungPositionItem> positionen = posRows
         .map(
           (row) => RechnungPositionItem(
@@ -2028,11 +2079,7 @@ ORDER BY position, id''',
       companyRow: companyRow,
       customerRow: customerRow,
       posRows: posRows,
-      preview: EInvoiceCanonicalTotals(
-        netCents: preview.nettoCents,
-        taxCents: preview.ustCents,
-        grossCents: preview.bruttoCents,
-      ),
+      preview: _eInvoiceCanonicalTotals(preview: preview, posRows: posRows),
       eingabemodus: invoice['eingabemodus']?.toString() ?? 'netto',
       buyerReference: buyerReference,
       deliveryDate: invoice['leistungsdatum']?.toString(),

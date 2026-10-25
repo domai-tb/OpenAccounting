@@ -105,6 +105,36 @@ void _expectSection6Rejected({required String expectedField, String? destination
   );
 }
 
+FinalizationSnapshot _grossInputSnapshot() => const EInvoiceSnapshotBuilder().buildFinalization(
+  documentNumber: 'RE-2026-0001',
+  outputFormat: EInvoiceOutputFormat.xrechnung,
+  issueDate: '2026-03-15',
+  companyRow: validCompany(),
+  customerRow: validCustomer(),
+  posRows: <Map<String, Object?>>[
+    <String, Object?>{
+      'bezeichnung': 'Beratung',
+      'menge': 1,
+      'einzelpreis': 119,
+      'ust_satz': 19,
+      'tax_treatment': 'standard_19',
+      'tax_legal_basis': 'ustg_12_1',
+      'e_invoice_tax_category_code': 'S',
+      'position': 0,
+    },
+  ],
+  preview: const EInvoiceCanonicalTotals(
+    netCents: 10000,
+    taxCents: 1900,
+    grossCents: 11900,
+    positionTotals: <EInvoiceCanonicalPositionAmounts>[
+      EInvoiceCanonicalPositionAmounts(position: 0, netCents: 10000, taxCents: 1900, grossCents: 11900),
+    ],
+    disclosureTotals: EInvoiceDisclosureTotals(netCents: 10000, taxCents: 1900, grossCents: 11900),
+  ),
+  eingabemodus: 'brutto',
+);
+
 void main() {
   group('ZUGFeRD and XRechnung e-invoicing', () {
     test('offline_validator_accepts_serialized_ubl_and_cii_before_return', () async {
@@ -932,12 +962,27 @@ void main() {
       );
     });
 
-    test('maps_section_25a_only_with_vatex_subtype_and_emits_required_invoice_note', () {
-      for (final (String treatment, String code, String note) in <(String, String, String)>[
-        ('margin_scheme_25a_second_hand', 'VATEX-EU-F', 'Gebrauchtgegenstände/Sonderregelung'),
-        ('margin_scheme_25a_art', 'VATEX-EU-I', 'Kunstgegenstände/Sonderregelung'),
-        ('margin_scheme_25a_collectors_antiquities', 'VATEX-EU-J', 'Sammlungsstücke und Antiquitäten/Sonderregelung'),
-      ]) {
+    for (final (String testName, String treatment, String code, String note) in <(String, String, String, String)>[
+      (
+        'section_25a_second_hand_preserves_disclosed_payable_amount_107_60',
+        'margin_scheme_25a_second_hand',
+        'VATEX-EU-F',
+        'Gebrauchtgegenstände/Sonderregelung',
+      ),
+      (
+        'section_25a_art_preserves_disclosed_payable_amount_107_60',
+        'margin_scheme_25a_art',
+        'VATEX-EU-I',
+        'Kunstgegenstände/Sonderregelung',
+      ),
+      (
+        'section_25a_collectors_antiquities_preserves_disclosed_payable_amount_107_60',
+        'margin_scheme_25a_collectors_antiquities',
+        'VATEX-EU-J',
+        'Sammlungsstücke und Antiquitäten/Sonderregelung',
+      ),
+    ]) {
+      test(testName, () {
         final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
           documentNumber: 'RE-2026-0001',
           outputFormat: EInvoiceOutputFormat.xrechnung,
@@ -948,32 +993,329 @@ void main() {
             <String, Object?>{
               'bezeichnung': 'Differenzbesteuerter Artikel',
               'menge': 1,
-              'einzelpreis': 100,
+              'einzelpreis': 107.60,
               'ust_satz': 0,
               'tax_treatment': treatment,
               'tax_legal_basis': 'ustg_25a',
               'e_invoice_tax_category_code': 'E',
               'e_invoice_exemption_reason_code': code,
               'e_invoice_exemption_reason_text': note,
-              'position': 0,
+              'position': 8,
             },
           ],
-          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 0, grossCents: 10000),
+          preview: const EInvoiceCanonicalTotals(
+            netCents: 10000,
+            taxCents: 760,
+            grossCents: 10760,
+            positionTotals: <EInvoiceCanonicalPositionAmounts>[
+              EInvoiceCanonicalPositionAmounts(position: 8, netCents: 10000, taxCents: 760, grossCents: 10760),
+            ],
+            disclosureTotals: EInvoiceDisclosureTotals(netCents: 10760, taxCents: 0, grossCents: 10760),
+          ),
           eingabemodus: 'netto',
         );
 
-        expect(snapshot.netCents, 10000);
+        expect(snapshot.lines.single.netCents, 10760);
+        expect(snapshot.lines.single.taxCents, 0);
+        expect(snapshot.lines.single.grossCents, 10760);
+        expect(snapshot.netCents, 10760);
         expect(snapshot.taxCents, 0);
+        expect(snapshot.grossCents, 10760);
+        expect(snapshot.accountingNetCents, 10000);
+        expect(snapshot.accountingTaxCents, 760);
+        expect(snapshot.accountingGrossCents, 10760);
         expect(snapshot.invoiceNotes, contains(note));
         expect(snapshot.taxBreakdowns.single.classification.category, EInvoiceTaxCategory.exempt);
+        expect(snapshot.taxBreakdowns.single.netCents, 10760);
         expect(snapshot.taxBreakdowns.single.taxCents, 0);
         final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
         final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+        expect(ubl, contains('<cbc:BaseQuantity unitCode="H87">1</cbc:BaseQuantity>'));
+        expect(cii, contains('<ram:BasisQuantity unitCode="H87">1</ram:BasisQuantity>'));
+        expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">107.60</cbc:LineExtensionAmount>'));
+        expect(ubl, contains('<cbc:TaxableAmount currencyID="EUR">107.60</cbc:TaxableAmount>'));
+        expect(ubl, contains('<cbc:TaxExclusiveAmount currencyID="EUR">107.60</cbc:TaxExclusiveAmount>'));
+        expect(ubl, contains('<cbc:TaxInclusiveAmount currencyID="EUR">107.60</cbc:TaxInclusiveAmount>'));
+        expect(ubl, contains('<cbc:PayableAmount currencyID="EUR">107.60</cbc:PayableAmount>'));
+        expect(cii, contains('<ram:LineTotalAmount>107.60</ram:LineTotalAmount>'));
+        expect(cii, contains('<ram:TaxBasisTotalAmount>107.60</ram:TaxBasisTotalAmount>'));
         expect(ubl, contains('<cbc:Note>$note</cbc:Note>'));
         expect(ubl, contains('<cbc:TaxExemptionReasonCode>$code</cbc:TaxExemptionReasonCode>'));
+        expect(cii, contains('<ram:DuePayableAmount>107.60</ram:DuePayableAmount>'));
         expect(cii, contains('<ram:IncludedNote><ram:Content>$note</ram:Content></ram:IncludedNote>'));
         expect(cii, contains('<ram:ExemptionReasonCode>$code</ram:ExemptionReasonCode>'));
+      });
+    }
+
+    test('gross_input_emits_canonical_net_price_basis_in_ubl_and_cii', () {
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Beratung',
+            'menge': 1,
+            'einzelpreis': 119,
+            'ust_satz': 19,
+            'tax_treatment': 'standard_19',
+            'tax_legal_basis': 'ustg_12_1',
+            'e_invoice_tax_category_code': 'S',
+            'position': 0,
+          },
+        ],
+        preview: const EInvoiceCanonicalTotals(
+          netCents: 10000,
+          taxCents: 1900,
+          grossCents: 11900,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(position: 0, netCents: 10000, taxCents: 1900, grossCents: 11900),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(netCents: 10000, taxCents: 1900, grossCents: 11900),
+        ),
+        eingabemodus: 'brutto',
+      );
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+
+      expect(snapshot.lines.single.netCents, 10000);
+      expect(ubl, contains('<cbc:PriceAmount currencyID="EUR">100.0000</cbc:PriceAmount>'));
+      expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">100.00</cbc:LineExtensionAmount>'));
+      expect(
+        cii,
+        contains(
+          '<ram:NetPriceProductTradePrice><ram:ChargeAmount>100.0000</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">1</ram:BasisQuantity></ram:NetPriceProductTradePrice>',
+        ),
+      );
+      expect(
+        cii,
+        contains(
+          '<ram:GrossPriceProductTradePrice><ram:ChargeAmount>119.0000</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">1</ram:BasisQuantity></ram:GrossPriceProductTradePrice>',
+        ),
+      );
+      expect(cii, contains('<ram:LineTotalAmount>100.00</ram:LineTotalAmount>'));
+    });
+
+    test('gross_input_cii_emits_canonical_net_and_source_gross_prices', () {
+      final FinalizationSnapshot snapshot = _grossInputSnapshot();
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+
+      expect(
+        cii,
+        contains(
+          '<ram:NetPriceProductTradePrice><ram:ChargeAmount>100.0000</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">1</ram:BasisQuantity></ram:NetPriceProductTradePrice>',
+        ),
+      );
+      expect(
+        cii,
+        contains(
+          '<ram:GrossPriceProductTradePrice><ram:ChargeAmount>119.0000</ram:ChargeAmount><ram:BasisQuantity unitCode="H87">1</ram:BasisQuantity></ram:GrossPriceProductTradePrice>',
+        ),
+      );
+      expect(cii, contains('<ram:LineTotalAmount>100.00</ram:LineTotalAmount>'));
+    });
+
+    test('gross_input_without_position_totals_fails_closed_for_missing_net_price_basis', () {
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Beratung',
+              'menge': 1,
+              'einzelpreis': 119,
+              'ust_satz': 19,
+              'tax_treatment': 'standard_19',
+              'tax_legal_basis': 'ustg_12_1',
+              'e_invoice_tax_category_code': 'S',
+              'position': 0,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(netCents: 10000, taxCents: 1900, grossCents: 11900),
+          eingabemodus: 'brutto',
+        ),
+        throwsA(
+          isA<EInvoiceSourceException>().having(
+            (EInvoiceSourceException error) => error.code,
+            'code',
+            'missingNetPriceBasis',
+          ),
+        ),
+      );
+    });
+
+    test('section_25a_canonical_line_total_reconciles_to_source_price_and_quantity', () {
+      expect(
+        () => const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: EInvoiceOutputFormat.xrechnung,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: <Map<String, Object?>>[
+            <String, Object?>{
+              'bezeichnung': 'Differenzbesteuerter Artikel',
+              'menge': 1,
+              'einzelpreis': 107.60,
+              'ust_satz': 0,
+              'tax_treatment': 'margin_scheme_25a_second_hand',
+              'tax_legal_basis': 'ustg_25a',
+              'e_invoice_tax_category_code': 'E',
+              'e_invoice_exemption_reason_code': 'VATEX-EU-F',
+              'e_invoice_exemption_reason_text': 'Gebrauchtgegenstände/Sonderregelung',
+              'position': 8,
+            },
+          ],
+          preview: const EInvoiceCanonicalTotals(
+            netCents: 10761,
+            taxCents: 0,
+            grossCents: 10761,
+            positionTotals: <EInvoiceCanonicalPositionAmounts>[
+              EInvoiceCanonicalPositionAmounts(position: 8, netCents: 10761, taxCents: 0, grossCents: 10761),
+            ],
+            disclosureTotals: EInvoiceDisclosureTotals(netCents: 10761, taxCents: 0, grossCents: 10761),
+          ),
+          eingabemodus: 'netto',
+        ),
+        throwsA(
+          isA<EInvoiceSourceException>().having(
+            (EInvoiceSourceException error) => error.code,
+            'code',
+            'unreconciledPriceBasis',
+          ),
+        ),
+      );
+    });
+
+    test('section_25a_line_and_document_discounts_fail_closed_without_emitted_basis', () {
+      for (final (String source, num? lineDiscount, num? documentDiscount) in <(String, num?, num?)>[
+        ('line', 10, null),
+        ('document', null, 10),
+      ]) {
+        const EInvoiceCanonicalTotals discountedTotals = EInvoiceCanonicalTotals(
+          netCents: 9684,
+          taxCents: 0,
+          grossCents: 9684,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(position: 8, netCents: 9684, taxCents: 0, grossCents: 9684),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(netCents: 9684, taxCents: 0, grossCents: 9684),
+        );
+        expect(
+          () => const EInvoiceSnapshotBuilder().buildFinalization(
+            documentNumber: 'RE-2026-0001',
+            outputFormat: EInvoiceOutputFormat.xrechnung,
+            issueDate: '2026-03-15',
+            companyRow: validCompany(),
+            customerRow: validCustomer(),
+            posRows: <Map<String, Object?>>[
+              <String, Object?>{
+                'bezeichnung': 'Differenzbesteuerter Artikel',
+                'menge': 1,
+                'einzelpreis': 107.60,
+                'ust_satz': 0,
+                'tax_treatment': 'margin_scheme_25a_second_hand',
+                'tax_legal_basis': 'ustg_25a',
+                'e_invoice_tax_category_code': 'E',
+                'e_invoice_exemption_reason_code': 'VATEX-EU-F',
+                'e_invoice_exemption_reason_text': 'Gebrauchtgegenstände/Sonderregelung',
+                'position': 8,
+                'rabatt_prozent': ?lineDiscount,
+              },
+            ],
+            preview: discountedTotals,
+            eingabemodus: 'netto',
+            documentDiscountPercent: documentDiscount,
+          ),
+          throwsA(
+            isA<EInvoiceSourceException>().having(
+              (EInvoiceSourceException error) => error.code,
+              'code',
+              'missingPriceAdjustmentBasis',
+            ),
+          ),
+          reason: '$source discount has no emitted adjustment basis',
+        );
       }
+    });
+
+    test('section_25a_mixed_with_standard_tax_preserves_standard_bt110', () {
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Differenzbesteuerter Artikel',
+            'menge': 1,
+            'einzelpreis': 107.60,
+            'ust_satz': 0,
+            'tax_treatment': 'margin_scheme_25a_second_hand',
+            'tax_legal_basis': 'ustg_25a',
+            'e_invoice_tax_category_code': 'E',
+            'e_invoice_exemption_reason_code': 'VATEX-EU-F',
+            'e_invoice_exemption_reason_text': 'Gebrauchtgegenstände/Sonderregelung',
+            'position': 8,
+          },
+          <String, Object?>{
+            'bezeichnung': 'Beratung',
+            'menge': 1,
+            'einzelpreis': 50,
+            'ust_satz': 19,
+            'tax_treatment': 'standard_19',
+            'tax_legal_basis': 'ustg_12_1',
+            'e_invoice_tax_category_code': 'S',
+            'position': 2,
+          },
+        ],
+        preview: const EInvoiceCanonicalTotals(
+          netCents: 15000,
+          taxCents: 1710,
+          grossCents: 16710,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(position: 2, netCents: 5000, taxCents: 950, grossCents: 5950),
+            EInvoiceCanonicalPositionAmounts(position: 8, netCents: 10000, taxCents: 760, grossCents: 10760),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(netCents: 15760, taxCents: 950, grossCents: 16710),
+        ),
+        eingabemodus: 'netto',
+      );
+
+      expect(snapshot.netCents, 15760);
+      expect(snapshot.taxCents, 950);
+      expect(snapshot.grossCents, 16710);
+      expect(snapshot.accountingNetCents, 15000);
+      expect(snapshot.accountingTaxCents, 1710);
+      expect(snapshot.accountingGrossCents, 16710);
+      expect(
+        snapshot.taxBreakdowns.map((EInvoiceTaxBreakdownSnapshot row) => row.taxCents),
+        containsAll(<int>[0, 950]),
+      );
+      expect(
+        snapshot.taxBreakdowns.fold<int>(0, (int sum, EInvoiceTaxBreakdownSnapshot row) => sum + row.taxCents),
+        950,
+      );
+      final EInvoiceTaxBreakdownSnapshot section25aBreakdown = snapshot.taxBreakdowns.firstWhere(
+        (EInvoiceTaxBreakdownSnapshot row) => row.classification.category == EInvoiceTaxCategory.exempt,
+      );
+      expect(section25aBreakdown.netCents, 10760);
+      expect(section25aBreakdown.taxCents, 0);
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      expect(ubl, contains('<cbc:TaxAmount currencyID="EUR">9.50</cbc:TaxAmount>'));
+      expect(ubl, contains('<cbc:TaxableAmount currencyID="EUR">107.60</cbc:TaxableAmount>'));
+      expect(ubl, contains('<cbc:TaxableAmount currencyID="EUR">50.00</cbc:TaxableAmount>'));
+      expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">157.60</cbc:LineExtensionAmount>'));
+      expect(ubl, contains('<cbc:TaxExclusiveAmount currencyID="EUR">157.60</cbc:TaxExclusiveAmount>'));
+      expect(ubl, contains('<cbc:TaxInclusiveAmount currencyID="EUR">167.10</cbc:TaxInclusiveAmount>'));
+      expect(ubl, contains('<cbc:PayableAmount currencyID="EUR">167.10</cbc:PayableAmount>'));
     });
 
     test('section_25a_without_supported_reason_code_fails_with_position_diagnostic', () {
