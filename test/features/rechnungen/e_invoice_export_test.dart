@@ -82,9 +82,51 @@ void main() {
       return invoiceId;
     }
 
+    Future<int> finalizeDiscountedPdfInvoice() async {
+      final int customerId = await addEInvoiceCustomer(db);
+      final int invoiceId = await createEInvoiceDraft(
+        RechnungenDataSource(db.executor, profileDir: profileDir.path),
+        kundeId: customerId,
+        leistungsdatum: '2026-03-10',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(
+            bezeichnung: 'Beratung',
+            menge: 1,
+            einzelpreis: 100,
+            gesamt: 90,
+            position: 4,
+            rabattProzent: 10,
+          ),
+        ],
+      );
+      await _ensureTaxEvidenceColumns(db);
+      await _setTaxEvidence(db, invoiceId, treatment: 'standard_19', legalBasis: 'ustg_12_1', category: 'S');
+      await useCases.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE');
+      return invoiceId;
+    }
+
     Future<FinalizationSnapshot> readCommittedSnapshot(int invoiceId) {
       return RechnungenDataSource(db.executor, profileDir: profileDir.path).readCommittedEInvoiceSnapshot(invoiceId);
     }
+
+    test('committed_reader_preserves_persisted_line_allowance_basis', () async {
+      final int invoiceId = await finalizeDiscountedPdfInvoice();
+
+      final FinalizationSnapshot snapshot = await readCommittedSnapshot(invoiceId);
+      final EInvoiceLineSnapshot line = snapshot.lines.single;
+
+      expect(line.position, 4);
+      expect(line.netCents, 9000);
+      expect(line.taxCents, 1710);
+      expect(line.grossCents, 10710);
+      expect(line.netUnitPriceText, '100.0000');
+      expect(line.lineAllowance?.amountCents, 1000);
+      expect(line.lineAllowance?.baseAmountCents, 10000);
+      expect(line.lineAllowance?.percentHundredths, 1000);
+      expect(snapshot.netCents, 9000);
+      expect(snapshot.taxCents, 1710);
+      expect(snapshot.grossCents, 10710);
+    });
 
     test('committed_reader_preserves_persisted_25a_payable_amount', () async {
       final int invoiceId = await finalizeSection25aPdfInvoice(includeTaxEvidence: true);

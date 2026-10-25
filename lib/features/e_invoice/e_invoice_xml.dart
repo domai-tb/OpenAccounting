@@ -168,6 +168,22 @@ class EInvoiceXmlSerializer {
       xml.writeln(
         '    <cbc:LineExtensionAmount currencyID="${snapshot.currency}">${_cents(line.netCents)}</cbc:LineExtensionAmount>',
       );
+      final EInvoiceLineAllowanceSnapshot? allowance = line.lineAllowance;
+      if (allowance != null) {
+        xml.writeln('    <cac:AllowanceCharge>');
+        xml.writeln('      <cbc:ChargeIndicator>false</cbc:ChargeIndicator>');
+        xml.writeln('      <cbc:AllowanceChargeReason>Rabatt</cbc:AllowanceChargeReason>');
+        xml.writeln(
+          '      <cbc:MultiplierFactorNumeric>${_rateText(allowance.percentHundredths)}</cbc:MultiplierFactorNumeric>',
+        );
+        xml.writeln(
+          '      <cbc:Amount currencyID="${snapshot.currency}">${_cents(allowance.amountCents)}</cbc:Amount>',
+        );
+        xml.writeln(
+          '      <cbc:BaseAmount currencyID="${snapshot.currency}">${_cents(allowance.baseAmountCents)}</cbc:BaseAmount>',
+        );
+        xml.writeln('    </cac:AllowanceCharge>');
+      }
       xml.writeln('    <cac:Item><cbc:Name>${_escape(line.description)}</cbc:Name>');
       xml.writeln('      <cac:ClassifiedTaxCategory>');
       xml.writeln('        <cbc:ID>${line.classification.category.code}</cbc:ID>');
@@ -228,6 +244,12 @@ class EInvoiceXmlSerializer {
     xml.writeln(
       '        <ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode>$exemptionCodeXml$exemptionReasonXml<ram:CategoryCode>${line.classification.category.code}</ram:CategoryCode><ram:RateApplicablePercent>${_rateText(line.taxRateHundredths)}</ram:RateApplicablePercent></ram:ApplicableTradeTax>',
     );
+    final EInvoiceLineAllowanceSnapshot? allowance = line.lineAllowance;
+    if (allowance != null) {
+      xml.writeln(
+        '        <ram:SpecifiedTradeAllowanceCharge><ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator><ram:ActualAmount>${_cents(allowance.amountCents)}</ram:ActualAmount><ram:BasisAmount>${_cents(allowance.baseAmountCents)}</ram:BasisAmount><ram:CalculationPercent>${_rateText(allowance.percentHundredths)}</ram:CalculationPercent><ram:Reason>Rabatt</ram:Reason></ram:SpecifiedTradeAllowanceCharge>',
+      );
+    }
     xml.writeln(
       '        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>${_cents(line.netCents)}</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>',
     );

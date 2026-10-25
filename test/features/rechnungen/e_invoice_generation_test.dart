@@ -8,6 +8,8 @@ import 'package:openaccounting/features/e_invoice/e_invoice_snapshot.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_tax_classification.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_validation.dart';
 import 'package:openaccounting/features/e_invoice/e_invoice_xml.dart';
+import 'package:openaccounting/pages/rechnungen/rechnungen_item_entity.dart';
+import 'package:openaccounting/pages/rechnungen/vorschau_service.dart';
 
 import 'e_invoice_test_fixtures.dart'
     show
@@ -1243,6 +1245,237 @@ void main() {
           reason: '$source discount has no emitted adjustment basis',
         );
       }
+    });
+
+    test('persisted_line_discount_emits_allowance_and_reconciles_to_bt131', () {
+      final VorschauResult accountingPreview = VorschauService.calculate(
+        eingabemodus: 'netto',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(
+            bezeichnung: 'Beratung',
+            menge: 1,
+            einzelpreis: 100,
+            gesamt: 90,
+            position: 4,
+            rabattProzent: 10,
+          ),
+        ],
+      );
+      final VorschauPositionTotals positionAmounts = accountingPreview.positionTotals.single;
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Beratung',
+            'menge': 1,
+            'einzelpreis': 100,
+            'ust_satz': 19,
+            'tax_treatment': 'standard_19',
+            'tax_legal_basis': 'ustg_12_1',
+            'e_invoice_tax_category_code': 'S',
+            'position': 4,
+            'rabatt_prozent': 10,
+          },
+        ],
+        preview: EInvoiceCanonicalTotals(
+          netCents: accountingPreview.nettoCents,
+          taxCents: accountingPreview.ustCents,
+          grossCents: accountingPreview.bruttoCents,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(
+              position: 4,
+              netCents: positionAmounts.nettoCents,
+              taxCents: positionAmounts.ustCents,
+              grossCents: positionAmounts.bruttoCents,
+              priceBasisNetCents: positionAmounts.priceBasisNetCents,
+              lineDiscountCents: positionAmounts.lineDiscountCents,
+            ),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(
+            netCents: accountingPreview.nettoCents,
+            taxCents: accountingPreview.ustCents,
+            grossCents: accountingPreview.bruttoCents,
+          ),
+        ),
+        eingabemodus: 'netto',
+      );
+
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+
+      expect(ubl, contains('<cbc:PriceAmount currencyID="EUR">100.0000</cbc:PriceAmount>'));
+      expect(ubl, contains('<cbc:ChargeIndicator>false</cbc:ChargeIndicator>'));
+      expect(ubl, contains('<cbc:Amount currencyID="EUR">10.00</cbc:Amount>'));
+      expect(ubl, contains('<cbc:BaseAmount currencyID="EUR">100.00</cbc:BaseAmount>'));
+      expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">90.00</cbc:LineExtensionAmount>'));
+      expect(
+        cii,
+        contains(
+          '<ram:SpecifiedTradeAllowanceCharge><ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator><ram:ActualAmount>10.00</ram:ActualAmount><ram:BasisAmount>100.00</ram:BasisAmount><ram:CalculationPercent>10.00</ram:CalculationPercent><ram:Reason>Rabatt</ram:Reason></ram:SpecifiedTradeAllowanceCharge>',
+        ),
+      );
+      expect(cii, contains('<ram:LineTotalAmount>90.00</ram:LineTotalAmount>'));
+
+      final int invoiceLineStart = ubl.indexOf('<cac:InvoiceLine>');
+      final int invoiceLineEnd = ubl.indexOf('</cac:InvoiceLine>', invoiceLineStart);
+      final String invoiceLine = ubl.substring(invoiceLineStart, invoiceLineEnd);
+      final int lineExtensionIndex = invoiceLine.indexOf('<cbc:LineExtensionAmount');
+      final int allowanceIndex = invoiceLine.indexOf('<cac:AllowanceCharge>');
+      final int itemIndex = invoiceLine.indexOf('<cac:Item>');
+      expect(lineExtensionIndex, greaterThanOrEqualTo(0));
+      expect(lineExtensionIndex, lessThan(allowanceIndex));
+      expect(allowanceIndex, lessThan(itemIndex));
+    });
+
+    test('gross_persisted_line_discount_keeps_vat_exclusive_price_in_ubl_and_cii', () {
+      final VorschauResult accountingPreview = VorschauService.calculate(
+        eingabemodus: 'brutto',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(
+            bezeichnung: 'Beratung',
+            menge: 1,
+            einzelpreis: 119,
+            gesamt: 107.10,
+            position: 4,
+            rabattProzent: 10,
+          ),
+        ],
+      );
+      final VorschauPositionTotals positionAmounts = accountingPreview.positionTotals.single;
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Beratung',
+            'menge': 1,
+            'einzelpreis': 119,
+            'ust_satz': 19,
+            'tax_treatment': 'standard_19',
+            'tax_legal_basis': 'ustg_12_1',
+            'e_invoice_tax_category_code': 'S',
+            'position': 4,
+            'rabatt_prozent': 10,
+          },
+        ],
+        preview: EInvoiceCanonicalTotals(
+          netCents: accountingPreview.nettoCents,
+          taxCents: accountingPreview.ustCents,
+          grossCents: accountingPreview.bruttoCents,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(
+              position: 4,
+              netCents: positionAmounts.nettoCents,
+              taxCents: positionAmounts.ustCents,
+              grossCents: positionAmounts.bruttoCents,
+              priceBasisNetCents: positionAmounts.priceBasisNetCents,
+              lineDiscountCents: positionAmounts.lineDiscountCents,
+            ),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(
+            netCents: accountingPreview.nettoCents,
+            taxCents: accountingPreview.ustCents,
+            grossCents: accountingPreview.bruttoCents,
+          ),
+        ),
+        eingabemodus: 'brutto',
+      );
+
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+
+      expect(ubl, contains('<cbc:PriceAmount currencyID="EUR">100.0000</cbc:PriceAmount>'));
+      expect(ubl, contains('<cbc:Amount currencyID="EUR">10.00</cbc:Amount>'));
+      expect(ubl, contains('<cbc:BaseAmount currencyID="EUR">100.00</cbc:BaseAmount>'));
+      expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">90.00</cbc:LineExtensionAmount>'));
+      expect(cii, contains('<ram:GrossPriceProductTradePrice><ram:ChargeAmount>119.0000</ram:ChargeAmount>'));
+      expect(cii, contains('<ram:NetPriceProductTradePrice><ram:ChargeAmount>100.0000</ram:ChargeAmount>'));
+      expect(cii, contains('<ram:ActualAmount>10.00</ram:ActualAmount><ram:BasisAmount>100.00</ram:BasisAmount>'));
+      expect(cii, contains('<ram:LineTotalAmount>90.00</ram:LineTotalAmount>'));
+    });
+
+    test('section_25a_line_discount_uses_position_keyed_allowance_basis', () {
+      final VorschauResult accountingPreview = VorschauService.calculate(
+        eingabemodus: 'netto',
+        positionen: const <RechnungPositionItem>[
+          RechnungPositionItem(
+            bezeichnung: 'Differenzbesteuerter Artikel',
+            menge: 1,
+            einzelpreis: 107.60,
+            gesamt: 96.84,
+            position: 8,
+            ustSatz: 0,
+            rabattProzent: 10,
+          ),
+        ],
+      );
+      final VorschauPositionTotals positionAmounts = accountingPreview.positionTotals.single;
+      final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(
+        documentNumber: 'RE-2026-0001',
+        outputFormat: EInvoiceOutputFormat.xrechnung,
+        issueDate: '2026-03-15',
+        companyRow: validCompany(),
+        customerRow: validCustomer(),
+        posRows: <Map<String, Object?>>[
+          <String, Object?>{
+            'bezeichnung': 'Differenzbesteuerter Artikel',
+            'menge': 1,
+            'einzelpreis': 107.60,
+            'ust_satz': 0,
+            'tax_treatment': 'margin_scheme_25a_second_hand',
+            'tax_legal_basis': 'ustg_25a',
+            'e_invoice_tax_category_code': 'E',
+            'e_invoice_exemption_reason_code': 'VATEX-EU-F',
+            'e_invoice_exemption_reason_text': 'Gebrauchtgegenstände/Sonderregelung',
+            'position': 8,
+            'rabatt_prozent': 10,
+          },
+        ],
+        preview: EInvoiceCanonicalTotals(
+          netCents: accountingPreview.nettoCents,
+          taxCents: accountingPreview.ustCents,
+          grossCents: accountingPreview.bruttoCents,
+          positionTotals: <EInvoiceCanonicalPositionAmounts>[
+            EInvoiceCanonicalPositionAmounts(
+              position: 8,
+              netCents: positionAmounts.nettoCents,
+              taxCents: positionAmounts.ustCents,
+              grossCents: positionAmounts.bruttoCents,
+              priceBasisNetCents: positionAmounts.priceBasisNetCents,
+              lineDiscountCents: positionAmounts.lineDiscountCents,
+            ),
+          ],
+          disclosureTotals: EInvoiceDisclosureTotals(
+            netCents: accountingPreview.nettoCents,
+            taxCents: accountingPreview.ustCents,
+            grossCents: accountingPreview.bruttoCents,
+          ),
+        ),
+        eingabemodus: 'netto',
+      );
+
+      final String ubl = const EInvoiceXmlSerializer().xrechnungUbl(snapshot);
+      final String cii = const EInvoiceXmlSerializer().zugferdCii(snapshot);
+
+      expect(snapshot.netCents, 9684);
+      expect(snapshot.taxCents, 0);
+      expect(snapshot.grossCents, 9684);
+      expect(snapshot.taxBreakdowns.single.taxCents, 0);
+      expect(ubl, contains('<cbc:PriceAmount currencyID="EUR">107.6000</cbc:PriceAmount>'));
+      expect(ubl, contains('<cbc:ChargeIndicator>false</cbc:ChargeIndicator>'));
+      expect(ubl, contains('<cbc:Amount currencyID="EUR">10.76</cbc:Amount>'));
+      expect(ubl, contains('<cbc:BaseAmount currencyID="EUR">107.60</cbc:BaseAmount>'));
+      expect(ubl, contains('<cbc:LineExtensionAmount currencyID="EUR">96.84</cbc:LineExtensionAmount>'));
+      expect(cii, contains('<ram:NetPriceProductTradePrice><ram:ChargeAmount>107.6000</ram:ChargeAmount>'));
+      expect(cii, contains('<ram:ActualAmount>10.76</ram:ActualAmount><ram:BasisAmount>107.60</ram:BasisAmount>'));
+      expect(cii, contains('<ram:LineTotalAmount>96.84</ram:LineTotalAmount>'));
     });
 
     test('section_25a_mixed_with_standard_tax_preserves_standard_bt110', () {

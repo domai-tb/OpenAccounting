@@ -536,3 +536,19 @@ Not checked: Application runtime behavior, actual serializer output, test execut
 - **Finding:** `readCommittedEInvoiceSnapshot` selected legacy position fields only, while `_eInvoiceCanonicalTotals` and `EInvoiceSnapshotBuilder` require persisted typed `tax_treatment`, category, and reason data. A committed/native export could therefore fail classification despite typed fields being available in the database.
 - **Author repair and verification:** Finalization and committed export now share one schema-aware optional tax-evidence projection. A synthetic v28-shaped test schema proves persisted §25a amount parity and fail-closed behavior when typed evidence columns are absent. The red regression reproduced `unresolvedTaxClassification`; after the fix, the export test passed 9/9, generation passed 45/45, invoice-money passed 19/19, scoped analysis found no issues, and the six-file formatter check reported zero changes. This records author verification only; a fresh independent source review remains pending.
 - **Remaining scope:** This repair does not change accepted design/spec wording and does not complete v28 persistence, accounting margin-tax capture, or the explicit persisted price/adjustment basis. Tasks 1.2 and 7.1 remain open; no migration or schema version was changed.
+
+
+### Current source review status: position-keyed line-discount basis (2026-10-25)
+
+- **Review status:** pending fresh independent review of the current exact source and evidence diff. This author update is not an approval and does not extend any prior review verdict.
+- **Source change:** existing persisted line price, quantity, and percentage discount now feed a position-keyed canonical price basis and allowance through preview, finalization, and committed export. The snapshot validates and groups those values; UBL/CII serialize the resulting allowance object.
+- **Evidence:** focused generation/export/snapshot/validator/invoice-money tests passed 89/89; scoped analysis found no issues, and the formatter check reported zero changes. Tests cover net/gross standard-tax and §25a line discounts, plus committed-reader parity. Document-level discounts remain fail-closed.
+- **Open contract and persistence scope:** no migration/schema code or explicit accounting margin-tax input changed. Tasks 1.2 and 7.1 remain open for the full accepted source contract, typed v29 persistence, separate §25a accounting margin tax, and remaining tax-matrix cases.
+
+
+### Independent-review finding repair: UBL invoice-line child order (2026-10-25)
+
+- **Prior finding:** the allowance preceded `cbc:LineExtensionAmount` in UBL `cac:InvoiceLine`, violating the UBL 2.1 child sequence.
+- **Author repair:** UBL now serializes `cbc:LineExtensionAmount` before the optional `cac:AllowanceCharge`, and both before `cac:Item`. CII remains unchanged.
+- **Regression evidence:** an index assertion failed before the edit (`LineExtensionAmount` index 475; allowance index 111) and passed after it; the focused five-file e-invoice suite passed 89 tests. This is author verification, not an independent approval.
+- **Review status:** independent reviewer `APPROVED` the exact 11-path diff SHA-256 `59f9492f8f2feee3dea892dfaaa755fa029ebb696947f77852a626dc5ba6e548` on base HEAD `0b94e89ea509673fc26f5d39189174ecfb2103c3` (2026-10-25). This approval covers the reviewed source snapshot only; no task boxes, accepted contract wording, migrations, or schema versions changed.

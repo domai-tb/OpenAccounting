@@ -81,6 +81,7 @@ class EInvoiceLineSnapshot {
     required this.grossCents,
     required this.taxRateHundredths,
     required this.classification,
+    this.lineAllowance,
   });
 
   final int position;
@@ -103,9 +104,24 @@ class EInvoiceLineSnapshot {
   final int taxCents;
   final int grossCents;
 
+  /// Canonical line-level allowance. Null when no adjustment exists.
+  final EInvoiceLineAllowanceSnapshot? lineAllowance;
+
   /// Exact VAT percentage in hundredths (1900 = 19.00 %).
   final int taxRateHundredths;
   final EInvoiceLineClassification classification;
+}
+
+class EInvoiceLineAllowanceSnapshot {
+  const EInvoiceLineAllowanceSnapshot({
+    required this.amountCents,
+    required this.baseAmountCents,
+    required this.percentHundredths,
+  });
+
+  final int amountCents;
+  final int baseAmountCents;
+  final int percentHundredths;
 }
 
 /// One immutable finalization snapshot.
@@ -207,12 +223,20 @@ class EInvoiceCanonicalPositionAmounts {
     required this.netCents,
     required this.taxCents,
     required this.grossCents,
+    this.priceBasisNetCents,
+    this.lineDiscountCents,
   });
 
   final int position;
   final int netCents;
   final int taxCents;
   final int grossCents;
+
+  /// VAT-exclusive line amount before the persisted line discount.
+  final int? priceBasisNetCents;
+
+  /// VAT-exclusive allowance amount calculated by the accounting preview.
+  final int? lineDiscountCents;
 }
 
 class EInvoiceTaxBreakdownSnapshot {
@@ -328,6 +352,10 @@ class EInvoiceSnapshotBuilder {
       );
     }
     final bool hasCanonicalPositionTotals = preview.positionTotals.isNotEmpty;
+    if (!hasCanonicalPositionTotals &&
+        prepared.any((_PreDiscountLine line) => line.lineDiscountPercentHundredths != 0)) {
+      throw _missingPriceAdjustmentBasis(prepared.first.position);
+    }
     if (eingabemodus == 'brutto' && !hasCanonicalPositionTotals) {
       throw _missingNetPriceBasis(prepared.first.position);
     }
@@ -407,11 +435,17 @@ class EInvoiceSnapshotBuilder {
   ) {
     final Map<int, EInvoiceCanonicalPositionAmounts> amountsByPosition = <int, EInvoiceCanonicalPositionAmounts>{};
     for (final EInvoiceCanonicalPositionAmounts amounts in positionTotals) {
+      final bool hasPriceBasis = amounts.priceBasisNetCents != null;
+      final bool hasLineDiscount = amounts.lineDiscountCents != null;
       if (amountsByPosition.containsKey(amounts.position) ||
           amounts.netCents < 0 ||
           amounts.taxCents < 0 ||
           amounts.grossCents < 0 ||
-          amounts.netCents + amounts.taxCents != amounts.grossCents) {
+          amounts.netCents + amounts.taxCents != amounts.grossCents ||
+          hasPriceBasis != hasLineDiscount ||
+          (amounts.priceBasisNetCents ?? 0) < 0 ||
+          (amounts.lineDiscountCents ?? 0) < 0 ||
+          (amounts.lineDiscountCents ?? 0) > (amounts.priceBasisNetCents ?? 0)) {
         _throwCanonicalPositionTotalsMismatch();
       }
       amountsByPosition[amounts.position] = amounts;
@@ -429,7 +463,7 @@ class EInvoiceSnapshotBuilder {
         _ => false,
       };
       final int netCents = section25a ? amounts.grossCents : amounts.netCents;
-      if (netCents != line.preDiscountNet) {
+      if (netCents != line.netBeforeDocumentDiscountCents) {
         throw EInvoiceSourceException(
           code: 'unreconciledPriceBasis',
           messageDe: 'Position ${line.position + 1}: BT-131 stimmt nicht mit Einzelpreis × Menge überein',
@@ -437,8 +471,51 @@ class EInvoiceSnapshotBuilder {
           fields: ['position[${line.position}].einzelpreis', 'position[${line.position}].menge'],
         );
       }
+      EInvoiceLineAllowanceSnapshot? lineAllowance;
+      if (line.lineDiscountPercentHundredths != 0) {
+        final int? basisCents = amounts.priceBasisNetCents;
+        final int? canonicalAllowanceCents = amounts.lineDiscountCents;
+        if (basisCents == null || canonicalAllowanceCents == null) {
+          throw _missingPriceAdjustmentBasis(line.position);
+        }
+        if (basisCents != line.priceBasisNetCents || basisCents - canonicalAllowanceCents != netCents) {
+          throw EInvoiceSourceException(
+            code: 'unreconciledPriceBasis',
+            messageDe:
+                'Position ${line.position + 1}: Rabattbasis stimmt nicht mit dem gespeicherten Einzelpreis überein',
+            messageEn: 'Line ${line.position + 1}: discount basis does not reconcile to the stored unit price',
+            fields: ['position[${line.position}].einzelpreis', 'position[${line.position}].menge'],
+          );
+        }
+        final int expectedAllowance = _roundHalfUp(
+          BigInt.from(basisCents) * BigInt.from(line.lineDiscountPercentHundredths),
+          BigInt.from(10000),
+        );
+        if (canonicalAllowanceCents <= 0 || canonicalAllowanceCents != expectedAllowance) {
+          throw EInvoiceSourceException(
+            code: 'unreconciledPriceAdjustment',
+            messageDe: 'Position ${line.position + 1}: Rabattbetrag stimmt nicht mit Prozent und Preisbasis überein',
+            messageEn:
+                'Line ${line.position + 1}: discount amount does not reconcile to its percentage and price basis',
+            fields: ['position[${line.position}].rabattProzent'],
+          );
+        }
+        lineAllowance = EInvoiceLineAllowanceSnapshot(
+          amountCents: canonicalAllowanceCents,
+          baseAmountCents: basisCents,
+          percentHundredths: line.lineDiscountPercentHundredths,
+        );
+      } else if ((amounts.lineDiscountCents ?? 0) != 0 ||
+          (amounts.priceBasisNetCents != null && amounts.priceBasisNetCents != line.priceBasisNetCents)) {
+        _throwCanonicalPositionTotalsMismatch();
+      }
+      final int unitPriceBasisCents = lineAllowance?.baseAmountCents ?? netCents;
       final String netUnitPriceText = line.unitPriceIsGross
-          ? _canonicalNetUnitPriceText(position: line.position, netCents: netCents, quantityScaled: line.quantityScaled)
+          ? _canonicalNetUnitPriceText(
+              position: line.position,
+              netCents: unitPriceBasisCents,
+              quantityScaled: line.quantityScaled,
+            )
           : line.unitPriceText;
       final int taxCents = section25a ? 0 : amounts.taxCents;
       lines.add(
@@ -454,6 +531,7 @@ class EInvoiceSnapshotBuilder {
           grossCents: netCents + taxCents,
           taxRateHundredths: line.taxRateHundredths,
           classification: line.classification,
+          lineAllowance: lineAllowance,
         ),
       );
     }
@@ -547,28 +625,24 @@ class EInvoiceSnapshotBuilder {
         fields: ['position[$index].rabattProzent'],
       );
     }
-    if (discountScaled != 0) {
-      throw EInvoiceSourceException(
-        code: 'missingPriceAdjustmentBasis',
-        messageDe: 'Position ${index + 1}: Rabatt kann ohne ausgewiesene Preisbasis nicht exportiert werden',
-        messageEn: 'Line ${index + 1}: discount cannot be exported without an emitted price adjustment basis',
-        fields: ['position[$index].rabattProzent'],
-      );
-    }
     final BigInt product = BigInt.from(unitPriceScaled) * BigInt.from(quantityScaled);
+    final int priceBasisEntered = _roundHalfUp(product, BigInt.from(100000));
+    final int priceBasisNet = eingabemodus == 'brutto'
+        ? _roundHalfUp(BigInt.from(priceBasisEntered) * BigInt.from(10000), BigInt.from(10000 + rateHundredths))
+        : priceBasisEntered;
     final int enteredCents = _roundHalfUp(product * BigInt.from(10000 - discountScaled), BigInt.from(1000000000));
-    // Pre-discount net; document discounts are distributed below with the
-    // canonical proportional allocator, mirroring the calculator's order.
-    final int preDiscountNet;
+    // Net after the line discount, before document discounts; document discounts
+    // are distributed below with the canonical proportional allocator.
+    final int netBeforeDocumentDiscountCents;
     final int preDiscountEntered;
     if (eingabemodus == 'brutto') {
-      preDiscountNet = _roundHalfUp(
+      netBeforeDocumentDiscountCents = _roundHalfUp(
         BigInt.from(enteredCents) * BigInt.from(10000),
         BigInt.from(10000 + rateHundredths),
       );
       preDiscountEntered = enteredCents;
     } else {
-      preDiscountNet = enteredCents;
+      netBeforeDocumentDiscountCents = enteredCents;
       preDiscountEntered = enteredCents;
     }
     return _PreDiscountLine(
@@ -579,7 +653,9 @@ class EInvoiceSnapshotBuilder {
       unitPriceText: _scaledText(einzelpreis, 4),
       unitPriceIsGross: eingabemodus == 'brutto',
       enteredCents: preDiscountEntered,
-      preDiscountNet: preDiscountNet,
+      netBeforeDocumentDiscountCents: netBeforeDocumentDiscountCents,
+      priceBasisNetCents: priceBasisNet,
+      lineDiscountPercentHundredths: discountScaled,
       taxRateHundredths: rateHundredths,
       classification: classification,
     );
@@ -878,7 +954,7 @@ class EInvoiceSnapshotBuilder {
     }
     var netSubtotal = 0;
     for (final _PreDiscountLine line in prepared) {
-      netSubtotal += line.preDiscountNet;
+      netSubtotal += line.netBeforeDocumentDiscountCents;
     }
     final int discount = discountPercent != 0
         ? _roundHalfUp(BigInt.from(netSubtotal) * BigInt.from(discountPercent), BigInt.from(10000))
@@ -893,7 +969,11 @@ class EInvoiceSnapshotBuilder {
     }
     final Map<int, int> netByRate = <int, int>{};
     for (final _PreDiscountLine line in prepared) {
-      netByRate.update(line.taxRateHundredths, (old) => old + line.preDiscountNet, ifAbsent: () => line.preDiscountNet);
+      netByRate.update(
+        line.taxRateHundredths,
+        (old) => old + line.netBeforeDocumentDiscountCents,
+        ifAbsent: () => line.netBeforeDocumentDiscountCents,
+      );
     }
     Map<int, int> discountByRate = <int, int>{};
     if (discount != 0) {
@@ -925,7 +1005,9 @@ class EInvoiceSnapshotBuilder {
         try {
           discountByPosition = money.allocateProportionally<int>(
             amount: rateDiscount,
-            weights: <int, int>{for (final int index in lineIndexes) index: prepared[index].preDiscountNet},
+            weights: <int, int>{
+              for (final int index in lineIndexes) index: prepared[index].netBeforeDocumentDiscountCents,
+            },
             compareKeys: (int a, int b) {
               final int order = prepared[a].position.compareTo(prepared[b].position);
               return order == 0 ? a.compareTo(b) : order;
@@ -942,9 +1024,9 @@ class EInvoiceSnapshotBuilder {
       }
       for (final int index in lineIndexes) {
         final _PreDiscountLine pre = prepared[index];
-        final int netCents = pre.preDiscountNet - (discountByPosition[index] ?? 0);
+        final int netCents = pre.netBeforeDocumentDiscountCents - (discountByPosition[index] ?? 0);
         final int taxCents = eingabemodus == 'brutto' && discount == 0
-            ? pre.enteredCents - pre.preDiscountNet
+            ? pre.enteredCents - pre.netBeforeDocumentDiscountCents
             : _roundHalfUp(BigInt.from(netCents) * BigInt.from(rate), BigInt.from(10000));
         lines.add(
           EInvoiceLineSnapshot(
@@ -1104,6 +1186,13 @@ class EInvoiceSnapshotBuilder {
     fields: ['position[$position].einzelpreis', 'position[$position].menge'],
   );
 
+  EInvoiceSourceException _missingPriceAdjustmentBasis(int position) => EInvoiceSourceException(
+    code: 'missingPriceAdjustmentBasis',
+    messageDe: 'Position ${position + 1}: Rabatt kann ohne ausgewiesene Preisbasis nicht exportiert werden',
+    messageEn: 'Line ${position + 1}: discount cannot be exported without an emitted price adjustment basis',
+    fields: ['position[$position].rabattProzent'],
+  );
+
   /// Renders a stored decimal at [scale] places without float formatting.
   String _scaledText(num value, int scale) {
     final int scaled = money.scaledFromNum(value, scale: scale, field: 'betrag');
@@ -1129,7 +1218,9 @@ class _PreDiscountLine {
     required this.unitPriceText,
     required this.unitPriceIsGross,
     required this.enteredCents,
-    required this.preDiscountNet,
+    required this.netBeforeDocumentDiscountCents,
+    required this.priceBasisNetCents,
+    required this.lineDiscountPercentHundredths,
     required this.taxRateHundredths,
     required this.classification,
   });
@@ -1141,7 +1232,9 @@ class _PreDiscountLine {
   final String unitPriceText;
   final bool unitPriceIsGross;
   final int enteredCents;
-  final int preDiscountNet;
+  final int netBeforeDocumentDiscountCents;
+  final int priceBasisNetCents;
+  final int lineDiscountPercentHundredths;
   final int taxRateHundredths;
   final EInvoiceLineClassification classification;
 }

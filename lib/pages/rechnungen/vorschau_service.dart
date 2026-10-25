@@ -53,12 +53,20 @@ class VorschauPositionTotals {
     required this.nettoCents,
     required this.ustCents,
     required this.bruttoCents,
+    this.priceBasisNetCents,
+    this.lineDiscountCents,
   });
 
   final int position;
   final int nettoCents;
   final int ustCents;
   final int bruttoCents;
+
+  /// VAT-exclusive line amount before the persisted line discount.
+  final int? priceBasisNetCents;
+
+  /// VAT-exclusive allowance amount calculated by the accounting preview.
+  final int? lineDiscountCents;
 }
 
 /// One calculator for preview and every invoice persistence path.
@@ -102,6 +110,7 @@ class VorschauService {
     final List<int> lineRates = <int>[];
     final List<int> lineAmounts = <int>[];
     final List<int> lineNets = <int>[];
+    final List<int> linePriceBasisNets = <int>[];
     final Map<int, int> netByRate = <int, int>{};
     for (var index = 0; index < positionen.length; index++) {
       final RechnungPositionItem position = positionen[index];
@@ -138,6 +147,15 @@ class VorschauService {
               lineIndex: index,
               position: position.position,
             );
+      final int priceBasisAmount = _lineAmountCents(unitPrice, quantity, 0, index, position.position);
+      final int priceBasisNet = eingabemodus == 'netto'
+          ? priceBasisAmount
+          : _checkedCurrency(
+              _roundRatio(BigInt.from(priceBasisAmount) * BigInt.from(10000), BigInt.from(10000 + rate)),
+              index,
+              position.position,
+              const <String>['netto_betrag'],
+            );
       final int lineAmount = _lineAmountCents(unitPrice, quantity, lineDiscount, index, position.position);
       if (assertedTotal != lineAmount) {
         throw _error(
@@ -159,6 +177,7 @@ class VorschauService {
       lineRates.add(rate);
       lineAmounts.add(lineAmount);
       lineNets.add(lineNet);
+      linePriceBasisNets.add(priceBasisNet);
       netByRate.update(
         rate,
         (int old) => _addCurrency(old, lineNet, index, position.position, const <String>['netto_betrag']),
@@ -247,6 +266,8 @@ class VorschauService {
             nettoCents: lineNet,
             ustCents: lineVat,
             bruttoCents: lineGross,
+            priceBasisNetCents: linePriceBasisNets[index],
+            lineDiscountCents: linePriceBasisNets[index] - lineNets[index],
           ),
         );
         netto = _addCurrency(netto, lineNet, index, position.position, const <String>['netto_betrag']);

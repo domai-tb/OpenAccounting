@@ -1074,6 +1074,8 @@ WHERE id = ? AND ist_entwurf = 1
         netCents: amounts.nettoCents,
         taxCents: amounts.ustCents,
         grossCents: amounts.bruttoCents,
+        priceBasisNetCents: amounts.priceBasisNetCents,
+        lineDiscountCents: amounts.lineDiscountCents,
       );
       positionTotals.add(canonical);
       final bool section25a = switch (EInvoiceTaxTreatment.fromCode(row['tax_treatment']?.toString())) {
