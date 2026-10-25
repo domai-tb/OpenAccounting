@@ -2159,6 +2159,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get actionCreateAccount => 'Konto anlegen';
 
   @override
+  String get bankAccountType => 'Kontotyp';
+
+  @override
+  String get bankAccountTypeBank => 'Bankkonto';
+
+  @override
+  String get bankAccountTypeSachkonto => 'Sachkonto';
+
+  @override
   String get actionCreateTaxRate => 'Steuersatz anlegen';
 
   @override

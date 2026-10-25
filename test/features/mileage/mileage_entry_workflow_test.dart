@@ -15,6 +15,7 @@ import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_repository.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_usecases.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_workspace.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
 
 class _FailingListMileageEntryRepository extends MileageEntryRepository {
   _FailingListMileageEntryRepository(super.executor);
@@ -36,6 +37,7 @@ void main() {
     late AppDatabase db;
     late MileageEntryRepository repo;
     late MileageEntryUseCases useCases;
+    late AppServices appServices;
 
     setUp(() async {
       db = AppDatabase.createTestDatabase();
@@ -43,6 +45,7 @@ void main() {
       repo = MileageEntryRepository(db.executor);
       await repo.ensureTablesForTests();
       useCases = MileageEntryUseCases(repo);
+      appServices = AppServices(db);
     });
     tearDown(() async => db.close());
 
@@ -961,7 +964,14 @@ void main() {
       await tester.pumpAndSettle();
       await saveTrip(date: '2026-10-17', purpose: 'Customer visit', kind: 'Business trip');
       trip = (await repo.listTrips()).firstWhere((MileageTrip value) => value.purpose == 'Customer visit');
-      await tester.tap(find.byKey(ValueKey<String>('mileage-calculate-${trip.id}')));
+      final Finder calculateTripButton = find.byKey(ValueKey<String>('mileage-calculate-${trip.id}'));
+      await tester.scrollUntilVisible(
+        calculateTripButton,
+        120,
+        scrollable: find.descendant(of: find.byType(MileageEntryWorkspace), matching: find.byType(Scrollable)).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(calculateTripButton);
       await tester.pumpAndSettle();
       trip = (await repo.getById(trip.id))!;
       expect(trip.state, MileageTripState.calculated);
@@ -1021,7 +1031,13 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: MileageEntryWorkspace(useCases: useCases)),
+          home: Scaffold(
+            body: MileageEntryWorkspace(
+              useCases: useCases,
+              bankAccounts: appServices.bankAccounts,
+              categoryWorkspace: appServices.categoryWorkspace,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1055,6 +1071,7 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey<String>('mileage-business-context')), 'Project Alpha');
       final Finder saveButton = find.byKey(const ValueKey<String>('mileage-save'));
       await tester.ensureVisible(saveButton);
+      await tester.pumpAndSettle();
       await tester.tap(saveButton);
       await tester.pumpAndSettle();
 
@@ -1088,7 +1105,13 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: MileageEntryWorkspace(useCases: useCases)),
+          home: Scaffold(
+            body: MileageEntryWorkspace(
+              useCases: useCases,
+              bankAccounts: appServices.bankAccounts,
+              categoryWorkspace: appServices.categoryWorkspace,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1152,7 +1175,13 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: MileageEntryWorkspace(useCases: useCases)),
+          home: Scaffold(
+            body: MileageEntryWorkspace(
+              useCases: useCases,
+              bankAccounts: appServices.bankAccounts,
+              categoryWorkspace: appServices.categoryWorkspace,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1223,6 +1252,87 @@ void main() {
         <Object?>[trip.id],
       );
       expect(retryPostingRows, hasLength(2));
+    });
+
+    testWidgets('mileage posting role settings save explicit eligible pairs', (tester) async {
+      final AppServices services = AppServices(db);
+      final BankAccount expenseAccount = await services.bankAccounts.create(
+        name: 'Mileage travel ledger',
+        kontoart: 'Sachkonto',
+      );
+      final BankAccount contributionAccount = await services.bankAccounts.create(
+        name: 'Mileage contribution ledger',
+        kontoart: 'Sachkonto',
+      );
+      await services.bankAccounts.create(name: 'Ordinary bank account', kontoart: 'Girokonto');
+      final int expenseCategoryId = await insertCategory(label: 'Mileage expense', art: 'ausgabe', euerLine: 71);
+      final int contributionCategoryId = await insertCategory(
+        label: 'Mileage private contribution',
+        art: 'einnahme',
+        euerLine: 107,
+      );
+      await insertCategory(label: 'Unrelated category', art: 'ausgabe', euerLine: 70);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MileageEntryWorkspace(
+              useCases: useCases,
+              bankAccounts: services.bankAccounts,
+              categoryWorkspace: services.categoryWorkspace,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final Finder settingsToggle = find.byKey(const ValueKey<String>('mileage-role-settings-toggle'));
+      await tester.tap(settingsToggle);
+      await tester.pumpAndSettle();
+
+      final Finder saveButton = find.byKey(const ValueKey<String>('mileage-role-save'));
+      expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
+
+      Future<void> choose(String key, String label) async {
+        final Finder field = find.byKey(ValueKey<String>(key));
+        await tester.ensureVisible(field);
+        await tester.tap(field);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+
+      final Finder expenseAccountField = find.byKey(const ValueKey<String>('mileage-role-expense-account'));
+      await tester.ensureVisible(expenseAccountField);
+      await tester.tap(expenseAccountField);
+      await tester.pumpAndSettle();
+      expect(find.text('Ordinary bank account'), findsNothing);
+      await tester.tap(find.text('Mileage travel ledger').last);
+      await tester.pumpAndSettle();
+
+      await choose('mileage-role-expense-category', 'Mileage expense');
+      await choose('mileage-role-contribution-account', 'Mileage contribution ledger');
+
+      final Finder contributionCategoryField = find.byKey(const ValueKey<String>('mileage-role-contribution-category'));
+      await tester.ensureVisible(contributionCategoryField);
+      await tester.tap(contributionCategoryField);
+      await tester.pumpAndSettle();
+      expect(find.text('Unrelated category'), findsNothing);
+      await tester.tap(find.text('Mileage private contribution').last);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mileage posting roles saved.'), findsOneWidget);
+      final MileagePostingRoleSettings settings = await useCases.loadPostingRoleSettings();
+      expect(settings.travelExpense, (kontoId: expenseAccount.id, kategorieId: expenseCategoryId));
+      expect(settings.privateContribution, (kontoId: contributionAccount.id, kategorieId: contributionCategoryId));
     });
   });
 }

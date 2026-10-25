@@ -1041,7 +1041,9 @@ class _BankAccountsViewState extends ConsumerState<BankAccountsView> {
                     type: MaterialType.transparency,
                     child: ListTile(
                       title: Text(rows[index].name),
-                      subtitle: Text(rows[index].iban ?? ''),
+                      subtitle: Text(
+                        rows[index].kontoart == 'Sachkonto' ? l10n.bankAccountTypeSachkonto : rows[index].iban ?? '',
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
                         tooltip: l10n.actionDelete,
@@ -1061,38 +1063,62 @@ class _BankAccountsViewState extends ConsumerState<BankAccountsView> {
 
   Future<void> _create(BuildContext context, AppServices services) async {
     final AppLocalizations l10n = appLocalizationsOf(context);
-    final TextEditingController name = TextEditingController();
-    final TextEditingController iban = TextEditingController();
+    String accountName = '';
+    String accountIban = '';
+    String accountType = 'bank';
     final bool? saved = await showDialog<bool>(
       context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text(l10n.actionCreateAccount),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            TextField(
-              controller: name,
-              decoration: InputDecoration(labelText: l10n.formName),
-            ),
-            TextField(
-              controller: iban,
-              decoration: InputDecoration(labelText: l10n.formIban),
-            ),
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
+          title: Text(l10n.actionCreateAccount),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                onChanged: (String value) => accountName = value,
+                decoration: InputDecoration(labelText: l10n.formName),
+              ),
+              DropdownButtonFormField<String>(
+                key: const ValueKey<String>('bank_account_type'),
+                initialValue: accountType,
+                isExpanded: true,
+                decoration: InputDecoration(labelText: l10n.bankAccountType),
+                items: <DropdownMenuItem<String>>[
+                  DropdownMenuItem<String>(value: 'bank', child: Text(l10n.bankAccountTypeBank)),
+                  DropdownMenuItem<String>(value: 'sachkonto', child: Text(l10n.bankAccountTypeSachkonto)),
+                ],
+                onChanged: (String? value) {
+                  if (value != null) {
+                    setDialogState(() {
+                      accountType = value;
+                      if (value == 'sachkonto') accountIban = '';
+                    });
+                  }
+                },
+              ),
+              if (accountType == 'bank')
+                TextField(
+                  onChanged: (String value) => accountIban = value,
+                  decoration: InputDecoration(labelText: l10n.formIban),
+                ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.actionCancel)),
+            FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.actionCreate)),
           ],
         ),
-        actions: <Widget>[
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.actionCancel)),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.actionCreate)),
-        ],
       ),
     );
-    final String accountName = name.text.trim();
-    final String accountIban = iban.text.trim();
-    name.dispose();
-    iban.dispose();
+    accountName = accountName.trim();
+    accountIban = accountIban.trim();
     if (saved != true || accountName.isEmpty || !context.mounted) return;
     try {
-      await services.bankAccounts.create(name: accountName, iban: accountIban.isEmpty ? null : accountIban);
+      await services.bankAccounts.create(
+        name: accountName,
+        iban: accountType == 'bank' && accountIban.isNotEmpty ? accountIban : null,
+        kontoart: accountType == 'sachkonto' ? 'Sachkonto' : null,
+      );
       if (mounted) setState(() => _reloadToken++);
     } catch (error) {
       if (context.mounted) {

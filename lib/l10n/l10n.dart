@@ -4136,6 +4136,24 @@ abstract class AppLocalizations {
   /// **'Konto anlegen'**
   String get actionCreateAccount;
 
+  /// No description provided for @bankAccountType.
+  ///
+  /// In de, this message translates to:
+  /// **'Kontotyp'**
+  String get bankAccountType;
+
+  /// No description provided for @bankAccountTypeBank.
+  ///
+  /// In de, this message translates to:
+  /// **'Bankkonto'**
+  String get bankAccountTypeBank;
+
+  /// No description provided for @bankAccountTypeSachkonto.
+  ///
+  /// In de, this message translates to:
+  /// **'Sachkonto'**
+  String get bankAccountTypeSachkonto;
+
   /// No description provided for @actionCreateTaxRate.
   ///
   /// In de, this message translates to:

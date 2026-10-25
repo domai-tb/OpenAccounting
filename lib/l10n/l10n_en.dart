@@ -2148,6 +2148,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionCreateAccount => 'Create account';
 
   @override
+  String get bankAccountType => 'Account type';
+
+  @override
+  String get bankAccountTypeBank => 'Bank account';
+
+  @override
+  String get bankAccountTypeSachkonto => 'General ledger account (Sachkonto)';
+
+  @override
   String get actionCreateTaxRate => 'Create tax rate';
 
   @override

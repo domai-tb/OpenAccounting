@@ -1,5 +1,12 @@
 /// Mileage trip entity — immutable-after-posting source record.
 /// Spec: distance as integer hundredths, unresolved until accepted policy.
+typedef MileagePostingRoleSelection = ({int kontoId, int kategorieId});
+
+typedef MileagePostingRoleSettings = ({
+  MileagePostingRoleSelection? travelExpense,
+  MileagePostingRoleSelection? privateContribution,
+});
+
 enum MileageTripState { unresolved, calculated, posted, corrected, voided }
 
 enum MileageTripKind { businessTrip, commuting, eksAllowance, other, unknown }

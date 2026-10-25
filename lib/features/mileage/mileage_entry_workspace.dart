@@ -5,12 +5,21 @@ import 'package:flutter/services.dart';
 import 'package:openaccounting/core/localization.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 import 'package:openaccounting/features/mileage/mileage_entry_usecases.dart';
+import 'package:openaccounting/pages/stammdaten/kategorien_repository.dart';
+import 'package:openaccounting/pages/stammdaten/master_data_workspaces.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 
 class MileageEntryWorkspace extends StatefulWidget {
-  const MileageEntryWorkspace({required this.useCases, super.key});
+  const MileageEntryWorkspace({
+    required this.useCases,
+    required this.bankAccounts,
+    required this.categoryWorkspace,
+    super.key,
+  });
 
   final MileageEntryUseCases useCases;
+  final BankAccountWorkspaceUseCase bankAccounts;
+  final CategoryWorkspaceUseCase categoryWorkspace;
 
   @override
   State<MileageEntryWorkspace> createState() => _MileageEntryWorkspaceState();
@@ -25,6 +34,16 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
   final TextEditingController _contextController = TextEditingController();
 
   List<MileageTrip> _trips = <MileageTrip>[];
+  List<BankAccount> _mileageRoleAccounts = <BankAccount>[];
+  List<Kategorie> _mileageRoleCategories = <Kategorie>[];
+  int? _travelExpenseKontoId;
+  int? _travelExpenseKategorieId;
+  int? _privateContributionKontoId;
+  int? _privateContributionKategorieId;
+  String? _roleSettingsError;
+  String? _roleSettingsNotice;
+  bool _isRoleSettingsLoading = true;
+  bool _isRoleSettingsSaving = false;
   final Set<String> _confirmedPostedTripIds = <String>{};
   String _searchQuery = '';
   MileageTripState? _stateFilter;
@@ -44,6 +63,7 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
   void initState() {
     super.initState();
     unawaited(_loadTrips(showLoading: true));
+    unawaited(_loadPostingRoleSettings(showLoading: true));
   }
 
   @override
@@ -74,6 +94,257 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
         _errorMessage = _l10n.mileageLoadError;
       });
     }
+  }
+
+  Future<void> _loadPostingRoleSettings({bool showLoading = false}) async {
+    if (showLoading && mounted) {
+      setState(() {
+        _isRoleSettingsLoading = true;
+        _roleSettingsError = null;
+      });
+    }
+    try {
+      final List<Object?> loaded = await Future.wait<Object?>(<Future<Object?>>[
+        widget.bankAccounts.list(),
+        widget.categoryWorkspace.list(),
+        widget.useCases.loadPostingRoleSettings(),
+      ]);
+      final List<BankAccount> accounts = (loaded[0]! as List<BankAccount>)
+          .where((BankAccount account) => account.kontoart == 'Sachkonto')
+          .toList(growable: false);
+      final List<Kategorie> categories = (loaded[1]! as List<Kategorie>).toList(growable: false);
+      final MileagePostingRoleSettings settings = loaded[2]! as MileagePostingRoleSettings;
+      final int? travelAccountId = _accountOptionExists(accounts, settings.travelExpense?.kontoId)
+          ? settings.travelExpense?.kontoId
+          : null;
+      final int? travelCategoryId =
+          _categoryOptionExists(categories, settings.travelExpense?.kategorieId, art: 'ausgabe', euerZeile: 71)
+          ? settings.travelExpense?.kategorieId
+          : null;
+      final int? contributionAccountId = _accountOptionExists(accounts, settings.privateContribution?.kontoId)
+          ? settings.privateContribution?.kontoId
+          : null;
+      final int? contributionCategoryId =
+          _categoryOptionExists(categories, settings.privateContribution?.kategorieId, art: 'einnahme', euerZeile: 107)
+          ? settings.privateContribution?.kategorieId
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _mileageRoleAccounts = accounts;
+        _mileageRoleCategories = categories;
+        _travelExpenseKontoId = travelAccountId;
+        _travelExpenseKategorieId = travelCategoryId;
+        _privateContributionKontoId = contributionAccountId;
+        _privateContributionKategorieId = contributionCategoryId;
+        _isRoleSettingsLoading = false;
+        _roleSettingsError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRoleSettingsLoading = false;
+        _roleSettingsError = _l10n.mileageRoleLoadError;
+      });
+    }
+  }
+
+  bool _accountOptionExists(List<BankAccount> accounts, int? id) {
+    return id != null && accounts.any((BankAccount account) => account.id == id);
+  }
+
+  bool _categoryOptionExists(List<Kategorie> categories, int? id, {required String art, required int euerZeile}) {
+    return id != null &&
+        categories.any(
+          (Kategorie category) =>
+              category.id == id && _isEligibleRoleCategory(category, art: art, euerZeile: euerZeile),
+        );
+  }
+
+  List<Kategorie> _roleCategories({required String art, required int euerZeile}) {
+    return _mileageRoleCategories
+        .where((Kategorie category) => _isEligibleRoleCategory(category, art: art, euerZeile: euerZeile))
+        .toList(growable: false);
+  }
+
+  bool _isEligibleRoleCategory(Kategorie category, {required String art, required int euerZeile}) {
+    final String? skr03 = category.kontoSkr03?.trim();
+    final String? skr04 = category.kontoSkr04?.trim();
+    final bool catalogVerified = category.mappingStatus == CategoryMappingStatus.catalogVerified;
+    final bool userConfirmed = category.mappingStatus == CategoryMappingStatus.userConfirmed;
+    final String? source = category.catalogSourceReference?.trim();
+    final String? version = category.catalogSourceVersion?.trim();
+    return category.aktiv &&
+        category.bezeichnung.trim().isNotEmpty &&
+        category.art?.trim().toLowerCase() == art &&
+        category.euerZeile == euerZeile &&
+        (catalogVerified || userConfirmed) &&
+        ((skr03?.isNotEmpty ?? false) || (skr04?.isNotEmpty ?? false)) &&
+        (!catalogVerified || ((source?.isNotEmpty ?? false) && (version?.isNotEmpty ?? false)));
+  }
+
+  Future<void> _saveMileagePostingRoles() async {
+    final int? travelExpenseKontoId = _travelExpenseKontoId;
+    final int? travelExpenseKategorieId = _travelExpenseKategorieId;
+    final int? privateContributionKontoId = _privateContributionKontoId;
+    final int? privateContributionKategorieId = _privateContributionKategorieId;
+    if (travelExpenseKontoId == null ||
+        travelExpenseKategorieId == null ||
+        privateContributionKontoId == null ||
+        privateContributionKategorieId == null) {
+      return;
+    }
+    setState(() {
+      _isRoleSettingsSaving = true;
+      _roleSettingsError = null;
+      _roleSettingsNotice = null;
+    });
+    try {
+      await widget.useCases.configureMileagePostingRoles(
+        travelExpenseKontoId: travelExpenseKontoId,
+        travelExpenseKategorieId: travelExpenseKategorieId,
+        privateContributionKontoId: privateContributionKontoId,
+        privateContributionKategorieId: privateContributionKategorieId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRoleSettingsSaving = false;
+        _roleSettingsError = _l10n.mileageRoleSaveError;
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _isRoleSettingsSaving = false;
+      _roleSettingsError = null;
+      _roleSettingsNotice = _l10n.mileageRoleSaved;
+    });
+  }
+
+  void _changeRoleSelection(VoidCallback update) {
+    setState(() {
+      update();
+      _roleSettingsError = null;
+      _roleSettingsNotice = null;
+    });
+  }
+
+  Widget _buildMileageRoleSelection({
+    required String title,
+    required String accountKey,
+    required String categoryKey,
+    required int? accountId,
+    required int? categoryId,
+    required List<Kategorie> categories,
+    required ValueChanged<int?> onAccountChanged,
+    required ValueChanged<int?> onCategoryChanged,
+  }) {
+    final bool disabled = _isBusy || _isRoleSettingsLoading || _isRoleSettingsSaving;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: _l10n.mileageRoleAccount,
+            helperText: _mileageRoleAccounts.isEmpty ? _l10n.mileageRoleNoSachkonten : null,
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              key: ValueKey<String>(accountKey),
+              value: accountId,
+              hint: Text(_l10n.mileageRoleSelectAccount),
+              isExpanded: true,
+              items: <DropdownMenuItem<int>>[
+                for (final BankAccount account in _mileageRoleAccounts)
+                  DropdownMenuItem<int>(value: account.id, child: Text(account.name)),
+              ],
+              onChanged: disabled || _mileageRoleAccounts.isEmpty ? null : onAccountChanged,
+            ),
+          ),
+        ),
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: _l10n.mileageRoleCategory,
+            helperText: categories.isEmpty ? _l10n.mileageRoleNoCategories : null,
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              key: ValueKey<String>(categoryKey),
+              value: categoryId,
+              hint: Text(_l10n.mileageRoleSelectCategory),
+              isExpanded: true,
+              items: <DropdownMenuItem<int>>[
+                for (final Kategorie category in categories)
+                  DropdownMenuItem<int>(value: category.id, child: Text(category.bezeichnung)),
+              ],
+              onChanged: disabled || categories.isEmpty ? null : onCategoryChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMileageRoleSettings() {
+    final List<Kategorie> travelExpenseCategories = _roleCategories(art: 'ausgabe', euerZeile: 71);
+    final List<Kategorie> privateContributionCategories = _roleCategories(art: 'einnahme', euerZeile: 107);
+    final bool canSave =
+        !_isRoleSettingsLoading &&
+        !_isRoleSettingsSaving &&
+        !_isBusy &&
+        _travelExpenseKontoId != null &&
+        _travelExpenseKategorieId != null &&
+        _privateContributionKontoId != null &&
+        _privateContributionKategorieId != null;
+    return Card(
+      child: ExpansionTile(
+        key: const ValueKey<String>('mileage-role-settings-toggle'),
+        dense: true,
+        title: Text(_l10n.mileageRoleSettingsTitle, style: Theme.of(context).textTheme.titleSmall),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        children: <Widget>[
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_l10n.mileageRoleSettingsDescription)),
+              if (_isRoleSettingsLoading) const LinearProgressIndicator(),
+              _buildMileageRoleSelection(
+                title: _l10n.mileageRoleTravelExpense,
+                accountKey: 'mileage-role-expense-account',
+                categoryKey: 'mileage-role-expense-category',
+                accountId: _travelExpenseKontoId,
+                categoryId: _travelExpenseKategorieId,
+                categories: travelExpenseCategories,
+                onAccountChanged: (int? value) => _changeRoleSelection(() => _travelExpenseKontoId = value),
+                onCategoryChanged: (int? value) => _changeRoleSelection(() => _travelExpenseKategorieId = value),
+              ),
+              const SizedBox(height: 12),
+              _buildMileageRoleSelection(
+                title: _l10n.mileageRolePrivateContribution,
+                accountKey: 'mileage-role-contribution-account',
+                categoryKey: 'mileage-role-contribution-category',
+                accountId: _privateContributionKontoId,
+                categoryId: _privateContributionKategorieId,
+                categories: privateContributionCategories,
+                onAccountChanged: (int? value) => _changeRoleSelection(() => _privateContributionKontoId = value),
+                onCategoryChanged: (int? value) => _changeRoleSelection(() => _privateContributionKategorieId = value),
+              ),
+              if (_roleSettingsError != null) _buildMessage(_roleSettingsError!, isError: true),
+              if (_roleSettingsNotice != null) _buildMessage(_roleSettingsNotice!, isError: false),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const ValueKey<String>('mileage-role-save'),
+                onPressed: canSave ? _saveMileagePostingRoles : null,
+                icon: const Icon(Icons.save_outlined),
+                label: Text(_l10n.mileageRoleSave),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<List<MileageTrip>?> _refreshTripsAfterCommit() async {
@@ -109,6 +380,7 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
       _errorMessage = actionError ?? (refreshedTrips == null ? _l10n.mileageLoadError : null);
       _noticeMessage = notice;
     });
+    if (hideForm) _scrollToTop();
   }
 
   List<MileageTrip> _mergeTrip(MileageTrip trip) {
@@ -548,6 +820,7 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
       children: <Widget>[
+        _buildMileageRoleSettings(),
         Align(
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
@@ -558,7 +831,14 @@ class _MileageEntryWorkspaceState extends State<MileageEntryWorkspace> {
           ),
         ),
         if (_errorMessage != null && _selectedTripId == null) _buildMessage(_errorMessage!, isError: true),
-        if (_noticeMessage != null) _buildMessage(_noticeMessage!, isError: false),
+        if (_noticeMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(_noticeMessage!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+            ),
+          ),
         if (_isLoading) const LinearProgressIndicator(),
         if (_showForm) _buildForm(),
         const SizedBox(height: 16),

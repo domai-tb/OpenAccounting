@@ -10,6 +10,22 @@ class MileageEntryUseCases {
 
   Future<List<MileageTrip>> listTrips() => repo.listTrips();
 
+  Future<MileagePostingRoleSettings> loadPostingRoleSettings() => repo.loadPostingRoleSettings();
+
+  Future<void> configureMileagePostingRoles({
+    required int travelExpenseKontoId,
+    required int travelExpenseKategorieId,
+    required int privateContributionKontoId,
+    required int privateContributionKategorieId,
+  }) {
+    return repo.configureMileagePostingRoles(
+      travelExpenseKontoId: travelExpenseKontoId,
+      travelExpenseKategorieId: travelExpenseKategorieId,
+      privateContributionKontoId: privateContributionKontoId,
+      privateContributionKategorieId: privateContributionKategorieId,
+    );
+  }
+
   final MileageEntryRepository repo;
   final MileagePostingPort postingPort;
 

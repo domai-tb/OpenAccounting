@@ -13,6 +13,38 @@ class MileageEntryRepository implements MileagePostingPort {
     return PostingGroupService(executor).postMileage(trip: trip);
   }
 
+  Future<MileagePostingRoleSettings> loadPostingRoleSettings() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT role, konto_id, kategorie_id FROM mileage_posting_account_mapping ORDER BY role',
+      const <Object?>[],
+    );
+    final Map<String, MileagePostingRoleSelection> roles = <String, MileagePostingRoleSelection>{};
+    for (final Map<String, Object?> row in rows) {
+      final String role = row['role']?.toString() ?? '';
+      final int? kontoId = (row['konto_id'] as num?)?.toInt();
+      final int? kategorieId = (row['kategorie_id'] as num?)?.toInt();
+      if ((role != 'travel_expense' && role != 'private_contribution') || kontoId == null || kategorieId == null) {
+        throw StateError('Mileage posting role configuration is invalid');
+      }
+      roles[role] = (kontoId: kontoId, kategorieId: kategorieId);
+    }
+    return (travelExpense: roles['travel_expense'], privateContribution: roles['private_contribution']);
+  }
+
+  Future<void> configureMileagePostingRoles({
+    required int travelExpenseKontoId,
+    required int travelExpenseKategorieId,
+    required int privateContributionKontoId,
+    required int privateContributionKategorieId,
+  }) {
+    return PostingGroupService(executor).configureMileagePostingRoles(
+      travelExpenseKontoId: travelExpenseKontoId,
+      travelExpenseKategorieId: travelExpenseKategorieId,
+      privateContributionKontoId: privateContributionKontoId,
+      privateContributionKategorieId: privateContributionKategorieId,
+    );
+  }
+
   final QueryExecutor executor;
 
   Future<void> ensureTablesForTests() async {
