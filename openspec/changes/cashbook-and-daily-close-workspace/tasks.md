@@ -77,8 +77,8 @@
 - [x] 2.1 Write failing test `test_approved_cash_event_appears_in_the_cashbook` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Approved cash event appears in the cashbook"; assert it fails for the right reason.
 - [x] 2.2 Implement the specified behavior for "Approved cash event appears in the cashbook" to pass 2.1.
 - [ ] 2.3 Refactor the affected code; keep the focused and full suites green.
-- [ ] 2.4 Write failing test `test_missing_posting_contract_blocks_cash_entry` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Missing posting contract blocks cash entry"; assert it fails for the right reason.
-- [ ] 2.5 Implement the specified behavior for "Missing posting contract blocks cash entry" to pass 2.4.
+- [x] 2.4 Write failing test `test_missing_posting_contract_blocks_cash_entry` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Missing posting contract blocks cash entry"; assert it fails for the right reason.
+- [x] 2.5 Implement the specified behavior for "Missing posting contract blocks cash entry" to pass 2.4.
 - [ ] 2.6 Refactor the affected code; keep the focused and full suites green.
 - [ ] 2.7 Write failing test `test_imported_or_legacy_row_is_not_treated_as_cash` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Imported or legacy row is not treated as cash"; assert it fails for the right reason.
 - [ ] 2.8 Implement the specified behavior for "Imported or legacy row is not treated as cash" to pass 2.7.

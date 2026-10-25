@@ -2,7 +2,7 @@
 
 ### Task Completion
 - [ ] All tasks marked `[x]` in tasks.md
-- Remaining open tasks: 93 remain unchecked. Refactor tasks 0.4, 0.7, 0.10, 0.13, 0.16, 0.19, 0.22, 0.25, 0.28, 0.31, 0.34, and 0.37 were completed against the named focused suites. The v26 case-only `INSERT OR REPLACE` and disclosure-collation regressions have fresh deliberate red→green evidence below. The full suite was attempted under this scoped delegation but stopped at the five-minute cap with migration and other failures; no full-suite pass is claimed. The account/date source now reads the verified v26 opening and committed cash-payment groups through AppServices, and `/banking?view=close` requires explicit company/account/date selections. Receipt-reference atomicity behavior is implemented under task 9; its full-suite refactor gate, close finalization, and PDFs remain open.
+- Remaining open tasks: 91 remain unchecked. Refactor tasks 0.4, 0.7, 0.10, 0.13, 0.16, 0.19, 0.22, 0.25, 0.28, 0.31, 0.34, and 0.37 were completed against the named focused suites. The v26 case-only `INSERT OR REPLACE` and disclosure-collation regressions have fresh deliberate red→green evidence below. The prior full-suite attempt stopped at the five-minute cap with migration and other failures; no full-suite pass is claimed. The account/date source now reads the verified v26 opening and committed cash-payment groups through AppServices, and `/banking?view=close` requires explicit company/account/date selections. Receipt-reference atomicity behavior is implemented under task 9. Cash entry remains read-only until a posting writer contract is wired; task 2.6, close finalization, and PDFs remain open.
 
 ### TDD Integrity
 - [ ] Every test-plan.md entry exists as a real test (or documented `N/A — non-executable` with its check run green)
@@ -11,7 +11,7 @@
 - [ ] Zero skipped/pending/commented-out tests
 - [ ] No test weakened or deleted without REMOVED requirement
 
-Eighteen of the 46 mapped delta-spec scenario rows are green for migration/setup, schema parity, profile portability, customer disclosure, routed Tagesabschluss creation, the approved committed-cash-event listing, the three account/date balance scenarios, and task 9 receipt-reference atomicity; the remaining 28 are 🔴 red and open. The supplementary v26/v27 trigger-semantics and `INSERT OR REPLACE` regressions are green. The standalone account/date calculator suite passed all 10 tests, and the new SQLite-backed source/route focused run passed all 5 tests. The full Flutter suite remains incomplete, so the overall post-implementation TDD gate remains open.
+Nineteen of the 46 mapped delta-spec scenario rows are green for migration/setup, schema parity, profile portability, customer disclosure, routed Tagesabschluss creation, the approved committed-cash-event listing, the three account/date balance scenarios, task 9 receipt-reference atomicity, and task 2.4–2.5 fail-closed cash entry; the remaining 27 are 🔴 red and open. The supplementary v26/v27 trigger-semantics and `INSERT OR REPLACE` regressions are green. The standalone account/date calculator suite passed all 10 tests, and the new SQLite-backed source/route focused run passed all 5 tests. The full Flutter suite remains incomplete, so the overall post-implementation TDD gate remains open.
 
 ### Evidence
 
@@ -147,6 +147,16 @@ The Round 5 v26 implementation review is recorded as `VERDICT: REVISE`, and its 
 - Full suite attempted on the current `dev` HEAD after mileage migration v30 landed: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm` → interrupt requested at the five-minute cap; Flutter stopped at 05:49 with exit 130, incomplete. Interim output was 1,929 passed and 38 failed (1,967 completed outcomes). Migration-version failures include cashbook v26/v27 tests expecting schema 27 but receiving 30, v29 migration tests expecting 29 but receiving 30, inventory migration fixtures rejecting schema 30 (expected range 18–24), and profile/receivable schema inventories expecting 51 tables but seeing 54. Migration startup failures also report `Cashbook-Eröffnungsquellen konnten nicht verifiziert werden` at `migrations.dart:1319`. These migration-owned failures are outside this slice and were not repaired.
 - Task 9.3 remains unchecked because the focused suite is green but the full suite did not complete green.
 
+### Cash entry remains blocked without a posting contract (tasks 2.4–2.6)
+
+- Red before the guard: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart --plain-name test_missing_posting_contract_blocks_cash_entry` → failed at the intended missing-state assertion: no `cashbook-entry-contract-unavailable` widget was rendered for a complete v26 balance.
+- Green targeted run: the same command → passed, 1/1. With a complete balance selected, the page shows the existing localized read-only `cashbookSubtitle`, provides no cash-entry form or submit action, and preserves journal-row, posting-group, and receipt-link counts.
+- Green focused suite: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart test/features/accounting/cashbook_and_daily_close_workspace_test.dart test/features/cashbook/account_date_balance_source_test.dart test/features/einkommen/balanced_journal_postings_and_settlement_events_test.dart test/features/accounting/euer_test.dart test/features/accounting/reporting/reporting_contracts_test.dart test/features/accounting/balanced_journal_postings_and_settlement_events_test.dart` → passed, 103/103.
+- Scoped analysis: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter analyze lib/features/accounting/tagesabschluss_page.dart test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` → `No issues found!`.
+- Formatter: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm dart format --output=none --set-exit-if-changed --line-length=120 lib/features/accounting/tagesabschluss_page.dart test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` → passed, zero files changed. Scoped `git diff --check` passed.
+- No posting writer is wired into this cashbook route. This slice keeps entry controls absent and surfaces the existing localized read-only state; it does not add posting, AppServices wiring, or localization keys. The earlier full-suite attempt remains incomplete (exit 130, interim 1,929 passed/38 failed) with v30 migration failures; the full suite was not rerun in this slice.
+- Task 2.6 remains unchecked because its full-suite gate has not passed.
+
 ### Review Integrity
 
 Round 7 independently accepted task 0.16c for the reviewed scoped diff. The checkboxes below remain the full-change review gate.
@@ -160,10 +170,10 @@ Rounds 1 and 2 remain historical `VERDICT: REVISE`; Round 4 approved the revised
 
 ### Change Delivery
 
-- Prior commit range for the earlier review repair artifacts: `51dbddc1f15eee5eb929acf7ea2afa32bba42a96..36452f1dfd629e704c01ec9528c4ed9507095cbf`. The isolated balance core and current scoped artifact edits are uncommitted; no remote operation was performed.
+- Prior commit range for the earlier review repair artifacts: `51dbddc1f15eee5eb929acf7ea2afa32bba42a96..36452f1dfd629e704c01ec9528c4ed9507095cbf`. Receipt-reference atomicity is committed and pushed as `a73258bf2daeb78429fc64e8b789246738dc5a49`; the task 2.4–2.6 slice remains uncommitted. No archive or maintained-spec sync was performed.
 
 ## Overall Decision
 
 DECISION: FAIL
 
-❌ FAIL — this bounded production balance slice and its focused tests/analysis are green, while 95 tasks, the full-suite gate, and fresh independent approval remain open.
+❌ FAIL — focused cashbook balance, receipt-atomicity, and missing-writer gate checks are green, while 91 tasks, the full-suite gate, and fresh independent approval remain open.

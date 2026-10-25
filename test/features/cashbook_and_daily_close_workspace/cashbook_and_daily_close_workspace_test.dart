@@ -69,6 +69,49 @@ void main() {
     expect(find.byKey(const ValueKey<String>('cashbook-event-list')), findsOneWidget);
   });
 
+  testWidgets('test_missing_posting_contract_blocks_cash_entry', (WidgetTester tester) async {
+    final AppDatabase db = await _cashbookDatabase();
+    addTearDown(db.close);
+    await PostingGroupService(db.executor).ensureSchema();
+    final List<Map<String, Object?>> before = await db.executor.runSelect(
+      'SELECT (SELECT COUNT(*) FROM journal) AS journal_rows, '
+      '(SELECT COUNT(*) FROM settlement_groups) AS posting_groups, '
+      '(SELECT COUNT(*) FROM journal WHERE beleg_id IS NOT NULL) AS receipt_links',
+      const <Object?>[],
+    );
+
+    final GoRouter router = createRouter(db);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: MaterialApp.router(locale: const Locale('de'), routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    router.go('/banking?view=cashbook');
+    await tester.pumpAndSettle();
+    await _selectCashbookAccountAndDate(tester);
+
+    expect(find.byKey(const ValueKey<String>('cashbook-event-list')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('cashbook-result-unavailable')), findsNothing);
+    final Finder unavailable = find.byKey(const ValueKey<String>('cashbook-entry-contract-unavailable'));
+    expect(unavailable, findsOneWidget);
+    expect(
+      tester.widget<Text>(unavailable).data,
+      'Schreibgeschützte Kassenhistorie aus gebuchten Kassenbewegungen und verifizierter Saldenvorschau.',
+    );
+    expect(find.byKey(const ValueKey<String>('cashbook-entry-form')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('cashbook-entry-submit')), findsNothing);
+
+    final List<Map<String, Object?>> after = await db.executor.runSelect(
+      'SELECT (SELECT COUNT(*) FROM journal) AS journal_rows, '
+      '(SELECT COUNT(*) FROM settlement_groups) AS posting_groups, '
+      '(SELECT COUNT(*) FROM journal WHERE beleg_id IS NOT NULL) AS receipt_links',
+      const <Object?>[],
+    );
+    expect(after, before);
+  });
+
   test('test_cash_posting_and_receipt_reference_roll_back_together', () async {
     final AppDatabase db = await _cashbookDatabase();
     addTearDown(db.close);

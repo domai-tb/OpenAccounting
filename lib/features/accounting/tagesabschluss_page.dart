@@ -190,6 +190,10 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            if (cashbook)
+              AppCard(
+                child: Text(l10n.cashbookSubtitle, key: const ValueKey<String>('cashbook-entry-contract-unavailable')),
+              ),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
