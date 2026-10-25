@@ -101,26 +101,28 @@
 
 ## 4. cashbook-and-daily-close-workspace: Daily close records use the approved close result
 
-- [ ] 4.1 Write failing test `test_complete_daily_close_is_finalized` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Complete daily close is finalized"; assert it fails for the right reason.
-- [ ] 4.2 Implement the specified behavior for "Complete daily close is finalized" to pass 4.1.
+- [x] 4.1 Write failing test `test_complete_daily_close_is_finalized` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Complete daily close is finalized"; assert it fails for the right reason.
+- [x] 4.2 Implement the specified behavior for "Complete daily close is finalized" to pass 4.1.
 - [ ] 4.3 Refactor the affected code; keep the focused and full suites green.
 - [ ] 4.4 Write failing test `test_expected_balance_or_persistence_mapping_is_unavailable` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Expected balance or persistence mapping is unavailable"; assert it fails for the right reason.
-- [ ] 4.5 Implement the specified behavior for "Expected balance or persistence mapping is unavailable" to pass 4.4.
+- [x] 4.5 Implement the specified behavior for "Expected balance or persistence mapping is unavailable" to pass 4.4.
 - [ ] 4.6 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.7 Write failing test `test_discrepancy_requires_an_explanation` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Discrepancy requires an explanation"; assert it fails for the right reason.
-- [ ] 4.8 Implement the specified behavior for "Discrepancy requires an explanation" to pass 4.7.
+- [x] 4.7 Write failing test `test_discrepancy_requires_an_explanation` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Discrepancy requires an explanation"; assert it fails for the right reason.
+- [x] 4.8 Implement the specified behavior for "Discrepancy requires an explanation" to pass 4.7.
 - [ ] 4.9 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.10 Write failing test `test_existing_close_remains_read_only` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Existing close remains read-only"; assert it fails for the right reason.
-- [ ] 4.11 Implement the specified behavior for "Existing close remains read-only" to pass 4.10.
+
+Tasks 4.1 and 4.7 have captured red-before runs: the complete-balance close action and discrepancy explanation field were absent. Task 4.4's unavailable-result test is green, but no red-before run was captured, so its test-authoring checkbox remains open. Tasks 4.3, 4.6, 4.9, 4.12, 4.15, 4.18, and 4.21 remain open because the full-suite gate has not passed in this slice. Tasks 4.10–4.20 have focused red→green evidence below and remain a partial implementation of the full daily-close lifecycle.
+- [x] 4.10 Write failing test `test_existing_close_remains_read_only` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Existing close remains read-only"; assert it fails for the right reason.
+- [x] 4.11 Implement the specified behavior for "Existing close remains read-only" to pass 4.10.
 - [ ] 4.12 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.13 Write failing test `test_concurrent_close_finalization_cannot_duplicate_a_record` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Concurrent close finalization cannot duplicate a record"; assert it fails for the right reason.
-- [ ] 4.14 Implement the specified behavior for "Concurrent close finalization cannot duplicate a record" to pass 4.13.
+- [x] 4.13 Write failing test `test_concurrent_close_finalization_cannot_duplicate_a_record` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Concurrent close finalization cannot duplicate a record"; assert it fails for the right reason.
+- [x] 4.14 Implement the specified behavior for "Concurrent close finalization cannot duplicate a record" to pass 4.13.
 - [ ] 4.15 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.16 Write failing test `test_ambiguous_legacy_closes_block_finalization` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Ambiguous legacy closes block finalization"; assert it fails for the right reason.
-- [ ] 4.17 Implement the specified behavior for "Ambiguous legacy closes block finalization" to pass 4.16.
+- [x] 4.16 Write failing test `test_ambiguous_legacy_closes_block_finalization` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Ambiguous legacy closes block finalization"; assert it fails for the right reason.
+- [x] 4.17 Implement the specified behavior for "Ambiguous legacy closes block finalization" to pass 4.16.
 - [ ] 4.18 Refactor the affected code; keep the focused and full suites green.
-- [ ] 4.19 Write failing test `test_single_unsigned_legacy_close_blocks_finalization` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Single unsigned legacy close blocks finalization"; assert it fails for the right reason.
-- [ ] 4.20 Implement the specified behavior for "Single unsigned legacy close blocks finalization" to pass 4.19.
+- [x] 4.19 Write failing test `test_single_unsigned_legacy_close_blocks_finalization` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Single unsigned legacy close blocks finalization"; assert it fails for the right reason.
+- [x] 4.20 Implement the specified behavior for "Single unsigned legacy close blocks finalization" to pass 4.19.
 - [ ] 4.21 Refactor the affected code; keep the focused and full suites green.
 
 ## 5. cashbook-and-daily-close-workspace: Cashbook views follow desktop localization and accessibility rules

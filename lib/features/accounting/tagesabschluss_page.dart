@@ -10,6 +10,7 @@ import 'package:openaccounting/design_system/components/app_card.dart';
 import 'package:openaccounting/design_system/components/app_page.dart';
 import 'package:openaccounting/design_system/components/app_page_header.dart';
 import 'package:openaccounting/design_system/components/app_money.dart';
+import 'package:openaccounting/features/accounting/money.dart' as money;
 import 'package:openaccounting/features/accounting/tagesabschluss_creation.dart';
 import 'package:openaccounting/features/cashbook/account_date_balance.dart';
 import 'package:openaccounting/features/cashbook/cashbook_balance_source.dart';
@@ -34,12 +35,32 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
   bool _companiesLoading = true;
   bool _accountsLoading = false;
   bool _balanceLoading = false;
+  bool _finalizationInProgress = false;
+  bool _finalized = false;
+  TagesabschlussCloseLookup _existingClose = const TagesabschlussCloseLookup(status: TagesabschlussCloseStatus.absent);
   int _requestGeneration = 0;
+  final TextEditingController _countedBalanceController = TextEditingController();
+  final TextEditingController _explanationController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadCompanies());
+  }
+
+  @override
+  void dispose() {
+    _countedBalanceController.dispose();
+    _explanationController.dispose();
+    super.dispose();
+  }
+
+  void _resetFinalization() {
+    _countedBalanceController.clear();
+    _explanationController.clear();
+    _finalizationInProgress = false;
+    _finalized = false;
+    _existingClose = const TagesabschlussCloseLookup(status: TagesabschlussCloseStatus.absent);
   }
 
   Future<void> _loadCompanies() async {
@@ -61,6 +82,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
 
   Future<void> _changeCompany(int? companyId) async {
     ++_requestGeneration;
+    _resetFinalization();
     setState(() {
       _companyId = companyId;
       _accountId = null;
@@ -87,6 +109,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
   }
 
   void _changeAccount(int? accountId) {
+    _resetFinalization();
     setState(() {
       _accountId = accountId;
       _balance = null;
@@ -103,6 +126,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
       lastDate: DateTime(2100),
     );
     if (!mounted || picked == null) return;
+    _resetFinalization();
     setState(() {
       _asOfDate = DateTime(picked.year, picked.month, picked.day);
       _balance = null;
@@ -150,11 +174,56 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
     } catch (_) {
       result = null;
     }
+    TagesabschlussCloseLookup existingClose;
+    try {
+      existingClose = await ref
+          .read(appServicesProvider)
+          .tagesabschlussFinalization
+          .lookupExisting(companyId: companyId.toString(), accountId: accountId.toString(), asOfDate: asOfDate);
+    } catch (_) {
+      existingClose = const TagesabschlussCloseLookup(status: TagesabschlussCloseStatus.unverified);
+    }
     if (!mounted || generation != _requestGeneration) return;
     setState(() {
       _balance = result;
+      _existingClose = existingClose;
       _balanceLoading = false;
     });
+  }
+
+  int? _countedBalanceCents() {
+    final String raw = _countedBalanceController.text.trim();
+    if (raw.isEmpty) return null;
+    try {
+      return money.parseScaled(raw, scale: 2, field: 'counted balance');
+    } on money.MoneyParseException {
+      return null;
+    }
+  }
+
+  Future<void> _finalizeClose(CashbookBalanceResult balance, int countedBalanceCents) async {
+    if (_finalizationInProgress || _finalized) return;
+    setState(() => _finalizationInProgress = true);
+    try {
+      final TagesabschlussCloseLookup close = await ref
+          .read(appServicesProvider)
+          .tagesabschlussFinalization
+          .finalize(
+            balance: balance,
+            countedBalanceCents: countedBalanceCents,
+            explanation: _explanationController.text,
+          );
+      if (!mounted) return;
+      setState(() {
+        _finalizationInProgress = false;
+        _existingClose = close;
+        _finalized = close.status == TagesabschlussCloseStatus.verified;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _finalizationInProgress = false);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(appLocalizationsOf(context).saveFailed)));
+    }
   }
 
   @override
@@ -164,6 +233,18 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
     final TagesabschlussCreation creation = services.tagesabschlussCreation;
     final CashbookBalanceResult? result = _balance;
     final TagesabschlussDraft? draft = result == null ? null : creation.prepare(result);
+    final int? countedBalanceCents = _countedBalanceCents();
+    final BigInt? difference = draft == null || countedBalanceCents == null
+        ? null
+        : BigInt.from(countedBalanceCents) - BigInt.from(draft.expectedBalanceCents);
+    final bool explanationRequired = difference != null && difference != BigInt.zero;
+    final bool canFinalize =
+        draft != null &&
+        result != null &&
+        countedBalanceCents != null &&
+        !_finalizationInProgress &&
+        !_finalized &&
+        (!explanationRequired || _explanationController.text.trim().isNotEmpty);
     final String locale = Localizations.localeOf(context).toString();
     final String? companyName = _companyName();
     final String? accountName = _accountName();
@@ -206,7 +287,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                       for (final CashbookCompanyOption company in _companies)
                         DropdownMenuItem<int>(value: company.id, child: Text(company.name)),
                     ],
-                    onChanged: _companiesLoading ? null : _changeCompany,
+                    onChanged: _companiesLoading || _finalizationInProgress ? null : _changeCompany,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
@@ -217,14 +298,16 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                       for (final CashbookAccountOption account in _accounts)
                         DropdownMenuItem<int>(value: account.id, child: Text(account.name)),
                     ],
-                    onChanged: _companyId == null || _accountsLoading ? null : _changeAccount,
+                    onChanged: _companyId == null || _accountsLoading || _finalizationInProgress
+                        ? null
+                        : _changeAccount,
                   ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
                       key: ValueKey<String>(cashbook ? 'cashbook-date-picker' : 'daily-close-date-picker'),
-                      onPressed: _chooseDate,
+                      onPressed: _finalizationInProgress ? null : _chooseDate,
                       icon: const Icon(Icons.calendar_today),
                       label: Text(
                         _asOfDate == null
@@ -249,7 +332,18 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
             ],
             const SizedBox(height: 16),
             if (_balanceLoading) const Center(child: CircularProgressIndicator()),
-            if (draft == null && (!cashbook || !_balanceLoading))
+            if (!cashbook && _existingClose.status == TagesabschlussCloseStatus.unverified)
+              AppCard(
+                child: Text(
+                  l10n.tagesabschlussUnavailable,
+                  key: const ValueKey<String>('daily-close-unverified-history'),
+                ),
+              )
+            else if (!cashbook &&
+                _existingClose.status == TagesabschlussCloseStatus.verified &&
+                _existingClose.snapshot != null)
+              _verifiedCloseCard(l10n, locale, _existingClose.snapshot!)
+            else if (draft == null && (!cashbook || !_balanceLoading))
               AppCard(
                 child: Text(
                   cashbook
@@ -284,10 +378,49 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
               if (!cashbook) ...<Widget>[
                 const SizedBox(height: 16),
                 AppCard(
-                  child: TextField(
-                    key: const ValueKey<String>('daily-close-counted-balance'),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: l10n.tagesabschlussCountedBalance),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      TextField(
+                        key: const ValueKey<String>('daily-close-counted-balance'),
+                        controller: _countedBalanceController,
+                        enabled: !_finalized && !_finalizationInProgress,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(labelText: l10n.tagesabschlussCountedBalance),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      if (explanationRequired || _explanationController.text.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 12),
+                        TextField(
+                          key: const ValueKey<String>('daily-close-explanation'),
+                          controller: _explanationController,
+                          enabled: !_finalized && !_finalizationInProgress,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            labelText: '${l10n.mileageCorrectionReason}${explanationRequired ? ' *' : ''}',
+                            helperText: explanationRequired ? l10n.mileageCorrectionReasonRequired : null,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        key: const ValueKey<String>('daily-close-finalize'),
+                        onPressed: canFinalize ? () => unawaited(_finalizeClose(result, countedBalanceCents)) : null,
+                        icon: const Icon(Icons.fact_check),
+                        label: Text(l10n.close),
+                      ),
+                      if (_finalizationInProgress) const LinearProgressIndicator(),
+                      if (_finalized)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            l10n.tagesabschlussComplete,
+                            key: const ValueKey<String>('daily-close-finalized'),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -356,6 +489,36 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _verifiedCloseCard(AppLocalizations l10n, String locale, TagesabschlussFinalizedSnapshot snapshot) {
+    return AppCard(
+      child: Column(
+        key: const ValueKey<String>('daily-close-verified-snapshot'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            l10n.tagesabschlussComplete,
+            key: const ValueKey<String>('daily-close-finalized'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          _field(l10n.tagesabschlussCompany, _companyName() ?? snapshot.companyId),
+          _field(l10n.tagesabschlussAccount, _accountName() ?? snapshot.accountId),
+          _field(l10n.tagesabschlussDate, formatDate(snapshot.asOfDate, locale: locale)),
+          _field(
+            l10n.tagesabschlussExpectedBalance,
+            _formatCents(snapshot.expectedBalanceCents, snapshot.currencyCode, locale),
+          ),
+          _field(
+            l10n.tagesabschlussCountedBalance,
+            _formatCents(snapshot.countedBalanceCents, snapshot.currencyCode, locale),
+          ),
+          _field(l10n.tagesabschlussCurrency, snapshot.currencyCode),
+          _field(l10n.tagesabschlussSource, snapshot.sourceReference),
+          if (snapshot.explanation != null) _field(l10n.mileageCorrectionReason, snapshot.explanation!),
         ],
       ),
     );

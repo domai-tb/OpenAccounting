@@ -167,6 +167,7 @@ class AppServices {
   );
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final TagesabschlussCreation tagesabschlussCreation = const TagesabschlussCreation();
+  late final TagesabschlussFinalization tagesabschlussFinalization = TagesabschlussFinalization(_db.executor);
   late final CashbookBalanceSource cashbookBalanceSource = CashbookBalanceSource(_db.executor);
   late final MileageEntryUseCases mileageEntry = MileageEntryUseCases(MileageEntryRepository(_db.executor));
   late final DashboardUseCase dashboard = DashboardUseCase(_db.executor);
