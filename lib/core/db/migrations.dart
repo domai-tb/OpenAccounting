@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 29;
+  static const int currentVersion = 30;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -85,17 +85,30 @@ class MigrationRunner {
       malformedTables.add('tagesabschluesse');
     }
     if (version >= 28 && actualTables.contains('mileage_trip_corrections')) {
+      final bool businessDate = version >= 30;
       final List<Map<String, Object?>> correctionGuards = await executor.runSelect(
         "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' "
         "AND name = 'trg_mileage_correction_update_guard'",
         const <Object?>[],
       );
       if (!_hasExpectedTriggers(correctionGuards, <String, String>{
-        'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
-      })) {
+            'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(businessDate: businessDate),
+          }) ||
+          businessDate && !await _hasMileageCorrectionBusinessDateColumn()) {
         malformedTables.add('mileage_trip_corrections');
       }
-      if (!await _hasMileageCorrectionPostingGuard()) malformedTables.add('mileage_trips');
+      if (businessDate) {
+        final List<Map<String, Object?>> correctionInsertGuards = await executor.runSelect(
+          "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_insert_draft'",
+          const <Object?>[],
+        );
+        if (!_hasExpectedTriggers(correctionInsertGuards, <String, String>{
+          'trg_mileage_correction_insert_draft': _mileageCorrectionInsertGuardBusinessDateSql(),
+        })) {
+          malformedTables.add('mileage_trip_corrections');
+        }
+      }
+      if (!await _hasMileageCorrectionPostingGuard(businessDate: businessDate)) malformedTables.add('mileage_trips');
     }
     if (version >= 29 &&
         actualTables.contains('rechnungspositionen') &&
@@ -614,6 +627,7 @@ class MigrationRunner {
       await _migrateDailyCloseEvidence();
       await _migrateAccountHolder();
       await _migrateMileageCorrectionOperation();
+      await _migrateMileageCorrectionBusinessDate();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
       await _migrateEInvoiceTaxEvidence();
@@ -781,6 +795,9 @@ class MigrationRunner {
     if (version == 29) {
       await _migrateEInvoiceTaxEvidence();
     }
+    if (version == 30) {
+      await _migrateMileageCorrectionBusinessDate();
+    }
   }
 
   Future<void> _migrateMileageLifecycle() async {
@@ -900,6 +917,32 @@ WHERE state = 'calculated'
     await _verifyMileagePostingSchema(requireCorrectionOperation: true);
     await _verifyMileageLifecycleSchema(requireCorrectionOperation: true);
   }
+
+  Future<void> _migrateMileageCorrectionBusinessDate() async {
+    await _addColumnIfMissing('mileage_trip_corrections', 'applied_business_date', 'TEXT');
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_insert_draft');
+    await executor.runCustom(_mileageCorrectionInsertGuardBusinessDateSql());
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+    await executor.runCustom(_mileageCorrectionUpdateGuardSql(businessDate: true));
+    await _verifyMileagePostingSchema(requireCorrectionOperation: true, businessDate: true);
+    await _verifyMileageLifecycleSchema(requireCorrectionOperation: true, businessDate: true);
+  }
+
+  String _mileageCorrectionInsertGuardBusinessDateSql() => '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_insert_draft
+BEFORE INSERT ON mileage_trip_corrections
+WHEN NEW.state <> 'draft'
+  OR NEW.accounting_correction_id IS NOT NULL
+  OR NEW.applied_at IS NOT NULL
+  OR NEW.applied_business_date IS NOT NULL
+  OR NOT EXISTS (
+    SELECT 1 FROM mileage_trips source
+    WHERE source.id = NEW.trip_id AND source.state = 'posted'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'mileage correction must start as a draft for a posted trip');
+END
+''';
 
   String _mileageCorrectionJournalProof({required String correctionId, required bool replacementPosted}) {
     final String replacementState = replacementPosted ? 'posted' : 'calculated';
@@ -1153,8 +1196,26 @@ EXISTS (
 )''';
   }
 
-  String _mileageCorrectionUpdateGuardSql() =>
-      '''
+  String _mileageCorrectionUpdateGuardSql({bool businessDate = false}) {
+    final String dateConsistencyGuard = businessDate
+        ? '''
+    OR NEW.applied_business_date IS NULL
+    OR length(NEW.applied_business_date) <> 10
+    OR strftime('%Y-%m-%d', NEW.applied_business_date) IS NOT NEW.applied_business_date
+    OR EXISTS (
+      SELECT 1 FROM journal j
+      WHERE j.source_kind = 'mileage_correction'
+        AND j.source_id = NEW.id
+        AND j.datum IS NOT NEW.applied_business_date
+    )'''
+        : '''
+    OR EXISTS (
+      SELECT 1 FROM journal j
+      WHERE j.source_kind = 'mileage_correction'
+        AND j.source_id = NEW.id
+        AND j.datum IS NOT date(NEW.applied_at, 'localtime')
+    )''';
+    return '''
 CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_update_guard
 BEFORE UPDATE ON mileage_trip_corrections
 WHEN OLD.state <> 'draft'
@@ -1165,7 +1226,11 @@ WHEN OLD.state <> 'draft'
   OR NEW.created_at IS NOT OLD.created_at
   OR NEW.state NOT IN ('draft', 'applied', 'cancelled')
   OR (NEW.state IN ('draft', 'cancelled')
-    AND (NEW.accounting_correction_id IS NOT NULL OR NEW.applied_at IS NOT NULL))
+    AND (
+      NEW.accounting_correction_id IS NOT NULL
+      OR NEW.applied_at IS NOT NULL
+      ${businessDate ? 'OR NEW.applied_business_date IS NOT NULL' : ''}
+    ))
   OR (NEW.state = 'applied' AND (
     NEW.accounting_correction_id IS NOT NEW.id
     OR NEW.applied_at IS NULL
@@ -1185,17 +1250,13 @@ WHEN OLD.state <> 'draft'
     ))
     OR (NEW.kind = 'void' AND NEW.replacement_trip_id IS NOT NULL)
     OR NOT ${_mileageCorrectionJournalProof(correctionId: 'NEW.id', replacementPosted: true)}
-    OR EXISTS (
-      SELECT 1 FROM journal j
-      WHERE j.source_kind = 'mileage_correction'
-        AND j.source_id = NEW.id
-        AND j.datum IS NOT date(NEW.applied_at, 'localtime')
-    )
+    $dateConsistencyGuard
   ))
 BEGIN
   SELECT RAISE(ABORT, 'mileage correction requires one matching atomic reversal and replacement group');
 END
 ''';
+  }
 
   String _version28MileageTripPostingGuardSql(List<String> lifecycleTriggers) {
     final String legacyGuard = lifecycleTriggers.singleWhere(
@@ -1302,14 +1363,17 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
     });
   }
 
-  Future<void> _verifyMileagePostingSchema({bool requireCorrectionOperation = false}) async {
+  Future<void> _verifyMileagePostingSchema({bool requireCorrectionOperation = false, bool businessDate = false}) async {
     if (!await _hasMileagePostingMappingConstraints() || !await _hasMileagePostingPeriodClosureConstraints()) {
       throw StateError('Mileage-Kontenzuordnung konnte nicht verifiziert werden');
     }
     if (!await _hasMileagePostingJournalSnapshots() || !await _hasMileageTripPostingGuard()) {
       throw StateError('Mileage-Journal-Snapshots konnten nicht verifiziert werden');
     }
-    if (requireCorrectionOperation && !await _hasMileageCorrectionPostingGuard()) {
+    if (businessDate && !await _hasMileageCorrectionBusinessDateColumn()) {
+      throw StateError('Mileage correction business date column could not be verified');
+    }
+    if (requireCorrectionOperation && !await _hasMileageCorrectionPostingGuard(businessDate: businessDate)) {
       throw StateError('Mileage correction posting guard could not be verified');
     }
   }
@@ -1406,7 +1470,7 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
         sql.contains('count(*)');
   }
 
-  Future<bool> _hasMileageCorrectionPostingGuard() async {
+  Future<bool> _hasMileageCorrectionPostingGuard({bool businessDate = false}) async {
     final List<Map<String, Object?>> rows = await executor.runSelect(
       "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' "
       "AND name IN ('trg_mileage_trip_posting_guard', 'trg_mileage_correction_update_guard')",
@@ -1414,13 +1478,27 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
     );
     return _hasExpectedTriggers(rows, <String, String>{
       'trg_mileage_trip_posting_guard': _version28MileageTripPostingGuardSql(_mileageLifecycleTriggersSql),
-      'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
+      'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(businessDate: businessDate),
     });
+  }
+
+  Future<bool> _hasMileageCorrectionBusinessDateColumn() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(mileage_trip_corrections)',
+      const <Object?>[],
+    );
+    final List<Map<String, Object?>> businessDateColumns = columns
+        .where((Map<String, Object?> column) => column['name'] == 'applied_business_date')
+        .toList(growable: false);
+    return businessDateColumns.length == 1 &&
+        businessDateColumns.single['type'].toString().toUpperCase() == 'TEXT' &&
+        (businessDateColumns.single['notnull'] as num?)?.toInt() == 0;
   }
 
   Future<bool> _mileagePostingNeedsRepair() async {
     try {
-      await _verifyMileagePostingSchema(requireCorrectionOperation: await getUserVersion() >= 28);
+      final int version = await getUserVersion();
+      await _verifyMileagePostingSchema(requireCorrectionOperation: version >= 28, businessDate: version >= 30);
       return false;
     } catch (_) {
       return true;
@@ -1429,14 +1507,18 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
 
   Future<bool> _mileageLifecycleNeedsRepair() async {
     try {
-      await _verifyMileageLifecycleSchema(requireCorrectionOperation: await getUserVersion() >= 28);
+      final int version = await getUserVersion();
+      await _verifyMileageLifecycleSchema(requireCorrectionOperation: version >= 28, businessDate: version >= 30);
       return false;
     } catch (_) {
       return true;
     }
   }
 
-  Future<void> _verifyMileageLifecycleSchema({bool requireCorrectionOperation = false}) async {
+  Future<void> _verifyMileageLifecycleSchema({
+    bool requireCorrectionOperation = false,
+    bool businessDate = false,
+  }) async {
     final List<Map<String, Object?>> columns = await executor.runSelect(
       'PRAGMA table_info(mileage_trips)',
       const <Object?>[],
@@ -1461,11 +1543,25 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
     if (correctionGuards.length != 1) {
       throw StateError('Mileage correction update guard could not be verified');
     }
+    if (businessDate && !await _hasMileageCorrectionBusinessDateColumn()) {
+      throw StateError('Mileage correction business date column could not be verified');
+    }
     if (requireCorrectionOperation) {
       if (!_hasExpectedTriggers(correctionGuards, <String, String>{
-        'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
+        'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(businessDate: businessDate),
       })) {
         throw StateError('Mileage correction operation guard could not be verified');
+      }
+      if (businessDate) {
+        final List<Map<String, Object?>> correctionInsertGuards = await executor.runSelect(
+          "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_insert_draft'",
+          const <Object?>[],
+        );
+        if (!_hasExpectedTriggers(correctionInsertGuards, <String, String>{
+          'trg_mileage_correction_insert_draft': _mileageCorrectionInsertGuardBusinessDateSql(),
+        })) {
+          throw StateError('Mileage correction insert guard could not be verified');
+        }
       }
     } else {
       final String correctionGuardSql = correctionGuards.single['sql']?.toString().toLowerCase() ?? '';
@@ -1532,6 +1628,7 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
       await _migrateAccountOpeningBalanceSource();
       await _migrateDailyCloseEvidence();
       await _migrateMileageCorrectionOperation();
+      await _migrateMileageCorrectionBusinessDate();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);

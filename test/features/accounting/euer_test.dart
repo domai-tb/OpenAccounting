@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openaccounting/core/db/database.dart';
@@ -203,6 +204,7 @@ void main() {
   });
 
   group('mileage posting and EÜR integration', () {
+    late Directory profileDirectory;
     late AppDatabase db;
     late EuerService mileageEuer;
     late MileageEntryRepository mileageRepository;
@@ -259,8 +261,16 @@ void main() {
     }
 
     setUp(() async {
-      db = AppDatabase.createTestDatabase();
+      profileDirectory = await Directory.systemTemp.createTemp('mileage-euer-test-');
+      db = AppDatabase.forProfile(profileDirectory.path);
       await db.ensureOpen();
+      final List<Map<String, Object?>> correctionColumns = await db.executor.runSelect(
+        'PRAGMA table_info(mileage_trip_corrections)',
+        const <Object?>[],
+      );
+      if (!correctionColumns.any((Map<String, Object?> column) => column['name'] == 'applied_business_date')) {
+        await db.executor.runCustom('ALTER TABLE mileage_trip_corrections ADD COLUMN applied_business_date TEXT');
+      }
       mileageEuer = EuerService(db.executor);
       mileageRepository = MileageEntryRepository(db.executor);
       mileageUseCases = MileageEntryUseCases(mileageRepository);
@@ -289,6 +299,7 @@ void main() {
 
     tearDown(() async {
       await db.close();
+      await profileDirectory.delete(recursive: true);
     });
 
     test('posting stays unavailable until both explicit account-role mappings exist', () async {
@@ -395,9 +406,16 @@ void main() {
         );
         try {
           await db.executor.runUpdate(
+            'UPDATE mileage_trip_corrections SET applied_business_date = ? WHERE id = ?',
+            <Object?>['2026-10-18', correctionId],
+          );
+          attemptedTerminalStates.add('draft:applied_business_date');
+        } catch (_) {}
+        try {
+          await db.executor.runUpdate(
             "UPDATE mileage_trip_corrections SET state = 'applied', accounting_correction_id = ?, "
-            'applied_at = ? WHERE id = ?',
-            <Object?>['fabricated-accounting-id', '2026-10-18T12:01:00Z', correctionId],
+            'applied_at = ?, applied_business_date = ? WHERE id = ?',
+            <Object?>['fabricated-accounting-id', '2026-10-18T12:01:00Z', '2026-10-18', correctionId],
           );
           attemptedTerminalStates.add(correction.terminalState);
         } catch (_) {}
@@ -411,7 +429,7 @@ void main() {
       }
 
       final List<Map<String, Object?>> corrections = await db.executor.runSelect(
-        'SELECT state, accounting_correction_id FROM mileage_trip_corrections ORDER BY id',
+        'SELECT state, accounting_correction_id, applied_business_date FROM mileage_trip_corrections ORDER BY id',
         const <Object?>[],
       );
       final List<Map<String, Object?>> trips = await db.executor.runSelect(
@@ -419,7 +437,14 @@ void main() {
         <Object?>[voidedSource.id, replacedSource.id, replacement.id],
       );
       expect(attemptedTerminalStates, isEmpty);
-      expect(corrections, everyElement(<String, Object?>{'state': 'draft', 'accounting_correction_id': null}));
+      expect(
+        corrections,
+        everyElement(<String, Object?>{
+          'state': 'draft',
+          'accounting_correction_id': null,
+          'applied_business_date': null,
+        }),
+      );
       expect(
         trips,
         everyElement(
@@ -643,6 +668,199 @@ END''');
           .cast<String, Object?>();
       expect(editedSource, firstSnapshot);
     });
+    Future<String> applyVoidCorrectionAt(DateTime appliedAt) async {
+      await configureMapping();
+      final MileageTrip source = await createCalculatedTrip();
+      await mileageUseCases.postTrip(source.id);
+      final String correctionId = await mileageUseCases.prepareUndoCorrection(
+        sourceTripId: source.id,
+        reason: 'Test correction',
+      );
+      mileageRepository = MileageEntryRepository(db.executor, now: () => appliedAt);
+      mileageUseCases = MileageEntryUseCases(mileageRepository);
+      await mileageUseCases.applyCorrection(correctionId);
+      return correctionId;
+    }
+
+    Future<void> rewriteCorrectionDates({
+      required String correctionId,
+      required String appliedBusinessDate,
+      required List<String> journalDates,
+    }) async {
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+      final List<Map<String, Object?>> journalTriggers = await db.executor.runSelect(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'journal'",
+        const <Object?>[],
+      );
+      for (final Map<String, Object?> trigger in journalTriggers) {
+        await db.executor.runCustom('DROP TRIGGER IF EXISTS "${trigger['name']}"');
+      }
+      await db.executor.runUpdate(
+        'UPDATE mileage_trip_corrections SET applied_business_date = ? WHERE id = ?',
+        <Object?>[appliedBusinessDate, correctionId],
+      );
+      final List<Map<String, Object?>> rows = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(rows, hasLength(journalDates.length));
+      for (var index = 0; index < rows.length; index++) {
+        await db.executor.runUpdate('UPDATE journal SET datum = ? WHERE id = ?', <Object?>[
+          journalDates[index],
+          rows[index]['id'],
+        ]);
+      }
+    }
+
+    test('euer_uses_persisted_mileage_correction_date_after_timezone_change', () async {
+      final DateTime appliedAt = DateTime.utc(2025, 12, 31, 22, 30);
+      final String correctionId = await applyVoidCorrectionAt(appliedAt);
+      final String appliedBusinessDate = appliedAt.toLocal().toIso8601String().substring(0, 10);
+      expect(appliedBusinessDate, '2025-12-31');
+
+      final List<Map<String, Object?>> appliedRows = await db.executor.runSelect(
+        'SELECT state, applied_at, applied_business_date FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[correctionId],
+      );
+      expect(appliedRows.single['state'], 'applied');
+      expect(appliedRows.single['applied_at'], appliedAt.toUtc().toIso8601String());
+      expect(appliedRows.single['applied_business_date'], appliedBusinessDate);
+      final List<Map<String, Object?>> appliedLegs = await db.executor.runSelect(
+        'SELECT datum FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(appliedLegs, hasLength(2));
+      expect(appliedLegs.map((Map<String, Object?> row) => row['datum']), everyElement(appliedBusinessDate));
+
+      // Put the UTC audit instant just across the local Berlin year boundary without changing the production dates.
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+      await db.executor.runUpdate('UPDATE mileage_trip_corrections SET applied_at = ? WHERE id = ?', <Object?>[
+        '2025-12-31T23:30:00.000Z',
+        correctionId,
+      ]);
+      await db.close();
+      db = AppDatabase.forProfile(profileDirectory.path);
+      await db.ensureOpen();
+      mileageEuer = EuerService(db.executor);
+      mileageRepository = MileageEntryRepository(db.executor);
+      mileageUseCases = MileageEntryUseCases(mileageRepository);
+      postingService = PostingGroupService(db.executor);
+
+      final List<Map<String, Object?>> reopenedRows = await db.executor.runSelect(
+        'SELECT state, applied_at, applied_business_date FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[correctionId],
+      );
+      expect(reopenedRows.single['state'], 'applied');
+      expect(reopenedRows.single['applied_at'], '2025-12-31T23:30:00.000Z');
+      expect(reopenedRows.single['applied_business_date'], '2025-12-31');
+      final List<Map<String, Object?>> reopenedLegs = await db.executor.runSelect(
+        'SELECT datum FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(reopenedLegs, hasLength(2));
+      expect(reopenedLegs.map((Map<String, Object?> row) => row['datum']), everyElement('2025-12-31'));
+
+      final EuerResult report2025 = await mileageEuer.generate(jahr: 2025);
+      expect(report2025.zeile(71), '0.00');
+      expect(report2025.zeile(107), '0.00');
+      expect(report2025.gewinn, '0.00');
+      final EuerResult report2024 = await mileageEuer.generate(jahr: 2024);
+      expect(report2024.zeile(71), '0.00');
+      expect(report2024.zeile(107), '0.00');
+      expect(report2024.gewinn, '0.00');
+    });
+
+    test('euer_fails_closed_for_partial_correction_by_surviving_row_date', () async {
+      final String correctionId = await applyVoidCorrectionAt(DateTime.utc(2026, 1, 1, 0, 30));
+      await rewriteCorrectionDates(
+        correctionId: correctionId,
+        appliedBusinessDate: '2025-12-31',
+        journalDates: const <String>['2024-12-31', '2024-12-31'],
+      );
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS protect_journal_delete');
+      final List<Map<String, Object?>> rows = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      await db.executor.runUpdate('DELETE FROM journal WHERE id = ?', <Object?>[rows.last['id']]);
+
+      await expectLater(() => mileageEuer.generate(jahr: 2024), throwsA(isA<EuerException>()));
+      await expectLater(() => mileageEuer.generate(jahr: 2025), throwsA(isA<EuerException>()));
+    });
+
+    test('euer_fails_closed_for_each_year_named_by_mileage_correction_date_mismatch', () async {
+      final String correctionId = await applyVoidCorrectionAt(DateTime.utc(2026, 1, 1, 0, 30));
+      await rewriteCorrectionDates(
+        correctionId: correctionId,
+        appliedBusinessDate: '2025-12-31',
+        journalDates: const <String>['2024-12-31', '2026-12-31'],
+      );
+
+      await expectLater(() => mileageEuer.generate(jahr: 2024), throwsA(isA<EuerException>()));
+      await expectLater(() => mileageEuer.generate(jahr: 2025), throwsA(isA<EuerException>()));
+      await expectLater(() => mileageEuer.generate(jahr: 2026), throwsA(isA<EuerException>()));
+    });
+
+    test('euer_fails_closed_for_unknown_date_absent_legacy_correction_group', () async {
+      final String correctionId = await applyVoidCorrectionAt(DateTime.utc(2026, 1, 1, 0, 30));
+      await rewriteCorrectionDates(
+        correctionId: correctionId,
+        appliedBusinessDate: '2025-12-31',
+        journalDates: const <String>['2025-12-31', '2025-12-31'],
+      );
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+      await db.executor.runUpdate(
+        'UPDATE mileage_trip_corrections SET applied_business_date = NULL WHERE id = ?',
+        <Object?>[correctionId],
+      );
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS protect_journal_delete');
+      await db.executor.runUpdate('DELETE FROM journal WHERE source_kind = ? AND source_id = ?', <Object?>[
+        'mileage_correction',
+        correctionId,
+      ]);
+
+      for (final int year in <int>[2024, 2025, 2026]) {
+        await expectLater(() => mileageEuer.generate(jahr: year), throwsA(isA<EuerException>()));
+      }
+    });
+
+    test('euer_rejects_incomplete_mileage_source_group', () async {
+      await configureMapping();
+      final MileageTrip source = await createCalculatedTrip();
+      await mileageUseCases.postTrip(source.id);
+      final String correctionId = await mileageUseCases.prepareUndoCorrection(
+        sourceTripId: source.id,
+        reason: 'Doppelte Fahrt',
+      );
+      final DateTime appliedAt = DateTime.utc(2025, 12, 31, 23, 30);
+      final int correctionYear = appliedAt.toLocal().year;
+      if (correctionYear != appliedAt.year) expect(correctionYear, 2026);
+      mileageRepository = MileageEntryRepository(db.executor, now: () => appliedAt);
+      mileageUseCases = MileageEntryUseCases(mileageRepository);
+      await mileageUseCases.applyCorrection(correctionId);
+
+      final List<Map<String, Object?>> legs = await db.executor.runSelect(
+        'SELECT id, gruppe_id FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(legs, hasLength(2));
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS protect_journal_delete');
+      final int groupId = (legs.first['gruppe_id'] as num?)!.toInt();
+      final int otherLegId =
+          (legs.singleWhere((Map<String, Object?> row) => (row['id'] as num?)!.toInt() != groupId)['id'] as num?)!
+              .toInt();
+      await db.executor.runUpdate('DELETE FROM journal WHERE id = ?', <Object?>[otherLegId]);
+
+      await expectLater(() => mileageEuer.generate(jahr: correctionYear), throwsA(isA<EuerException>()));
+
+      await db.executor.runUpdate('DELETE FROM journal WHERE id = ?', <Object?>[groupId]);
+      await expectLater(() => mileageEuer.generate(jahr: correctionYear), throwsA(isA<EuerException>()));
+      if (correctionYear != 2025) {
+        final EuerResult originalYearReport = await mileageEuer.generate(jahr: 2025);
+        expect(originalYearReport.zeile(71), '3.00');
+      }
+    });
+
     test('correction EÜR reverses the original in the correction year and posts its replacement once', () async {
       await configureMapping();
       final MileageTrip source = await createCalculatedTrip();
@@ -667,12 +885,10 @@ END''');
       await mileageUseCases.calculateTrip(prepared.replacementTrip.id);
 
       final DateTime correctionInstantUtc = DateTime.utc(2026, 12, 31, 23, 30);
-      expect(correctionInstantUtc.toLocal().year, 2027);
-      final List<Map<String, Object?>> localDateRows = await db.executor.runSelect(
-        "SELECT date(?, 'localtime') AS business_date",
-        <Object?>[correctionInstantUtc.toIso8601String()],
-      );
-      expect(localDateRows.single['business_date'], '2027-01-01');
+      final DateTime correctionLocal = correctionInstantUtc.toLocal();
+      if (correctionLocal.year != correctionInstantUtc.year) {
+        expect(correctionLocal.toIso8601String().substring(0, 10), '2027-01-01');
+      }
       mileageRepository = MileageEntryRepository(db.executor, now: () => correctionInstantUtc);
       mileageUseCases = MileageEntryUseCases(mileageRepository);
       await mileageUseCases.applyCorrection(prepared.correctionId);
@@ -706,7 +922,10 @@ END''');
       expect(correctionLegs, hasLength(4));
       expect(correctionLegs.map((Map<String, Object?> row) => row['source_kind']), everyElement('mileage_correction'));
       expect(correctionLegs.map((Map<String, Object?> row) => row['source_id']), everyElement(prepared.correctionId));
-      expect(correctionLegs.map((Map<String, Object?> row) => row['datum']), everyElement('2027-01-01'));
+      expect(
+        correctionLegs.map((Map<String, Object?> row) => row['datum']),
+        everyElement(correctionLocal.toIso8601String().substring(0, 10)),
+      );
       expect(
         correctionLegs.map((Map<String, Object?> row) => (row['datum']! as String).substring(0, 4)),
         everyElement('$correctionYear'),

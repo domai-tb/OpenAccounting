@@ -20,3 +20,28 @@ The EÜR SHALL read a posted mileage trip through one mileage-specific source pa
 - **GIVEN** an in-period mileage trip has a missing, duplicate, unbalanced, or snapshot-incomplete source group
 - **WHEN** EÜR is generated
 - **THEN** the report is unavailable or incomplete and does not partially count either leg
+
+### Requirement: Keep correction report periods independent of runtime timezone
+
+For each requested report year, EÜR SHALL inspect an applied correction when either its non-null `mileage_trip_corrections.applied_business_date` or any surviving correction row's stored `journal.datum` names that year. It SHALL NOT derive a correction year from `applied_at` or convert that timestamp using the report process timezone. EÜR SHALL inspect all surviving rows in the correction group even when the persisted business date and row dates name different years. All surviving rows in a correction group SHALL have the same canonical `journal.datum`; when `applied_business_date` is non-null, it SHALL equal every surviving row's date. Any disagreement SHALL make EÜR unavailable or incomplete for every candidate report year: the persisted business-date year and every year named by a surviving row. EÜR SHALL NOT partially count the correction. A complete legacy group with a null business date SHALL use its consistent stored journal date. If an applied legacy correction has no surviving journal rows and a null `applied_business_date`, EÜR SHALL be unavailable or incomplete for every requested year because its report period is unknown.
+
+#### Scenario: Correction report year survives a runtime timezone change
+- **GIVEN** a correction is applied in Europe/Berlin at `2024-12-31T23:30Z`, its persisted business date and journal dates are `2025-01-01`, and its audit timestamp is UTC
+- **WHEN** the same profile is opened and EÜR is generated under UTC
+- **THEN** the complete correction is reported in 2025 and is not treated as missing from 2024
+
+#### Scenario: Partial correction group is detected by a surviving journal date
+- **GIVEN** an applied correction has one or more surviving correction rows dated `2025-01-01` and an incomplete group
+- **WHEN** EÜR is generated for 2025
+- **THEN** the report is unavailable or incomplete even if the correction date metadata is null or names another year
+
+#### Scenario: Date mismatch fails closed in every candidate report year
+- **GIVEN** an applied correction has `applied_business_date = 2025-01-01` and its surviving correction rows are dated `2024-12-31` and `2025-01-01`
+- **WHEN** EÜR is generated for 2024 and for 2025
+- **THEN** both reports are unavailable or incomplete because both years are candidates
+- **AND** neither report partially counts the correction
+
+#### Scenario: Entirely missing legacy correction group with unknown date fails closed
+- **GIVEN** an applied legacy correction has no surviving journal rows and a null `applied_business_date`
+- **WHEN** EÜR is generated for any requested year
+- **THEN** the report is unavailable or incomplete without guessing from `applied_at`

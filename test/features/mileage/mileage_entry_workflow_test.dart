@@ -355,6 +355,65 @@ void main() {
       expect((await repo.getById(prepared.replacementTrip.id))!.state, MileageTripState.unresolved);
     });
 
+    test(
+      'test_apply_accepted_replacement_correction_atomically_persists_business_date_without_legacy_backfill',
+      () async {
+        final MileageTrip source = await useCases.recordBusinessTrip(
+          tripDate: '2026-03-14',
+          purpose: 'Kundenbesuch',
+          distanceHundredthsKm: 1000,
+          businessContext: 'Projekt',
+          tripKind: MileageTripKind.businessTrip,
+          vehicleSource: MileageVehicleSource.private,
+          vehicleClass: MileageVehicleClass.kraftwagen,
+        );
+        await useCases.calculateTrip(source.id);
+        await configureMileagePostingRoles();
+        await useCases.postTrip(source.id);
+        final ({String correctionId, MileageTrip replacementTrip}) prepared = await useCases
+            .prepareReplacementCorrection(
+              sourceTripId: source.id,
+              reason: 'Korrektur der Strecke',
+              tripDate: '2026-03-15',
+              purpose: 'Korrigierter Kundenbesuch',
+              distanceHundredthsKm: 1200,
+              businessContext: 'Projekt',
+              tripKind: MileageTripKind.businessTrip,
+              vehicleSource: MileageVehicleSource.private,
+              vehicleClass: MileageVehicleClass.kraftwagen,
+            );
+        await useCases.calculateTrip(prepared.replacementTrip.id);
+
+        final DateTime appliedAt = DateTime.utc(2026, 12, 31, 23, 30);
+        final String expectedBusinessDate = appliedAt.toLocal().toIso8601String().substring(0, 10);
+        repo = MileageEntryRepository(db.executor, now: () => appliedAt);
+        useCases = MileageEntryUseCases(repo);
+        await useCases.applyCorrection(prepared.correctionId);
+
+        final List<Map<String, Object?>> correctionRows = await db.executor.runSelect(
+          'SELECT state, applied_at, applied_business_date FROM mileage_trip_corrections WHERE id = ?',
+          <Object?>[prepared.correctionId],
+        );
+        expect(correctionRows.single['state'], 'applied');
+        expect(correctionRows.single['applied_at'], appliedAt.toUtc().toIso8601String());
+        expect(correctionRows.single['applied_business_date'], expectedBusinessDate);
+        final List<Map<String, Object?>> journalRows = await db.executor.runSelect(
+          'SELECT datum FROM journal WHERE source_kind = ? AND source_id = ?',
+          <Object?>['mileage_correction', prepared.correctionId],
+        );
+        expect(journalRows, isNotEmpty);
+        expect(journalRows.map((Map<String, Object?> row) => row['datum']), everyElement(expectedBusinessDate));
+        await useCases.applyCorrection(prepared.correctionId);
+        expect(
+          (await db.executor.runSelect(
+            'SELECT applied_business_date FROM mileage_trip_corrections WHERE id = ?',
+            <Object?>[prepared.correctionId],
+          )).single['applied_business_date'],
+          expectedBusinessDate,
+        );
+      },
+    );
+
     test('test_apply_accepted_replacement_correction_atomically', () async {
       final MileageTrip source = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',

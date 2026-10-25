@@ -39,6 +39,55 @@ void main() {
       );
     });
 
+    test('v30 adds nullable applied_business_date on fresh and upgraded schemas without backfill', () async {
+      List<Map<String, Object?>> columns = await db.executor.runSelect(
+        'PRAGMA table_info(mileage_trip_corrections)',
+        const <Object?>[],
+      );
+      expect(MigrationRunner.currentVersion, 30);
+      expect(columns.map((Map<String, Object?> row) => row['name']), contains('applied_business_date'));
+      final Map<String, Object?> businessDateColumn = columns.singleWhere(
+        (Map<String, Object?> row) => row['name'] == 'applied_business_date',
+      );
+      expect((businessDateColumn['notnull']! as num).toInt(), 0);
+
+      await db.executor.runCustom('PRAGMA foreign_keys = OFF');
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_insert_draft');
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+      await db.executor.runInsert(
+        'INSERT INTO mileage_trip_corrections '
+        '(id, trip_id, kind, replacement_trip_id, reason, state, accounting_correction_id, created_at, applied_at, '
+        'applied_business_date) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)',
+        const <Object?>[
+          'legacy-applied-correction',
+          'legacy-source-trip',
+          'void',
+          'Legacy applied correction',
+          'applied',
+          'legacy-applied-correction',
+          '2025-01-01T00:00:00.000Z',
+          '2026-01-01T00:30:00.000Z',
+        ],
+      );
+      await db.executor.runCustom('ALTER TABLE mileage_trip_corrections DROP COLUMN applied_business_date');
+      await db.executor.runCustom('PRAGMA user_version = 29');
+
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      expect(await runner.run(createSchema: () async {}), isTrue);
+      expect(await runner.getUserVersion(), 30);
+      columns = await db.executor.runSelect('PRAGMA table_info(mileage_trip_corrections)', const <Object?>[]);
+      expect(columns.map((Map<String, Object?> row) => row['name']), contains('applied_business_date'));
+      final List<Map<String, Object?>> legacyRows = await db.executor.runSelect(
+        'SELECT state, applied_at, applied_business_date FROM mileage_trip_corrections WHERE id = ?',
+        const <Object?>['legacy-applied-correction'],
+      );
+      expect(legacyRows.single, <String, Object?>{
+        'state': 'applied',
+        'applied_at': '2026-01-01T00:30:00.000Z',
+        'applied_business_date': null,
+      });
+    });
+
     test('v22 migration demotes unknown calculated facts and preserves posted facts', () async {
       final List<Map<String, Object?>> existingTriggers = await db.executor.runSelect(
         "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_mileage_%'",

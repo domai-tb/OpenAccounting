@@ -415,10 +415,46 @@ class EuerService {
       'SELECT DISTINCT source_id FROM journal WHERE source_kind = ? AND datum >= ? AND datum < ? ORDER BY source_id',
       <Object?>['mileage_correction', start, end],
     );
+    final List<Map<String, Object?>> appliedCorrections = await executor.runSelect(
+      'SELECT id AS source_id, applied_at, applied_business_date FROM mileage_trip_corrections '
+      'WHERE state = ? ORDER BY id',
+      <Object?>['applied'],
+    );
     if (correctionSources.any(
       (Map<String, Object?> row) => row['source_id'] == null || row['source_id'].toString().trim().isEmpty,
     )) {
       throw const EuerException('EÜR blockiert: Mileage-Korrekturquelle ohne UUID');
+    }
+    final Set<String> correctionIds = <String>{
+      for (final Map<String, Object?> row in correctionSources) row['source_id'].toString(),
+    };
+    for (final Map<String, Object?> row in appliedCorrections) {
+      final String correctionId = row['source_id']?.toString() ?? '';
+      final DateTime? appliedAt = DateTime.tryParse(row['applied_at']?.toString() ?? '');
+      final String? appliedBusinessDate = _validatedMileageCorrectionDate(row['applied_business_date'], correctionId);
+      if (correctionId.trim().isEmpty) {
+        throw const EuerException('EÜR blockiert: Mileage-Korrekturquelle ohne UUID');
+      }
+      if (appliedAt == null || !appliedAt.isUtc) {
+        throw const EuerException('EÜR blockiert: Mileage-Korrekturquelle ohne gültigen UTC-Zeitpunkt');
+      }
+      final List<Map<String, Object?>> correctionJournalDates = await executor.runSelect(
+        'SELECT datum FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      if (correctionJournalDates.isEmpty && appliedBusinessDate == null) {
+        throw EuerException('EÜR blockiert: Mileage-Korrektur $correctionId hat kein bekanntes Buchungsdatum');
+      }
+      if (appliedBusinessDate != null && int.parse(appliedBusinessDate.substring(0, 4)) == jahr) {
+        correctionIds.add(correctionId);
+      }
+      for (final Map<String, Object?> journalDateRow in correctionJournalDates) {
+        final String? journalDate = _validatedMileageCorrectionDate(journalDateRow['datum'], correctionId);
+        if (journalDate == null) {
+          throw EuerException('EÜR blockiert: Mileage-Korrektur $correctionId hat ein unbekanntes Buchungsdatum');
+        }
+        if (int.parse(journalDate.substring(0, 4)) == jahr) correctionIds.add(correctionId);
+      }
     }
     final Set<String> sourceIds = <String>{
       for (final Map<String, Object?> trip in trips)
@@ -562,12 +598,8 @@ class EuerService {
         'legs': legSnapshots,
       });
     }
-    for (final Map<String, Object?> correction in correctionSources) {
-      final _MileageEuerTotals correctionTotals = await _mileageCorrectionTotalsForEvent(
-        correction['source_id'].toString(),
-        start,
-        end,
-      );
+    for (final String correctionId in correctionIds) {
+      final _MileageEuerTotals correctionTotals = await _mileageCorrectionTotalsForEvent(correctionId, start, end);
       expensesCents += correctionTotals.expenseCents;
       contributionCents += correctionTotals.contributionCents;
       reportSnapshots.addAll(correctionTotals.reportSnapshots);
@@ -582,7 +614,7 @@ class EuerService {
   Future<_MileageEuerTotals> _mileageCorrectionTotalsForEvent(String correctionId, String start, String end) async {
     final List<Map<String, Object?>> corrections = await executor.runSelect(
       'SELECT c.id, c.trip_id, c.kind, c.replacement_trip_id, c.state, c.accounting_correction_id, c.applied_at, '
-      'source.state AS source_state, source.posting_event_id AS source_event, '
+      'c.applied_business_date, source.state AS source_state, source.posting_event_id AS source_event, '
       'source.calculated_amount AS source_amount, replacement.state AS replacement_state, '
       'replacement.posting_event_id AS replacement_event, replacement.calculated_amount AS replacement_amount '
       'FROM mileage_trip_corrections c JOIN mileage_trips source ON source.id = c.trip_id '
@@ -595,17 +627,34 @@ class EuerService {
     final String expectedSourceState = replace ? 'corrected' : 'voided';
     final String appliedAt = correction['applied_at']?.toString() ?? '';
     final DateTime? appliedAtInstant = DateTime.tryParse(appliedAt);
+    final String? appliedBusinessDate = _validatedMileageCorrectionDate(
+      correction['applied_business_date'],
+      correctionId,
+    );
     final List<Map<String, Object?>> dateRows = await executor.runSelect(
       'SELECT DISTINCT datum FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY datum',
       <Object?>['mileage_correction', correctionId],
     );
-    final String date = dateRows.length == 1 ? dateRows.single['datum']?.toString() ?? '' : '';
+    final Set<String> correctionDates = <String>{};
+    for (final Map<String, Object?> dateRow in dateRows) {
+      final String? journalDate = _validatedMileageCorrectionDate(dateRow['datum'], correctionId);
+      if (journalDate == null) {
+        throw EuerException('EÜR blockiert: Mileage-Korrektur $correctionId hat ein unbekanntes Buchungsdatum');
+      }
+      correctionDates.add(journalDate);
+    }
+    final String date = correctionDates.length == 1
+        ? correctionDates.single
+        : correctionDates.isEmpty
+        ? appliedBusinessDate ?? ''
+        : '';
     if (correction['state'] != 'applied' ||
         correction['accounting_correction_id'] != correctionId ||
         appliedAtInstant == null ||
         !appliedAtInstant.isUtc ||
         date.length != 10 ||
         DateTime.tryParse(date) == null ||
+        appliedBusinessDate != null && appliedBusinessDate != date ||
         date.compareTo(start) < 0 ||
         date.compareTo(end) >= 0 ||
         correction['source_state'] != expectedSourceState ||
@@ -789,6 +838,16 @@ class EuerService {
         },
       ],
     );
+  }
+
+  String? _validatedMileageCorrectionDate(Object? raw, String correctionId) {
+    if (raw == null) return null;
+    final String date = raw.toString();
+    final DateTime? parsed = DateTime.tryParse(date);
+    if (date.length != 10 || parsed == null || parsed.toIso8601String().substring(0, 10) != date) {
+      throw EuerException('EÜR blockiert: Mileage-Korrektur $correctionId hat ein ungültiges Buchungsdatum');
+    }
+    return date;
   }
 
   int _mileageEurCents(Object? raw, String tripId) {

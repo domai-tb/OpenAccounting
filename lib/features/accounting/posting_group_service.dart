@@ -468,9 +468,9 @@ class PostingGroupService {
         if (replacementChanged != 1) throw const PostingException('Ersatzfahrt wurde parallel geändert');
       }
       final int correctionChanged = await tx.runUpdate(
-        'UPDATE mileage_trip_corrections SET state = ?, accounting_correction_id = ?, applied_at = ? '
-        'WHERE id = ? AND state = ?',
-        <Object?>['applied', id, appliedAtIso, id, 'draft'],
+        'UPDATE mileage_trip_corrections SET state = ?, accounting_correction_id = ?, applied_at = ?, '
+        'applied_business_date = ? WHERE id = ? AND state = ?',
+        <Object?>['applied', id, appliedAtIso, date, id, 'draft'],
       );
       if (correctionChanged != 1) throw const PostingException('Korrektur wurde parallel geändert');
       final String terminalState = replace ? 'corrected' : 'voided';
@@ -646,11 +646,16 @@ class PostingGroupService {
       for (final Map<String, Object?> row in rows) row['datum']?.toString() ?? '',
     };
     final String date = journalDates.length == 1 ? journalDates.single : '';
+    final String? appliedBusinessDate = correction['applied_business_date']?.toString();
     if (rows.length != expected ||
         appliedAt == null ||
         !appliedAt.isUtc ||
         date.length != 10 ||
         DateTime.tryParse(date) == null ||
+        appliedBusinessDate != null &&
+            (appliedBusinessDate.length != 10 ||
+                DateTime.tryParse(appliedBusinessDate) == null ||
+                appliedBusinessDate != date) ||
         rows.any(
           (Map<String, Object?> row) =>
               row['datum'] != date ||
