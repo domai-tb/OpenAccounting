@@ -261,7 +261,7 @@ void main() {
       );
     });
 
-    test('test_correction_apply_is_unavailable_without_accepted_operation', () async {
+    test('test_correction_apply_rejects_unprepared_replacement_without_mutation', () async {
       final MileageTrip source = await useCases.recordBusinessTrip(
         tripDate: '2026-03-14',
         purpose: 'Kundenbesuch',
@@ -298,16 +298,7 @@ void main() {
         const <Object?>[],
       );
 
-      await expectLater(
-        () => useCases.applyCorrection(prepared.correctionId),
-        throwsA(
-          isA<StateError>().having(
-            (StateError error) => error.message,
-            'message',
-            contains('correction operation unavailable'),
-          ),
-        ),
-      );
+      await expectLater(() => useCases.applyCorrection(prepared.correctionId), throwsA(isA<Exception>()));
 
       expect(await db.executor.runSelect('SELECT * FROM mileage_trips ORDER BY id', const <Object?>[]), tripsBefore);
       expect(
@@ -317,6 +308,200 @@ void main() {
       expect(await db.executor.runSelect('SELECT * FROM journal ORDER BY id', const <Object?>[]), journalBefore);
       expect((await repo.getById(source.id))!.state, MileageTripState.posted);
       expect((await repo.getById(prepared.replacementTrip.id))!.state, MileageTripState.unresolved);
+    });
+
+    test('test_apply_accepted_replacement_correction_atomically', () async {
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(source.id);
+      final List<Map<String, Object?>> sourceBeforeRows = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[source.id],
+      );
+      final List<Map<String, Object?>> originalLegsBefore = await db.executor.runSelect(
+        'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', source.id],
+      );
+      final ({String correctionId, MileageTrip replacementTrip}) prepared = await useCases.prepareReplacementCorrection(
+        sourceTripId: source.id,
+        reason: 'Korrektur der Strecke',
+        tripDate: '2026-03-15',
+        purpose: 'Korrigierter Kundenbesuch',
+        distanceHundredthsKm: 1200,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(prepared.replacementTrip.id);
+
+      await useCases.applyCorrection(prepared.correctionId);
+
+      final List<Map<String, Object?>> sourceAfterRows = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[source.id],
+      );
+      expect(sourceAfterRows.single['trip_date'], sourceBeforeRows.single['trip_date']);
+      expect(sourceAfterRows.single['purpose'], sourceBeforeRows.single['purpose']);
+      expect(sourceAfterRows.single['business_context'], sourceBeforeRows.single['business_context']);
+      expect(sourceAfterRows.single['distance_hundredths_km'], sourceBeforeRows.single['distance_hundredths_km']);
+      expect(sourceAfterRows.single['calculated_amount'], sourceBeforeRows.single['calculated_amount']);
+      expect(sourceAfterRows.single['posting_event_id'], sourceBeforeRows.single['posting_event_id']);
+      expect(sourceAfterRows.single['state'], 'corrected');
+
+      final List<Map<String, Object?>> corrections = await db.executor.runSelect(
+        'SELECT state, accounting_correction_id, replacement_trip_id FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[prepared.correctionId],
+      );
+      final String eventId = corrections.single['accounting_correction_id']! as String;
+      final MileageTrip replacementAfter = (await repo.getById(prepared.replacementTrip.id))!;
+      expect(replacementAfter.state, MileageTripState.posted);
+      expect(replacementAfter.postingEventId, eventId);
+      expect(corrections.single, <String, Object?>{
+        'state': 'applied',
+        'accounting_correction_id': eventId,
+        'replacement_trip_id': prepared.replacementTrip.id,
+      });
+      final List<Map<String, Object?>> originalLegsAfter = await db.executor.runSelect(
+        'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', source.id],
+      );
+      expect(originalLegsAfter, originalLegsBefore);
+
+      final List<Map<String, Object?>> correctionLegs = await db.executor.runSelect(
+        'SELECT id, gruppe_id, source_kind, source_id, reversal_of_group_id, soll, haben, ust_satz_id, '
+        'ust_satz, vorsteuer_betrag FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', prepared.correctionId],
+      );
+      expect(correctionLegs, hasLength(4));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['source_kind']), everyElement('mileage_correction'));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['source_id']), everyElement(prepared.correctionId));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['gruppe_id']).toSet(), hasLength(1));
+      expect(correctionLegs.where((Map<String, Object?> row) => row['reversal_of_group_id'] != null), hasLength(2));
+      expect(
+        correctionLegs,
+        everyElement(
+          predicate<Map<String, Object?>>(
+            (Map<String, Object?> row) =>
+                row['ust_satz_id'] == null && row['ust_satz'] == null && row['vorsteuer_betrag'] == null,
+          ),
+        ),
+      );
+      final int debitCents = correctionLegs.fold<int>(
+        0,
+        (int sum, Map<String, Object?> row) => sum + ((row['soll']! as num) * 100).round(),
+      );
+      final int creditCents = correctionLegs.fold<int>(
+        0,
+        (int sum, Map<String, Object?> row) => sum + ((row['haben']! as num) * 100).round(),
+      );
+      expect(debitCents, creditCents);
+
+      final int journalCountBeforeRetry =
+          ((await db.executor.runSelect('SELECT COUNT(*) AS count FROM journal', const <Object?>[])).single['count']!
+                  as num)
+              .toInt();
+      await useCases.applyCorrection(prepared.correctionId);
+      expect(
+        (await db.executor.runSelect(
+          'SELECT accounting_correction_id FROM mileage_trip_corrections WHERE id = ?',
+          <Object?>[prepared.correctionId],
+        )).single['accounting_correction_id'],
+        eventId,
+      );
+      final int journalCountAfterRetry =
+          ((await db.executor.runSelect('SELECT COUNT(*) AS count FROM journal', const <Object?>[])).single['count']!
+                  as num)
+              .toInt();
+      expect(journalCountAfterRetry, journalCountBeforeRetry);
+    });
+
+    test('test_undo_posted_trip_through_correction', () async {
+      final MileageTrip source = await useCases.recordBusinessTrip(
+        tripDate: '2026-03-14',
+        purpose: 'Kundenbesuch',
+        distanceHundredthsKm: 1000,
+        businessContext: 'Projekt',
+        tripKind: MileageTripKind.businessTrip,
+        vehicleSource: MileageVehicleSource.private,
+        vehicleClass: MileageVehicleClass.kraftwagen,
+      );
+      await useCases.calculateTrip(source.id);
+      await configureMileagePostingRoles();
+      await useCases.postTrip(source.id);
+      final List<Map<String, Object?>> sourceBeforeRows = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[source.id],
+      );
+      final String correctionId = await useCases.prepareUndoCorrection(
+        sourceTripId: source.id,
+        reason: 'Trip entered twice',
+      );
+      final List<Map<String, Object?>> originalLegsBefore = await db.executor.runSelect(
+        'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_trip', source.id],
+      );
+
+      await useCases.applyCorrection(correctionId);
+
+      final List<Map<String, Object?>> sourceAfterRows = await db.executor.runSelect(
+        'SELECT * FROM mileage_trips WHERE id = ?',
+        <Object?>[source.id],
+      );
+      expect(sourceAfterRows.single['trip_date'], sourceBeforeRows.single['trip_date']);
+      expect(sourceAfterRows.single['purpose'], sourceBeforeRows.single['purpose']);
+      expect(sourceAfterRows.single['business_context'], sourceBeforeRows.single['business_context']);
+      expect(sourceAfterRows.single['distance_hundredths_km'], sourceBeforeRows.single['distance_hundredths_km']);
+      expect(sourceAfterRows.single['posting_event_id'], sourceBeforeRows.single['posting_event_id']);
+      expect(sourceAfterRows.single['state'], 'voided');
+      expect((await repo.getById(source.id))!.postingEventId, sourceBeforeRows.single['posting_event_id']);
+      expect(
+        await db.executor.runSelect(
+          'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+          <Object?>['mileage_trip', source.id],
+        ),
+        originalLegsBefore,
+      );
+      final List<Map<String, Object?>> corrections = await db.executor.runSelect(
+        'SELECT state, accounting_correction_id, replacement_trip_id FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[correctionId],
+      );
+      final String eventId = corrections.single['accounting_correction_id']! as String;
+      expect(corrections.single, <String, Object?>{
+        'state': 'applied',
+        'accounting_correction_id': eventId,
+        'replacement_trip_id': null,
+      });
+      final List<Map<String, Object?>> correctionLegs = await db.executor.runSelect(
+        'SELECT id, gruppe_id, source_id, reversal_of_group_id, soll, haben FROM journal '
+        'WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(correctionLegs, hasLength(2));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['reversal_of_group_id'] != null), everyElement(true));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['gruppe_id']).toSet(), hasLength(1));
+      await useCases.applyCorrection(correctionId);
+      expect(
+        (await db.executor.runSelect(
+          'SELECT accounting_correction_id FROM mileage_trip_corrections WHERE id = ?',
+          <Object?>[correctionId],
+        )).single['accounting_correction_id'],
+        eventId,
+      );
+      final List<Map<String, Object?>> correctionLegsAfterRetry = await db.executor.runSelect(
+        'SELECT id FROM journal WHERE source_kind = ? AND source_id = ?',
+        <Object?>['mileage_correction', correctionId],
+      );
+      expect(correctionLegsAfterRetry, hasLength(2));
     });
 
     test('test_failed_or_repeated_correction_is_safe', () async {
@@ -343,6 +528,14 @@ void main() {
         vehicleSource: MileageVehicleSource.private,
         vehicleClass: MileageVehicleClass.kraftwagen,
       );
+      await useCases.calculateTrip(prepared.replacementTrip.id);
+      await db.executor.runCustom('''
+CREATE TRIGGER test_abort_mileage_source_correction
+BEFORE UPDATE ON mileage_trips
+WHEN OLD.id = '${source.id}' AND NEW.state = 'corrected'
+BEGIN
+  SELECT RAISE(ABORT, 'forced correction rollback');
+END''');
       final List<Map<String, Object?>> tripsBefore = await db.executor.runSelect(
         'SELECT * FROM mileage_trips ORDER BY id',
         const <Object?>[],
@@ -355,25 +548,40 @@ void main() {
         'SELECT * FROM journal ORDER BY id',
         const <Object?>[],
       );
-      final Matcher unavailable = throwsA(
-        isA<StateError>().having(
-          (StateError error) => error.message,
-          'message',
-          contains('correction operation unavailable'),
-        ),
-      );
 
-      await expectLater(() => useCases.applyCorrection(prepared.correctionId), unavailable);
-      await expectLater(() => useCases.applyCorrection(prepared.correctionId), unavailable);
-
+      await expectLater(() => useCases.applyCorrection(prepared.correctionId), throwsA(isA<Exception>()));
       expect(await db.executor.runSelect('SELECT * FROM mileage_trips ORDER BY id', const <Object?>[]), tripsBefore);
       expect(
         await db.executor.runSelect('SELECT * FROM mileage_trip_corrections ORDER BY id', const <Object?>[]),
         correctionsBefore,
       );
       expect(await db.executor.runSelect('SELECT * FROM journal ORDER BY id', const <Object?>[]), journalBefore);
-      expect((await repo.getById(source.id))!.state, MileageTripState.posted);
-      expect((await repo.getById(prepared.replacementTrip.id))!.state, MileageTripState.unresolved);
+
+      await db.executor.runCustom('DROP TRIGGER test_abort_mileage_source_correction');
+      await useCases.applyCorrection(prepared.correctionId);
+      final String eventId =
+          (await db.executor.runSelect(
+                'SELECT accounting_correction_id FROM mileage_trip_corrections WHERE id = ?',
+                <Object?>[prepared.correctionId],
+              )).single['accounting_correction_id']!
+              as String;
+      await useCases.applyCorrection(prepared.correctionId);
+      expect(
+        (await db.executor.runSelect(
+          'SELECT accounting_correction_id FROM mileage_trip_corrections WHERE id = ?',
+          <Object?>[prepared.correctionId],
+        )).single['accounting_correction_id'],
+        eventId,
+      );
+      expect(
+        await db.executor
+            .runSelect('SELECT COUNT(*) AS count FROM journal WHERE source_kind = ? AND source_id = ?', <Object?>[
+              'mileage_correction',
+              prepared.correctionId,
+            ])
+            .then((List<Map<String, Object?>> rows) => (rows.single['count']! as num).toInt()),
+        4,
+      );
     });
 
     test('test_calculate_from_an_approved_policy', () async {

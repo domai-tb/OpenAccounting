@@ -35,6 +35,7 @@ class PostingSource {
   static const String bankTransaction = 'bank_transaction';
   static const String cashPayment = 'cash_payment';
   static const String mileageTrip = 'mileage_trip';
+  static const String mileageCorrection = 'mileage_correction';
 }
 
 /// One balanced journal leg in integer cents.
@@ -144,9 +145,10 @@ class StoredAllocation {
 }
 
 class PostingGroupService {
-  PostingGroupService(this.executor);
+  PostingGroupService(this.executor, {DateTime Function()? now}) : _now = now ?? DateTime.now;
 
   final QueryExecutor executor;
+  final DateTime Function() _now;
 
   static const Set<String> _eligibleMapping = <String>{'catalog_verified', 'user_confirmed'};
 
@@ -320,6 +322,342 @@ class PostingGroupService {
         }
       }
       Error.throwWithStackTrace(error is PostingException ? error : PostingException(error.toString()), stackTrace);
+    }
+  }
+
+  Future<void> applyMileageCorrection({required String correctionId}) async {
+    final String id = correctionId.trim();
+    if (!_uuidPattern.hasMatch(id)) throw const PostingException('Korrektur-ID muss eine UUID sein');
+    await _requireMileagePostingSchema(executor);
+    final TransactionExecutor tx = executor.beginTransaction();
+    await tx.ensureOpen(_PostingTxUser());
+    try {
+      final Map<String, Object?>? correction = await _mileageCorrectionRecord(tx, id);
+      if (correction == null) throw const PostingException('Mileage-Korrektur nicht gefunden');
+      if (correction['state'] == 'applied') {
+        await _verifyAppliedMileageCorrection(tx, correction);
+        await tx.send();
+        return;
+      }
+      if (correction['state'] != 'draft') {
+        throw const PostingException('Nur Entwurfskorrekturen können angewendet werden');
+      }
+
+      final String tripId = correction['trip_id']?.toString() ?? '';
+      final Map<String, Object?>? source = await _mileageTripRow(tx, tripId);
+      if (source == null || source['state'] != 'posted') {
+        throw const PostingException('Nur gebuchte Fahrten können korrigiert werden');
+      }
+      final String sourceEventId = source['posting_event_id']?.toString() ?? '';
+      if (!_uuidPattern.hasMatch(sourceEventId)) {
+        throw const PostingException('Gebuchte Fahrt hat keine Buchungsreferenz');
+      }
+      _validatedMileageTripFacts(source);
+      final List<Map<String, Object?>> originalRows = await _mileageOriginalRows(tx, source);
+      final int originalRoot = _validateMileageOriginalRows(source, originalRows);
+      final List<Map<String, Object?>> sourceSettlements = await tx.runSelect(
+        'SELECT id FROM settlement_groups WHERE source_kind = ? AND source_id = ? LIMIT 1',
+        <Object?>[originalRows.first['source_kind'], originalRows.first['source_id']],
+      );
+      if (sourceSettlements.isNotEmpty) {
+        throw const PostingException('Mileage-Buchung darf keine Zahlung enthalten');
+      }
+
+      final String kind = correction['kind']?.toString() ?? '';
+      final bool replace = kind == 'replace';
+      if (!replace && kind != 'void') throw const PostingException('Unbekannte Mileage-Korrekturart');
+      final String? replacementId = correction['replacement_trip_id']?.toString();
+      Map<String, Object?>? replacement;
+      int replacementAmount = 0;
+      Map<String, _MileagePostingRoleSnapshot> replacementRoles = <String, _MileagePostingRoleSnapshot>{};
+      if (replace) {
+        if (replacementId == null || replacementId.isEmpty || replacementId == tripId) {
+          throw const PostingException('Ersatzfahrt fehlt oder ist ungültig');
+        }
+        replacement = await _mileageTripRow(tx, replacementId);
+        if (replacement == null || replacement['state'] != 'calculated' || replacement['posting_event_id'] != null) {
+          throw const PostingException('Ersatzfahrt muss berechnet und noch ungebucht sein');
+        }
+        _validatedMileageTripFacts(replacement);
+        replacementAmount = _mileageAmountCents(replacement['calculated_amount']);
+        replacementRoles = await _loadMileagePostingRoles(tx);
+      } else if (replacementId != null) {
+        throw const PostingException('Eine Stornokorrektur darf keine Ersatzfahrt enthalten');
+      }
+
+      final DateTime appliedAt = _now().toUtc();
+      final String appliedAtIso = appliedAt.toIso8601String();
+      // Audit timestamps stay UTC; journal dates use the host's business-local calendar.
+      final String date = appliedAt.toLocal().toIso8601String().substring(0, 10);
+      await _requireMileagePeriodOpen(tx, date);
+      final List<int> legIds = <int>[];
+      final Map<String, int> reversalIds = <String, int>{};
+      for (final Map<String, Object?> original in originalRows) {
+        final String role = original['mileage_role_snapshot']?.toString() ?? '';
+        final _MileagePostingRoleSnapshot snapshot = _mileageRoleSnapshotFromRow(original);
+        final int debit = money.toCents(money.formatBetrag((original['soll'] ?? 0).toString()));
+        final int credit = money.toCents(money.formatBetrag((original['haben'] ?? 0).toString()));
+        final int amount = money.toCents(money.formatBetrag((original['betrag'] ?? 0).toString()));
+        final int reversalId = await _insertLeg(
+          tx,
+          datum: date,
+          beschreibung: 'Mileage-Korrektur: ${correction['reason']}',
+          kategorieId: (original['kategorie_id'] as num?)?.toInt(),
+          art: 'Ausgabe',
+          betragCents: -amount,
+          debitCents: credit,
+          creditCents: debit,
+          kontoId: (original['konto_id'] as num?)?.toInt(),
+          sollKontoId: (original['haben_konto_id'] as num?)?.toInt(),
+          habenKontoId: (original['soll_konto_id'] as num?)?.toInt(),
+          sourceKind: PostingSource.mileageCorrection,
+          sourceId: id,
+          reversalOfGroupId: originalRoot,
+        );
+        reversalIds[role] = reversalId;
+        legIds.add(reversalId);
+        await _writeMileageLegSnapshot(tx, journalId: reversalId, role: snapshot);
+      }
+      if (replace) {
+        final _MileagePostingRoleSnapshot expense = replacementRoles['travel_expense']!;
+        final _MileagePostingRoleSnapshot contribution = replacementRoles['private_contribution']!;
+        final String description = 'Ersatzfahrt ${replacement!['purpose']}';
+        final int expenseId = await _insertLeg(
+          tx,
+          datum: date,
+          beschreibung: description,
+          kategorieId: expense.kategorieId,
+          art: 'Ausgabe',
+          betragCents: replacementAmount,
+          debitCents: replacementAmount,
+          creditCents: 0,
+          kontoId: expense.kontoId,
+          sollKontoId: expense.kontoId,
+          habenKontoId: null,
+          sourceKind: PostingSource.mileageCorrection,
+          sourceId: id,
+        );
+        final int contributionId = await _insertLeg(
+          tx,
+          datum: date,
+          beschreibung: description,
+          kategorieId: contribution.kategorieId,
+          art: 'Ausgabe',
+          betragCents: -replacementAmount,
+          debitCents: 0,
+          creditCents: replacementAmount,
+          kontoId: contribution.kontoId,
+          sollKontoId: null,
+          habenKontoId: contribution.kontoId,
+          sourceKind: PostingSource.mileageCorrection,
+          sourceId: id,
+        );
+        await _writeMileageLegSnapshot(tx, journalId: expenseId, role: expense);
+        await _writeMileageLegSnapshot(tx, journalId: contributionId, role: contribution);
+        legIds.addAll(<int>[expenseId, contributionId]);
+      }
+      final int rootId = reversalIds['travel_expense']!;
+      await _sealLegs(tx, legIds, rootId);
+
+      if (replace) {
+        final int replacementChanged = await tx.runUpdate(
+          'UPDATE mileage_trips SET state = ?, posting_event_id = ?, updated_at = ? '
+          'WHERE id = ? AND state = ? AND posting_event_id IS NULL',
+          <Object?>['posted', id, appliedAtIso, replacementId, 'calculated'],
+        );
+        if (replacementChanged != 1) throw const PostingException('Ersatzfahrt wurde parallel geändert');
+      }
+      final int correctionChanged = await tx.runUpdate(
+        'UPDATE mileage_trip_corrections SET state = ?, accounting_correction_id = ?, applied_at = ? '
+        'WHERE id = ? AND state = ?',
+        <Object?>['applied', id, appliedAtIso, id, 'draft'],
+      );
+      if (correctionChanged != 1) throw const PostingException('Korrektur wurde parallel geändert');
+      final String terminalState = replace ? 'corrected' : 'voided';
+      final int sourceChanged = await tx.runUpdate(
+        'UPDATE mileage_trips SET state = ?, updated_at = ? WHERE id = ? AND state = ? AND posting_event_id = ?',
+        <Object?>[terminalState, appliedAtIso, tripId, 'posted', sourceEventId],
+      );
+      if (sourceChanged != 1) throw const PostingException('Fahrt wurde parallel geändert');
+      await tx.send();
+    } catch (error, stackTrace) {
+      try {
+        await tx.rollback();
+      } catch (rollbackError, rollbackStackTrace) {
+        Error.throwWithStackTrace(rollbackError, rollbackStackTrace);
+      }
+      final Map<String, Object?>? applied = await _mileageCorrectionRecord(executor, id);
+      if (applied != null && applied['state'] == 'applied') {
+        try {
+          await _verifyAppliedMileageCorrection(executor, applied);
+          return;
+        } catch (_) {
+          // Keep the original failure if a competing operation did not commit a complete correction.
+        }
+      }
+      Error.throwWithStackTrace(error is PostingException ? error : PostingException(error.toString()), stackTrace);
+    }
+  }
+
+  Future<Map<String, Object?>?> _mileageCorrectionRecord(QueryExecutor query, String id) async {
+    final List<Map<String, Object?>> rows = await query.runSelect(
+      'SELECT c.*, source.state AS source_state, source.posting_event_id AS source_posting_event_id, '
+      'replacement.state AS replacement_state, replacement.posting_event_id AS replacement_posting_event_id '
+      'FROM mileage_trip_corrections c JOIN mileage_trips source ON source.id = c.trip_id '
+      'LEFT JOIN mileage_trips replacement ON replacement.id = c.replacement_trip_id WHERE c.id = ? LIMIT 1',
+      <Object?>[id],
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<List<Map<String, Object?>>> _mileageOriginalRows(QueryExecutor query, Map<String, Object?> source) async {
+    final String tripId = source['id']?.toString() ?? '';
+    final List<Map<String, Object?>> rows = await query.runSelect(
+      'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+      <Object?>[PostingSource.mileageTrip, tripId],
+    );
+    if (rows.isNotEmpty) return rows;
+    final String eventId = source['posting_event_id']?.toString() ?? '';
+    final List<Map<String, Object?>> replacementRows = await query.runSelect(
+      'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? AND reversal_of_group_id IS NULL ORDER BY id',
+      <Object?>[PostingSource.mileageCorrection, eventId],
+    );
+    final List<Map<String, Object?>> prior = await query.runSelect(
+      'SELECT id FROM mileage_trip_corrections WHERE id = ? AND kind = ? AND replacement_trip_id = ? '
+      'AND state = ? AND accounting_correction_id = ?',
+      <Object?>[eventId, 'replace', tripId, 'applied', eventId],
+    );
+    if (prior.length != 1) throw const PostingException('Ersatzfahrt hat keine angewendete Ursprungskorrektur');
+    return replacementRows;
+  }
+
+  int _validateMileageOriginalRows(Map<String, Object?> source, List<Map<String, Object?>> rows) {
+    if (rows.length != 2) throw const PostingException('Ursprüngliche Mileage-Buchung ist unvollständig');
+    final bool tripSource = rows.first['source_kind'] == PostingSource.mileageTrip;
+    final int rootId = (rows.first['gruppe_id'] as num?)?.toInt() ?? 0;
+    final int amount = _mileageAmountCents(source['calculated_amount']);
+    final Map<String, Map<String, Object?>> roles = <String, Map<String, Object?>>{};
+    var debit = 0;
+    var credit = 0;
+    for (final Map<String, Object?> row in rows) {
+      final String role = row['mileage_role_snapshot']?.toString() ?? '';
+      final String expectedSource = tripSource ? source['id'].toString() : source['posting_event_id'].toString();
+      final String expectedKind = tripSource ? PostingSource.mileageTrip : PostingSource.mileageCorrection;
+      final int rowDebit = money.toCents(money.formatBetrag((row['soll'] ?? 0).toString()));
+      final int rowCredit = money.toCents(money.formatBetrag((row['haben'] ?? 0).toString()));
+      final int rowAmount = money.toCents(money.formatBetrag((row['betrag'] ?? 0).toString()));
+      if ((role != 'travel_expense' && role != 'private_contribution') ||
+          roles.containsKey(role) ||
+          row['source_kind'] != expectedKind ||
+          row['source_id'] != expectedSource ||
+          (row['gruppe_id'] as num?)?.toInt() != rootId ||
+          rootId <= 0 ||
+          (row['immutable'] as num?)?.toInt() != 1 ||
+          (row['legacy_unverified'] as num?)?.toInt() != 0 ||
+          row['reversal_of_group_id'] != null ||
+          row['beleg_typ'] != 'Ausgabe' ||
+          row['ust_satz_id'] != null ||
+          row['ust_satz'] != null ||
+          row['ust_sonderfall'] != null ||
+          row['vorsteuer_betrag'] != null ||
+          row['marge_25a_brutto'] != null ||
+          row['ust_satz_25a'] != null ||
+          !_mileageRowMatchesRole(row, _mileageRoleSnapshotFromRow(row))) {
+        throw const PostingException('Ursprüngliche Mileage-Buchungsgruppe ist fehlerhaft');
+      }
+      if (role == 'travel_expense' &&
+          (rowDebit != amount ||
+              rowCredit != 0 ||
+              rowAmount != amount ||
+              (row['soll_konto_id'] as num?)?.toInt() != (row['konto_id'] as num?)?.toInt() ||
+              row['haben_konto_id'] != null)) {
+        throw const PostingException('Ursprünglicher Mileage-Aufwand ist fehlerhaft');
+      }
+      if (role == 'private_contribution' &&
+          (rowDebit != 0 ||
+              rowCredit != amount ||
+              rowAmount != -amount ||
+              row['soll_konto_id'] != null ||
+              (row['haben_konto_id'] as num?)?.toInt() != (row['konto_id'] as num?)?.toInt())) {
+        throw const PostingException('Ursprüngliche Mileage-Privateinlage ist fehlerhaft');
+      }
+      roles[role] = row;
+      debit += rowDebit;
+      credit += rowCredit;
+    }
+    final Map<String, Object?>? expense = roles['travel_expense'];
+    if (expense == null ||
+        roles['private_contribution'] == null ||
+        debit != amount ||
+        credit != amount ||
+        tripSource && (expense['id'] as num?)?.toInt() != rootId) {
+      throw const PostingException('Ursprüngliche Mileage-Buchungsgruppe ist unausgeglichen');
+    }
+    return rootId;
+  }
+
+  _MileagePostingRoleSnapshot _mileageRoleSnapshotFromRow(Map<String, Object?> row) {
+    final String role = row['mileage_role_snapshot']?.toString() ?? '';
+    final int? kontoId = (row['konto_id'] as num?)?.toInt();
+    final int? kategorieId = (row['kategorie_id'] as num?)?.toInt();
+    final int? euerLine = (row['mileage_euer_zeile_snapshot'] as num?)?.toInt();
+    final int? historyId = (row['mileage_mapping_history_id_snapshot'] as num?)?.toInt();
+    if ((role != 'travel_expense' && role != 'private_contribution') ||
+        kontoId == null ||
+        kategorieId == null ||
+        euerLine == null ||
+        historyId == null) {
+      throw const PostingException('Mileage-Zuordnungssnapshot ist unvollständig');
+    }
+    return _MileagePostingRoleSnapshot(
+      role: role,
+      kontoId: kontoId,
+      kategorieId: kategorieId,
+      categoryLabel: row['mileage_kategorie_name_snapshot']?.toString() ?? '',
+      categoryArt: row['mileage_kategorie_art_snapshot']?.toString() ?? '',
+      euerLine: euerLine,
+      kontoSkr03: row['mileage_kategorie_skr03_snapshot']?.toString(),
+      kontoSkr04: row['mileage_kategorie_skr04_snapshot']?.toString(),
+      mappingStatus: row['mileage_mapping_status_snapshot']?.toString() ?? '',
+      mappingSourceReference: row['mileage_mapping_source_reference_snapshot']?.toString(),
+      mappingSourceVersion: row['mileage_mapping_source_version_snapshot']?.toString(),
+      mappingHistoryId: historyId,
+    );
+  }
+
+  Future<void> _verifyAppliedMileageCorrection(QueryExecutor query, Map<String, Object?> correction) async {
+    final String id = correction['id']?.toString() ?? '';
+    final String kind = correction['kind']?.toString() ?? '';
+    final String state = kind == 'replace' ? 'corrected' : 'voided';
+    final Map<String, Object?>? source = await _mileageTripRow(query, correction['trip_id'].toString());
+    if (correction['state'] != 'applied' ||
+        correction['accounting_correction_id'] != id ||
+        source == null ||
+        source['state'] != state) {
+      throw const PostingException('Angewendete Mileage-Korrektur ist nicht konsistent');
+    }
+    final List<Map<String, Object?>> rows = await query.runSelect(
+      'SELECT * FROM journal WHERE source_kind = ? AND source_id = ? ORDER BY id',
+      <Object?>[PostingSource.mileageCorrection, id],
+    );
+    final int expected = kind == 'replace' ? 4 : 2;
+    final DateTime? appliedAt = DateTime.tryParse(correction['applied_at']?.toString() ?? '');
+    final Set<String> journalDates = <String>{
+      for (final Map<String, Object?> row in rows) row['datum']?.toString() ?? '',
+    };
+    final String date = journalDates.length == 1 ? journalDates.single : '';
+    if (rows.length != expected ||
+        appliedAt == null ||
+        !appliedAt.isUtc ||
+        date.length != 10 ||
+        DateTime.tryParse(date) == null ||
+        rows.any(
+          (Map<String, Object?> row) =>
+              row['datum'] != date ||
+              (row['immutable'] as num?)?.toInt() != 1 ||
+              (row['legacy_unverified'] as num?)?.toInt() != 0,
+        )) {
+      throw const PostingException('Angewendete Mileage-Korrekturgruppe ist fehlerhaft');
     }
   }
 

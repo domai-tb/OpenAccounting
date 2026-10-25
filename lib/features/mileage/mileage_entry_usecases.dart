@@ -107,7 +107,19 @@ class MileageEntryUseCases {
 
   Future<void> applyCorrection(String correctionId) async {
     _requireText(correctionId, 'correctionId');
-    throw StateError('mileage correction operation unavailable');
+    await repo.applyCorrection(correctionId.trim());
+  }
+
+  Future<String> prepareUndoCorrection({required String sourceTripId, required String reason}) async {
+    _requireText(sourceTripId, 'sourceTripId');
+    _requireText(reason, 'reason');
+    final String correctionId = _newUuidV4();
+    await repo.prepareUndoCorrection(
+      sourceTripId: sourceTripId.trim(),
+      correctionId: correctionId,
+      reason: reason.trim(),
+    );
+    return correctionId;
   }
 
   Future<MileageTrip> editTripFacts(

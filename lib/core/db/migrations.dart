@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 27;
+  static const int currentVersion = 28;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -83,6 +83,19 @@ class MigrationRunner {
     }
     if (version >= 27 && actualTables.contains('tagesabschluesse') && !(await _hasDailyCloseEvidenceSchema())) {
       malformedTables.add('tagesabschluesse');
+    }
+    if (version >= 28 && actualTables.contains('mileage_trip_corrections')) {
+      final List<Map<String, Object?>> correctionGuards = await executor.runSelect(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' "
+        "AND name = 'trg_mileage_correction_update_guard'",
+        const <Object?>[],
+      );
+      if (!_hasExpectedTriggers(correctionGuards, <String, String>{
+        'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
+      })) {
+        malformedTables.add('mileage_trip_corrections');
+      }
+      if (!await _hasMileageCorrectionPostingGuard()) malformedTables.add('mileage_trips');
     }
     malformedTables.sort();
     final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
@@ -593,6 +606,7 @@ class MigrationRunner {
       await _migrateAccountOpeningBalanceSource(allowCreate: true);
       await _migrateDailyCloseEvidence();
       await _migrateAccountHolder();
+      await _migrateMileageCorrectionOperation();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
@@ -753,6 +767,9 @@ class MigrationRunner {
     if (version == 27) {
       await _migrateDailyCloseEvidence();
     }
+    if (version == 28) {
+      await _migrateMileageCorrectionOperation();
+    }
   }
 
   Future<void> _migrateMileageLifecycle() async {
@@ -864,6 +881,349 @@ WHERE state = 'calculated'
     await _verifyMileagePostingSchema();
   }
 
+  Future<void> _migrateMileageCorrectionOperation() async {
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+    await executor.runCustom(_version28MileageTripPostingGuardSql(_mileageLifecycleTriggersSql));
+    await executor.runCustom(_mileageCorrectionUpdateGuardSql());
+    await _verifyMileagePostingSchema(requireCorrectionOperation: true);
+    await _verifyMileageLifecycleSchema(requireCorrectionOperation: true);
+  }
+
+  String _mileageCorrectionJournalProof({required String correctionId, required bool replacementPosted}) {
+    final String replacementState = replacementPosted ? 'posted' : 'calculated';
+    final String replacementEvent = replacementPosted ? 'c.id' : 'NULL';
+    return '''
+EXISTS (
+  SELECT 1 FROM mileage_trip_corrections c
+  JOIN mileage_trips source ON source.id = c.trip_id
+  WHERE c.id = $correctionId
+    AND c.state = 'draft'
+    AND source.state = 'posted'
+    AND source.posting_event_id IS NOT NULL
+    AND trim(source.posting_event_id) <> ''
+    AND (
+      (c.kind = 'replace' AND c.replacement_trip_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM mileage_trips replacement
+          WHERE replacement.id = c.replacement_trip_id
+            AND replacement.state = '$replacementState'
+            AND replacement.posting_event_id IS $replacementEvent
+        ))
+      OR (c.kind = 'void' AND c.replacement_trip_id IS NULL)
+    )
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id)
+      = CASE WHEN c.kind = 'replace' THEN 4 ELSE 2 END
+    AND (SELECT COUNT(DISTINCT j.gruppe_id) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id) = 1
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND j.mileage_role_snapshot = 'travel_expense') = CASE WHEN c.kind = 'replace' THEN 2 ELSE 1 END
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND j.mileage_role_snapshot = 'private_contribution') = CASE WHEN c.kind = 'replace' THEN 2 ELSE 1 END
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND j.reversal_of_group_id IS NOT NULL) = 2
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND j.reversal_of_group_id IS NULL) = CASE WHEN c.kind = 'replace' THEN 2 ELSE 0 END
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND j.id = j.gruppe_id
+        AND j.mileage_role_snapshot = 'travel_expense'
+        AND j.reversal_of_group_id IS NOT NULL) = 1
+    AND (SELECT COUNT(DISTINCT j.datum) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id) = 1
+    AND (SELECT COUNT(*) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id
+        AND (
+          strftime('%Y-%m-%d', j.datum) IS NOT j.datum
+          OR j.beleg_typ IS NOT 'Ausgabe'
+          OR j.immutable IS NOT 1
+          OR j.legacy_unverified IS NOT 0
+          OR j.ust_satz_id IS NOT NULL
+          OR j.ust_satz IS NOT NULL
+          OR j.ust_sonderfall IS NOT NULL
+          OR j.vorsteuer_betrag IS NOT NULL
+          OR j.marge_25a_brutto IS NOT NULL
+          OR j.ust_satz_25a IS NOT NULL
+        )) = 0
+    AND NOT EXISTS (
+      SELECT 1 FROM mileage_posting_period_closures closed
+      JOIN journal j ON j.source_kind = 'mileage_correction' AND j.source_id = c.id
+      WHERE j.datum BETWEEN closed.closed_from AND closed.closed_through
+    )
+    AND coalesce((SELECT SUM(j.soll) FROM journal j
+      WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id), 0)
+      = coalesce((SELECT SUM(j.haben) FROM journal j
+        WHERE j.source_kind = 'mileage_correction' AND j.source_id = c.id), 0)
+    AND (
+      SELECT COUNT(*) FROM journal original
+      WHERE original.reversal_of_group_id IS NULL
+        AND (
+          (original.source_kind = 'mileage_trip' AND original.source_id = source.id)
+          OR (original.source_kind = 'mileage_correction'
+            AND original.source_id = source.posting_event_id)
+        )
+    ) = 2
+    AND (
+      SELECT COUNT(DISTINCT original.gruppe_id) FROM journal original
+      WHERE original.reversal_of_group_id IS NULL
+        AND (
+          (original.source_kind = 'mileage_trip' AND original.source_id = source.id)
+          OR (original.source_kind = 'mileage_correction'
+            AND original.source_id = source.posting_event_id)
+        )
+    ) = 1
+    AND (
+      SELECT COUNT(*) FROM journal original
+      WHERE original.reversal_of_group_id IS NULL
+        AND (
+          (original.source_kind = 'mileage_trip' AND original.source_id = source.id)
+          OR (original.source_kind = 'mileage_correction'
+            AND original.source_id = source.posting_event_id)
+        )
+        AND original.mileage_role_snapshot = 'travel_expense'
+    ) = 1
+    AND (
+      SELECT COUNT(*) FROM journal original
+      WHERE original.reversal_of_group_id IS NULL
+        AND (
+          (original.source_kind = 'mileage_trip' AND original.source_id = source.id)
+          OR (original.source_kind = 'mileage_correction'
+            AND original.source_id = source.posting_event_id)
+        )
+        AND original.mileage_role_snapshot = 'private_contribution'
+    ) = 1
+    AND NOT EXISTS (
+      SELECT 1 FROM journal original
+      WHERE original.reversal_of_group_id IS NULL
+        AND (
+          (original.source_kind = 'mileage_trip' AND original.source_id = source.id)
+          OR (original.source_kind = 'mileage_correction'
+            AND original.source_id = source.posting_event_id)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM journal reversal
+          WHERE reversal.source_kind = 'mileage_correction'
+            AND reversal.source_id = c.id
+            AND reversal.reversal_of_group_id = original.gruppe_id
+            AND reversal.mileage_role_snapshot = original.mileage_role_snapshot
+            AND reversal.konto_id IS original.konto_id
+            AND reversal.kategorie_id IS original.kategorie_id
+            AND reversal.betrag = -original.betrag
+            AND reversal.soll = original.haben
+            AND reversal.haben = original.soll
+            AND reversal.soll_konto_id IS original.haben_konto_id
+            AND reversal.haben_konto_id IS original.soll_konto_id
+            AND reversal.mileage_kategorie_id_snapshot IS original.mileage_kategorie_id_snapshot
+            AND reversal.mileage_kategorie_name_snapshot IS original.mileage_kategorie_name_snapshot
+            AND reversal.mileage_kategorie_art_snapshot IS original.mileage_kategorie_art_snapshot
+            AND reversal.mileage_euer_zeile_snapshot IS original.mileage_euer_zeile_snapshot
+            AND reversal.mileage_kategorie_skr03_snapshot IS original.mileage_kategorie_skr03_snapshot
+            AND reversal.mileage_kategorie_skr04_snapshot IS original.mileage_kategorie_skr04_snapshot
+            AND reversal.mileage_mapping_status_snapshot IS original.mileage_mapping_status_snapshot
+            AND reversal.mileage_mapping_source_reference_snapshot IS original.mileage_mapping_source_reference_snapshot
+            AND reversal.mileage_mapping_source_version_snapshot IS original.mileage_mapping_source_version_snapshot
+            AND reversal.mileage_mapping_history_id_snapshot IS original.mileage_mapping_history_id_snapshot
+        )
+    )
+    AND (
+      c.kind = 'void'
+      OR (
+        (SELECT COUNT(*) FROM journal replacement
+          WHERE replacement.source_kind = 'mileage_correction'
+            AND replacement.source_id = c.id
+            AND replacement.reversal_of_group_id IS NULL) = 2
+        AND (SELECT COUNT(*) FROM journal replacement
+          WHERE replacement.source_kind = 'mileage_correction'
+            AND replacement.source_id = c.id
+            AND replacement.reversal_of_group_id IS NULL
+            AND replacement.gruppe_id = (
+              SELECT root.gruppe_id FROM journal root
+              WHERE root.source_kind = 'mileage_correction'
+                AND root.source_id = c.id
+                AND root.mileage_role_snapshot = 'travel_expense'
+                AND root.reversal_of_group_id IS NOT NULL
+              LIMIT 1
+            )) = 2
+        AND NOT EXISTS (
+          SELECT 1 FROM journal replacement
+          LEFT JOIN konten account ON account.id = replacement.konto_id
+          LEFT JOIN kategorien category ON category.id = replacement.kategorie_id
+          LEFT JOIN category_mapping_history history ON history.id = (
+            SELECT MAX(history2.id) FROM category_mapping_history history2
+            WHERE history2.kategorie_id = replacement.kategorie_id
+          )
+          WHERE replacement.source_kind = 'mileage_correction'
+            AND replacement.source_id = c.id
+            AND replacement.reversal_of_group_id IS NULL
+            AND (
+              replacement.datum <> substr(
+                (SELECT reversal.datum FROM journal reversal
+                  WHERE reversal.source_kind = 'mileage_correction'
+                    AND reversal.source_id = c.id
+                    AND reversal.mileage_role_snapshot = 'travel_expense'
+                    AND reversal.reversal_of_group_id IS NOT NULL LIMIT 1), 1, 10)
+              OR replacement.gruppe_id IS NOT (
+                SELECT root.gruppe_id FROM journal root
+                WHERE root.source_kind = 'mileage_correction'
+                  AND root.source_id = c.id
+                  AND root.mileage_role_snapshot = 'travel_expense'
+                  AND root.reversal_of_group_id IS NOT NULL LIMIT 1)
+              OR replacement.mileage_role_snapshot NOT IN ('travel_expense', 'private_contribution')
+              OR replacement.konto_id IS NULL
+              OR replacement.kategorie_id IS NULL
+              OR account.kontoart IS NOT 'Sachkonto'
+              OR category.aktiv IS NOT 1
+              OR NOT EXISTS (
+                SELECT 1 FROM mileage_posting_account_mapping mapping
+                WHERE mapping.role = replacement.mileage_role_snapshot
+                  AND mapping.konto_id = replacement.konto_id
+                  AND mapping.kategorie_id = replacement.kategorie_id
+              )
+              OR replacement.immutable IS NOT 1
+              OR replacement.legacy_unverified IS NOT 0
+              OR replacement.mileage_kategorie_id_snapshot IS NOT replacement.kategorie_id
+              OR replacement.mileage_kategorie_name_snapshot IS NOT category.bezeichnung
+              OR replacement.mileage_kategorie_art_snapshot IS NOT category.art
+              OR replacement.mileage_euer_zeile_snapshot IS NOT category.euer_zeile
+              OR replacement.mileage_kategorie_skr03_snapshot IS NOT category.konto_skr03
+              OR replacement.mileage_kategorie_skr04_snapshot IS NOT category.konto_skr04
+              OR replacement.mileage_mapping_status_snapshot IS NOT category.mapping_status
+              OR replacement.mileage_mapping_source_reference_snapshot IS NOT category.catalog_source_reference
+              OR replacement.mileage_mapping_source_version_snapshot IS NOT category.catalog_source_version
+              OR replacement.mileage_mapping_history_id_snapshot IS NOT history.id
+              OR coalesce(trim(replacement.mileage_kategorie_name_snapshot), '') = ''
+              OR replacement.mileage_mapping_status_snapshot NOT IN ('catalog_verified', 'user_confirmed')
+              OR (replacement.mileage_mapping_status_snapshot = 'catalog_verified'
+                AND (coalesce(trim(replacement.mileage_mapping_source_reference_snapshot), '') = ''
+                  OR coalesce(trim(replacement.mileage_mapping_source_version_snapshot), '') = ''))
+              OR replacement.mileage_mapping_history_id_snapshot IS NULL
+              OR replacement.mileage_mapping_history_id_snapshot <= 0
+              OR (coalesce(trim(replacement.mileage_kategorie_skr03_snapshot), '') = ''
+                AND coalesce(trim(replacement.mileage_kategorie_skr04_snapshot), '') = '')
+              OR (replacement.mileage_role_snapshot = 'travel_expense'
+                AND (lower(replacement.mileage_kategorie_art_snapshot) <> 'ausgabe'
+                  OR replacement.mileage_euer_zeile_snapshot <> 71
+                  OR replacement.soll <> (SELECT amount.calculated_amount FROM mileage_trips amount
+                    WHERE amount.id = c.replacement_trip_id)
+                  OR replacement.haben <> 0
+                  OR replacement.betrag <> (SELECT amount.calculated_amount FROM mileage_trips amount
+                    WHERE amount.id = c.replacement_trip_id)
+                  OR replacement.soll_konto_id IS NOT replacement.konto_id
+                  OR replacement.haben_konto_id IS NOT NULL))
+              OR (replacement.mileage_role_snapshot = 'private_contribution'
+                AND (lower(replacement.mileage_kategorie_art_snapshot) <> 'einnahme'
+                  OR replacement.mileage_euer_zeile_snapshot <> 107
+                  OR replacement.soll <> 0
+                  OR replacement.haben <> (SELECT amount.calculated_amount FROM mileage_trips amount
+                    WHERE amount.id = c.replacement_trip_id)
+                  OR replacement.betrag <> -(SELECT amount.calculated_amount FROM mileage_trips amount
+                    WHERE amount.id = c.replacement_trip_id)
+                  OR replacement.soll_konto_id IS NOT NULL
+                  OR replacement.haben_konto_id IS NOT replacement.konto_id))
+            )
+        )
+        AND (SELECT COUNT(*) FROM journal replacement
+          WHERE replacement.source_kind = 'mileage_correction'
+            AND replacement.source_id = c.id
+            AND replacement.reversal_of_group_id IS NULL
+            AND replacement.mileage_role_snapshot = 'travel_expense') = 1
+        AND (SELECT COUNT(*) FROM journal replacement
+          WHERE replacement.source_kind = 'mileage_correction'
+            AND replacement.source_id = c.id
+            AND replacement.reversal_of_group_id IS NULL
+            AND replacement.mileage_role_snapshot = 'private_contribution') = 1
+      )
+    )
+)''';
+  }
+
+  String _mileageCorrectionUpdateGuardSql() =>
+      '''
+CREATE TRIGGER IF NOT EXISTS trg_mileage_correction_update_guard
+BEFORE UPDATE ON mileage_trip_corrections
+WHEN OLD.state <> 'draft'
+  OR NEW.id IS NOT OLD.id
+  OR NEW.trip_id IS NOT OLD.trip_id
+  OR NEW.kind IS NOT OLD.kind
+  OR NEW.replacement_trip_id IS NOT OLD.replacement_trip_id
+  OR NEW.created_at IS NOT OLD.created_at
+  OR NEW.state NOT IN ('draft', 'applied', 'cancelled')
+  OR (NEW.state IN ('draft', 'cancelled')
+    AND (NEW.accounting_correction_id IS NOT NULL OR NEW.applied_at IS NOT NULL))
+  OR (NEW.state = 'applied' AND (
+    NEW.accounting_correction_id IS NOT NEW.id
+    OR NEW.applied_at IS NULL
+    OR trim(NEW.applied_at) = ''
+    OR length(NEW.applied_at) < 10
+    OR strftime('%Y-%m-%d', substr(NEW.applied_at, 1, 10)) IS NOT substr(NEW.applied_at, 1, 10)
+    OR NOT EXISTS (
+      SELECT 1 FROM mileage_trips source
+      WHERE source.id = NEW.trip_id AND source.state = 'posted'
+        AND source.posting_event_id IS NOT NULL AND trim(source.posting_event_id) <> ''
+    )
+    OR (NEW.kind = 'replace' AND NOT EXISTS (
+      SELECT 1 FROM mileage_trips replacement
+      WHERE replacement.id = NEW.replacement_trip_id
+        AND replacement.state = 'posted'
+        AND replacement.posting_event_id IS NEW.id
+    ))
+    OR (NEW.kind = 'void' AND NEW.replacement_trip_id IS NOT NULL)
+    OR NOT ${_mileageCorrectionJournalProof(correctionId: 'NEW.id', replacementPosted: true)}
+    OR EXISTS (
+      SELECT 1 FROM journal j
+      WHERE j.source_kind = 'mileage_correction'
+        AND j.source_id = NEW.id
+        AND j.datum IS NOT date(NEW.applied_at, 'localtime')
+    )
+  ))
+BEGIN
+  SELECT RAISE(ABORT, 'mileage correction requires one matching atomic reversal and replacement group');
+END
+''';
+
+  String _version28MileageTripPostingGuardSql(List<String> lifecycleTriggers) {
+    final String legacyGuard = lifecycleTriggers.singleWhere(
+      (String trigger) => trigger.contains('CREATE TRIGGER IF NOT EXISTS trg_mileage_trip_posting_guard'),
+    );
+    const String startMarker =
+        "    OR (SELECT COUNT(*) FROM journal j\n        WHERE j.source_kind = 'mileage_trip' AND j.source_id = NEW.id) <> 2";
+    const String endMarker = '\n  )\nBEGIN';
+    final int groupStart = legacyGuard.indexOf(startMarker);
+    final int groupEnd = legacyGuard.indexOf(endMarker, groupStart);
+    if (groupStart < 0 || groupEnd < 0) {
+      throw StateError('Version 25 mileage posting guard cannot be upgraded safely');
+    }
+    final String legacyGroupFailure = legacyGuard
+        .substring(groupStart, groupEnd)
+        .replaceFirst(RegExp(r'^\s*OR\s+'), '');
+    final String correctionGroupProof =
+        '''
+EXISTS (
+  SELECT 1 FROM mileage_trip_corrections correction
+  WHERE correction.id = NEW.posting_event_id
+    AND correction.kind = 'replace'
+    AND correction.replacement_trip_id = NEW.id
+    AND correction.state = 'draft'
+)
+AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', replacementPosted: false)}
+''';
+    final String guardedGroupFailure =
+        '''
+    OR (
+      ($legacyGroupFailure)
+      AND NOT (
+        $correctionGroupProof
+      )
+    )
+''';
+    return legacyGuard.replaceRange(groupStart, groupEnd, guardedGroupFailure.trimRight());
+  }
+
   Future<void> _migrateAccountOpeningBalanceSource({bool allowCreate = false}) async {
     if (!allowCreate && !(await _hasAccountOpeningBalanceSourceTable())) {
       throw StateError('account_opening_balance_sources is required from schema version 26; refusing to recreate it');
@@ -931,12 +1291,15 @@ WHERE state = 'calculated'
     });
   }
 
-  Future<void> _verifyMileagePostingSchema() async {
+  Future<void> _verifyMileagePostingSchema({bool requireCorrectionOperation = false}) async {
     if (!await _hasMileagePostingMappingConstraints() || !await _hasMileagePostingPeriodClosureConstraints()) {
       throw StateError('Mileage-Kontenzuordnung konnte nicht verifiziert werden');
     }
     if (!await _hasMileagePostingJournalSnapshots() || !await _hasMileageTripPostingGuard()) {
       throw StateError('Mileage-Journal-Snapshots konnten nicht verifiziert werden');
+    }
+    if (requireCorrectionOperation && !await _hasMileageCorrectionPostingGuard()) {
+      throw StateError('Mileage correction posting guard could not be verified');
     }
   }
 
@@ -1032,9 +1395,21 @@ WHERE state = 'calculated'
         sql.contains('count(*)');
   }
 
+  Future<bool> _hasMileageCorrectionPostingGuard() async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' "
+      "AND name IN ('trg_mileage_trip_posting_guard', 'trg_mileage_correction_update_guard')",
+      const <Object?>[],
+    );
+    return _hasExpectedTriggers(rows, <String, String>{
+      'trg_mileage_trip_posting_guard': _version28MileageTripPostingGuardSql(_mileageLifecycleTriggersSql),
+      'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
+    });
+  }
+
   Future<bool> _mileagePostingNeedsRepair() async {
     try {
-      await _verifyMileagePostingSchema();
+      await _verifyMileagePostingSchema(requireCorrectionOperation: await getUserVersion() >= 28);
       return false;
     } catch (_) {
       return true;
@@ -1043,14 +1418,14 @@ WHERE state = 'calculated'
 
   Future<bool> _mileageLifecycleNeedsRepair() async {
     try {
-      await _verifyMileageLifecycleSchema();
+      await _verifyMileageLifecycleSchema(requireCorrectionOperation: await getUserVersion() >= 28);
       return false;
     } catch (_) {
       return true;
     }
   }
 
-  Future<void> _verifyMileageLifecycleSchema() async {
+  Future<void> _verifyMileageLifecycleSchema({bool requireCorrectionOperation = false}) async {
     final List<Map<String, Object?>> columns = await executor.runSelect(
       'PRAGMA table_info(mileage_trips)',
       const <Object?>[],
@@ -1069,15 +1444,24 @@ WHERE state = 'calculated'
       throw StateError('Mileage lifecycle triggers could not be verified');
     }
     final List<Map<String, Object?>> correctionGuards = await executor.runSelect(
-      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_update_guard'",
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_update_guard'",
       const <Object?>[],
     );
     if (correctionGuards.length != 1) {
-      throw StateError('Mileage correction posting remains fail-closed until its accounting operation is wired');
+      throw StateError('Mileage correction update guard could not be verified');
     }
-    final String correctionGuardSql = correctionGuards.single['sql']?.toString().toLowerCase() ?? '';
-    if (!correctionGuardSql.replaceAll(RegExp(r'\s+'), ' ').contains("or new.state = 'applied'")) {
-      throw StateError('Mileage correction posting remains fail-closed until its accounting operation is wired');
+    if (requireCorrectionOperation) {
+      if (!_hasExpectedTriggers(correctionGuards, <String, String>{
+        'trg_mileage_correction_update_guard': _mileageCorrectionUpdateGuardSql(),
+      })) {
+        throw StateError('Mileage correction operation guard could not be verified');
+      }
+    } else {
+      final String correctionGuardSql = correctionGuards.single['sql']?.toString().toLowerCase() ?? '';
+      final String normalizedGuard = correctionGuardSql.replaceAll(RegExp(r'\s+'), ' ');
+      if (!normalizedGuard.contains("or new.state = 'applied'")) {
+        throw StateError('Legacy mileage correction guard could not be verified');
+      }
     }
   }
 
@@ -1135,6 +1519,7 @@ WHERE state = 'calculated'
       await _migrateMileagePosting();
       await _migrateAccountOpeningBalanceSource();
       await _migrateDailyCloseEvidence();
+      await _migrateMileageCorrectionOperation();
       await _runFeatureDdlCallback(callback);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);

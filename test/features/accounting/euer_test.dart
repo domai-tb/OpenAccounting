@@ -643,6 +643,75 @@ END''');
           .cast<String, Object?>();
       expect(editedSource, firstSnapshot);
     });
+    test('correction EÜR reverses the original in the correction year and posts its replacement once', () async {
+      await configureMapping();
+      final MileageTrip source = await createCalculatedTrip();
+      await mileageUseCases.postTrip(source.id);
+
+      final EuerResult originalYearBefore = await mileageEuer.generate(jahr: 2025);
+      expect(originalYearBefore.zeile(71), '3.00');
+      expect(originalYearBefore.zeile(107), '3.00');
+
+      final ({String correctionId, MileageTrip replacementTrip}) prepared = await mileageUseCases
+          .prepareReplacementCorrection(
+            sourceTripId: source.id,
+            reason: 'Korrigierte Strecke',
+            tripDate: '2025-06-12',
+            purpose: 'Korrigierter Kundenbesuch',
+            distanceHundredthsKm: 2000,
+            businessContext: 'Testprojekt',
+            tripKind: MileageTripKind.businessTrip,
+            vehicleSource: MileageVehicleSource.private,
+            vehicleClass: MileageVehicleClass.kraftwagen,
+          );
+      await mileageUseCases.calculateTrip(prepared.replacementTrip.id);
+
+      final DateTime correctionInstantUtc = DateTime.utc(2026, 12, 31, 23, 30);
+      expect(correctionInstantUtc.toLocal().year, 2027);
+      final List<Map<String, Object?>> localDateRows = await db.executor.runSelect(
+        "SELECT date(?, 'localtime') AS business_date",
+        <Object?>[correctionInstantUtc.toIso8601String()],
+      );
+      expect(localDateRows.single['business_date'], '2027-01-01');
+      mileageRepository = MileageEntryRepository(db.executor, now: () => correctionInstantUtc);
+      mileageUseCases = MileageEntryUseCases(mileageRepository);
+      await mileageUseCases.applyCorrection(prepared.correctionId);
+      await mileageUseCases.applyCorrection(prepared.correctionId);
+      final List<Map<String, Object?>> appliedRows = await db.executor.runSelect(
+        'SELECT applied_at FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[prepared.correctionId],
+      );
+      expect(appliedRows.single['applied_at'], '2026-12-31T23:30:00.000Z');
+
+      final EuerResult originalYearAfter = await mileageEuer.generate(jahr: 2025);
+      expect(originalYearAfter.zeile(71), '3.00');
+      expect(originalYearAfter.zeile(107), '3.00');
+      final int correctionYear = correctionInstantUtc.toLocal().year;
+      final EuerResult correctionYearReport = await mileageEuer.generate(jahr: correctionYear);
+      expect(correctionYearReport.zeile(71), '3.00');
+      expect(correctionYearReport.zeile(107), '3.00');
+      expect(correctionYearReport.gewinn, '-3.00');
+
+      final List<Map<String, Object?>> correctionRows = await db.executor.runSelect(
+        'SELECT id, state, accounting_correction_id FROM mileage_trip_corrections WHERE id = ?',
+        <Object?>[prepared.correctionId],
+      );
+      expect(correctionRows.single['state'], 'applied');
+      expect(correctionRows.single['accounting_correction_id'], isNotNull);
+      final List<Map<String, Object?>> correctionLegs = await db.executor.runSelect(
+        'SELECT source_kind, source_id, datum, soll, haben FROM journal '
+        'WHERE source_kind = ? AND source_id = ? ORDER BY id',
+        <Object?>['mileage_correction', prepared.correctionId],
+      );
+      expect(correctionLegs, hasLength(4));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['source_kind']), everyElement('mileage_correction'));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['source_id']), everyElement(prepared.correctionId));
+      expect(correctionLegs.map((Map<String, Object?> row) => row['datum']), everyElement('2027-01-01'));
+      expect(
+        correctionLegs.map((Map<String, Object?> row) => (row['datum']! as String).substring(0, 4)),
+        everyElement('$correctionYear'),
+      );
+    });
   });
 
   test('test_proportional_cent_equal_remainders_use_stable_key', () {

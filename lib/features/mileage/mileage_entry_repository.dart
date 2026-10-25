@@ -6,7 +6,9 @@ import 'package:openaccounting/features/mileage/mileage_entry_entity.dart';
 /// Mileage repository — raw SQL via drift executor, no codegen.
 /// shortcut: migration disabled until portability/export accept inventory, tests call ensureTablesForTests only.
 class MileageEntryRepository implements MileagePostingPort {
-  MileageEntryRepository(this.executor);
+  MileageEntryRepository(this.executor, {DateTime Function()? now}) : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
 
   @override
   Future<String> postExpense(MileageTrip trip) {
@@ -157,6 +159,42 @@ CREATE TABLE IF NOT EXISTS mileage_trip_corrections (
       } catch (_) {}
       Error.throwWithStackTrace(error, stackTrace);
     }
+  }
+
+  Future<void> prepareUndoCorrection({
+    required String sourceTripId,
+    required String correctionId,
+    required String reason,
+  }) async {
+    final TransactionExecutor transaction = executor.beginTransaction();
+    try {
+      await transaction.ensureOpen(_NoopTransactionUser());
+      final List<Map<String, Object?>> sourceRows = await transaction.runSelect(
+        'SELECT state, posting_event_id FROM mileage_trips WHERE id = ?',
+        <Object?>[sourceTripId],
+      );
+      if (sourceRows.isEmpty) throw StateError('not found');
+      if (sourceRows.single['state'] != MileageTripState.posted.name ||
+          (sourceRows.single['posting_event_id']?.toString().trim().isNotEmpty ?? false) == false) {
+        throw StateError('not posted');
+      }
+      await transaction.runInsert(
+        'INSERT INTO mileage_trip_corrections '
+        '(id, trip_id, kind, replacement_trip_id, reason, state, accounting_correction_id, created_at, applied_at) '
+        'VALUES (?, ?, ?, NULL, ?, ?, NULL, ?, NULL)',
+        <Object?>[correctionId, sourceTripId, 'void', reason.trim(), 'draft', DateTime.now().toUtc().toIso8601String()],
+      );
+      await transaction.send();
+    } catch (error, stackTrace) {
+      try {
+        await transaction.rollback();
+      } catch (_) {}
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> applyCorrection(String correctionId) {
+    return PostingGroupService(executor, now: _now).applyMileageCorrection(correctionId: correctionId);
   }
 
   Future<List<MileageTrip>> listTrips() async {

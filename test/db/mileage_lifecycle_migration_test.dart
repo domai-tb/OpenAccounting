@@ -33,7 +33,7 @@ void main() {
         const <Object?>[],
       );
       expect(triggers, hasLength(16));
-      expect(await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(), 25);
+      expect(await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(), 28);
     });
 
     test('v22 migration demotes unknown calculated facts and preserves posted facts', () async {
@@ -108,7 +108,7 @@ INSERT INTO mileage_trips (
       expect(migratedCalculated['calculated_amount'], isNull);
       expect(migratedCalculated['calculated_at'], isNull);
       expect(migratedCalculated['posting_event_id'], isNull);
-      expect(await runner.getUserVersion(), 25);
+      expect(await runner.getUserVersion(), 28);
     });
 
     test('v23 correction demotes unknown calculations and refreshes snapshot guards', () async {
@@ -175,7 +175,7 @@ INSERT INTO mileage_trips (
       ]) {
         expect(triggerSql, contains('NEW.$field IS NULL'));
       }
-      expect(await runner.getUserVersion(), 25);
+      expect(await runner.getUserVersion(), 28);
     });
 
     test('v24 upgrade adds mileage mapping snapshots and preserves existing ledger rows', () async {
@@ -203,6 +203,7 @@ INSERT INTO mileage_trips (
 )''');
 
       await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
       await db.executor.runCustom('DROP TABLE mileage_posting_account_mapping');
       await db.executor.runCustom('DROP TABLE IF EXISTS mileage_posting_period_closures');
       const List<String> v25Columns = <String>[
@@ -246,7 +247,7 @@ INSERT INTO mileage_trips (
 
       final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       expect(await runner.run(createSchema: () async {}), isTrue);
-      expect(await runner.getUserVersion(), 25);
+      expect(await runner.getUserVersion(), 28);
 
       final List<Map<String, Object?>> accountRows = await db.executor.runSelect(
         'SELECT id, name, kontoart FROM konten WHERE id = ?',
@@ -323,28 +324,125 @@ INSERT INTO mileage_trips (
       expect((closureRows.single['row_count']! as num).toInt(), 0);
     });
 
-    test('current v25 repair replaces an old permissive correction trigger', () async {
-      await db.executor.runCustom('DROP TRIGGER trg_mileage_correction_update_guard');
+    test('v27-to-v28 correction migration preserves existing trip and journal rows', () async {
+      final int categoryId = await db.executor.runInsert(
+        'INSERT INTO kategorien (bezeichnung, euer_zeile) VALUES (?, ?)',
+        const <Object?>['Legacy v27 category', 12],
+      );
+      final int journalId = await db.executor.runInsert(
+        'INSERT INTO journal (datum, beschreibung, kategorie_id, betrag, beleg_typ, immutable) '
+        'VALUES (?, ?, ?, ?, ?, 0)',
+        <Object?>['2026-10-01', 'Legacy v27 journal row', categoryId, '17.00', 'Einnahme'],
+      );
+      await db.executor.runCustom('''
+INSERT INTO mileage_trips (
+  id, trip_date, purpose, business_context, trip_kind, vehicle_source, vehicle_class,
+  distance_hundredths_km, state, created_at, updated_at
+) VALUES (
+  'v27-existing-trip', '2026-10-02', 'Legacy trip', 'Legacy project',
+  'business_trip', 'private', 'kraftwagen', 1000, 'unresolved',
+  '2026-10-02T12:00:00Z', '2026-10-02T12:00:00Z'
+)''');
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
       await db.executor.runCustom('''
 CREATE TRIGGER trg_mileage_correction_update_guard
 BEFORE UPDATE ON mileage_trip_corrections
-WHEN 0
+WHEN OLD.state <> 'draft' OR NEW.state = 'applied'
 BEGIN
-  SELECT RAISE(ABORT, 'old correction guard');
+  SELECT RAISE(ABORT, 'v27 fail-closed correction guard');
 END''');
+      await db.executor.runCustom('PRAGMA user_version = 27');
 
       final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       expect(await runner.run(createSchema: () async {}), isTrue);
+      expect(await runner.getUserVersion(), 28);
 
-      final List<Map<String, Object?>> triggers = await db.executor.runSelect(
+      final List<Map<String, Object?>> tripRows = await db.executor.runSelect(
+        'SELECT id, trip_date, purpose, business_context, distance_hundredths_km, state, posting_event_id '
+        'FROM mileage_trips WHERE id = ?',
+        const <Object?>['v27-existing-trip'],
+      );
+      expect(tripRows.single, <String, Object?>{
+        'id': 'v27-existing-trip',
+        'trip_date': '2026-10-02',
+        'purpose': 'Legacy trip',
+        'business_context': 'Legacy project',
+        'distance_hundredths_km': 1000,
+        'state': 'unresolved',
+        'posting_event_id': null,
+      });
+      final List<Map<String, Object?>> journalRows = await db.executor.runSelect(
+        'SELECT id, datum, beschreibung, kategorie_id, betrag, beleg_typ FROM journal WHERE id = ?',
+        <Object?>[journalId],
+      );
+      expect(journalRows.single, <String, Object?>{
+        'id': journalId,
+        'datum': '2026-10-01',
+        'beschreibung': 'Legacy v27 journal row',
+        'kategorie_id': categoryId,
+        'betrag': 17.0,
+        'beleg_typ': 'Einnahme',
+      });
+      final List<Map<String, Object?>> correctionGuards = await db.executor.runSelect(
         "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_correction_update_guard'",
         const <Object?>[],
       );
-      expect(triggers, hasLength(1));
-      expect(triggers.single['sql'].toString().toLowerCase(), contains("or new.state = 'applied'"));
+      expect(correctionGuards, hasLength(1));
+      expect(correctionGuards.single['sql'].toString().toLowerCase(), contains('mileage_correction'));
+      final List<Map<String, Object?>> tripPostingGuards = await db.executor.runSelect(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_mileage_trip_posting_guard'",
+        const <Object?>[],
+      );
+      expect(tripPostingGuards, hasLength(1));
+      expect(tripPostingGuards.single['sql'].toString().toLowerCase(), contains('mileage_correction'));
+      expect(tripPostingGuards.single['sql'].toString().toLowerCase(), contains('reversal_of_group_id'));
     });
 
-    test('current v25 startup fails closed when required mileage configuration tables are missing', () async {
+    test('current v28 repair replaces marker-retaining weakened correction guards', () async {
+      await db.executor.runCustom('DROP TRIGGER trg_mileage_correction_update_guard');
+      await db.executor.runCustom('DROP TRIGGER trg_mileage_trip_posting_guard');
+      await db.executor.runCustom('''
+CREATE TRIGGER trg_mileage_correction_update_guard
+BEFORE UPDATE ON mileage_trip_corrections
+WHEN 0 /* new.accounting_correction_id is not new.id reversal_of_group_id source_kind = 'mileage_correction' marker-only-weakened-trigger */
+BEGIN
+  SELECT RAISE(ABORT, 'weakened correction guard');
+END''');
+      await db.executor.runCustom('''
+CREATE TRIGGER trg_mileage_trip_posting_guard
+BEFORE UPDATE ON mileage_trips
+WHEN 0 /* mileage_correction reversal_of_group_id new.posting_event_id mileage_posting_period_closures mileage_kategorie_id_snapshot mileage_euer_zeile_snapshot source_kind count(*) marker-only-weakened-trigger */
+BEGIN
+  SELECT RAISE(ABORT, 'weakened posting guard');
+END''');
+
+      final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
+      final SchemaHealthReport weakenedHealth = await runner.inspectSchemaHealth();
+      expect(weakenedHealth.isHealthy, isFalse);
+      expect(weakenedHealth.malformedTables, containsAll(<String>['mileage_trips', 'mileage_trip_corrections']));
+      expect(await runner.run(createSchema: () async {}), isTrue);
+      final SchemaHealthReport repairedHealth = await runner.inspectSchemaHealth();
+      expect(repairedHealth.malformedTables, isNot(contains('mileage_trips')));
+      expect(repairedHealth.malformedTables, isNot(contains('mileage_trip_corrections')));
+
+      final List<Map<String, Object?>> triggers = await db.executor.runSelect(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name IN (?, ?)",
+        const <Object?>['trg_mileage_correction_update_guard', 'trg_mileage_trip_posting_guard'],
+      );
+      expect(triggers, hasLength(2));
+      final Map<String, String> triggerSql = <String, String>{
+        for (final Map<String, Object?> trigger in triggers)
+          trigger['name'].toString(): trigger['sql'].toString().toLowerCase(),
+      };
+      final String correctionSql = triggerSql['trg_mileage_correction_update_guard']!.replaceAll(RegExp(r'\\s+'), ' ');
+      final String postingSql = triggerSql['trg_mileage_trip_posting_guard']!.replaceAll(RegExp(r'\\s+'), ' ');
+      expect(correctionSql, isNot(contains('marker-only-weakened-trigger')));
+      expect(correctionSql, contains('reversal.reversal_of_group_id = original.gruppe_id'));
+      expect(postingSql, isNot(contains('marker-only-weakened-trigger')));
+      expect(postingSql, contains('reversal.reversal_of_group_id = original.gruppe_id'));
+    });
+
+    test('current v28 startup fails closed when required mileage configuration tables are missing', () async {
       final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       final List<Object> startupErrors = <Object>[];
       final List<String> recreatedTables = <String>[];
