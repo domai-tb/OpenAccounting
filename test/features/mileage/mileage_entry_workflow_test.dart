@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:openaccounting/core/app_scope.dart';
 import 'package:openaccounting/core/app_services.dart';
+import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/features/bank_import/bank_import_page.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 
@@ -1462,7 +1463,7 @@ END''');
       expect(retryPostingRows, hasLength(2));
     });
 
-    testWidgets('mileage posting role settings save explicit eligible pairs', (tester) async {
+    testWidgets('mileage posting role settings save explicit eligible pairs through production route', (tester) async {
       final AppServices services = AppServices(db);
       final BankAccount expenseAccount = await services.bankAccounts.create(
         name: 'Mileage travel ledger',
@@ -1480,22 +1481,34 @@ END''');
         euerLine: 107,
       );
       await insertCategory(label: 'Unrelated category', art: 'ausgabe', euerLine: 70);
+      final List<Map<String, Object?>> companyRows = await db.executor.runSelect(
+        'SELECT id FROM unternehmen LIMIT 1',
+        const <Object?>[],
+      );
+      if (companyRows.isEmpty) {
+        await db.executor.runInsert('INSERT INTO unternehmen (name) VALUES (?)', const <Object?>['Test GmbH']);
+      }
+      final router = createRouter(db);
 
       await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: MileageEntryWorkspace(
-              useCases: useCases,
-              bankAccounts: services.bankAccounts,
-              categoryWorkspace: services.categoryWorkspace,
+        ProviderScope(
+          overrides: [appDatabaseProvider.overrideWithValue(db)],
+          child: AppScope(
+            services: services,
+            child: MaterialApp.router(
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              routerConfig: router,
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
+      router.go('/banking?view=mileage');
+      await tester.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, '/banking');
+      expect(router.routeInformationProvider.value.uri.queryParameters['view'], 'mileage');
 
       final Finder settingsToggle = find.byKey(const ValueKey<String>('mileage-role-settings-toggle'));
       await tester.tap(settingsToggle);

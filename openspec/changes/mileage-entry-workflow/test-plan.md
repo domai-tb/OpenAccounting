@@ -133,9 +133,9 @@ The final focused workflow file run passed 19 tests on 2026-10-22, and the focus
 
 | Test file | Test | Evidence |
 |---|---|---|
-| `test/features/mileage/mileage_entry_workflow_test.dart` | `mileage posting role settings save explicit eligible pairs` | GREEN — confirms saving begins disabled with no configured roles, excludes Girokonto and the wrong EÜR line, saves both explicit role pairs, and verifies persisted selections |
+| `test/features/mileage/mileage_entry_workflow_test.dart` | `mileage posting role settings save explicit eligible pairs through production route` | GREEN — builds the production router with `createRouter`, navigates to `/banking?view=mileage`, then verifies service-backed options, disabled-until-configured save, eligibility filters, and persisted role pairs |
 
-The workspace loads options through `AppServices` use cases and delegates the atomic role save through the mileage use case. This test is outside the 65-scenario contract matrix. The focused 36-test workflow/router command passed on 2026-10-24. The independent review approved this slice after the test-plan checkpoint label was corrected; scoped analysis, formatting, and diff checks are recorded in `verify.md`.
+The workspace loads options through `AppServices` use cases and delegates the atomic role save through the mileage use case. This test is outside the 65-scenario contract matrix. The 2026-10-25 route follow-up drives the production `/banking?view=mileage` route through `createRouter` and records its red/green evidence in `verify.md`. The earlier focused 36-test workflow/router command passed on 2026-10-24. The independent review approved the earlier role-settings UI slice after the test-plan checkpoint label was corrected; scoped analysis, formatting, and diff checks are recorded in `verify.md`.
 
 ## 2026-10-24 user-facing Sachkonto creation (runtime green; independently approved)
 

@@ -191,11 +191,13 @@ class _BankImportPageState extends ConsumerState<BankImportPage> {
     return BankingUseCase(ref.read(appDatabaseProvider).executor);
   }
 
-  MileageEntryUseCases get _mileage {
+  AppServices get _services {
     final AppScope? scope = AppScope.maybeOf(context);
-    if (scope != null) return scope.services.mileageEntry;
-    return ref.read(appServicesProvider).mileageEntry;
+    if (scope != null) return scope.services;
+    return ref.read(appServicesProvider);
   }
+
+  MileageEntryUseCases get _mileage => _services.mileageEntry;
 
   @override
   void initState() {
@@ -2057,7 +2059,11 @@ LIMIT 100
     );
   }
 
-  Widget _buildMileageView() => MileageEntryWorkspace(useCases: _mileage);
+  Widget _buildMileageView() => MileageEntryWorkspace(
+    useCases: _mileage,
+    bankAccounts: _services.bankAccounts,
+    categoryWorkspace: _services.categoryWorkspace,
+  );
 
   @override
   Widget build(BuildContext context) {
