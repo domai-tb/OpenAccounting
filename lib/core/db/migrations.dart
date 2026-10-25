@@ -445,11 +445,7 @@ class MigrationRunner {
       return false;
     }
 
-    return MigrationRunner._hasExpectedTriggers(triggers, <String, String>{
-      'account_opening_balance_sources_no_update': _accountOpeningBalanceSourceTriggersSql[0],
-      'account_opening_balance_sources_no_delete': _accountOpeningBalanceSourceTriggersSql[1],
-      'account_opening_balance_sources_no_replace': _accountOpeningBalanceSourceTriggersSql[2],
-    });
+    return MigrationRunner._hasExpectedTriggers(triggers, _accountOpeningBalanceSourceTriggersSql);
   }
 
   Future<bool> hasAnyTables() async {
@@ -881,10 +877,10 @@ WHERE state = 'calculated'
     }
 
     await executor.runCustom(_accountOpeningBalanceSourcesTableSql);
-    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_update');
-    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_delete');
-    await executor.runCustom('DROP TRIGGER IF EXISTS account_opening_balance_sources_no_replace');
-    for (final String trigger in _accountOpeningBalanceSourceTriggersSql) {
+    for (final String triggerName in _accountOpeningBalanceSourceTriggersSql.keys) {
+      await executor.runCustom('DROP TRIGGER IF EXISTS "$triggerName"');
+    }
+    for (final String trigger in _accountOpeningBalanceSourceTriggersSql.values) {
       await executor.runCustom(trigger);
     }
     if (!await _hasAccountOpeningBalanceSourceSchema()) {
@@ -2717,22 +2713,22 @@ CREATE TABLE IF NOT EXISTS account_opening_balance_sources (
   UNIQUE (source_reference)
 )''';
 
-const List<String> _accountOpeningBalanceSourceTriggersSql = <String>[
-  '''
+const Map<String, String> _accountOpeningBalanceSourceTriggersSql = <String, String>{
+  'account_opening_balance_sources_no_update': '''
 CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_update
 BEFORE UPDATE ON account_opening_balance_sources
 BEGIN
   SELECT RAISE(ABORT, 'account opening sources are immutable');
 END
 ''',
-  '''
+  'account_opening_balance_sources_no_delete': '''
 CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_delete
 BEFORE DELETE ON account_opening_balance_sources
 BEGIN
   SELECT RAISE(ABORT, 'account opening sources are immutable');
 END
 ''',
-  '''
+  'account_opening_balance_sources_no_replace': '''
 CREATE TRIGGER IF NOT EXISTS account_opening_balance_sources_no_replace
 BEFORE INSERT ON account_opening_balance_sources
 WHEN EXISTS (
@@ -2746,7 +2742,7 @@ BEGIN
   SELECT RAISE(ABORT, 'account opening sources are immutable');
 END
 ''',
-];
+};
 const String _mileagePostingAccountMappingTableSql = '''
 CREATE TABLE IF NOT EXISTS mileage_posting_account_mapping (
   role TEXT PRIMARY KEY NOT NULL CHECK (role IN ('travel_expense', 'private_contribution')),

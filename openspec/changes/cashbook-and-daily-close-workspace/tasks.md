@@ -3,43 +3,43 @@
 - [x] 0.1 Before implementation, obtain fresh independent approval of the revised cashbook contract. Until its v26 source and v27 close evidence are implemented, keep cash writes, balances, close finalization, and PDFs unavailable. Fresh independent Round 4 contract approval is recorded in `review.md`; implementation remains open.
 - [x] 0.2 Write failing test `test_v26_opening_source_migration_preserves_legacy_history_without_backfill` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "v26 migration preserves legacy history without backfill"; assert it fails for the right reason.
 - [x] 0.3 Implement and verify the v26 source table migration, constraints, and no-backfill behavior to pass 0.2.
-- [ ] 0.4 Refactor the v26 source migration; keep focused and full suites green.
+- [x] 0.4 Refactor the v26 source migration; keep focused and full suites green.
 - [x] 0.5 Write failing test `test_fresh_and_upgraded_v26_opening_source_schemas_match` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Fresh and upgraded v26 source schemas match"; compare columns, foreign keys, unique constraints, triggers, and reject weakened `effective_date` and `currency_code` GLOB constraints with named schema-health regressions.
 - [x] 0.6 Implement matching fresh-schema DDL and migration behavior to pass 0.5; make schema-health validation compare the complete required date and currency GLOB patterns.
-- [ ] 0.7 Refactor schema declarations; keep focused and full suites green.
+- [x] 0.7 Refactor schema declarations; keep focused and full suites green.
 - [x] 0.8 Write failing test `test_opening_source_identity_is_unique_and_immutable` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Opening-source identity is unique and immutable"; assert conflicting identity and update/delete attempts are rejected.
 - [x] 0.9 Implement source uniqueness and immutability to pass 0.8.
-- [ ] 0.10 Refactor source constraints and triggers; keep focused and full suites green.
+- [x] 0.10 Refactor source constraints and triggers; keep focused and full suites green.
 - [x] 0.11 Write and verify `test_setup_opening_source_commits_atomically` in `test/features/setup/cashbook_opening_source_test.dart` for scenario "Setup opening source commits atomically"; inject failures at company creation, new-account creation, existing-account association, category creation, journal insertion, saldo update, and source insertion across new and existing Kasse paths. Assert the complete company, account, category, journal, and source state is unchanged after each failure.
 - [x] 0.12 Implement setup transaction wiring for the source record to pass 0.11.
-- [ ] 0.13 Refactor setup source persistence; keep focused and full suites green.
+- [x] 0.13 Refactor setup source persistence; keep focused and full suites green.
 - [x] 0.14 Write failing test `test_setup_retry_preserves_opening_source_identity` in `test/features/setup/cashbook_opening_source_test.dart` for scenario "Setup retry preserves opening source identity"; assert exact retry after a later cash movement changes account saldo still succeeds and preserves the original source, while a conflicting opening amount changes nothing.
 - [x] 0.15 Implement idempotent setup source retry and conflict behavior to pass 0.14; keep retry identity validation independent of current account saldo while retaining creation-time saldo verification.
-- [ ] 0.16 Refactor retry behavior; keep focused and full suites green.
+- [x] 0.16 Refactor retry behavior; keep focused and full suites green.
 - [x] 0.16a Resolve the second consecutive v26 implementation-review REVISE follow-up: add weakened-schema and saldo-only regressions, update the onboarding integration test to reject a conflicting retry while preserving source, journal, and saldo, and pass focused migration, setup, onboarding, and scoped-analysis checks.
 - [x] 0.16b Fix the independent currency GLOB case-sensitivity finding: reject lowercase-only `[a-z][a-z][a-z]` schema DDL while preserving SQL identifier and whitespace normalization and case-sensitive string literals; pass the focused migration suite and scoped analysis.
 - [x] 0.17 Write failing test `test_fresh_and_upgraded_v27_close_schemas_match` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Fresh and upgraded v27 close schemas match"; confirm the red failure identifies the missing `zaehlung_json` column.
 - [x] 0.18 Implement v27 close-evidence fields and trigger parity in fresh and migrated schemas to pass 0.17; focused migration tests pass 7/7.
-- [ ] 0.19 Refactor v27 schema declarations; keep focused and full suites green.
+- [x] 0.19 Refactor v27 schema declarations; keep focused and full suites green.
 - [x] 0.19a Preserve custom schema-version ownership for file-backed profiles: disable Drift auto-migrations in `AppDatabase.forProfile` and pass the v27 reopen / v26 upgrade missing-source regressions with unchanged database path, version, and missing-table state.
 - [x] 0.20 Write failing test `test_v25_profile_does_not_require_v26_opening_source_table` in `test/features/setup/profile_data_portability_test.dart` for scenario "Pre-v26 profile does not require the opening-source table".
 - [x] 0.21 Implement v26 version-pending table inventory behavior to pass 0.20.
-- [ ] 0.22 Refactor profile inventory version rules; keep focused and full suites green.
+- [x] 0.22 Refactor profile inventory version rules; keep focused and full suites green.
 - [x] 0.23 Write failing test `test_v26_profile_export_preserves_opening_source_rows` in `test/features/setup/profile_data_portability_test.dart` for scenario "v26 profile export preserves opening-source rows".
 - [x] 0.24 Implement typed v26 source-row export, including a valid empty source table, to pass 0.23.
-- [ ] 0.25 Refactor source-row serialization; keep focused and full suites green.
+- [x] 0.25 Refactor source-row serialization; keep focused and full suites green.
 - [x] 0.26 Write failing test `test_missing_v26_source_schema_blocks_complete_export` in `test/features/setup/profile_data_portability_test.dart` for scenario "Missing v26 source schema blocks complete export".
 - [x] 0.27 Implement fail-closed export validation for a missing or malformed v26 source table to pass 0.26.
-- [ ] 0.28 Refactor schema validation; keep focused and full suites green.
+- [x] 0.28 Refactor schema validation; keep focused and full suites green.
 - [x] 0.29 Write failing test `test_v25_customer_disclosure_treats_opening_source_as_pending` in `test/features/stammdaten/customer_data_disclosure_export_test.dart` for scenario "v25 customer disclosure remains version-pending".
 - [x] 0.30 Implement v26 source-table version handling in disclosure schema checks to pass 0.29.
-- [ ] 0.31 Refactor disclosure version checks; keep focused and full suites green.
+- [x] 0.31 Refactor disclosure version checks; keep focused and full suites green.
 - [x] 0.32 Write failing test `test_v26_customer_disclosure_checks_but_does_not_project_opening_sources` in `test/features/stammdaten/customer_data_disclosure_export_test.dart` for scenario "v26 source table is checked but not projected".
 - [x] 0.33 Implement source schema validation without customer-row projection to pass 0.32.
-- [ ] 0.34 Refactor disclosure serialization; keep focused and full suites green.
+- [x] 0.34 Refactor disclosure serialization; keep focused and full suites green.
 - [x] 0.35 Write failing direct-SQL tests `test_opening_source_insert_or_replace_preserves_original_when_recursive_triggers_are_off` and `test_finalized_close_insert_or_replace_preserves_original_when_recursive_triggers_are_off` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart`; both must assert complete evidence remains unchanged.
 - [x] 0.36 Add source and finalized-close pre-insert guards, plus schema-health parity, to reject `INSERT OR REPLACE` without relying on recursive triggers.
-- [ ] 0.37 Refactor the immutability guards and schema checks, including source-reference collation and case-only REPLACE protection; the disclosure-level collation regression is `test_v26_customer_disclosure_rejects_nocase_opening_source_unique_index` under the existing v26 disclosure scenario; keep focused and full suites green.
+- [x] 0.37 Refactor the immutability guards and schema checks, including source-reference collation and case-only REPLACE protection; the disclosure-level collation regression is `test_v26_customer_disclosure_rejects_nocase_opening_source_unique_index` under the existing v26 disclosure scenario; keep focused and full suites green.
 
 ## 1. accounting: Tagesabschluss
 
