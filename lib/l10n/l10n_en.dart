@@ -1237,6 +1237,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bankViewTransactions => 'Transactions';
 
   @override
+  String get bankViewCashbook => 'Cashbook';
+
+  @override
+  String get bankViewClose => 'Daily cash close';
+
+  @override
+  String get cashbookTitle => 'Cashbook';
+
+  @override
+  String get cashbookSubtitle =>
+      'Read-only cash balance preview. Cash movements are unavailable from the current source.';
+
+  @override
+  String get cashbookBalance => 'Cash balance as of date';
+
+  @override
+  String get cashbookUnavailable =>
+      'No complete, verified cash balance is available for this company, cash account, and date.';
+
+  @override
+  String get cashbookSelectionPrompt => 'Choose a company, cash account, and date to request a balance preview.';
+
+  @override
+  String get cashbookMovementsUnavailable =>
+      'Cash movements are unavailable: the current source provides balances but no typed movement rows.';
+
+  @override
   String get tagesabschlussTitle => 'Daily cash close';
 
   @override

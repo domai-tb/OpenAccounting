@@ -1244,6 +1244,33 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankViewTransactions => 'Transaktionen';
 
   @override
+  String get bankViewCashbook => 'Kassenbuch';
+
+  @override
+  String get bankViewClose => 'Tagesabschluss';
+
+  @override
+  String get cashbookTitle => 'Kassenbuch';
+
+  @override
+  String get cashbookSubtitle =>
+      'Schreibgeschützte Saldenvorschau. Kassenbewegungen sind in der aktuellen Datenquelle nicht verfügbar.';
+
+  @override
+  String get cashbookBalance => 'Kassenbestand zum Stichtag';
+
+  @override
+  String get cashbookUnavailable =>
+      'Für Unternehmen, Kassenkonto und Datum ist kein vollständiger, verifizierter Kassenbestand verfügbar.';
+
+  @override
+  String get cashbookSelectionPrompt => 'Wähle Unternehmen, Kassenkonto und Datum, um eine Saldenvorschau anzufordern.';
+
+  @override
+  String get cashbookMovementsUnavailable =>
+      'Kassenbewegungen nicht verfügbar: Die Quelle liefert derzeit nur Salden und keine typisierten Bewegungszeilen.';
+
+  @override
   String get tagesabschlussTitle => 'Tagesabschluss';
 
   @override

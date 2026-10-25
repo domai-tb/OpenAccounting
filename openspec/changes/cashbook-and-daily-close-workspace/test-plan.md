@@ -54,7 +54,7 @@
 
 ## Coverage Notes
 
-- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Twelve of 46 rows are green, including the routed Tagesabschluss creation UI scenario; the other 34 rows remain red.
+- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Fifteen of 46 rows are green, including the routed Tagesabschluss creation UI scenario; the other 31 rows remain red.
 - The atomicity row passed with 11 deterministic SQLite abort-trigger failures across company creation, new-account creation, existing-account association, category creation, journal insertion, saldo update, and source insertion. New and existing Kasse paths each assert that complete company, account, category, journal, and source state is unchanged after failure.
 - The retry row passes after a later committed `Einnahme` changes Kasse saldo from `125.00` to `150.00`: an exact `125.00` setup retry preserves the opening source, opening journal, later movement, and current saldo; a conflicting `150.00` opening retry remains rejected without changing them.
 - The supplementary v26 implementation-review regressions below passed at base HEAD `5272cbaf128cb5feb6c6bb7674e85e92cd3d7ff9`; they do not change the 46 mapped delta-spec scenario rows.
@@ -62,7 +62,7 @@
 - The supplementary v26 migration regression `test_v26_schema_health_rejects_partial_opening_source_unique_index` checks that a partial unique `journal_id` index cannot satisfy the canonical source identity constraint.
 - The migration source-reference regressions `test_v26_schema_health_rejects_nocase_opening_source_unique_index` and `test_opening_source_case_only_insert_or_replace_preserves_original` cover BINARY-index health enforcement and preservation of original evidence on case-only REPLACE conflicts; both passed in the four-file focused suite (86/86). With the pre-insert collation guard temporarily disabled, the case-only REPLACE test failed because the insert succeeded (row id 2); restoring the guard passed the test 1/1.
 - The customer-disclosure collation regression `test_v26_customer_disclosure_rejects_nocase_opening_source_unique_index` maps to the existing v26 schema-check scenario. Its fixture uses the canonical three unique indexes with only `source_reference` collated NOCASE. A deliberate red run with the collation guard disabled returned `complete` instead of `incomplete`; after restoring the guard, the focused test passed 1/1.
-- Remaining red scenarios include v27 evidence, portability, report, database, AppServices, and UI behavior.
+- Remaining red scenarios include v27 evidence, report, database, AppServices, close finalization, and full typed cash-event history. The supplementary cashbook route tests below cover only the available account/date balance preview and do not satisfy the committed-event listing scenario.
 - Tests are planned for the repository’s Flutter test infrastructure and focused fixtures for the affected feature and persistence boundaries.
 
 ### Supplementary account/date balance core checks
@@ -94,6 +94,15 @@ These tests supplement the delta-spec scenarios above with SQLite-backed source 
 | test/features/cashbook/account_date_balance_source_test.dart | fails closed for missing or mismatched opening evidence and legacy account rows | 🟢 passed |
 | test/features/cashbook/account_date_balance_source_test.dart | isolates the selected company, account, and requested local date | 🟢 passed |
 | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_tagesabschluss_creation; prepares only a complete typed balance result | 🟢 passed |
+
+### Supplementary routed cashbook balance-preview checks
+
+These widget tests cover the bounded read-only route slice. They do not implement typed movement rows or change the status of the mapped committed-cash-event scenario.
+
+| Test File | Test Name | Current Result |
+|-----------|-----------|----------------|
+| test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_cashbook_route_displays_a_cashbook_workspace | 🟢 passed |
+| test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_cashbook_route_shows_incomplete_source_as_unavailable | 🟢 passed |
 
 ### Supplementary v26 implementation-review regressions
 

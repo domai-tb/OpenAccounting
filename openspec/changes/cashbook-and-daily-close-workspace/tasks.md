@@ -189,5 +189,12 @@
 ## Scoped implementation progress: production account/date balance source
 
 - Added a SQLite-backed request-driven source that joins the v26 opening source to its exact setup journal row once, verifies account/company/currency/date identity, and calculates only complete balanced immutable `cash_payment` groups through the requested local date. Missing sources, legacy/unlinked rows, malformed groups, and incomplete evidence return an unavailable result with no amount. The source never reads `konten.saldo`.
-- Exposed the source through AppServices and changed `/banking?view=close` to require explicit company, cash-account, and date selections. The page does not preselect a company, account, or date. Existing non-close Banking routes remain routed to the bank-import view.
+- Exposed the source through AppServices and changed `/banking?view=close` to require explicit company, cash-account, and date selections. The page does not preselect a company, account, or date. Existing bank-import view values remain routed to the bank-import page with their query state.
 - DB-backed source tests and the routed selection flow are green. Refactor tasks 3.3, 3.6, and 3.9 remain open because the full suite was not run. Cashbook posting/writing, close persistence/finalization, and PDFs remain gated by their later tasks.
+
+## Scoped implementation progress: read-only cashbook balance preview
+
+- Added the `/banking?view=cashbook` route and localized Banking-menu entry. The workspace reuses `CashbookBalanceSource.resolve` through the existing AppServices contract and displays only a complete account/date balance result with its source metadata. Incomplete results remain unavailable with no amount or zero fallback.
+- The screen identifies itself as a read-only balance preview and explicitly reports that typed movement rows are unavailable. The approved committed-cash-event listing and posting tasks remain unchecked because the existing route contract does not expose typed rows. No cash posting, close finalization, PDF, schema, migration, or service-wiring behavior was added.
+- Preserved the existing `/banking?view=close` dispatch and default daily-close page behavior. The cashbook header links to that existing close view; existing bank-import view values continue to preserve query state.
+- Added a routed red/green widget test for menu navigation and a complete balance preview, plus a fail-closed incomplete-source test. Focused evidence is recorded in `verify.md`; the full-suite and independent-review gates remain open.

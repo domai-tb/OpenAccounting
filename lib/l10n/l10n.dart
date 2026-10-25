@@ -2402,6 +2402,54 @@ abstract class AppLocalizations {
   /// **'Transaktionen'**
   String get bankViewTransactions;
 
+  /// No description provided for @bankViewCashbook.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbuch'**
+  String get bankViewCashbook;
+
+  /// No description provided for @bankViewClose.
+  ///
+  /// In de, this message translates to:
+  /// **'Tagesabschluss'**
+  String get bankViewClose;
+
+  /// No description provided for @cashbookTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbuch'**
+  String get cashbookTitle;
+
+  /// No description provided for @cashbookSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Schreibgeschützte Saldenvorschau. Kassenbewegungen sind in der aktuellen Datenquelle nicht verfügbar.'**
+  String get cashbookSubtitle;
+
+  /// No description provided for @cashbookBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbestand zum Stichtag'**
+  String get cashbookBalance;
+
+  /// No description provided for @cashbookUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Für Unternehmen, Kassenkonto und Datum ist kein vollständiger, verifizierter Kassenbestand verfügbar.'**
+  String get cashbookUnavailable;
+
+  /// No description provided for @cashbookSelectionPrompt.
+  ///
+  /// In de, this message translates to:
+  /// **'Wähle Unternehmen, Kassenkonto und Datum, um eine Saldenvorschau anzufordern.'**
+  String get cashbookSelectionPrompt;
+
+  /// No description provided for @cashbookMovementsUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenbewegungen nicht verfügbar: Die Quelle liefert derzeit nur Salden und keine typisierten Bewegungszeilen.'**
+  String get cashbookMovementsUnavailable;
+
   /// No description provided for @tagesabschlussTitle.
   ///
   /// In de, this message translates to:

@@ -183,6 +183,9 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(
             path: '/banking',
             builder: (context, state) {
+              if (state.uri.queryParameters['view'] == 'cashbook') {
+                return const TagesabschlussPage(cashbook: true);
+              }
               if (state.uri.queryParameters['view'] == 'close') {
                 return const TagesabschlussPage();
               }

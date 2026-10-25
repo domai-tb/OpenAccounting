@@ -1989,16 +1989,16 @@ LIMIT 100
     );
   }
 
-  void _changeView(_BankImportView value) {
+  void _changeView(String value) {
     final Uri? routeUri = widget.routeUri;
     if (routeUri == null) {
-      setState(() => _view = value);
+      setState(() => _view = _BankImportView.fromQueryValue(value));
       return;
     }
 
     // Keep repeated filters by passing each query value's iterable through Uri.replace.
     final Map<String, dynamic> queryParameters = Map<String, dynamic>.from(routeUri.queryParametersAll);
-    queryParameters['view'] = value.queryValue;
+    queryParameters['view'] = value;
     context.go(routeUri.replace(queryParameters: queryParameters).toString());
   }
 
@@ -2109,24 +2109,28 @@ LIMIT 100
               },
         showFilterToolbar: false,
         actions: <Widget>[
-          PopupMenuButton<_BankImportView>(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.menu),
             tooltip: _l10n.sidebarBanking,
             onSelected: _changeView,
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<_BankImportView>>[
-              PopupMenuItem<_BankImportView>(value: _BankImportView.import, child: Text(_l10n.bankViewImport)),
-              PopupMenuItem<_BankImportView>(value: _BankImportView.history, child: Text(_l10n.bankViewHistory)),
-              PopupMenuItem<_BankImportView>(
-                value: _BankImportView.transactions,
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(value: _BankImportView.import.queryValue, child: Text(_l10n.bankViewImport)),
+              PopupMenuItem<String>(value: _BankImportView.history.queryValue, child: Text(_l10n.bankViewHistory)),
+              PopupMenuItem<String>(
+                value: _BankImportView.transactions.queryValue,
                 child: Text(_l10n.bankViewTransactions),
               ),
-              PopupMenuItem<_BankImportView>(value: _BankImportView.rules, child: Text(_l10n.bankViewRules)),
-              PopupMenuItem<_BankImportView>(value: _BankImportView.templates, child: Text(_l10n.bankViewTemplates)),
-              PopupMenuItem<_BankImportView>(
-                value: _BankImportView.quickBookings,
+              PopupMenuItem<String>(value: _BankImportView.rules.queryValue, child: Text(_l10n.bankViewRules)),
+              PopupMenuItem<String>(value: _BankImportView.templates.queryValue, child: Text(_l10n.bankViewTemplates)),
+              PopupMenuItem<String>(
+                value: _BankImportView.quickBookings.queryValue,
                 child: Text(_l10n.quickBookingsTitle),
               ),
-              PopupMenuItem<_BankImportView>(value: _BankImportView.mileage, child: Text(_l10n.bankViewMileage)),
+              PopupMenuItem<String>(value: _BankImportView.mileage.queryValue, child: Text(_l10n.bankViewMileage)),
+              if (widget.routeUri != null) ...<PopupMenuEntry<String>>[
+                PopupMenuItem<String>(value: 'cashbook', child: Text(_l10n.bankViewCashbook)),
+                PopupMenuItem<String>(value: 'close', child: Text(_l10n.bankViewClose)),
+              ],
             ],
           ),
         ],

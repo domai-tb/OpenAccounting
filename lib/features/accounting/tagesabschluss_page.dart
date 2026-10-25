@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:openaccounting/core/app_services.dart';
 import 'package:openaccounting/core/localization.dart';
@@ -15,7 +16,9 @@ import 'package:openaccounting/features/cashbook/cashbook_balance_source.dart';
 import 'package:openaccounting/l10n/l10n.dart';
 
 class TagesabschlussPage extends ConsumerStatefulWidget {
-  const TagesabschlussPage({super.key});
+  const TagesabschlussPage({super.key, this.cashbook = false});
+
+  final bool cashbook;
 
   @override
   ConsumerState<TagesabschlussPage> createState() => _TagesabschlussPageState();
@@ -164,13 +167,24 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
     final String locale = Localizations.localeOf(context).toString();
     final String? companyName = _companyName();
     final String? accountName = _accountName();
+    final bool cashbook = widget.cashbook;
+    final bool hasSelection = _companyId != null && _accountId != null && _asOfDate != null;
 
     return AppPage(
       maxWidth: 1000,
       header: AppPageHeader(
-        title: l10n.tagesabschlussTitle,
-        subtitle: l10n.tagesabschlussSubtitle,
+        title: cashbook ? l10n.cashbookTitle : l10n.tagesabschlussTitle,
+        subtitle: cashbook ? l10n.cashbookSubtitle : l10n.tagesabschlussSubtitle,
         showFilterToolbar: false,
+        actions: cashbook
+            ? <Widget>[
+                TextButton.icon(
+                  onPressed: () => context.go('/banking?view=close'),
+                  icon: const Icon(Icons.fact_check),
+                  label: Text(l10n.bankViewClose),
+                ),
+              ]
+            : const <Widget>[],
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -181,7 +195,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   DropdownButtonFormField<int>(
-                    key: const ValueKey<String>('daily-close-company'),
+                    key: ValueKey<String>(cashbook ? 'cashbook-company' : 'daily-close-company'),
                     initialValue: _companyId,
                     decoration: InputDecoration(labelText: l10n.tagesabschlussCompany),
                     items: <DropdownMenuItem<int>>[
@@ -192,7 +206,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
-                    key: const ValueKey<String>('daily-close-account'),
+                    key: ValueKey<String>(cashbook ? 'cashbook-account' : 'daily-close-account'),
                     initialValue: _accountId,
                     decoration: InputDecoration(labelText: l10n.tagesabschlussAccount),
                     items: <DropdownMenuItem<int>>[
@@ -205,7 +219,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
-                      key: const ValueKey<String>('daily-close-date-picker'),
+                      key: ValueKey<String>(cashbook ? 'cashbook-date-picker' : 'daily-close-date-picker'),
                       onPressed: _chooseDate,
                       icon: const Icon(Icons.calendar_today),
                       label: Text(
@@ -218,16 +232,29 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            if (_balanceLoading) const Center(child: CircularProgressIndicator()),
-            if (draft == null)
+            if (cashbook) ...<Widget>[
+              const SizedBox(height: 16),
               AppCard(
                 child: Text(
-                  l10n.tagesabschlussUnavailable,
-                  key: const ValueKey<String>('daily-close-result-unavailable'),
+                  l10n.cashbookMovementsUnavailable,
+                  key: const ValueKey<String>('cashbook-movements-unavailable'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            if (_balanceLoading) const Center(child: CircularProgressIndicator()),
+            if (draft == null && (!cashbook || !_balanceLoading))
+              AppCard(
+                child: Text(
+                  cashbook
+                      ? hasSelection
+                            ? l10n.cashbookUnavailable
+                            : l10n.cashbookSelectionPrompt
+                      : l10n.tagesabschlussUnavailable,
+                  key: ValueKey<String>(cashbook ? 'cashbook-result-unavailable' : 'daily-close-result-unavailable'),
                 ),
               )
-            else ...<Widget>[
+            else if (draft != null) ...<Widget>[
               AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,7 +263,7 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                     _field(l10n.tagesabschlussAccount, accountName ?? draft.accountId),
                     _field(l10n.tagesabschlussDate, formatDate(draft.asOfDate, locale: locale)),
                     _field(
-                      l10n.tagesabschlussExpectedBalance,
+                      cashbook ? l10n.cashbookBalance : l10n.tagesabschlussExpectedBalance,
                       _formatCents(draft.expectedBalanceCents, draft.currencyCode, locale),
                     ),
                     _field(l10n.tagesabschlussCurrency, draft.currencyCode),
@@ -248,14 +275,16 @@ class _TagesabschlussPageState extends ConsumerState<TagesabschlussPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              AppCard(
-                child: TextField(
-                  key: const ValueKey<String>('daily-close-counted-balance'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l10n.tagesabschlussCountedBalance),
+              if (!cashbook) ...<Widget>[
+                const SizedBox(height: 16),
+                AppCard(
+                  child: TextField(
+                    key: const ValueKey<String>('daily-close-counted-balance'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: l10n.tagesabschlussCountedBalance),
+                  ),
                 ),
-              ),
+              ],
             ],
           ],
         ),
