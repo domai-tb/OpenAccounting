@@ -124,21 +124,21 @@ void main() {
       );
     });
 
-    test('valid_snapshot_is_accepted_and_reported_ready', () {
-      const EInvoiceService service = eInvoiceTestService;
-      final FinalizationSnapshot snapshot = validSnapshot(buyerReference: 'LEITWEG-123');
+    test('valid_snapshot_is_accepted_and_reported_ready', () async {
+      const EInvoiceService service = EInvoiceService();
+      final FinalizationSnapshot snapshot = validSnapshot(
+        buyerReference: 'LEITWEG-123',
+        format: EInvoiceOutputFormat.zugferd,
+      );
 
-      final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.xrechnung);
+      final EInvoiceValidationResult result = service.validate(snapshot, EInvoiceOutputFormat.zugferd);
       expect(result.valid, isTrue);
       expect(result.diagnostics, isEmpty);
       expect(service.readiness(result), EInvoiceReadiness.valid);
       expect(service.readiness(null), EInvoiceReadiness.notValidated);
-      expect(
-        const EInvoiceXmlSerializer()
-            .xrechnungUbl(snapshot)
-            .contains('<cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>'),
-        isTrue,
-      );
+
+      final String xml = await service.zugferdXml(snapshot);
+      expect(xml, contains('<rsm:CrossIndustryInvoice'));
     });
 
     test('missing_source_field_reports_localized_diagnostic_without_output', () {

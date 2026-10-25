@@ -107,9 +107,9 @@ Implementation progress (2026-10-25): the independent approval of the seven-arti
 
 ## 8. Required-field and business-rule validation
 
-- [ ] 8.1 Write failing test for "Valid data passes pinned validation": valid_snapshot_is_accepted_and_reported_ready in test/features/rechnungen/e_invoice_validator_test.dart (assert it fails for the right reason).
-- [ ] 8.2 Implement the required application behavior for "Valid data passes pinned validation" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
-- [ ] 8.3 Refactor the related implementation; targeted tests and the full suite stay green.
+- [x] 8.1 Write failing test for "Valid data passes pinned validation": valid_snapshot_is_accepted_and_reported_ready in test/features/rechnungen/e_invoice_validator_test.dart (assert it fails for the right reason).
+- [x] 8.2 Implement the required application behavior for "Valid data passes pinned validation" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
+- [ ] 8.3 Refactor the related implementation; targeted tests and the full suite stay green. The scoped validator files pass; full-suite verification remains pending.
 - [x] 8.4 Write failing test for "Missing required source field": missing_source_field_reports_localized_diagnostic_without_output in test/features/rechnungen/e_invoice_validator_test.dart (assert it fails for the right reason).
 - [x] 8.5 Implement the required application behavior for "Missing required source field" from specs/outgoing-e-invoice-generation/spec.md to pass the named test.
 - [x] 8.6 Refactor the related implementation; targeted tests and the full suite stay green.

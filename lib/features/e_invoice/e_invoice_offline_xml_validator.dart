@@ -300,8 +300,30 @@ class EInvoiceOfflineXmlValidator {
         .where((XmlElement element) => element.name.local == 'name' && element.name.namespaceUri == _scenarioNamespace)
         .map((XmlElement element) => element.innerText.trim())
         .firstOrNull;
+    final XmlElement? assessment = root.children
+        .whereType<XmlElement>()
+        .where(
+          (XmlElement element) => element.name.local == 'assessment' && element.name.namespaceUri == _reportNamespace,
+        )
+        .firstOrNull;
+    final List<XmlElement> verdicts =
+        assessment?.children
+            .whereType<XmlElement>()
+            .where(
+              (XmlElement element) =>
+                  element.name.namespaceUri == _reportNamespace &&
+                  (element.name.local == 'accept' || element.name.local == 'reject'),
+            )
+            .toList(growable: false) ??
+        const <XmlElement>[];
+    if (verdicts.length != 1) {
+      throw const FormatException('The offline validator report has no unambiguous acceptance verdict.');
+    }
+    final bool accepted = verdicts.single.name.local == 'accept';
 
-    if (validValue == 'true') {
+    // KoSIT's generic validity attribute follows finding severity; the explicit
+    // assessment verdict honors warnings that the selected scenario accepts.
+    if (accepted) {
       return EInvoiceOfflineXmlValidationResult(
         status: EInvoiceOfflineXmlValidationStatus.valid,
         message: 'XML passed the pinned schema and business-rule validation.',

@@ -308,3 +308,28 @@ DECISION: FAIL
   FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter test --no-pub --dart-define=platform=vm test/features/rechnungen/e_invoice_generation_test.dart test/features/rechnungen/e_invoice_finalization_test.dart test/features/rechnungen/e_invoice_export_test.dart test/features/rechnungen/e_invoice_snapshot_test.dart
   ```
 - Boundary: unresolved, stale, mismatched, and legacy evidence remains fail-closed because the assessment resolver does not exist. Positive AE output, immutable evidence freezing from a verified source record, and the committed-export frozen-evidence positive path remain unimplemented. The existing §13b(2) USt 1 TG validity check still compares validity with `leistungsdatum`; no §13b(1) date condition was introduced. Tasks 7.7–7.9 remain unchecked pending a real owning upstream assessment/invoice-entry integration; no evidence is inferred from position fields, customer state, VAT IDs, or non-empty references.
+
+### Valid snapshot through the pinned CII profile (2026-10-25)
+
+- Red-first evidence: `valid_snapshot_is_accepted_and_reported_ready` was changed to use the default packaged `EInvoiceService` and a ZUGFeRD CII snapshot. It failed before the parser fix because the generated CII reached KoSIT but the adapter returned unavailable with `The validator process and its report did not agree (exit code 0)`.
+- The raw local KoSIT 1.6.3 run on that generated XML exited 0 (`Acceptable: 1; Rejected: 0`), passed the XSD step, and reported one tolerated `PEPPOL-EN16931-R008` warning for the empty `ApplicableHeaderTradeDelivery` element. The report contained `rep:accept` while its generic root `valid` attribute was `false`; KoSIT computes acceptance from the selected scenario. See the [KoSIT Validator README](https://github.com/itplr-kosit/validator/blob/main/README.md).
+
+  ```sh
+  java -jar assets/e_invoice_validator/validator-1.6.3-standalone.jar -s assets/e_invoice_validator/scenarios.xml -r assets/e_invoice_validator -o /tmp/openaccounting-kosit-report /tmp/openaccounting-generated-valid-snapshot.cii.xml
+  ```
+- `EInvoiceOfflineXmlValidator._parseReport` now derives acceptance from exactly one direct `rep:accept` or `rep:reject` verdict under `rep:assessment`. Missing or ambiguous verdicts remain unavailable, and process exit status must still agree with the parsed verdict. Warning diagnostics and validation steps remain available in the result.
+- The focused named test passed 1/1 through the default service:
+
+  ```sh
+  FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter test --no-pub --dart-define=platform=vm test/features/rechnungen/e_invoice_validator_test.dart --plain-name valid_snapshot_is_accepted_and_reported_ready
+  ```
+
+  Combined validator and offline-validator tests passed 16/16, including official valid fixtures, rejected business rules, profile mismatch, corrupted assets, and missing Java:
+
+  ```sh
+  FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter test --no-pub --dart-define=platform=vm test/features/rechnungen/e_invoice_validator_test.dart test/features/rechnungen/e_invoice_offline_xml_validator_test.dart
+  ```
+
+  The tests use only the already packaged local bundle; no runtime downloads were added.
+- `FLUTTER_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm flutter analyze --no-pub lib/features/e_invoice/e_invoice_offline_xml_validator.dart test/features/rechnungen/e_invoice_validator_test.dart test/features/rechnungen/e_invoice_offline_xml_validator_test.dart` found no issues in 3 items. `FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true FVM_CACHE_PATH=/home/ubuntu/fvm fvm dart format --output=none --set-exit-if-changed --line-length=120 lib/features/e_invoice/e_invoice_offline_xml_validator.dart test/features/rechnungen/e_invoice_validator_test.dart` reported 0 changed files. `openspec validate outgoing-e-invoice-generation --type change --strict --json` passed with zero issues, and scoped `git diff --check` passed.
+- Evidence is Linux-only with Java 17. No Windows/macOS validator process proof or app-generated hybrid PDF/A verification is claimed. The full application suite was not run while migration repair work was active; task 8.3 remains open pending that check.
