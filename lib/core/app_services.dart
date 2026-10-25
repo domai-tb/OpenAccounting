@@ -41,6 +41,7 @@ import 'package:openaccounting/features/inventory/stocktake_repository.dart';
 import 'package:openaccounting/features/inventory/stocktake_usecases.dart';
 import 'package:openaccounting/features/accounting/gobd_export_service.dart';
 import 'package:openaccounting/features/accounting/tagesabschluss_creation.dart';
+import 'package:openaccounting/features/cashbook/cashbook_balance_source.dart';
 import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/report_export_history_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/reporting_workspace_use_case.dart';
@@ -166,6 +167,7 @@ class AppServices {
   );
   late final BankingUseCase banking = BankingUseCase(_db.executor);
   late final TagesabschlussCreation tagesabschlussCreation = const TagesabschlussCreation();
+  late final CashbookBalanceSource cashbookBalanceSource = CashbookBalanceSource(_db.executor);
   late final MileageEntryUseCases mileageEntry = MileageEntryUseCases(MileageEntryRepository(_db.executor));
   late final DashboardUseCase dashboard = DashboardUseCase(_db.executor);
 

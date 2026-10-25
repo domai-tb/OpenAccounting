@@ -13,20 +13,35 @@ void main() {
     final AppDatabase db = AppDatabase.forTesting(NativeDatabase.memory());
     await db.ensureOpen();
     await db.executor.runCustom('CREATE TABLE IF NOT EXISTS unternehmen (id INTEGER PRIMARY KEY, name TEXT)');
-    await db.executor.runCustom("INSERT INTO unternehmen (name) VALUES ('Test GmbH')");
+    await db.executor.runCustom("INSERT INTO unternehmen (id, name) VALUES (1, 'Test GmbH')");
+    await db.executor.runInsert(
+      'INSERT INTO konten (id, name, kontoart, waehrung, unternehmen_id) VALUES (?, ?, ?, ?, ?)',
+      <Object?>[9001, 'Test Kasse', 'Kasse', 'EUR', 1],
+    );
+    final List<Map<String, Object?>> journalColumns = await db.executor.runSelect(
+      'PRAGMA table_info(journal)',
+      const <Object?>[],
+    );
+    if (journalColumns.every((Map<String, Object?> column) => column['name'] != 'is_opening_balance')) {
+      await db.executor.runCustom('ALTER TABLE journal ADD COLUMN is_opening_balance INTEGER NOT NULL DEFAULT 0');
+    }
+    final DateTime today = DateTime.now();
+    final String effectiveDate =
+        '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final int openingJournalId = await db.executor.runInsert(
+      'INSERT INTO journal (datum, beschreibung, betrag, beleg_typ, konto_id, immutable, is_opening_balance) '
+      'VALUES (?, ?, ?, ?, ?, 0, 1)',
+      <Object?>[effectiveDate, 'Eröffnung Kasse', '100.00', 'Eroeffnung', 9001],
+    );
+    await db.executor.runInsert(
+      'INSERT INTO account_opening_balance_sources '
+      '(unternehmen_id, konto_id, journal_id, effective_date, amount_cents, currency_code, source_reference) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[1, 9001, openingJournalId, effectiveDate, 10000, 'EUR', 'setup-opening:1:9001'],
+    );
     addTearDown(db.close);
 
     final GoRouter router = createRouter(db);
-    final CashbookBalanceResult balance = CashbookBalanceResult.available(
-      companyId: 'company-1',
-      accountId: 'cash-1',
-      asOfDate: DateTime(2026, 6, 20, 23, 59, 59, 999, 999),
-      balanceCents: 12345,
-      currencyCode: 'EUR',
-      sourceReference: 'cash-balance:cash-1:2026-06-20',
-      sourceReferences: <String>['opening:setup-1', 'posting:cash-in-1'],
-    );
-
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appDatabaseProvider.overrideWithValue(db)],
@@ -35,28 +50,35 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    router.go('/banking?view=close', extra: balance);
+    router.go('/banking?view=close');
     await tester.pumpAndSettle();
 
     expect(router.routeInformationProvider.value.uri.queryParameters['view'], 'close');
     expect(find.text('Tagesabschluss'), findsWidgets);
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) => widget is Text && RegExp(r'^(20\.06\.2026|06/20/2026)$').hasMatch(widget.data ?? ''),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('cash-1'), findsOneWidget);
-    expect(find.text('company-1'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) => widget is Text && RegExp(r'^123[,.]45 EUR$').hasMatch(widget.data ?? ''),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('EUR'), findsOneWidget);
-    expect(find.text('cash-balance:cash-1:2026-06-20'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('daily-close-company')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('daily-close-account')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('daily-close-date-picker')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('daily-close-result-unavailable')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey<String>('daily-close-company')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Test GmbH').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('daily-close-account')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Test Kasse').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('daily-close-date-picker')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Vollständig'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((Widget widget) => widget is Text && RegExp('100[,.]00').hasMatch(widget.data ?? '')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey<String>('daily-close-counted-balance')), findsOneWidget);
   });
 

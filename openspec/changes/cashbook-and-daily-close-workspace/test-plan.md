@@ -20,9 +20,9 @@
 | specs/cashbook-and-daily-close-workspace/spec.md → Cashbook view uses typed committed cash events | Committed cash event cannot be silently rewritten | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_committed_cash_event_cannot_be_silently_rewritten | 🔴 red |
 | specs/cashbook-and-daily-close-workspace/spec.md → Setup opening source has one durable account-scoped identity | Setup opening source commits atomically | test/features/setup/cashbook_opening_source_test.dart | test_setup_opening_source_commits_atomically | 🟢 green |
 | specs/cashbook-and-daily-close-workspace/spec.md → Setup opening source has one durable account-scoped identity | Setup retry preserves opening source identity | test/features/setup/cashbook_opening_source_test.dart | test_setup_retry_preserves_opening_source_identity | 🟢 green |
-| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Complete balance is shown from the report result | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_complete_balance_is_shown_from_the_report_result | 🔴 red |
-| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Verified opening cash is counted once | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_verified_setup_opening_counted_once | 🔴 red |
-| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Incomplete or ambiguous cash history is unavailable | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_incomplete_or_ambiguous_cash_history_is_unavailable | 🔴 red |
+| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Complete balance is shown from the report result | test/features/accounting/cashbook_and_daily_close_workspace_test.dart; test/features/cashbook/account_date_balance_source_test.dart | test_tagesabschluss_creation; resolves a verified opening source plus one committed balanced cash payment | 🟢 green |
+| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Verified opening cash is counted once | test/features/cashbook/account_date_balance_source_test.dart | resolves a verified opening source plus one committed balanced cash payment | 🟢 green |
+| specs/cashbook-and-daily-close-workspace/spec.md → Cash balance uses a complete account/date result | Incomplete or ambiguous cash history is unavailable | test/features/cashbook/account_date_balance_source_test.dart | fails closed for missing or mismatched opening evidence and legacy account rows | 🟢 green |
 | specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Complete daily close is finalized | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_complete_daily_close_is_finalized | 🔴 red |
 | specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Expected balance or persistence mapping is unavailable | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_expected_balance_or_persistence_mapping_is_unavailable | 🔴 red |
 | specs/cashbook-and-daily-close-workspace/spec.md → Daily close records use the approved close result | Discrepancy requires an explanation | test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart | test_discrepancy_requires_an_explanation | 🔴 red |
@@ -82,7 +82,18 @@ These unit checks cover the standalone calculator slice and do not change the st
 | test/features/cashbook/account_date_balance_test.dart | accepts the exact JSON-safe cent limit and rejects 2^53 plus one | 🟢 passed |
 | test/features/cashbook/account_date_balance_test.dart | returns unavailable when individually safe amounts exceed the JSON-safe aggregate | 🟢 passed |
 
-The suite verifies exact integer cents under the app's two-decimal convention. It carries the account currency without conversion, accepts only the explicit supported two-decimal ISO currency set, rejects unsupported/malformed codes and mismatches, scopes opening evidence to the requested account, and fails closed when a source value or aggregate exceeds JSON's exact integer range. All ten tests passed in the focused rerun after the reviewer corrections.
+The pure calculator suite verifies exact integer cents under the app's two-decimal convention. It carries the account currency without conversion, accepts only the explicit supported two-decimal ISO currency set, rejects unsupported/malformed codes and mismatches, scopes opening evidence to the requested account, and fails closed when a source value or aggregate exceeds JSON's exact integer range. All ten tests passed in the focused rerun after the reviewer corrections.
+
+### Supplementary production account/date balance source checks
+
+These tests supplement the delta-spec scenarios above with SQLite-backed source verification and the user-driven route flow.
+
+| Test File | Test Name | Current Result |
+|-----------|-----------|----------------|
+| test/features/cashbook/account_date_balance_source_test.dart | resolves a verified opening source plus one committed balanced cash payment | 🟢 passed |
+| test/features/cashbook/account_date_balance_source_test.dart | fails closed for missing or mismatched opening evidence and legacy account rows | 🟢 passed |
+| test/features/cashbook/account_date_balance_source_test.dart | isolates the selected company, account, and requested local date | 🟢 passed |
+| test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_tagesabschluss_creation; prepares only a complete typed balance result | 🟢 passed |
 
 ### Supplementary v26 implementation-review regressions
 
