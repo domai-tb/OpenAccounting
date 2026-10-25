@@ -5,7 +5,7 @@
 
 | Requirement | Scenario | Test File | Test Name | Current State |
 |-------------|----------|-----------|-----------|---------------|
-| specs/accounting/spec.md → Tagesabschluss | Tagesabschluss creation | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_tagesabschluss_creation | 🔴 red |
+| specs/accounting/spec.md → Tagesabschluss | Tagesabschluss creation | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_tagesabschluss_creation | 🟢 green |
 | specs/accounting/spec.md → Tagesabschluss | Counting discrepancy | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_counting_discrepancy | 🔴 red |
 | specs/accounting/spec.md → Tagesabschluss | GoBD signature | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_close_integrity_hash_uses_canonical_utf8_bytes | 🔴 red |
 | specs/accounting/spec.md → Tagesabschluss | Daily close columns map to expected and counted values | test/features/accounting/cashbook_and_daily_close_workspace_test.dart | test_daily_close_columns_map_expected_count_and_account | 🔴 red |
@@ -54,7 +54,7 @@
 
 ## Coverage Notes
 
-- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Eleven migration/setup, schema, portability, and disclosure rows are green; the other 35 rows remain red.
+- Every scenario in all seven change delta specs is mapped to one named test using capability-relative `specs/<capability>/spec.md` paths. Twelve of 46 rows are green, including the routed Tagesabschluss creation UI scenario; the other 34 rows remain red.
 - The atomicity row passed with 11 deterministic SQLite abort-trigger failures across company creation, new-account creation, existing-account association, category creation, journal insertion, saldo update, and source insertion. New and existing Kasse paths each assert that complete company, account, category, journal, and source state is unchanged after failure.
 - The retry row passes after a later committed `Einnahme` changes Kasse saldo from `125.00` to `150.00`: an exact `125.00` setup retry preserves the opening source, opening journal, later movement, and current saldo; a conflicting `150.00` opening retry remains rejected without changing them.
 - The supplementary v26 implementation-review regressions below passed at base HEAD `5272cbaf128cb5feb6c6bb7674e85e92cd3d7ff9`; they do not change the 46 mapped delta-spec scenario rows.

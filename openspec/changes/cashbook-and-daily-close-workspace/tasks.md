@@ -44,8 +44,8 @@
 
 ## 1. accounting: Tagesabschluss
 
-- [ ] 1.1 Write failing test `test_tagesabschluss_creation` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Tagesabschluss creation"; assert it fails for the right reason.
-- [ ] 1.2 Implement the specified behavior for "Tagesabschluss creation" to pass 1.1.
+- [x] 1.1 Write failing test `test_tagesabschluss_creation` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Tagesabschluss creation"; assert it fails for the right reason.
+- [x] 1.2 Implement the specified behavior for "Tagesabschluss creation" to pass 1.1.
 - [ ] 1.3 Refactor the affected code; keep the focused and full suites green.
 - [ ] 1.4 Write failing test `test_counting_discrepancy` in `test/features/accounting/cashbook_and_daily_close_workspace_test.dart` for scenario "Counting discrepancy"; assert it fails for the right reason.
 - [ ] 1.5 Implement the specified behavior for "Counting discrepancy" to pass 1.4.

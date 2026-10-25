@@ -2402,6 +2402,78 @@ abstract class AppLocalizations {
   /// **'Transaktionen'**
   String get bankViewTransactions;
 
+  /// No description provided for @tagesabschlussTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Tagesabschluss'**
+  String get tagesabschlussTitle;
+
+  /// No description provided for @tagesabschlussSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Erwarteten Kassenbestand prüfen und gezählten Bestand erfassen'**
+  String get tagesabschlussSubtitle;
+
+  /// No description provided for @tagesabschlussUnavailable.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein vollständiger, verifizierter Kassenbestand verfügbar.'**
+  String get tagesabschlussUnavailable;
+
+  /// No description provided for @tagesabschlussCompany.
+  ///
+  /// In de, this message translates to:
+  /// **'Unternehmen'**
+  String get tagesabschlussCompany;
+
+  /// No description provided for @tagesabschlussAccount.
+  ///
+  /// In de, this message translates to:
+  /// **'Kassenkonto'**
+  String get tagesabschlussAccount;
+
+  /// No description provided for @tagesabschlussDate.
+  ///
+  /// In de, this message translates to:
+  /// **'Datum'**
+  String get tagesabschlussDate;
+
+  /// No description provided for @tagesabschlussExpectedBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Erwarteter Kassenbestand'**
+  String get tagesabschlussExpectedBalance;
+
+  /// No description provided for @tagesabschlussCurrency.
+  ///
+  /// In de, this message translates to:
+  /// **'Währung'**
+  String get tagesabschlussCurrency;
+
+  /// No description provided for @tagesabschlussSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle'**
+  String get tagesabschlussSource;
+
+  /// No description provided for @tagesabschlussCompleteness.
+  ///
+  /// In de, this message translates to:
+  /// **'Vollständigkeit'**
+  String get tagesabschlussCompleteness;
+
+  /// No description provided for @tagesabschlussComplete.
+  ///
+  /// In de, this message translates to:
+  /// **'Vollständig'**
+  String get tagesabschlussComplete;
+
+  /// No description provided for @tagesabschlussCountedBalance.
+  ///
+  /// In de, this message translates to:
+  /// **'Gezählter Kassenbestand'**
+  String get tagesabschlussCountedBalance;
+
   /// No description provided for @bankNoAccountSelected.
   ///
   /// In de, this message translates to:

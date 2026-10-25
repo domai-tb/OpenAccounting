@@ -173,3 +173,24 @@ VERDICT: REVISE
 VERDICT: APPROVE
 
 This approval accepts task 0.16c only. It does not accept the overall cashbook implementation; 105 implementation tasks remain unchecked.
+
+---
+
+## Independent Review Round 8 — Tagesabschluss creation wiring
+
+- **Reviewer**: independent reviewer; verdict relayed by the parent agent. This section records that verdict and the author's response; it does not replace reviewer approval.
+- **Reviewed checkout**: branch `dev`, based on HEAD `783c5a77d3126e552f2bb48223089293d062675d`.
+- **Reviewed diff SHA-256**: `507723f832c2c6bd17507e0417c916eddb1f577dd327f9e40f54e863f26c4d91`.
+- **Findings**: the coverage note reported 11 green / 35 red while the row and verify artifact reported 12 / 34; the named test called the preparation helper directly and did not exercise production AppServices or the Banking workspace.
+
+### Verdict
+
+VERDICT: REVISE
+
+### Author response
+
+- The coverage note now reports 12 green / 34 red, matching the 46 mapped scenario rows.
+- The named scenario is now a routed widget test for `/banking?view=close`. It verifies the user-facing expected amount, currency, source, completeness, explicit company/account/date, and counted-balance field. The test's earlier helper-only check remains a separately named unit test.
+- `TagesabschlussCreation` is exposed from `AppServices`; the `/banking` route dispatches only `view=close` to the new close workspace, leaving existing Banking views on `BankImportPage` unchanged. A missing or incomplete typed balance result produces an unavailable state without substituting a balance.
+- Focused red→green, localization generation, router, analyzer, format, strict OpenSpec validation, and scoped diff-check evidence is recorded in `verify.md`.
+- **Remediation status**: implemented; fresh independent review of the resulting diff is pending. Round 8 remains `VERDICT: REVISE`.

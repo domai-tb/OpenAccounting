@@ -31,6 +31,8 @@ import 'package:openaccounting/features/settings/settings_workspace.dart';
 
 export 'package:openaccounting/features/settings/settings_providers.dart' show profileManagerProvider;
 import 'package:openaccounting/features/accounting/gobd_export_page.dart';
+import 'package:openaccounting/features/accounting/tagesabschluss_page.dart';
+import 'package:openaccounting/features/cashbook/account_date_balance.dart';
 import 'package:openaccounting/features/accounting/reporting/report_catalog_page.dart';
 import 'package:openaccounting/features/accounting/reporting/report_catalog_use_case.dart';
 import 'package:openaccounting/features/accounting/reporting/report_workspace_page.dart';
@@ -181,7 +183,13 @@ GoRouter createRouter(AppDatabase db) {
           GoRoute(path: '/gobd-export', builder: (context, state) => const GobdExportPage()),
           GoRoute(
             path: '/banking',
-            builder: (context, state) => BankImportPage(routeUri: state.uri),
+            builder: (context, state) {
+              if (state.uri.queryParameters['view'] == 'close') {
+                final Object? extra = state.extra;
+                return TagesabschlussPage(balance: extra is CashbookBalanceResult ? extra : null);
+              }
+              return BankImportPage(routeUri: state.uri);
+            },
           ),
           GoRoute(
             path: '/mahnwesen',

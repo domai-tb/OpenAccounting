@@ -1244,6 +1244,42 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bankViewTransactions => 'Transaktionen';
 
   @override
+  String get tagesabschlussTitle => 'Tagesabschluss';
+
+  @override
+  String get tagesabschlussSubtitle => 'Erwarteten Kassenbestand prüfen und gezählten Bestand erfassen';
+
+  @override
+  String get tagesabschlussUnavailable => 'Kein vollständiger, verifizierter Kassenbestand verfügbar.';
+
+  @override
+  String get tagesabschlussCompany => 'Unternehmen';
+
+  @override
+  String get tagesabschlussAccount => 'Kassenkonto';
+
+  @override
+  String get tagesabschlussDate => 'Datum';
+
+  @override
+  String get tagesabschlussExpectedBalance => 'Erwarteter Kassenbestand';
+
+  @override
+  String get tagesabschlussCurrency => 'Währung';
+
+  @override
+  String get tagesabschlussSource => 'Quelle';
+
+  @override
+  String get tagesabschlussCompleteness => 'Vollständigkeit';
+
+  @override
+  String get tagesabschlussComplete => 'Vollständig';
+
+  @override
+  String get tagesabschlussCountedBalance => 'Gezählter Kassenbestand';
+
+  @override
   String get bankNoAccountSelected => 'kein Konto';
 
   @override

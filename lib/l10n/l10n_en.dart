@@ -1237,6 +1237,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bankViewTransactions => 'Transactions';
 
   @override
+  String get tagesabschlussTitle => 'Daily cash close';
+
+  @override
+  String get tagesabschlussSubtitle => 'Review the expected cash balance and enter the counted amount';
+
+  @override
+  String get tagesabschlussUnavailable => 'No complete, verified cash balance is available.';
+
+  @override
+  String get tagesabschlussCompany => 'Company';
+
+  @override
+  String get tagesabschlussAccount => 'Cash account';
+
+  @override
+  String get tagesabschlussDate => 'Date';
+
+  @override
+  String get tagesabschlussExpectedBalance => 'Expected cash balance';
+
+  @override
+  String get tagesabschlussCurrency => 'Currency';
+
+  @override
+  String get tagesabschlussSource => 'Source';
+
+  @override
+  String get tagesabschlussCompleteness => 'Completeness';
+
+  @override
+  String get tagesabschlussComplete => 'Complete';
+
+  @override
+  String get tagesabschlussCountedBalance => 'Counted cash balance';
+
+  @override
   String get bankNoAccountSelected => 'no account';
 
   @override
