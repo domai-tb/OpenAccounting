@@ -73,6 +73,14 @@ Future<void> _ensureV28TaxEvidenceColumns(AppDatabase db) async {
   }
 }
 
+Future<void> _setStandardTaxClassification(AppDatabase db, int invoiceId) async {
+  await db.executor.runUpdate(
+    'UPDATE rechnungspositionen SET tax_treatment = ?, tax_legal_basis = ?, e_invoice_tax_category_code = ? '
+    'WHERE rechnung_id = ?',
+    <Object?>['standard_19', 'ustg_12_1', 'S', invoiceId],
+  );
+}
+
 class _RecordingHybridInvoiceService extends EInvoiceService {
   _RecordingHybridInvoiceService()
     : super(bundle: eInvoiceTestService.bundle, offlineXmlValidation: eInvoiceTestOfflineXmlValidation);
@@ -267,6 +275,7 @@ void main() {
     test('zugferd_finalization_stores_validated_hybrid_and_readiness', () async {
       final int customerId = await addEInvoiceCustomer(db, zugferdAktiv: true);
       final int invoiceId = await createEInvoiceDraft(ds, kundeId: customerId);
+      await _setStandardTaxClassification(db, invoiceId);
 
       await ds.finalizeRechnung(
         rechnungId: invoiceId,
@@ -284,6 +293,60 @@ void main() {
       expect(content.contains('CrossIndustryInvoice'), isTrue);
       expect(content.contains('urn:cen.eu:en16931:2017'), isTrue);
       expect(content.contains(row['rechnungsnummer']! as String), isTrue);
+    });
+
+    test('unresolved_13b1_assessment_blocks_pdf_finalization_before_side_effects', () async {
+      final int customerId = await addEInvoiceCustomer(db);
+      final int invoiceId = await createEInvoiceDraft(ds, kundeId: customerId);
+      final Map<String, Object?> evidence = euService13b1PositionWithoutResolvedAssessment();
+      final List<String> evidenceFields = evidence.keys
+          .where((String field) => field.startsWith('tax_') || field.startsWith('e_invoice_'))
+          .toList(growable: false);
+      await db.executor.runUpdate(
+        'UPDATE rechnungspositionen SET ust_satz = 0, ${evidenceFields.map((String field) => '$field = ?').join(', ')} '
+        'WHERE rechnung_id = ?',
+        <Object?>[for (final String field in evidenceFields) evidence[field], invoiceId],
+      );
+      await db.executor.runUpdate(
+        'UPDATE rechnungen SET netto_betrag = 200, ust_betrag = 0, brutto_betrag = 200 WHERE id = ?',
+        <Object?>[invoiceId],
+      );
+      await db.executor.runUpdate("UPDATE unternehmen SET land = 'AT', ust_idnr = 'ATU12345678'", const <Object?>[]);
+      await db.executor.runUpdate('UPDATE kunden SET ust_idnr = ? WHERE id = ?', <Object?>['DE987654321', customerId]);
+
+      final Map<String, Object?> invoiceBefore = await eInvoiceRow(db, invoiceId);
+      final int sequenceBefore = await eInvoiceSequence(db);
+      Future<int> rowCount(String table) async {
+        final List<Map<String, Object?>> rows = await db.executor.runSelect(
+          'SELECT COUNT(*) AS count FROM $table',
+          const <Object?>[],
+        );
+        return (rows.single['count']! as num).toInt();
+      }
+
+      const List<String> postingTables = <String>['journal', 'forderungen', 'vorsteuer_ansprueche'];
+      final Map<String, int> postingCountsBefore = <String, int>{};
+      for (final String table in postingTables) {
+        postingCountsBefore[table] = await rowCount(table);
+      }
+
+      await expectLater(
+        ds.finalizeRechnung(rechnungId: invoiceId, locale: 'de_DE', profileDir: profileDir),
+        throwsA(
+          isA<EInvoiceSourceException>().having(
+            (EInvoiceSourceException error) => error.fields,
+            'diagnostic fields',
+            contains('position[0].e_invoice_reverse_charge_evidence_source_ref'),
+          ),
+        ),
+      );
+
+      expect(await eInvoiceRow(db, invoiceId), invoiceBefore);
+      expect(await eInvoiceSequence(db), sequenceBefore);
+      expect(await eInvoiceArtifacts(profileDir, invoiceId), isEmpty);
+      for (final String table in postingTables) {
+        expect(await rowCount(table), postingCountsBefore[table], reason: '$table must remain unchanged');
+      }
     });
 
     test('pdf_selection_does_not_embed_zugferd_xml', () async {
@@ -309,6 +372,7 @@ void main() {
         articleId,
         invoiceId,
       ]);
+      await _setStandardTaxClassification(db, invoiceId);
 
       final Map<String, Object?> invoiceBefore = await eInvoiceRow(db, invoiceId);
       final int sequenceBefore = await eInvoiceSequence(db);
@@ -393,6 +457,7 @@ void main() {
     test('pdf_and_cii_match_the_snapshot_and_committed_invoice', () async {
       final int customerId = await addEInvoiceCustomer(db);
       final int invoiceId = await createEInvoiceDraft(ds, kundeId: customerId);
+      await _setStandardTaxClassification(db, invoiceId);
       await ds.finalizeRechnung(
         rechnungId: invoiceId,
         locale: 'de_DE',

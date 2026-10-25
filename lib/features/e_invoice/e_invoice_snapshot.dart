@@ -323,7 +323,7 @@ class EInvoiceSnapshotBuilder {
       );
     }
     final List<_PreDiscountLine> prepared = <_PreDiscountLine>[];
-    _validateReverseChargeEvidence(
+    validateReverseChargeEvidence(
       posRows: posRows,
       companyRow: companyRow,
       customerRow: customerRow,
@@ -771,7 +771,7 @@ class EInvoiceSnapshotBuilder {
     }
   }
 
-  void _validateReverseChargeEvidence({
+  void validateReverseChargeEvidence({
     required List<Map<String, Object?>> posRows,
     required Map<String, Object?> companyRow,
     required Map<String, Object?> customerRow,

@@ -1140,7 +1140,6 @@ WHERE id = ? AND ist_entwurf = 1
     required EInvoiceOutputFormat selectedFormat,
     required bool isOutgoingInvoice,
   }) async {
-    if (selectedFormat == EInvoiceOutputFormat.pdf) return null;
     if (!isOutgoingInvoice || typ.trim().toLowerCase() != 'rechnung') return null;
     final List<Map<String, Object?>> effectiveCompany = companyRows.isEmpty
         ? await transaction.runSelect('SELECT * FROM unternehmen ORDER BY id LIMIT 1', const <Object?>[])
@@ -1152,9 +1151,20 @@ WHERE id = ? AND ist_entwurf = 1
     final List<Map<String, Object?>> customerRows = kundeId == null
         ? const <Map<String, Object?>>[]
         : await transaction.runSelect('SELECT * FROM kunden WHERE id = ?', <Object?>[kundeId]);
+    final Map<String, Object?> customerRow = customerRows.isEmpty ? const <String, Object?>{} : customerRows.single;
+    const EInvoiceSnapshotBuilder builder = EInvoiceSnapshotBuilder();
+    if (selectedFormat == EInvoiceOutputFormat.pdf) {
+      builder.validateReverseChargeEvidence(
+        posRows: posRows,
+        companyRow: companyRow,
+        customerRow: customerRow,
+        deliveryDate: invoice['leistungsdatum']?.toString(),
+      );
+      return null;
+    }
     final num rabattProzent = _asNum(invoice['rabatt_prozent']);
     final num rabattBetrag = _asNum(invoice['rabatt_betrag']);
-    return const EInvoiceSnapshotBuilder().buildFinalization(
+    return builder.buildFinalization(
       documentNumber: documentNumber,
       outputFormat: selectedFormat,
       issueDate: invoiceDate.toIso8601String().substring(0, 10),
