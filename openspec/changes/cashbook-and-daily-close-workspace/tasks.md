@@ -170,8 +170,8 @@
 
 ## 9. receipts-and-payment-reconciliation: Cash posting and receipt reference commit atomically
 
-- [ ] 9.1 Write failing test `test_cash_posting_and_receipt_reference_roll_back_together` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Failed receipt reference rolls back the balanced cash posting"; inject reference-persistence failure and assert the posting group, lines, relationship, and balance effect all roll back.
-- [ ] 9.2 Implement the specified behavior for "Failed receipt reference rolls back the balanced cash posting" to pass 9.1.
+- [x] 9.1 Write failing test `test_cash_posting_and_receipt_reference_roll_back_together` in `test/features/cashbook_and_daily_close_workspace/cashbook_and_daily_close_workspace_test.dart` for scenario "Failed receipt reference rolls back the balanced cash posting"; inject reference-persistence failure and assert the posting group, lines, relationship, and balance effect all roll back.
+- [x] 9.2 Implement the specified behavior for "Failed receipt reference rolls back the balanced cash posting" to pass 9.1.
 - [ ] 9.3 Refactor the affected code; keep the focused and full suites green.
 
 ## 10. Implementation order

@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:openaccounting/core/database.dart';
 import 'package:openaccounting/core/router/app_router.dart';
 import 'package:openaccounting/features/accounting/posting_group_service.dart';
+import 'package:openaccounting/features/cashbook/account_date_balance.dart';
+import 'package:openaccounting/features/cashbook/cashbook_balance_source.dart';
 
 void main() {
   testWidgets('test_approved_cash_event_appears_in_the_cashbook', (WidgetTester tester) async {
@@ -65,6 +67,106 @@ void main() {
     expect(find.text('Steuerbehandlung: Steuersatz nicht hinterlegt'), findsOneWidget);
     expect(find.text('Buchungsidentität: #${event.rootJournalId} · approved-cash-receipt-1'), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('cashbook-event-list')), findsOneWidget);
+  });
+
+  test('test_cash_posting_and_receipt_reference_roll_back_together', () async {
+    final AppDatabase db = await _cashbookDatabase();
+    addTearDown(db.close);
+    final PostingGroupService postings = PostingGroupService(db.executor);
+    await postings.ensureSchema();
+    await db.executor.runInsert(
+      'INSERT OR REPLACE INTO kategorien (id, bezeichnung, konto_skr03, konto_skr04, euer_zeile, aktiv, '
+      'mapping_status, catalog_source_reference, catalog_source_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',
+      <Object?>[7001, 'Kassenumsatz', '8400', '4400', 12, 'catalog_verified', 'TEST', '2026-test.1'],
+    );
+    final DateTime today = DateTime.now();
+    final int receiptId = await db.executor.runInsert('INSERT INTO belege (datum, betrag) VALUES (?, ?)', <Object?>[
+      _localDate(today),
+      '12.50',
+    ]);
+    await db.executor.runCustom(
+      'CREATE TRIGGER reject_cash_receipt_reference BEFORE UPDATE OF beleg_id ON journal '
+      '''WHEN NEW.beleg_id IS NOT NULL BEGIN SELECT RAISE(ABORT, 'injected receipt reference failure'); END''',
+    );
+
+    Future<SettlementGroupSummary> postCash(int selectedReceiptId) => postings.postSettlement(
+      sourceKind: PostingSource.cashPayment,
+      sourceId: 'cash-receipt-reference-atomicity',
+      signedAmountCents: 1250,
+      settlementDate: _localDate(today),
+      bankKontoId: 9001,
+      counterKontoId: 9002,
+      allocations: <SettlementAllocationInput>[
+        const SettlementAllocationInput(appliedCents: 1250, kategorieId: 7001, euerZeile: 12),
+      ],
+      beschreibung: 'Cash receipt reference rollback',
+      receiptId: selectedReceiptId,
+    );
+
+    await expectLater(() => postCash(receiptId), throwsA(isA<PostingException>()));
+
+    final List<Map<String, Object?>> groups = await db.executor.runSelect(
+      'SELECT id FROM settlement_groups WHERE source_kind = ? AND source_id = ?',
+      <Object?>[PostingSource.cashPayment, 'cash-receipt-reference-atomicity'],
+    );
+    final List<Map<String, Object?>> lines = await db.executor.runSelect(
+      'SELECT id FROM journal WHERE source_kind = ? AND source_id = ?',
+      <Object?>[PostingSource.cashPayment, 'cash-receipt-reference-atomicity'],
+    );
+    final List<Map<String, Object?>> references = await db.executor.runSelect(
+      'SELECT id FROM journal WHERE beleg_id = ?',
+      <Object?>[receiptId],
+    );
+    final List<Map<String, Object?>> receiptRows = await db.executor.runSelect(
+      'SELECT status FROM belege WHERE id = ?',
+      <Object?>[receiptId],
+    );
+    final CashbookBalanceResult balance = await CashbookBalanceSource(db.executor)
+        .resolve(CashbookBalanceRequest(companyId: '1', accountId: '9001', asOfDate: today, currencyCode: 'EUR'));
+
+    expect(
+      <Object?>[
+        groups.length,
+        lines.length,
+        references.length,
+        balance.balanceCents,
+        balance.complete,
+        receiptRows.single['status'],
+      ],
+      <Object?>[0, 0, 0, 10000, true, 'neu'],
+    );
+
+    await db.executor.runCustom('DROP TRIGGER reject_cash_receipt_reference');
+    final SettlementGroupSummary event = await postCash(receiptId);
+    final SettlementGroupSummary replay = await postCash(receiptId);
+    final List<Map<String, Object?>> linkedRows = await db.executor.runSelect(
+      'SELECT id FROM journal WHERE beleg_id = ?',
+      <Object?>[receiptId],
+    );
+    final CashbookBalanceResult balanceAfterSuccess = await CashbookBalanceSource(db.executor)
+        .resolve(CashbookBalanceRequest(companyId: '1', accountId: '9001', asOfDate: today, currencyCode: 'EUR'));
+    final int otherReceiptId = await db.executor.runInsert(
+      'INSERT INTO belege (datum, betrag) VALUES (?, ?)',
+      <Object?>[_localDate(today), '12.50'],
+    );
+    await expectLater(() => postCash(otherReceiptId), throwsA(isA<PostingException>()));
+
+    expect(
+      <Object?>[
+        event.rootJournalId,
+        replay.rootJournalId,
+        linkedRows.map((Map<String, Object?> row) => row['id']).toList(),
+        balanceAfterSuccess.balanceCents,
+        balanceAfterSuccess.complete,
+      ],
+      <Object?>[
+        event.rootJournalId,
+        event.rootJournalId,
+        <int>[event.rootJournalId],
+        11250,
+        true,
+      ],
+    );
   });
 
   testWidgets('test_imported_or_legacy_row_is_not_treated_as_cash', (WidgetTester tester) async {

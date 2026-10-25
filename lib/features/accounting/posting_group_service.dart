@@ -779,6 +779,7 @@ class PostingGroupService {
     int? creditKontoId,
     required List<SettlementAllocationInput> allocations,
     int? bankTransactionId,
+    int? receiptId,
     int? kategorieId,
     String? beschreibung,
   }) async {
@@ -786,6 +787,9 @@ class PostingGroupService {
     final String cleanSource = sourceId.trim();
     if (sourceKind != PostingSource.bankTransaction && sourceKind != PostingSource.cashPayment) {
       throw const PostingException('Unbekannte Ausgleichsquelle: nur bank_transaction oder cash_payment');
+    }
+    if (receiptId != null && (sourceKind != PostingSource.cashPayment || receiptId <= 0)) {
+      throw const PostingException('Belegreferenz benötigt eine positive ID und eine Barzahlung');
     }
     if (cleanSource.isEmpty) {
       throw const PostingException('Quellereignis fehlt: Ausgleich braucht eine stabile Quell-ID');
@@ -814,6 +818,11 @@ class PostingGroupService {
 
     final SettlementGroupSummary? replay = await findSettlementGroup(sourceKind, cleanSource);
     if (replay != null) {
+      if (receiptId != null) {
+        if (!await _journalReferencesReceipt(replay.rootJournalId, receiptId)) {
+          throw const PostingException('Barzahlung wurde bereits ohne diesen Beleg gebucht');
+        }
+      }
       return replay;
     }
     if (bankTransactionId != null) {
@@ -857,6 +866,12 @@ class PostingGroupService {
     final TransactionExecutor tx = executor.beginTransaction();
     await tx.ensureOpen(_PostingTxUser());
     try {
+      if (receiptId != null) {
+        final List<Map<String, Object?>> receipts = await tx.runSelect('SELECT id FROM belege WHERE id = ?', <Object?>[
+          receiptId,
+        ]);
+        if (receipts.length != 1) throw const PostingException('Beleg nicht gefunden');
+      }
       // Conditional open-item updates first: a lost race fails here and
       // leaves no provisional journal or allocation rows behind.
       for (final List<_ResolvedAllocation> allocationsForItem in resolvedByForderung.values) {
@@ -946,6 +961,13 @@ class PostingGroupService {
         );
       }
       final int rootId = legIds.first;
+      if (receiptId != null) {
+        final int linked = await tx.runUpdate('UPDATE journal SET beleg_id = ? WHERE id = ?', <Object?>[
+          receiptId,
+          rootId,
+        ]);
+        if (linked != 1) throw const PostingException('Beleg konnte nicht mit der Barzahlung verknüpft werden');
+      }
       await _sealLegs(tx, legIds, rootId);
 
       final int groupId = await tx.runInsert(
@@ -1026,6 +1048,11 @@ class PostingGroupService {
       if (_isUniqueViolation(error)) {
         final SettlementGroupSummary? raced = await findSettlementGroup(sourceKind, cleanSource);
         if (raced != null) {
+          if (receiptId != null) {
+            if (!await _journalReferencesReceipt(raced.rootJournalId, receiptId)) {
+              throw const PostingException('Barzahlung wurde bereits ohne diesen Beleg gebucht');
+            }
+          }
           return raced;
         }
       }
@@ -1315,6 +1342,14 @@ class PostingGroupService {
       return null;
     }
     return _summarizeSettlement(group);
+  }
+
+  Future<bool> _journalReferencesReceipt(int journalId, int receiptId) async {
+    final List<Map<String, Object?>> rows = await executor.runSelect(
+      'SELECT beleg_id FROM journal WHERE id = ?',
+      <Object?>[journalId],
+    );
+    return rows.length == 1 && rows.single['beleg_id'] == receiptId;
   }
 
   Future<SettlementGroupSummary?> findSettlementByBankRow(int bankTransactionId) async {
