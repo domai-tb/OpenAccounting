@@ -208,6 +208,36 @@ class CustomerDisclosureInventory {
 
   /// Versioned per-table field allowlists (record projection version 1).
   /// Unknown columns are never serialized.
+  static const Set<String> _v29TaxEvidenceColumns = <String>{
+    'tax_treatment',
+    'tax_legal_basis',
+    'e_invoice_tax_category_code',
+    'e_invoice_exemption_reason_code',
+    'e_invoice_exemption_reason_text',
+    'e_invoice_intra_community_destination_country_iso',
+    'e_invoice_intra_community_acquisition_tax_treatment',
+    'e_invoice_intra_community_supply_evidence_source_ref',
+    'e_invoice_export_destination_country_iso',
+    'e_invoice_export_movement_actor',
+    'e_invoice_export_evidence_source_ref',
+    'e_invoice_reverse_charge_supplier_establishment_country_iso',
+    'e_invoice_reverse_charge_supplier_establishment_basis',
+    'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+    'e_invoice_reverse_charge_recipient_status',
+    'e_invoice_reverse_charge_recipient_establishment_country_iso',
+    'e_invoice_reverse_charge_service_kind',
+    'e_invoice_reverse_charge_place_of_supply_basis',
+    'e_invoice_reverse_charge_place_of_supply_country_iso',
+    'e_invoice_reverse_charge_taxability',
+    'e_invoice_reverse_charge_evidence_source_ref',
+    'e_invoice_reverse_charge_recipient_13b5_basis',
+    'e_invoice_reverse_charge_ust1tg_certificate_ref',
+    'e_invoice_reverse_charge_ust1tg_scope',
+    'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+    'e_invoice_reverse_charge_ust1tg_issued_on',
+    'e_invoice_reverse_charge_ust1tg_valid_through',
+  };
+
   static const Map<String, Set<String>> fieldAllowlists = <String, Set<String>>{
     'kunden': <String>{
       'id',
@@ -284,6 +314,33 @@ class CustomerDisclosureInventory {
       'ust_satz',
       'position',
       'rabatt_prozent',
+      'tax_treatment',
+      'tax_legal_basis',
+      'e_invoice_tax_category_code',
+      'e_invoice_exemption_reason_code',
+      'e_invoice_exemption_reason_text',
+      'e_invoice_intra_community_destination_country_iso',
+      'e_invoice_intra_community_acquisition_tax_treatment',
+      'e_invoice_intra_community_supply_evidence_source_ref',
+      'e_invoice_export_destination_country_iso',
+      'e_invoice_export_movement_actor',
+      'e_invoice_export_evidence_source_ref',
+      'e_invoice_reverse_charge_supplier_establishment_country_iso',
+      'e_invoice_reverse_charge_supplier_establishment_basis',
+      'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+      'e_invoice_reverse_charge_recipient_status',
+      'e_invoice_reverse_charge_recipient_establishment_country_iso',
+      'e_invoice_reverse_charge_service_kind',
+      'e_invoice_reverse_charge_place_of_supply_basis',
+      'e_invoice_reverse_charge_place_of_supply_country_iso',
+      'e_invoice_reverse_charge_taxability',
+      'e_invoice_reverse_charge_evidence_source_ref',
+      'e_invoice_reverse_charge_recipient_13b5_basis',
+      'e_invoice_reverse_charge_ust1tg_certificate_ref',
+      'e_invoice_reverse_charge_ust1tg_scope',
+      'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+      'e_invoice_reverse_charge_ust1tg_issued_on',
+      'e_invoice_reverse_charge_ust1tg_valid_through',
     },
     'mahnungen': <String>{
       'id',
@@ -443,6 +500,9 @@ class CustomerDisclosureInventory {
     columns.removeAll(lazyPayloadColumns[table] ?? const <String>{});
     if (table == 'journal' && schemaVersion < 19) {
       columns.remove('legacy_unverified');
+    }
+    if (table == 'rechnungspositionen' && schemaVersion < 29) {
+      columns.removeAll(_v29TaxEvidenceColumns);
     }
     if (table == 'mileage_posting_account_mapping' && schemaVersion >= 25) {
       columns.addAll(<String>{'role', 'konto_id', 'kategorie_id', 'reviewed_at'});

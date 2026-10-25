@@ -721,9 +721,9 @@ class EInvoiceSnapshotBuilder {
             !_euMemberCountryCodes.contains(destinationCountry)) {
           fields.add('${prefix}e_invoice_intra_community_destination_country_iso');
         }
-
-        // A source-reference string is not eligibility evidence. This boundary has no resolver yet,
-        // so all §6a output stays fail-closed until v28 binds a real record to this invoice line.
+        // The typed status must be resolved against this buyer, goods, and destination. No
+        // immutable resolver exists yet, so even an eligible-looking value remains unverified.
+        fields.add('${prefix}e_invoice_intra_community_acquisition_tax_treatment');
         fields.add('${prefix}e_invoice_intra_community_supply_evidence_source_ref');
       }
     }
@@ -748,8 +748,15 @@ class EInvoiceSnapshotBuilder {
             _euMemberCountryCodes.contains(destinationCountry)) {
           fields.add('${prefix}e_invoice_export_destination_country_iso');
         }
+        final String? movementActor = sourceRows?.length == 1
+            ? _text(sourceRows!.single['e_invoice_export_movement_actor'])
+            : null;
+        if (movementActor != 'supplier_or_supplier_agent' && movementActor != 'buyer_or_buyer_agent') {
+          fields.add('${prefix}e_invoice_export_movement_actor');
+        }
 
-        // No v28 movement actor or evidence resolver exists, so even a nonempty reference cannot enable G.
+        // Typed movement facts are not proof that the movement is bound to this line. Keep G
+        // fail-closed until an immutable resolver validates the route and source record.
         fields.add('${prefix}e_invoice_export_evidence_source_ref');
       }
     }
@@ -866,8 +873,8 @@ class EInvoiceSnapshotBuilder {
         requireCountry(index, row, 'e_invoice_reverse_charge_place_of_supply_country_iso', 'DE');
         requireOneOf(index, row, 'e_invoice_reverse_charge_taxability', <String>{'taxable_in_germany_under_13b_2_4'});
         requireText(index, row, 'e_invoice_reverse_charge_evidence_source_ref');
-        // Assessment/certificate resolution belongs to the later v28 input
-        // persistence slice; block output until those real records are wired.
+        // Persisted certificate fields are not enough to prove validity for this buyer and date.
+        // Keep output fail-closed until the immutable assessment resolver is wired.
         fields.add('position[$index].e_invoice_reverse_charge_evidence_source_ref');
         requireOneOf(index, row, 'e_invoice_reverse_charge_recipient_13b5_basis', <String>{'valid_ust1tg_certificate'});
         requireText(index, row, 'e_invoice_reverse_charge_ust1tg_certificate_ref');

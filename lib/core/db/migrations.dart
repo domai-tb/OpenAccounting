@@ -15,7 +15,7 @@ class MigrationRunner {
   final String profileDir;
   final List<String> requiredTables;
 
-  static const int currentVersion = 28;
+  static const int currentVersion = 29;
 
   Future<int> getUserVersion() async {
     final rows = await executor.runSelect('PRAGMA user_version', const []);
@@ -96,6 +96,12 @@ class MigrationRunner {
         malformedTables.add('mileage_trip_corrections');
       }
       if (!await _hasMileageCorrectionPostingGuard()) malformedTables.add('mileage_trips');
+    }
+    if (version >= 29 &&
+        actualTables.contains('rechnungspositionen') &&
+        !await _hasEInvoiceTaxEvidenceSchema() &&
+        !malformedTables.contains('rechnungspositionen')) {
+      malformedTables.add('rechnungspositionen');
     }
     malformedTables.sort();
     final ({bool healthy, bool complete}) lazyTables = await _inspectLazyOccurrenceTables(version, actualTables);
@@ -500,7 +506,8 @@ class MigrationRunner {
           await _mileageLifecycleNeedsRepair() ||
           await _mileagePostingNeedsRepair() ||
           !(await _hasAccountOpeningBalanceSourceSchema()) ||
-          !(await _hasDailyCloseEvidenceSchema())) {
+          !(await _hasDailyCloseEvidenceSchema()) ||
+          !(await _hasEInvoiceTaxEvidenceSchema())) {
         await _repairCurrentFeature(afterFeatureSchemaDdl);
         return true;
       }
@@ -609,6 +616,7 @@ class MigrationRunner {
       await _migrateMileageCorrectionOperation();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
+      await _migrateEInvoiceTaxEvidence();
       await _runFeatureDdlCallback(afterFeatureSchemaDdl);
       await _verifyRequiredTables();
       await setUserVersion(currentVersion);
@@ -769,6 +777,9 @@ class MigrationRunner {
     }
     if (version == 28) {
       await _migrateMileageCorrectionOperation();
+    }
+    if (version == 29) {
+      await _migrateEInvoiceTaxEvidence();
     }
   }
 
@@ -1515,6 +1526,7 @@ AND ${_mileageCorrectionJournalProof(correctionId: 'NEW.posting_event_id', repla
       await _migrateAccountHolder();
       await _migrateOccurrenceReviewState();
       await _migrateEInvoiceOutputFormat();
+      await _migrateEInvoiceTaxEvidence();
       await _migrateMileageLifecycle();
       await _migrateMileagePosting();
       await _migrateAccountOpeningBalanceSource();
@@ -2388,6 +2400,55 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
     await _verifyOccurrenceReviewState();
   }
 
+  /// Add nullable per-position tax-evidence fields without backfilling legacy
+  /// rows. Missing or malformed source schema fails the migration closed.
+  Future<void> _migrateEInvoiceTaxEvidence() async {
+    final List<Map<String, Object?>> tables = await executor.runSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rechnungspositionen'",
+      const <Object?>[],
+    );
+    if (tables.isEmpty) {
+      throw StateError('E-Rechnungs-Steuerevidenz braucht die Tabelle rechnungspositionen');
+    }
+    for (final String column in _eInvoiceTaxEvidenceColumns) {
+      await _addColumnIfMissing('rechnungspositionen', column, 'TEXT');
+    }
+    await _verifyEInvoiceTaxEvidenceSchema();
+  }
+
+  Future<bool> _hasEInvoiceTaxEvidenceSchema() async {
+    try {
+      await _verifyEInvoiceTaxEvidenceSchema();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _verifyEInvoiceTaxEvidenceSchema() async {
+    final List<Map<String, Object?>> columns = await executor.runSelect(
+      'PRAGMA table_info(rechnungspositionen)',
+      const <Object?>[],
+    );
+    if (columns.isEmpty) {
+      throw StateError('E-Rechnungs-Steuerevidenz-Tabelle rechnungspositionen fehlt');
+    }
+    for (final String name in _eInvoiceTaxEvidenceColumns) {
+      final List<Map<String, Object?>> matching = columns.where((row) => row['name'] == name).toList();
+      if (matching.isEmpty) {
+        throw StateError('E-Rechnungs-Steuerevidenzspalte $name fehlt');
+      }
+      final Map<String, Object?> column = matching.single;
+      final Object? notNull = column['notnull'];
+      if (column['type'].toString().toUpperCase() != 'TEXT' ||
+          notNull is! num ||
+          notNull != 0 ||
+          column['dflt_value'] != null) {
+        throw StateError('E-Rechnungs-Steuerevidenzspalte $name ist unverifizierbar');
+      }
+    }
+  }
+
   /// E-invoice output-format persistence (v22, next sequential after the v21
   /// baseline). Adds nullable `rechnungen.ausgabeformat` (`pdf`, `zugferd`,
   /// or `xrechnung`) plus `rechnungen.kunde_snapshot` (finalized customer
@@ -2396,6 +2457,7 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
   /// output; drafts keep NULL until finalization writes the explicit choice.
   /// Readers resolve any remaining NULL to `pdf` without consulting current
   /// customer settings. Idempotent: reruns emit no duplicate DDL.
+
   Future<void> _migrateEInvoiceOutputFormat() async {
     final List<Map<String, Object?>> tables = await executor.runSelect(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rechnungen'",
@@ -2797,6 +2859,36 @@ const Map<String, Set<String>> _declaredRelationshipIdColumns = <String, Set<Str
   'dokument_email_versuche': <String>{'dokument_id', 'mahnung_id'},
   'account_opening_balance_sources': <String>{'unternehmen_id', 'konto_id', 'journal_id'},
 };
+
+const List<String> _eInvoiceTaxEvidenceColumns = <String>[
+  'tax_treatment',
+  'tax_legal_basis',
+  'e_invoice_tax_category_code',
+  'e_invoice_exemption_reason_code',
+  'e_invoice_exemption_reason_text',
+  'e_invoice_intra_community_destination_country_iso',
+  'e_invoice_intra_community_acquisition_tax_treatment',
+  'e_invoice_intra_community_supply_evidence_source_ref',
+  'e_invoice_export_destination_country_iso',
+  'e_invoice_export_movement_actor',
+  'e_invoice_export_evidence_source_ref',
+  'e_invoice_reverse_charge_supplier_establishment_country_iso',
+  'e_invoice_reverse_charge_supplier_establishment_basis',
+  'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+  'e_invoice_reverse_charge_recipient_status',
+  'e_invoice_reverse_charge_recipient_establishment_country_iso',
+  'e_invoice_reverse_charge_service_kind',
+  'e_invoice_reverse_charge_place_of_supply_basis',
+  'e_invoice_reverse_charge_place_of_supply_country_iso',
+  'e_invoice_reverse_charge_taxability',
+  'e_invoice_reverse_charge_evidence_source_ref',
+  'e_invoice_reverse_charge_recipient_13b5_basis',
+  'e_invoice_reverse_charge_ust1tg_certificate_ref',
+  'e_invoice_reverse_charge_ust1tg_scope',
+  'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+  'e_invoice_reverse_charge_ust1tg_issued_on',
+  'e_invoice_reverse_charge_ust1tg_valid_through',
+];
 
 const Map<String, Set<String>> _declaredSchemaColumns = <String, Set<String>>{
   // These keys are stable across profile versions; the exporter validates every projected field separately.

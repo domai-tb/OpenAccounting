@@ -8,6 +8,25 @@ import 'package:openaccounting/features/einkommen/forderungen_repository.dart';
 import 'package:openaccounting/features/recurring/rechnungsvorlagen_repository.dart';
 import 'package:openaccounting/pages/stammdaten/customer_data_disclosure_export.dart';
 
+const Set<String> _freshSchemaManagedTables = <String>{
+  'forderung_zahlungen',
+  'category_mapping_history',
+  'feature_table_state',
+  'mileage_trips',
+  'mileage_trip_corrections',
+  'mileage_posting_account_mapping',
+  'mileage_posting_period_closures',
+  'master_data_import_templates',
+  'anlage_afa_jahreswerte',
+  'account_opening_balance_sources',
+};
+const Set<String> _inventoryOnlyTables = <String>{
+  'buchungsvorlagen_occurrences',
+  'rechnungsvorlagen_occurrences',
+  'dokument_email_templates',
+  'dokument_email_versuche',
+};
+
 Future<Directory> _tempDir(String prefix) async {
   final Directory dir = await Directory.systemTemp.createTemp(prefix);
   addTearDown(() async {
@@ -238,7 +257,7 @@ void main() {
       );
       expect(actual, isNot(contains('buchungsvorlagen_occurrences')));
       expect(actual, isNot(contains('rechnungsvorlagen_occurrences')));
-      expect(actual.length, 48 + (MigrationRunner.currentVersion >= 19 ? 3 : 0));
+      expect(actual, <String>{...AppDatabase.allTableNames, ..._freshSchemaManagedTables});
       expect(actual.contains('settlement_groups'), MigrationRunner.currentVersion >= 19);
       expect(await _userVersion(db), MigrationRunner.currentVersion);
 
@@ -252,9 +271,8 @@ void main() {
       ]);
       expect(await _userVersion(db), MigrationRunner.currentVersion);
 
-      // The inventory includes future migration tables and four absent lazy or optional tables.
-      expect(CustomerDisclosureInventory.knownTableNames.length, 55);
-      expect(CustomerDisclosureInventory.knownTableNames, containsAll(actual));
+      // The inventory includes the physical schema plus two absent lazy and two optional tables.
+      expect(CustomerDisclosureInventory.knownTableNames, <String>{...actual, ..._inventoryOnlyTables});
       expect(
         CustomerDisclosureInventory.knownTableNames,
         containsAll(<String>['dokument_email_templates', 'dokument_email_versuche']),
@@ -481,8 +499,7 @@ void main() {
       final Set<String> after = await _tableNames(db);
       expect(after, before);
       // Fresh schema leaves both occurrence tables absent.
-      expect(after.length, 48 + (MigrationRunner.currentVersion >= 19 ? 3 : 0));
-      expect(after, containsAll(AppDatabase.allTableNames));
+      expect(after, <String>{...AppDatabase.allTableNames, ..._freshSchemaManagedTables});
       for (final String lazy in <String>['buchungsvorlagen_occurrences', 'rechnungsvorlagen_occurrences']) {
         expect(after, isNot(contains(lazy)));
       }
@@ -658,6 +675,45 @@ void main() {
       expect(health.malformedTables, contains('rechnungen'));
       expect(await _tableNames(db), after);
       expect(after, contains('rechnungen'));
+    });
+
+    test('v29 disclosure inventory requires persisted e-invoice tax evidence', () {
+      final Set<String> evidence = <String>{
+        'tax_treatment',
+        'tax_legal_basis',
+        'e_invoice_tax_category_code',
+        'e_invoice_exemption_reason_code',
+        'e_invoice_exemption_reason_text',
+        'e_invoice_intra_community_destination_country_iso',
+        'e_invoice_intra_community_acquisition_tax_treatment',
+        'e_invoice_intra_community_supply_evidence_source_ref',
+        'e_invoice_export_destination_country_iso',
+        'e_invoice_export_movement_actor',
+        'e_invoice_export_evidence_source_ref',
+        'e_invoice_reverse_charge_supplier_establishment_country_iso',
+        'e_invoice_reverse_charge_supplier_establishment_basis',
+        'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
+        'e_invoice_reverse_charge_recipient_status',
+        'e_invoice_reverse_charge_recipient_establishment_country_iso',
+        'e_invoice_reverse_charge_service_kind',
+        'e_invoice_reverse_charge_place_of_supply_basis',
+        'e_invoice_reverse_charge_place_of_supply_country_iso',
+        'e_invoice_reverse_charge_taxability',
+        'e_invoice_reverse_charge_evidence_source_ref',
+        'e_invoice_reverse_charge_recipient_13b5_basis',
+        'e_invoice_reverse_charge_ust1tg_certificate_ref',
+        'e_invoice_reverse_charge_ust1tg_scope',
+        'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
+        'e_invoice_reverse_charge_ust1tg_issued_on',
+        'e_invoice_reverse_charge_ust1tg_valid_through',
+      };
+      final Set<String> allowlist = CustomerDisclosureInventory.fieldAllowlists['rechnungspositionen']!;
+      expect(allowlist, containsAll(evidence));
+      expect(
+        CustomerDisclosureInventory.requiredPayloadColumns('rechnungspositionen', schemaVersion: 28),
+        isNot(contains('tax_treatment')),
+      );
+      expect(CustomerDisclosureInventory.requiredPayloadColumns('rechnungspositionen'), containsAll(evidence));
     });
 
     test('test_customer_data_disclosure_export_050_relationship_key_declared_as_text_fails_schema_health', () async {

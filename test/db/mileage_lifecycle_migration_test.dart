@@ -33,7 +33,10 @@ void main() {
         const <Object?>[],
       );
       expect(triggers, hasLength(16));
-      expect(await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(), 28);
+      expect(
+        await MigrationRunner(executor: db.executor, profileDir: profileDirectory.path).getUserVersion(),
+        MigrationRunner.currentVersion,
+      );
     });
 
     test('v22 migration demotes unknown calculated facts and preserves posted facts', () async {
@@ -108,7 +111,7 @@ INSERT INTO mileage_trips (
       expect(migratedCalculated['calculated_amount'], isNull);
       expect(migratedCalculated['calculated_at'], isNull);
       expect(migratedCalculated['posting_event_id'], isNull);
-      expect(await runner.getUserVersion(), 28);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
     });
 
     test('v23 correction demotes unknown calculations and refreshes snapshot guards', () async {
@@ -175,7 +178,7 @@ INSERT INTO mileage_trips (
       ]) {
         expect(triggerSql, contains('NEW.$field IS NULL'));
       }
-      expect(await runner.getUserVersion(), 28);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
     });
 
     test('v24 upgrade adds mileage mapping snapshots and preserves existing ledger rows', () async {
@@ -247,7 +250,7 @@ INSERT INTO mileage_trips (
 
       final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       expect(await runner.run(createSchema: () async {}), isTrue);
-      expect(await runner.getUserVersion(), 28);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
 
       final List<Map<String, Object?>> accountRows = await db.executor.runSelect(
         'SELECT id, name, kontoart FROM konten WHERE id = ?',
@@ -355,7 +358,7 @@ END''');
 
       final MigrationRunner runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
       expect(await runner.run(createSchema: () async {}), isTrue);
-      expect(await runner.getUserVersion(), 28);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
 
       final List<Map<String, Object?>> tripRows = await db.executor.runSelect(
         'SELECT id, trip_date, purpose, business_context, distance_hundredths_km, state, posting_event_id '
@@ -398,7 +401,7 @@ END''');
       expect(tripPostingGuards.single['sql'].toString().toLowerCase(), contains('reversal_of_group_id'));
     });
 
-    test('current v28 repair replaces marker-retaining weakened correction guards', () async {
+    test('current v29 repair replaces marker-retaining weakened correction guards', () async {
       await db.executor.runCustom('DROP TRIGGER trg_mileage_correction_update_guard');
       await db.executor.runCustom('DROP TRIGGER trg_mileage_trip_posting_guard');
       await db.executor.runCustom('''

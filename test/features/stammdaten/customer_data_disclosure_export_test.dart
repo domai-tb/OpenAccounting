@@ -369,6 +369,38 @@ void main() {
       expect(occJsonl, isNot(contains('vorlage_id')));
     });
 
+    test('v29 customer disclosure export preserves persisted e-invoice tax tuple', () async {
+      final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb(
+        'disclosure_tax_v29_',
+      );
+      final int customerId = await _seedCustomer(env.db, 'Tax Evidence Customer');
+      await _ensureInvoiceColumns(env.db);
+      final int invoiceId = await _seedInvoice(env.db, customerId: customerId, number: 'RE-TAX-29');
+      final int positionId = await env.db.executor.runInsert(
+        'INSERT INTO rechnungspositionen (rechnung_id, bezeichnung, einzelpreis, gesamt) VALUES (?, ?, ?, ?)',
+        <Object?>[invoiceId, 'Tax evidence line', '100.00', '100.00'],
+      );
+      await env.db.executor.runUpdate(
+        'UPDATE rechnungspositionen SET tax_treatment = ?, tax_legal_basis = ?, e_invoice_tax_category_code = ? '
+        'WHERE id = ?',
+        <Object?>['standard_19', 'ustg_12_1', 'S', positionId],
+      );
+
+      final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);
+      final String destination = p.join(env.outDir.path, 'tax_evidence.zip');
+      final CustomerDisclosureResult result = await service.exportCustomer(
+        customerId: customerId,
+        destinationPath: destination,
+      );
+
+      expect(result.status, CustomerDisclosureExportStatus.complete);
+      final String jsonl = utf8.decode(await service.readEntry(destination, 'records/rechnungspositionen.jsonl'));
+      final Map<String, Object?> position = Map<String, Object?>.from(jsonDecode(jsonl.trim()) as Map);
+      expect(position['tax_treatment'], 'standard_19');
+      expect(position['tax_legal_basis'], 'ustg_12_1');
+      expect(position['e_invoice_tax_category_code'], 'S');
+    });
+
     test('test_customer_data_disclosure_export_002_no_customer_is_selected_or_the_id_is_invalid', () async {
       final ({AppDatabase db, Directory profileDir, Directory outDir}) env = await _openCustomerDb('disclosure_002_');
       final CustomerDataDisclosureExportService service = _service(env.db, env.profileDir);

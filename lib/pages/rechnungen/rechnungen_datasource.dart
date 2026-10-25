@@ -28,31 +28,7 @@ class RechnungenDataSource {
   final CorrectionArtifactWriter correctionArtifactWriter;
   final EInvoiceService eInvoiceService;
 
-  static const List<String> _eInvoiceEvidenceColumns = <String>[
-    'tax_treatment',
-    'tax_legal_basis',
-    'e_invoice_tax_category_code',
-    'e_invoice_exemption_reason_code',
-    'e_invoice_exemption_reason_text',
-    'e_invoice_intra_community_destination_country_iso',
-    'e_invoice_intra_community_supply_evidence_source_ref',
-    'e_invoice_reverse_charge_supplier_establishment_country_iso',
-    'e_invoice_reverse_charge_supplier_establishment_basis',
-    'e_invoice_reverse_charge_supplier_german_fixed_establishment_status',
-    'e_invoice_reverse_charge_recipient_status',
-    'e_invoice_reverse_charge_recipient_establishment_country_iso',
-    'e_invoice_reverse_charge_service_kind',
-    'e_invoice_reverse_charge_place_of_supply_basis',
-    'e_invoice_reverse_charge_place_of_supply_country_iso',
-    'e_invoice_reverse_charge_taxability',
-    'e_invoice_reverse_charge_evidence_source_ref',
-    'e_invoice_reverse_charge_recipient_13b5_basis',
-    'e_invoice_reverse_charge_ust1tg_certificate_ref',
-    'e_invoice_reverse_charge_ust1tg_scope',
-    'e_invoice_reverse_charge_ust1tg_recipient_vat_id',
-    'e_invoice_reverse_charge_ust1tg_issued_on',
-    'e_invoice_reverse_charge_ust1tg_valid_through',
-  ];
+  static const List<String> _eInvoiceEvidenceColumns = RechnungPositionTaxEvidence.databaseColumns;
 
   bool get correctionArtifactTransactionAvailable => profileDir?.trim().isNotEmpty ?? false;
 
@@ -331,28 +307,47 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ],
     );
     for (var index = 0; index < positionen.length; index++) {
-      final RechnungPositionItem position = positionen[index];
-      await transaction.runInsert(
-        '''
-INSERT INTO rechnungspositionen (
-  rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent
-)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-''',
-        <Object?>[
-          invoiceId,
-          position.artikelId,
-          position.bezeichnung,
-          position.menge.toStringAsFixed(3),
-          position.einzelpreis.toStringAsFixed(4),
-          position.gesamt.toStringAsFixed(2),
-          position.ustSatz.toStringAsFixed(2),
-          position.position ?? index,
-          (position.rabattProzent ?? 0).toStringAsFixed(2),
-        ],
+      await _insertPositionInTransaction(
+        transaction: transaction,
+        invoiceId: invoiceId,
+        index: index,
+        position: positionen[index],
       );
     }
     return invoiceId;
+  }
+
+  Future<void> _insertPositionInTransaction({
+    required TransactionExecutor transaction,
+    required int invoiceId,
+    required int index,
+    required RechnungPositionItem position,
+  }) async {
+    final Map<String, Object?> evidence =
+        position.taxEvidence?.toDatabaseColumns() ?? const RechnungPositionTaxEvidence().toDatabaseColumns();
+    final String evidenceColumns = _eInvoiceEvidenceColumns.join(', ');
+    final String evidencePlaceholders = List<String>.filled(_eInvoiceEvidenceColumns.length, '?').join(', ');
+    await transaction.runInsert(
+      '''
+INSERT INTO rechnungspositionen (
+  rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent,
+  $evidenceColumns
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, $evidencePlaceholders)
+''',
+      <Object?>[
+        invoiceId,
+        position.artikelId,
+        position.bezeichnung,
+        position.menge.toStringAsFixed(3),
+        position.einzelpreis.toStringAsFixed(4),
+        position.gesamt.toStringAsFixed(2),
+        position.ustSatz.toStringAsFixed(2),
+        position.position ?? index,
+        (position.rabattProzent ?? 0).toStringAsFixed(2),
+        for (final String column in _eInvoiceEvidenceColumns) evidence[column],
+      ],
+    );
   }
 
   Future<int> createDokument({
@@ -476,21 +471,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       );
       await transaction.runUpdate('DELETE FROM rechnungspositionen WHERE rechnung_id = ?', <Object?>[rechnungId]);
       for (var index = 0; index < positionen.length; index++) {
-        final position = positionen[index];
-        await transaction.runInsert(
-          'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, '
-          'ust_satz, position, rabatt_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          <Object?>[
-            rechnungId,
-            position.artikelId,
-            position.bezeichnung,
-            position.menge.toStringAsFixed(3),
-            position.einzelpreis.toStringAsFixed(4),
-            position.gesamt.toStringAsFixed(2),
-            position.ustSatz.toStringAsFixed(2),
-            position.position ?? index,
-            (position.rabattProzent ?? 0).toStringAsFixed(2),
-          ],
+        await _insertPositionInTransaction(
+          transaction: transaction,
+          invoiceId: rechnungId,
+          index: index,
+          position: positionen[index],
         );
       }
       await transaction.send();
@@ -1777,8 +1762,10 @@ WHERE id = ? AND ist_entwurf = 1
       if (orig['ersatzrechnung_id'] != null) {
         throw StateError('Ersatzrechnung bereits vorhanden');
       }
+      final String evidenceColumns = _eInvoiceEvidenceColumns.join(', ');
+      final String evidencePlaceholders = List<String>.filled(_eInvoiceEvidenceColumns.length, '?').join(', ');
       final posRows = await transaction.runSelect(
-        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent, $evidenceColumns FROM rechnungspositionen WHERE rechnung_id = ?',
         <Object?>[vonRechnungId],
       );
       final String eingabemodus = orig['eingabemodus']?.toString() ?? 'netto';
@@ -1832,7 +1819,7 @@ WHERE id = ? AND ist_entwurf = 1
       );
       for (final r in posRows) {
         await transaction.runInsert(
-          'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent, $evidenceColumns) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, $evidencePlaceholders)',
           <Object?>[
             ersatzId,
             r['artikel_id'],
@@ -1843,6 +1830,7 @@ WHERE id = ? AND ist_entwurf = 1
             r['ust_satz'].toString(),
             r['position'],
             r['rabatt_prozent']?.toString() ?? '0.00',
+            for (final String column in _eInvoiceEvidenceColumns) r[column],
           ],
         );
       }
@@ -1896,8 +1884,10 @@ WHERE id = ? AND ist_entwurf = 1
               : '$srcTyp kann nicht in $zielTyp konvertiert werden',
         );
       }
+      final String evidenceColumns = _eInvoiceEvidenceColumns.join(', ');
+      final String evidencePlaceholders = List<String>.filled(_eInvoiceEvidenceColumns.length, '?').join(', ');
       final posRows = await transaction.runSelect(
-        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent FROM rechnungspositionen WHERE rechnung_id = ?',
+        'SELECT artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent, $evidenceColumns FROM rechnungspositionen WHERE rechnung_id = ?',
         <Object?>[quelleId],
       );
       final eingabemodus = src['eingabemodus'].toString();
@@ -1954,7 +1944,7 @@ WHERE id = ? AND ist_entwurf = 1
       );
       for (final r in posRows) {
         await transaction.runInsert(
-          'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO rechnungspositionen (rechnung_id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent, $evidenceColumns) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, $evidencePlaceholders)',
           <Object?>[
             zielId,
             r['artikel_id'],
@@ -1965,6 +1955,7 @@ WHERE id = ? AND ist_entwurf = 1
             r['ust_satz'].toString(),
             r['position'],
             r['rabatt_prozent']?.toString() ?? '0.00',
+            for (final String column in _eInvoiceEvidenceColumns) r[column],
           ],
         );
       }
@@ -2111,7 +2102,7 @@ WHERE r.id = ?
   Future<List<Map<String, Object?>>> findPositionenByRechnungId(int rechnungId) {
     return executor.runSelect(
       '''
-SELECT id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent
+SELECT id, artikel_id, bezeichnung, menge, einzelpreis, gesamt, ust_satz, position, rabatt_prozent, ${_eInvoiceEvidenceColumns.join(', ')}
 FROM rechnungspositionen
 WHERE rechnung_id = ?
 ORDER BY position, id

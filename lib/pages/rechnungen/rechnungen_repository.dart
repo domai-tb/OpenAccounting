@@ -230,6 +230,7 @@ class RechnungenRepository {
       ustSatz: _requiredNum(row, 'ust_satz'),
       position: _requiredInt(row, 'position'),
       rabattProzent: row['rabatt_prozent'] == null ? null : _requiredNum(row, 'rabatt_prozent'),
+      taxEvidence: RechnungPositionTaxEvidence.fromDatabaseRow(row),
     );
   }
 }
