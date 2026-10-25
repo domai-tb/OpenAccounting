@@ -139,6 +139,60 @@ FinalizationSnapshot _grossInputSnapshot() => const EInvoiceSnapshotBuilder().bu
 
 void main() {
   group('ZUGFeRD and XRechnung e-invoicing', () {
+    Map<String, Object?> section25aPosition({
+      required int position,
+      required String treatment,
+      required String reasonCode,
+      required String reason,
+    }) => <String, Object?>{
+      'bezeichnung': 'Differenzbesteuerter Artikel',
+      'menge': 1,
+      'einzelpreis': 100,
+      'ust_satz': 0,
+      'tax_treatment': treatment,
+      'tax_legal_basis': 'ustg_25a',
+      'e_invoice_tax_category_code': 'E',
+      'e_invoice_exemption_reason_code': reasonCode,
+      'e_invoice_exemption_reason_text': reason,
+      'position': position,
+    };
+
+    Map<String, Object?> section19Position(int position) => <String, Object?>{
+      'bezeichnung': 'Kleinunternehmerleistung',
+      'menge': 1,
+      'einzelpreis': 100,
+      'ust_satz': 0,
+      'tax_treatment': 'kleinunternehmer_19',
+      'tax_legal_basis': 'ustg_19',
+      'e_invoice_tax_category_code': 'E',
+      'e_invoice_exemption_reason_code': null,
+      'e_invoice_exemption_reason_text': 'Kein Ausweis von Umsatzsteuer, da Kleinunternehmer gemäß § 19 UStG',
+      'position': position,
+    };
+
+    FinalizationSnapshot snapshotForPositions(List<Map<String, Object?>> positions, EInvoiceOutputFormat format) =>
+        const EInvoiceSnapshotBuilder().buildFinalization(
+          documentNumber: 'RE-2026-0001',
+          outputFormat: format,
+          issueDate: '2026-03-15',
+          companyRow: validCompany(),
+          customerRow: validCustomer(),
+          posRows: positions,
+          preview: EInvoiceCanonicalTotals(
+            netCents: positions.length * 10000,
+            taxCents: 0,
+            grossCents: positions.length * 10000,
+          ),
+          eingabemodus: 'netto',
+        );
+
+    String serializeSnapshot(FinalizationSnapshot snapshot, EInvoiceOutputFormat format) {
+      const EInvoiceXmlSerializer serializer = EInvoiceXmlSerializer();
+      return format == EInvoiceOutputFormat.xrechnung
+          ? serializer.xrechnungUbl(snapshot)
+          : serializer.zugferdCii(snapshot);
+    }
+
     test('offline_validator_accepts_serialized_ubl_and_cii_before_return', () async {
       final List<EInvoiceOutputFormat> validatedFormats = <EInvoiceOutputFormat>[];
       final EInvoiceService service = EInvoiceService(
@@ -1048,6 +1102,142 @@ void main() {
         expect(cii, contains('<ram:ExemptionReasonCode>$code</ram:ExemptionReasonCode>'));
       });
     }
+
+    test('repeated_section_25a_subtype_aggregates_to_one_e_breakdown_with_one_reason', () {
+      final List<Map<String, Object?>> positions = <Map<String, Object?>>[
+        section25aPosition(
+          position: 8,
+          treatment: 'margin_scheme_25a_second_hand',
+          reasonCode: 'VATEX-EU-F',
+          reason: 'Gebrauchtgegenstände/Sonderregelung',
+        ),
+        section25aPosition(
+          position: 9,
+          treatment: 'margin_scheme_25a_second_hand',
+          reasonCode: 'VATEX-EU-F',
+          reason: 'Gebrauchtgegenstände/Sonderregelung',
+        ),
+      ];
+
+      for (final EInvoiceOutputFormat format in <EInvoiceOutputFormat>[
+        EInvoiceOutputFormat.xrechnung,
+        EInvoiceOutputFormat.zugferd,
+      ]) {
+        final FinalizationSnapshot snapshot = snapshotForPositions(positions, format);
+        expect(snapshot.taxBreakdowns, hasLength(1));
+        expect(snapshot.taxBreakdowns.single.classification.category, EInvoiceTaxCategory.exempt);
+        expect(snapshot.taxBreakdowns.single.classification.exemptionReasonCode, 'VATEX-EU-F');
+        expect(snapshot.taxBreakdowns.single.netCents, 20000);
+        expect(snapshot.lines.map((EInvoiceLineSnapshot line) => line.classification.invoiceNote).toList(), <String?>[
+          'Gebrauchtgegenstände/Sonderregelung',
+          'Gebrauchtgegenstände/Sonderregelung',
+        ]);
+        final String xml = serializeSnapshot(snapshot, format);
+        if (format == EInvoiceOutputFormat.xrechnung) {
+          expect(xml.split('<cac:TaxSubtotal>').length - 1, 1);
+          expect(xml, contains('<cbc:TaxExemptionReasonCode>VATEX-EU-F</cbc:TaxExemptionReasonCode>'));
+        } else {
+          expect(xml.split('<ram:CalculatedAmount>').length - 1, 1);
+          expect(xml, contains('<ram:ExemptionReasonCode>VATEX-EU-F</ram:ExemptionReasonCode>'));
+        }
+      }
+    });
+
+    test('section_25a_mixed_subtypes_fail_closed_for_single_e_breakdown', () {
+      final List<Map<String, Object?>> positions = <Map<String, Object?>>[
+        section25aPosition(
+          position: 8,
+          treatment: 'margin_scheme_25a_second_hand',
+          reasonCode: 'VATEX-EU-F',
+          reason: 'Gebrauchtgegenstände/Sonderregelung',
+        ),
+        section25aPosition(
+          position: 9,
+          treatment: 'margin_scheme_25a_art',
+          reasonCode: 'VATEX-EU-I',
+          reason: 'Kunstgegenstände/Sonderregelung',
+        ),
+        section25aPosition(
+          position: 10,
+          treatment: 'margin_scheme_25a_collectors_antiquities',
+          reasonCode: 'VATEX-EU-J',
+          reason: 'Sammlungsstücke und Antiquitäten/Sonderregelung',
+        ),
+      ];
+      final List<String> expectedFields = <String>[
+        for (final int position in <int>[8, 9, 10]) 'position[$position].e_invoice_exemption_reason_code',
+        for (final int position in <int>[8, 9, 10]) 'position[$position].e_invoice_exemption_reason_text',
+      ];
+
+      for (final EInvoiceOutputFormat format in <EInvoiceOutputFormat>[
+        EInvoiceOutputFormat.xrechnung,
+        EInvoiceOutputFormat.zugferd,
+      ]) {
+        expect(
+          () => serializeSnapshot(snapshotForPositions(positions, format), format),
+          throwsA(
+            predicate(
+              (Object? error) =>
+                  error is EInvoiceSourceException &&
+                  error.code == 'incompatibleEInvoiceExemptionReasons' &&
+                  error.fields.toSet().containsAll(expectedFields) &&
+                  error.messageEn.contains('Position 8') &&
+                  error.messageEn.contains('Position 9') &&
+                  error.messageEn.contains('Position 10') &&
+                  error.messageEn.contains('VATEX-EU-F') &&
+                  error.messageEn.contains('VATEX-EU-I') &&
+                  error.messageEn.contains('VATEX-EU-J') &&
+                  error.messageEn.contains('Gebrauchtgegenstände/Sonderregelung') &&
+                  error.messageEn.contains('Kunstgegenstände/Sonderregelung') &&
+                  error.messageEn.contains('Sammlungsstücke und Antiquitäten/Sonderregelung'),
+            ),
+          ),
+          reason: 'both formats must fail before either serializer returns XML',
+        );
+      }
+    });
+
+    test('section_19_mixed_with_25a_fails_closed_for_e_breakdown_reason_conflict', () {
+      final List<Map<String, Object?>> positions = <Map<String, Object?>>[
+        section19Position(11),
+        section25aPosition(
+          position: 12,
+          treatment: 'margin_scheme_25a_second_hand',
+          reasonCode: 'VATEX-EU-F',
+          reason: 'Gebrauchtgegenstände/Sonderregelung',
+        ),
+      ];
+      final List<String> expectedFields = <String>[
+        'position[11].e_invoice_exemption_reason_code',
+        'position[12].e_invoice_exemption_reason_code',
+        'position[11].e_invoice_exemption_reason_text',
+        'position[12].e_invoice_exemption_reason_text',
+      ];
+
+      for (final EInvoiceOutputFormat format in <EInvoiceOutputFormat>[
+        EInvoiceOutputFormat.xrechnung,
+        EInvoiceOutputFormat.zugferd,
+      ]) {
+        expect(
+          () => serializeSnapshot(snapshotForPositions(positions, format), format),
+          throwsA(
+            predicate(
+              (Object? error) =>
+                  error is EInvoiceSourceException &&
+                  error.code == 'incompatibleEInvoiceExemptionReasons' &&
+                  error.fields.toSet().containsAll(expectedFields) &&
+                  error.messageEn.contains('Position 11') &&
+                  error.messageEn.contains('Position 12') &&
+                  error.messageEn.contains('BT-121') &&
+                  error.messageEn.contains('BT-120') &&
+                  error.messageEn.contains('VATEX-EU-F') &&
+                  error.messageEn.contains('Kein Ausweis von Umsatzsteuer, da Kleinunternehmer gemäß § 19 UStG'),
+            ),
+          ),
+          reason: 'conflicting §19 and §25a reasons must be diagnosed before XML output',
+        );
+      }
+    });
 
     test('gross_input_emits_canonical_net_price_basis_in_ubl_and_cii', () {
       final FinalizationSnapshot snapshot = const EInvoiceSnapshotBuilder().buildFinalization(

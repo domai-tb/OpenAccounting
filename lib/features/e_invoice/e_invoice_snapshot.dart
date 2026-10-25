@@ -1060,6 +1060,40 @@ class EInvoiceSnapshotBuilder {
   }
 
   List<EInvoiceTaxBreakdownSnapshot> _buildTaxBreakdowns(List<EInvoiceLineSnapshot> lines) {
+    final List<EInvoiceLineSnapshot> exemptLines = lines
+        .where(
+          (EInvoiceLineSnapshot line) =>
+              line.taxRateHundredths == 0 && line.classification.category == EInvoiceTaxCategory.exempt,
+        )
+        .toList(growable: false);
+    if (exemptLines.length > 1) {
+      final EInvoiceLineClassification firstClassification = exemptLines.first.classification;
+      if (exemptLines.any(
+        (EInvoiceLineSnapshot line) =>
+            line.classification.exemptionReasonCode != firstClassification.exemptionReasonCode ||
+            line.classification.exemptionReason != firstClassification.exemptionReason,
+      )) {
+        final String details = exemptLines
+            .map(
+              (EInvoiceLineSnapshot line) =>
+                  'Position ${line.position} requires BT-121=${line.classification.exemptionReasonCode ?? '(none)'} '
+                  'and BT-120="${line.classification.exemptionReason ?? '(missing)'}"',
+            )
+            .join('; ');
+        throw EInvoiceSourceException(
+          code: 'incompatibleEInvoiceExemptionReasons',
+          messageDe: 'E/0%-Positionen haben unvereinbare BT-121/BT-120-Befreiungsgründe: $details',
+          messageEn: 'E/0% invoice positions have incompatible BT-121/BT-120 exemption reasons: $details',
+          fields: <String>[
+            for (final EInvoiceLineSnapshot line in exemptLines)
+              'position[${line.position}].e_invoice_exemption_reason_code',
+            for (final EInvoiceLineSnapshot line in exemptLines)
+              'position[${line.position}].e_invoice_exemption_reason_text',
+          ],
+        );
+      }
+    }
+
     final Map<String, EInvoiceTaxBreakdownSnapshot> groups = <String, EInvoiceTaxBreakdownSnapshot>{};
     for (final EInvoiceLineSnapshot line in lines) {
       final EInvoiceLineClassification classification = line.classification;
