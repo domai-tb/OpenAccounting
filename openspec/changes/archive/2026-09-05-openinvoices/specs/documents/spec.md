@@ -1,4 +1,4 @@
-# Documents — OpenInvoices Spec
+# Documents — OpenAccounting Spec
 
 ## ADDED Requirements
 

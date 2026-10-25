@@ -1,4 +1,4 @@
-# OpenInvoices — Core Application Specification
+# OpenAccounting — Core Application Specification
 
 ## ADDED Requirements
 

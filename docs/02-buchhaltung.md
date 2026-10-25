@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices provides double-entry bookkeeping with a journal-based ledger, category mapping provenance for SKR03/SKR04 account assignments, and German tax authority reporting (EÜR, UStVA, EKS, GuV, ZM). All journal entries are GoBD-immutable once posted.
+OpenAccounting provides double-entry bookkeeping with a journal-based ledger, category mapping provenance for SKR03/SKR04 account assignments, and German tax authority reporting (EÜR, UStVA, EKS, GuV, ZM). All journal entries are GoBD-immutable once posted.
 
 ---
 

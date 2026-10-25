@@ -1481,7 +1481,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get quickLinkItems => 'Artikel';
 
   @override
-  String get dashboardWidgetOpenInvoices => 'Offene Rechnungen';
+  String get dashboardWidgetOpenAccounting => 'Offene Rechnungen';
 
   @override
   String get dashboardWidgetIncomingPayments => 'Zahlungseingänge';

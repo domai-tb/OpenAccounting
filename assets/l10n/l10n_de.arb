@@ -764,7 +764,7 @@
   },
   "quickLinkJournal": "Journal",
   "quickLinkItems": "Artikel",
-  "dashboardWidgetOpenInvoices": "Offene Rechnungen",
+  "dashboardWidgetOpenAccounting": "Offene Rechnungen",
   "dashboardWidgetIncomingPayments": "Zahlungseingänge",
   "dashboardWidgetReminderWarning": "Mahnung-Warnung",
   "dashboardWidgetDeadlines": "Fristen",

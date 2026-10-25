@@ -1,4 +1,4 @@
-# OpenInvoices — Database Layer Specification
+# OpenAccounting — Database Layer Specification
 
 ## Purpose
 SQLite engine configuration, Drift schema management, migration strategy, and connection lifecycle.
@@ -469,8 +469,8 @@ Each user profile SHALL have an isolated database file. The active profile SHALL
 
 GIVEN a profile named "Max" is active
 WHEN the database path is resolved
-THEN the database SHALL be located at `~/.local/share/OpenInvoices/profile/Max/openinvoices.db`
-AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenInvoices/profile/Erika/openinvoices.db`
+THEN the database SHALL be located at `~/.local/share/OpenAccounting/profile/Max/openinvoices.db`
+AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenAccounting/profile/Erika/openinvoices.db`
 
 #### Scenario: Profile Switch Requires Restart
 

@@ -118,7 +118,7 @@ provenance repair, not a request to inflate the matrix with one row per sentence
 | C-003 | Shortcuts/tray commands are not connected to application intents | **REPRODUCIBLE / open; overlap B-013.** Empty callbacks and no production shortcut registration are visible; the stale invoice-route note should be corrected because `/invoices/new` exists. |
 | C-004 | Window state has competing formats and unawaited close lifecycle | **REPRODUCIBLE / open.** Main CSV keys differ from `WindowStateService`; listener/disposal ordering is not closed. |
 | C-005 | Production UI bypasses the application service boundary | **REPRODUCIBLE / open.** Dashboard/setup construct repositories/executors in route/widget paths. |
-| C-006 | Brand and platform data-path contracts contradict each other | **REPRODUCIBLE / BLOCKED canonical decision.** Decide OpenAccounting/OpenInvoices, profile(s), Linux/macOS roots, and Windows `APPDATA`/`LOCALAPPDATA`, then update code/spec/docs/tests together. |
+| C-006 | Brand and platform data-path contracts contradict each other | **REPRODUCIBLE / BLOCKED canonical decision.** Decide OpenAccounting/OpenAccounting, profile(s), Linux/macOS roots, and Windows `APPDATA`/`LOCALAPPDATA`, then update code/spec/docs/tests together. |
 | C-007 | Database table count and migration-hook ownership are out of parity | **REPRODUCIBLE / BLOCKED cross-workstream.** The 39-table runtime, 38-table spec language, empty `_postHooks`, and A migration evidence need one owner decision. |
 | C-008 | Structural OpenSpec green status hides semantic drift | **REPRODUCIBLE / open evidence and contract matrix.** 52/52 strict validation is structural; 28 specs retain TBD Purpose and 16 retain implementation-evidence text. |
 | C-009 | CI validates only the protected branch and Linux debug build | **REPRODUCIBLE / open delivery gap.** Current Linux checks do not verify macOS/Windows compilation/runtime or the `dev` workflow. |
@@ -141,7 +141,7 @@ These are bounded candidates for later Anvil routing. They are planning slices, 
 
 ## Decisions to route to the product/architecture owner
 
-1. Is the canonical product/data contract **OpenAccounting** or **OpenInvoices**? Choose exact Linux/macOS/Windows roots, `APPDATA` versus `LOCALAPPDATA`, and singular versus plural profile directories.
+1. Is the canonical product/data contract **OpenAccounting** or **OpenAccounting**? Choose exact Linux/macOS/Windows roots, `APPDATA` versus `LOCALAPPDATA`, and singular versus plural profile directories.
 2. Does deleting a profile retain the directory/database for recovery, as the maintained spec says, or purge it, as the current test/implementation do? If retention is chosen, define a separate explicit purge operation.
 3. Which typed document effects apply to outgoing/incoming invoices, Gutschrift, Storno, Angebot, Auftrag, Proforma, and Lieferschein? Include signed journal, receivable, inventory, tax, and PDF behavior.
 4. Which input-tax direction/reverse-charge/special-scheme rules are in scope, and what must the product call “not filed” versus exported? The official UStG/ELSTER sources do not supply this product matrix.

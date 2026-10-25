@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices maintains relational master data for customers (Kunden), vendors (Lieferanten), articles (Artikel), the owning company (Unternehmen), accounting categories (Kategorien), bank accounts (Konten), and document number sequences (Nummernkreise).
+OpenAccounting maintains relational master data for customers (Kunden), vendors (Lieferanten), articles (Artikel), the owning company (Unternehmen), accounting categories (Kategorien), bank accounts (Konten), and document number sequences (Nummernkreise).
 
 All master data is profile-scoped: each profile maintains its own dataset, isolated at the database level.
 

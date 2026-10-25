@@ -54,8 +54,8 @@ class BackupService {
   String get _statePath => p.join(profileDir, 'backup_state.json');
 
   /// Canonical profile-local backup directory. Platform base resolves to
-  /// `~/.local/share/OpenInvoices` (Linux), `~/Library/Application Support/OpenInvoices`
-  /// (macOS), `%LOCALAPPDATA%/OpenInvoices` (Windows); local backups live only
+  /// `~/.local/share/OpenAccounting` (Linux), `~/Library/Application Support/OpenAccounting`
+  /// (macOS), `%LOCALAPPDATA%/OpenAccounting` (Windows); local backups live only
   /// under `<base>/profiles/<profile>/backups/`. A global sibling `backups/`
   /// directory is never used for profile backups.
   static String canonicalBackupDir(String profileDir) => p.join(profileDir, 'backups');

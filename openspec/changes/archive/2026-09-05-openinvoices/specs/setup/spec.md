@@ -164,22 +164,22 @@ AND SHALL NOT perform the rename.
 
 ### Requirement: Platform-specific data paths
 
-The system SHALL use platform-appropriate data directories: `~/.local/share/OpenInvoices/` on Linux, `~/Library/Application Support/OpenInvoices/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/` on Windows. Profile databases SHALL be stored under `<data_dir>/profiles/<name>/`.
+The system SHALL use platform-appropriate data directories: `~/.local/share/OpenAccounting/` on Linux, `~/Library/Application Support/OpenAccounting/` on macOS, and `%LOCALAPPDATA%/OpenAccounting/` on Windows. Profile databases SHALL be stored under `<data_dir>/profiles/<name>/`.
 
 #### Scenario: Linux data path
 
 GIVEN the application runs on Linux
 WHEN a profile database is created
-THEN it SHALL be stored under `~/.local/share/OpenInvoices/profiles/<name>/`.
+THEN it SHALL be stored under `~/.local/share/OpenAccounting/profiles/<name>/`.
 
 #### Scenario: macOS data path
 
 GIVEN the application runs on macOS
 WHEN a profile database is created
-THEN it SHALL be stored under `~/Library/Application Support/OpenInvoices/profiles/<name>/`.
+THEN it SHALL be stored under `~/Library/Application Support/OpenAccounting/profiles/<name>/`.
 
 #### Scenario: Windows data path
 
 GIVEN the application runs on Windows
 WHEN a profile database is created
-THEN it SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/profiles/<name>/`.
+THEN it SHALL be stored under `%LOCALAPPDATA%/OpenAccounting/profiles/<name>/`.

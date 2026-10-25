@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices manages the complete lifecycle of financial documents: creation, finalization, reversal (Storno), credit notes (Gutschrift), replacement invoices (Ersatzrechnung), and archival. Finalized documents keep immutable snapshots and stored PDFs with startup reconciliation of staged or unreferenced artifacts. The GoBD export reports technical integrity (manifest hashes, completeness); it is not a certification of legal compliance.
+OpenAccounting manages the complete lifecycle of financial documents: creation, finalization, reversal (Storno), credit notes (Gutschrift), replacement invoices (Ersatzrechnung), and archival. Finalized documents keep immutable snapshots and stored PDFs with startup reconciliation of staged or unreferenced artifacts. The GoBD export reports technical integrity (manifest hashes, completeness); it is not a certification of legal compliance.
 
 ---
 

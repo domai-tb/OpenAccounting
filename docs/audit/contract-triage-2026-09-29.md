@@ -91,13 +91,13 @@ filename are canonical across code, specs, docs, and tests?
 
 | Option | Contract | Impact |
 |---|---|---|
-| **A — OpenAccounting, plural profiles (recommended)** | Use `OpenAccounting` in the product-facing name and paths; use Linux `$HOME/.local/share/OpenAccounting`, macOS `~/Library/Application Support/OpenAccounting`, Windows `%LOCALAPPDATA%\\OpenAccounting`, `profiles/<name>/`, and one documented database filename. | Aligns the shipped app identity and current `ProfileManager` plural layout, while making the Linux runtime contract explicit. Requires one migration/alias plan for existing OpenInvoices paths. |
-| B — preserve current runtime identity | Keep `OpenInvoices`, the current `data_paths.dart` roots, `profiles/<name>/`, and `openinvoices.db`; revise OpenAccounting references in docs/specs/tests. | Lowest runtime migration risk, but preserves the product-name mismatch visible to users and maintainers. |
+| **A — OpenAccounting, plural profiles (recommended)** | Use `OpenAccounting` in the product-facing name and paths; use Linux `$HOME/.local/share/OpenAccounting`, macOS `~/Library/Application Support/OpenAccounting`, Windows `%LOCALAPPDATA%\\OpenAccounting`, `profiles/<name>/`, and one documented database filename. | Aligns the shipped app identity and current `ProfileManager` plural layout, while making the Linux runtime contract explicit. Requires one migration/alias plan for existing OpenAccounting paths. |
+| B — preserve current runtime identity | Keep `OpenAccounting`, the current `data_paths.dart` roots, `profiles/<name>/`, and `openinvoices.db`; revise OpenAccounting references in docs/specs/tests. | Lowest runtime migration risk, but preserves the product-name mismatch visible to users and maintainers. |
 | C — compatibility bridge | Keep both names as read-only migration aliases, select one new canonical root, and write only there. | Eases upgrades, but creates a durable dual-path contract and additional discovery/security cases. |
 
 Evidence: `test/integration/audit/architecture-delivery-audit.md:94-102` records the
-OpenInvoices/OpenAccounting, `profile/`/`profiles/`, and `APPDATA`/`LOCALAPPDATA` conflicts;
-`lib/core/db/data_paths.dart:5-20` currently resolves OpenInvoices roots and
+OpenAccounting/OpenAccounting, `profile/`/`profiles/`, and `APPDATA`/`LOCALAPPDATA` conflicts;
+`lib/core/db/data_paths.dart:5-20` currently resolves OpenAccounting roots and
 `lib/core/db/profile_manager.dart:22-40` uses plural profiles and `openinvoices.db`;
 `openspec/specs/desktop/spec.md:293-305` and `openspec/specs/db/spec.md:194-203` preserve the
 competing contracts. macOS and Windows remain static-only for this run.

@@ -42,18 +42,18 @@ void main() {
     }
 
     test('test_linux_backup_path', () {
-      final String profileDir = p.join('/home/u/.local/share/OpenInvoices', 'profiles', 'Geschäft');
+      final String profileDir = p.join('/home/u/.local/share/OpenAccounting', 'profiles', 'Geschäft');
       expect(BackupService.canonicalBackupDir(profileDir), '$profileDir/backups');
-      expect(resolveDefaultBaseDir(), contains('OpenInvoices'));
+      expect(resolveDefaultBaseDir(), contains('OpenAccounting'));
     });
 
     test('test_macos_backup_path', () {
-      final String profileDir = p.join('/Users/u/Library/Application Support/OpenInvoices', 'profiles', 'Geschäft');
+      final String profileDir = p.join('/Users/u/Library/Application Support/OpenAccounting', 'profiles', 'Geschäft');
       expect(BackupService.canonicalBackupDir(profileDir), '$profileDir/backups');
     });
 
     test('test_windows_backup_path', () {
-      final String profileDir = p.join(r'C:\Users\u\AppData\Local\OpenInvoices', 'profiles', 'Geschäft');
+      final String profileDir = p.join(r'C:\Users\u\AppData\Local\OpenAccounting', 'profiles', 'Geschäft');
       expect(BackupService.canonicalBackupDir(profileDir), endsWith('backups'));
       expect(p.basename(BackupService.canonicalBackupDir(profileDir)), 'backups');
     });

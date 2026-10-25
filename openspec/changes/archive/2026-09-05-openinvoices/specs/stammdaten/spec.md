@@ -1,4 +1,4 @@
-# Stammdaten — OpenInvoices Spec
+# Stammdaten — OpenAccounting Spec
 
 ## ADDED Requirements
 

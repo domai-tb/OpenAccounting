@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices manages seven document types through a unified lifecycle: **Rechnung**, **Storno**, **Gutschrift**, **Angebot**, **Auftrag**, **Proforma**, and **Lieferschein**. Every document starts as an **Entwurf** (draft), transitions to **Finalisiert** (finalized/issued), and can then reach **Bezahlt** (paid) or **Storniert** (cancelled).
+OpenAccounting manages seven document types through a unified lifecycle: **Rechnung**, **Storno**, **Gutschrift**, **Angebot**, **Auftrag**, **Proforma**, and **Lieferschein**. Every document starts as an **Entwurf** (draft), transitions to **Finalisiert** (finalized/issued), and can then reach **Bezahlt** (paid) or **Storniert** (cancelled).
 
 The invoicing engine runs in a Flutter desktop application using Dart with Drift/SQLite for persistence and Riverpod for state management.
 

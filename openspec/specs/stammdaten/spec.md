@@ -1,4 +1,4 @@
-# Stammdaten — OpenInvoices Spec
+# Stammdaten — OpenAccounting Spec
 
 ## Purpose
 Master data management for customers (Kunden), suppliers (Lieferanten), articles (Artikel), and groups.

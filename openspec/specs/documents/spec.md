@@ -1,4 +1,4 @@
-# Documents — OpenInvoices Spec
+# Documents — OpenAccounting Spec
 
 ## Purpose
 Document type management for invoices, receipts, corrections, and outgoing correspondence.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices provides a 4-step Setup Wizard for initial configuration, multi-profile management, comprehensive backup system (local, encrypted external, SMB), SMTP configuration with certificate pinning, and printer/export settings.
+OpenAccounting provides a 4-step Setup Wizard for initial configuration, multi-profile management, comprehensive backup system (local, encrypted external, SMB), SMTP configuration with certificate pinning, and printer/export settings.
 
 ---
 

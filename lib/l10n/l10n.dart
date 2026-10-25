@@ -2834,11 +2834,11 @@ abstract class AppLocalizations {
   /// **'Artikel'**
   String get quickLinkItems;
 
-  /// No description provided for @dashboardWidgetOpenInvoices.
+  /// No description provided for @dashboardWidgetOpenAccounting.
   ///
   /// In de, this message translates to:
   /// **'Offene Rechnungen'**
-  String get dashboardWidgetOpenInvoices;
+  String get dashboardWidgetOpenAccounting;
 
   /// No description provided for @dashboardWidgetIncomingPayments.
   ///

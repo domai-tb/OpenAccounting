@@ -1,4 +1,4 @@
-# Review: OpenInvoices
+# Review: OpenAccounting
 
 ## Review Metadata
 - Review round: 2
@@ -9,7 +9,7 @@
 
 ### Unstated Assumptions
 
-- OpenInvoices is a brownfield change to OpenAccounting, not a new project.
+- OpenAccounting is a brownfield change to OpenAccounting, not a new project.
 - Local-first accounting must work without Riverpod, Tauri, a Python sidecar, a webview, a backend, or backend authentication.
 - External backup destinations are deliberate user-approved exceptions to profile-local storage.
 - The current 38 tables are the base schema; feature migrations need explicit table contracts.

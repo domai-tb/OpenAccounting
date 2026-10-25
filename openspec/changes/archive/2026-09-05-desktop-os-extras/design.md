@@ -1,6 +1,6 @@
 ## Context
 
-OpenInvoices added tray/shortcuts/updater/window-state but left OS-integration deferred as N/A. This change hardens remaining desktop OS specs that require native APIs. Current app uses `window_manager` and `system_tray` via VM-safe adapters; file handling and drag-drop are not yet implemented; single-instance not enforced; profile paths already differentiate Linux vs macOS but window console and GPU workarounds not hardened.
+OpenAccounting added tray/shortcuts/updater/window-state but left OS-integration deferred as N/A. This change hardens remaining desktop OS specs that require native APIs. Current app uses `window_manager` and `system_tray` via VM-safe adapters; file handling and drag-drop are not yet implemented; single-instance not enforced; profile paths already differentiate Linux vs macOS but window console and GPU workarounds not hardened.
 
 ## Goals / Non-Goals
 

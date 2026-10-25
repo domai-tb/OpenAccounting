@@ -56,20 +56,20 @@ AND SHALL fall back to the first available profile directory.
 
 ### Requirement: APP_DATA_DIR resolved per profile
 
-The application SHALL resolve `APP_DATA_DIR` to the active profile's canonical directory (e.g., `~/.local/share/OpenInvoices/profiles/Geschäft/`). All local file operations (uploads, backups, logos) SHALL use `APP_DATA_DIR` as the root. Explicitly approved external backup destinations are governed separately by the backup contract and are not rewritten as `APP_DATA_DIR` paths.
+The application SHALL resolve `APP_DATA_DIR` to the active profile's canonical directory (e.g., `~/.local/share/OpenAccounting/profiles/Geschäft/`). All local file operations (uploads, backups, logos) SHALL use `APP_DATA_DIR` as the root. Explicitly approved external backup destinations are governed separately by the backup contract and are not rewritten as `APP_DATA_DIR` paths.
 
 #### Scenario: Upload path uses active profile
 
 GIVEN the active profile is "Geschäft"
 WHEN the user uploads a logo
-THEN the logo SHALL be stored under `~/.local/share/OpenInvoices/profiles/Geschäft/uploads/logo.png`
+THEN the logo SHALL be stored under `~/.local/share/OpenAccounting/profiles/Geschäft/uploads/logo.png`
 AND NOT under a hardcoded path.
 
 #### Scenario: Backup path uses active profile
 
 GIVEN the active profile is "Privat"
 WHEN a local backup is triggered
-THEN the backup SHALL be stored under `~/.local/share/OpenInvoices/profiles/Privat/backups/`.
+THEN the backup SHALL be stored under `~/.local/share/OpenAccounting/profiles/Privat/backups/`.
 
 #### Scenario: Code outside APP_DATA_DIR is rejected
 
@@ -229,22 +229,22 @@ THEN the application SHALL restart to load the renamed profile.
 
 ### Requirement: Platform-specific data paths
 
-The system SHALL use platform-appropriate base data directories: `~/.local/share/OpenInvoices/` on Linux, `~/Library/Application Support/OpenInvoices/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/` on Windows. Profile subdirectories SHALL be created under this base path.
+The system SHALL use platform-appropriate base data directories: `~/.local/share/OpenAccounting/` on Linux, `~/Library/Application Support/OpenAccounting/` on macOS, and `%LOCALAPPDATA%/OpenAccounting/` on Windows. Profile subdirectories SHALL be created under this base path.
 
 #### Scenario: Linux profile path
 
 GIVEN the application runs on Linux AND the active profile is "Geschäft"
 WHEN `APP_DATA_DIR` is resolved
-THEN it SHALL resolve to `~/.local/share/OpenInvoices/profiles/Geschäft/`.
+THEN it SHALL resolve to `~/.local/share/OpenAccounting/profiles/Geschäft/`.
 
 #### Scenario: macOS profile path
 
 GIVEN the application runs on macOS AND the active profile is "Geschäft"
 WHEN `APP_DATA_DIR` is resolved
-THEN it SHALL resolve to `~/Library/Application Support/OpenInvoices/profiles/Geschäft/`.
+THEN it SHALL resolve to `~/Library/Application Support/OpenAccounting/profiles/Geschäft/`.
 
 #### Scenario: Windows profile path
 
 GIVEN the application runs on Windows AND the active profile is "Geschäft"
 WHEN `APP_DATA_DIR` is resolved
-THEN it SHALL resolve to `%LOCALAPPDATA%/OpenInvoices/profiles/Geschäft/`.
+THEN it SHALL resolve to `%LOCALAPPDATA%/OpenAccounting/profiles/Geschäft/`.

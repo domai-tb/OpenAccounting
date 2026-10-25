@@ -764,7 +764,7 @@
   },
   "quickLinkJournal": "Journal",
   "quickLinkItems": "Items",
-  "dashboardWidgetOpenInvoices": "Open invoices",
+  "dashboardWidgetOpenAccounting": "Open invoices",
   "dashboardWidgetIncomingPayments": "Incoming payments",
   "dashboardWidgetReminderWarning": "Reminder warning",
   "dashboardWidgetDeadlines": "Deadlines",

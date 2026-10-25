@@ -1,4 +1,4 @@
-# Implementation Tasks: OpenInvoices
+# Implementation Tasks: OpenAccounting
 
 > Red-green-refactor ordering. Each task group maps to a spec capability.
 > Full test-plan with 669 scenario→test mappings in test-plan.md.

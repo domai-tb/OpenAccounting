@@ -1,4 +1,4 @@
-# OpenInvoices — Desktop Platform Specification
+# OpenAccounting — Desktop Platform Specification
 
 ## ADDED Requirements
 
@@ -145,30 +145,30 @@ The application SHALL register as a handler for `.pdf` and `.csv` files on the o
 
 #### Scenario: PDF File Association
 
-GIVEN OpenInvoices is registered as a handler for `.pdf` files
+GIVEN OpenAccounting is registered as a handler for `.pdf` files
 WHEN the user double-clicks a `.pdf` file
 THEN the app SHALL open (or activate if already running)
 AND display the PDF in the internal PDF viewer
 
 #### Scenario: CSV File Association
 
-GIVEN OpenInvoices is registered as a handler for `.csv` files
+GIVEN OpenAccounting is registered as a handler for `.csv` files
 WHEN the user double-clicks a `.csv` file
 THEN the app SHALL open the import wizard
 AND pre-fill the file path in the import source field
 
 #### Scenario: File Association With No App Running
 
-GIVEN OpenInvoices is not currently running
-WHEN the user double-clicks a `.pdf` file associated with OpenInvoices
+GIVEN OpenAccounting is not currently running
+WHEN the user double-clicks a `.pdf` file associated with OpenAccounting
 THEN a new app instance SHALL launch
 AND open the PDF in the internal PDF viewer
 
 #### Scenario: Unsupported File Type Double-Click
 
-GIVEN OpenInvoices is not registered as a handler for `.docx` files
+GIVEN OpenAccounting is not registered as a handler for `.docx` files
 WHEN the user double-clicks a `.docx` file
-THEN OpenInvoices SHALL NOT launch
+THEN OpenAccounting SHALL NOT launch
 AND the OS default handler for `.docx` SHALL be used
 
 ### Requirement: PDF Viewer Window
@@ -245,22 +245,22 @@ Only one instance of the application SHALL run at a time. When a second instance
 
 #### Scenario: Second Instance Launch
 
-GIVEN OpenInvoices is already running
-WHEN the user launches OpenInvoices again
+GIVEN OpenAccounting is already running
+WHEN the user launches OpenAccounting again
 THEN the existing instance's window SHALL be brought to the foreground
 AND the new instance SHALL exit immediately
 
 #### Scenario: Deep Link to Running Instance
 
-GIVEN OpenInvoices is already running
-WHEN the user double-clicks a `.pdf` file associated with OpenInvoices
+GIVEN OpenAccounting is already running
+WHEN the user double-clicks a `.pdf` file associated with OpenAccounting
 THEN the file SHALL be opened in the existing instance's PDF viewer
 AND no new instance SHALL be created
 
 #### Scenario: First Instance Launch
 
-GIVEN no OpenInvoices instance is running
-WHEN the user launches OpenInvoices
+GIVEN no OpenAccounting instance is running
+WHEN the user launches OpenAccounting
 THEN a new instance SHALL start normally
 AND the main window SHALL appear
 
@@ -285,12 +285,12 @@ THEN no console window SHALL appear alongside the application window
 
 GIVEN the app launches on macOS
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/Library/Application Support/OpenInvoices/profiles/<Name>/`
-AND NOT at `~/.local/share/OpenInvoices/` (the Linux convention)
+THEN the profile directory SHALL be at `~/Library/Application Support/OpenAccounting/profiles/<Name>/`
+AND NOT at `~/.local/share/OpenAccounting/` (the Linux convention)
 
 #### Scenario: Linux Profile Path
 
 GIVEN the app launches on Linux
 WHEN the profile directory is resolved
-THEN the profile directory SHALL be at `~/.local/share/OpenInvoices/profiles/<Name>/`
+THEN the profile directory SHALL be at `~/.local/share/OpenAccounting/profiles/<Name>/`
 AND NOT at `~/Library/Application Support/` (the macOS convention)

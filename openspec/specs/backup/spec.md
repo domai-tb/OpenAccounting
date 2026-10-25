@@ -153,25 +153,25 @@ THEN the system SHALL skip the backup and log the skip.
 
 ### Requirement: Platform-specific backup paths
 
-The system SHALL use platform-appropriate default backup paths: `~/.local/share/OpenInvoices/backups/` on Linux, `~/Library/Application Support/OpenInvoices/backups/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/backups/` on Windows.
+The system SHALL use platform-appropriate default backup paths: `~/.local/share/OpenAccounting/backups/` on Linux, `~/Library/Application Support/OpenAccounting/backups/` on macOS, and `%LOCALAPPDATA%/OpenAccounting/backups/` on Windows.
 
 #### Scenario: Linux backup path
 
 GIVEN the application runs on Linux
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/.local/share/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `~/.local/share/OpenAccounting/backups/`.
 
 #### Scenario: macOS backup path
 
 GIVEN the application runs on macOS
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/Library/Application Support/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `~/Library/Application Support/OpenAccounting/backups/`.
 
 #### Scenario: Windows backup path
 
 GIVEN the application runs on Windows
 WHEN a local backup is created
-THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/backups/`.
+THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenAccounting/backups/`.
 
 ### Requirement: Backup target boundaries
 

@@ -1,4 +1,4 @@
-# OpenInvoices — Core Application Specification
+# OpenAccounting — Core Application Specification
 
 ## Purpose
 Core application routing, provider wiring, database lifecycle, and top-level page structure.

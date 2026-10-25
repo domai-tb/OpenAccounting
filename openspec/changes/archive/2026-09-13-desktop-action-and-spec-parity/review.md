@@ -83,7 +83,7 @@ Both features are still implemented. The existing spec had scenarios for these.
 
 `desktop/spec.md` lines 62-68 define profile paths as `~/Library/Application Support/OpenAccounting/profile/<Name>/` (macOS), `~/.local/share/OpenAccounting/profile/<Name>/` (Linux), `%APPDATA%/OpenAccounting/profile/<Name>/` (Windows).
 
-`data_paths.dart` uses `OpenInvoices` (old name) and the profile structure is `<base>/profiles/<name>/` (note: `profiles/` subdirectory). The delta spec uses `profile/<Name>/` (no `profiles/` subdirectory).
+`data_paths.dart` uses `OpenAccounting` (old name) and the profile structure is `<base>/profiles/<name>/` (note: `profiles/` subdirectory). The delta spec uses `profile/<Name>/` (no `profiles/` subdirectory).
 
 Proposal impact doesn't list `data_paths.dart`. Either add it or correct the spec paths.
 

@@ -1,6 +1,6 @@
 ## Context
 
-OpenInvoices is a brownfield extension of the existing OpenAccounting Flutter/Dart desktop application. The existing GetIt/AppScope/AppServices dependency flow and Page → UseCase → Repository → DataSource architecture remain authoritative. The current 38 tables define the base schema; feature migrations may add only explicitly named tables. The application targets Windows, macOS, and Linux with a single codebase.
+OpenAccounting is a brownfield extension of the existing OpenAccounting Flutter/Dart desktop application. The existing GetIt/AppScope/AppServices dependency flow and Page → UseCase → Repository → DataSource architecture remain authoritative. The current 38 tables define the base schema; feature migrations may add only explicitly named tables. The application targets Windows, macOS, and Linux with a single codebase.
 
 ## Goals / Non-Goals
 

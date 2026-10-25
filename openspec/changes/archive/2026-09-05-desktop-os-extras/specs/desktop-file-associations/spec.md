@@ -6,25 +6,25 @@ The application SHALL register as a handler for `.pdf` and `.csv` files on the o
 
 #### Scenario: PDF File Association
 
-- **GIVEN** OpenInvoices is registered as a handler for `.pdf` files
+- **GIVEN** OpenAccounting is registered as a handler for `.pdf` files
 - **WHEN** the user double-clicks a `.pdf` file
 - **THEN** the app SHALL open (or activate if already running) and display the PDF in the internal PDF viewer
 
 #### Scenario: CSV File Association
 
-- **GIVEN** OpenInvoices is registered as a handler for `.csv` files
+- **GIVEN** OpenAccounting is registered as a handler for `.csv` files
 - **WHEN** the user double-clicks a `.csv` file
 - **THEN** the app SHALL open the import wizard and pre-fill the file path in the import source field
 
 #### Scenario: File Association With No App Running
 
-- **GIVEN** OpenInvoices is not currently running
-- **WHEN** the user double-clicks a `.pdf` file associated with OpenInvoices
+- **GIVEN** OpenAccounting is not currently running
+- **WHEN** the user double-clicks a `.pdf` file associated with OpenAccounting
 - **THEN** a new app instance SHALL launch and open the PDF in the internal PDF viewer
 
 #### Scenario: Unsupported File Type Double-Click
 
-- **GIVEN** OpenInvoices is not registered as a handler for `.docx` files
+- **GIVEN** OpenAccounting is not registered as a handler for `.docx` files
 - **WHEN** the user double-clicks a `.docx` file
-- **THEN** OpenInvoices SHALL NOT launch and the OS default handler for `.docx` SHALL be used
+- **THEN** OpenAccounting SHALL NOT launch and the OS default handler for `.docx` SHALL be used
 

@@ -393,7 +393,7 @@ class _QuickLinkRow extends ConsumerWidget {
 
 String _dashboardWidgetTitle(String id, AppLocalizations l10n) {
   return switch (id) {
-    'offene_rechnungen' => l10n.dashboardWidgetOpenInvoices,
+    'offene_rechnungen' => l10n.dashboardWidgetOpenAccounting,
     'zahlungseingaenge' => l10n.dashboardWidgetIncomingPayments,
     'lagerwarnung' => l10n.dashboardInventoryWarning,
     'mahnung_warnung' => l10n.dashboardWidgetReminderWarning,

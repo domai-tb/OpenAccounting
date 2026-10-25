@@ -1,4 +1,4 @@
-# OpenInvoices — PDF Generation Specification
+# OpenAccounting — PDF Generation Specification
 
 ## ADDED Requirements
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-OpenInvoices provides a 3-step bank transaction import workflow: **Upload** CSV/CAMT.053 → **Review** with rule categorization and match scores → **Import** storing confirmed rows in `bank_transaktionen`. Supports seven predefined CSV templates plus the seeded CAMT.053 template and profile-scoped custom templates, deduplication, and manual/automatic matching modes. Imports never create journal entries or payments; automatic mode may link one unambiguous existing journal entry.
+OpenAccounting provides a 3-step bank transaction import workflow: **Upload** CSV/CAMT.053 → **Review** with rule categorization and match scores → **Import** storing confirmed rows in `bank_transaktionen`. Supports seven predefined CSV templates plus the seeded CAMT.053 template and profile-scoped custom templates, deduplication, and manual/automatic matching modes. Imports never create journal entries or payments; automatic mode may link one unambiguous existing journal entry.
 
 ---
 

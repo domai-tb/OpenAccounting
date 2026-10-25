@@ -1,6 +1,6 @@
 ## Why
 
-OpenInvoices tasks 15.x covered tray, shortcuts, updater and window state, but deferred OS-integration specs (file associations, PDF viewer window, drag-and-drop, single-instance, platform workarounds) require native OS APIs that cannot be VM-tested in LXC and were marked N/A with 4.2h period. Splitting them into a focused change makes implementation agent-friendly (<15 tasks) and allows OS-harness testing on Windows/macOS/Linux.
+OpenAccounting tasks 15.x covered tray, shortcuts, updater and window state, but deferred OS-integration specs (file associations, PDF viewer window, drag-and-drop, single-instance, platform workarounds) require native OS APIs that cannot be VM-tested in LXC and were marked N/A with 4.2h period. Splitting them into a focused change makes implementation agent-friendly (<15 tasks) and allows OS-harness testing on Windows/macOS/Linux.
 
 ## What Changes
 

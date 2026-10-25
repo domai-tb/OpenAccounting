@@ -1,4 +1,4 @@
-# Test Plan: OpenInvoices
+# Test Plan: OpenAccounting
 
 > Map EVERY scenario in specs/ to a named test. Each row starts 🔴 red.
 

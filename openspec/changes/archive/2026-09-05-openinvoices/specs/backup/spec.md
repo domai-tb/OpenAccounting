@@ -160,22 +160,22 @@ THEN the system SHALL skip the backup and log the skip.
 
 ### Requirement: Platform-specific backup paths
 
-The system SHALL use the active profile's platform-appropriate local backup path: `~/.local/share/OpenInvoices/profiles/<active>/backups/` on Linux, `~/Library/Application Support/OpenInvoices/profiles/<active>/backups/` on macOS, and `%LOCALAPPDATA%/OpenInvoices/profiles/<active>/backups/` on Windows.
+The system SHALL use the active profile's platform-appropriate local backup path: `~/.local/share/OpenAccounting/profiles/<active>/backups/` on Linux, `~/Library/Application Support/OpenAccounting/profiles/<active>/backups/` on macOS, and `%LOCALAPPDATA%/OpenAccounting/profiles/<active>/backups/` on Windows.
 
 #### Scenario: Linux backup path
 
 GIVEN the application runs on Linux
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/.local/share/OpenInvoices/profiles/<active>/backups/`.
+THEN backups SHALL be stored under `~/.local/share/OpenAccounting/profiles/<active>/backups/`.
 
 #### Scenario: macOS backup path
 
 GIVEN the application runs on macOS
 WHEN a local backup is created
-THEN backups SHALL be stored under `~/Library/Application Support/OpenInvoices/profiles/<active>/backups/`.
+THEN backups SHALL be stored under `~/Library/Application Support/OpenAccounting/profiles/<active>/backups/`.
 
 #### Scenario: Windows backup path
 
 GIVEN the application runs on Windows
 WHEN a local backup is created
-THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenInvoices/profiles/<active>/backups/`.
+THEN backups SHALL be stored under `%LOCALAPPDATA%/OpenAccounting/profiles/<active>/backups/`.

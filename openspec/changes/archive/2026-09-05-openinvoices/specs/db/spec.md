@@ -1,4 +1,4 @@
-# OpenInvoices — Database Layer Specification
+# OpenAccounting — Database Layer Specification
 
 ## ADDED Requirements
 
@@ -207,8 +207,8 @@ Each user profile SHALL have an isolated database file. The active profile SHALL
 
 GIVEN a profile named "Max" is active
 WHEN the database path is resolved
-THEN the database SHALL be located at `~/.local/share/OpenInvoices/profiles/Max/openinvoices.db`
-AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenInvoices/profiles/Erika/openinvoices.db`
+THEN the database SHALL be located at `~/.local/share/OpenAccounting/profiles/Max/openinvoices.db`
+AND a different profile "Erika" SHALL have its own database at `~/.local/share/OpenAccounting/profiles/Erika/openinvoices.db`
 
 #### Scenario: Profile Switch Requires Restart
 

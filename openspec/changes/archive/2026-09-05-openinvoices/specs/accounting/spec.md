@@ -1,4 +1,4 @@
-# OpenInvoices — Accounting Specification
+# OpenAccounting — Accounting Specification
 
 ## ADDED Requirements
 

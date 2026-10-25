@@ -20,11 +20,11 @@ The application SHALL use Flutter desktop APIs and target-platform integrations 
 
 - **GIVEN** the app launches on macOS
 - **WHEN** the profile directory is resolved
-- **THEN** the profile directory SHALL be at `~/Library/Application Support/OpenInvoices/profiles/<Name>/` and NOT at `~/.local/share/OpenInvoices/` (the Linux convention)
+- **THEN** the profile directory SHALL be at `~/Library/Application Support/OpenAccounting/profiles/<Name>/` and NOT at `~/.local/share/OpenAccounting/` (the Linux convention)
 
 #### Scenario: Linux Profile Path
 
 - **GIVEN** the app launches on Linux
 - **WHEN** the profile directory is resolved
-- **THEN** the profile directory SHALL be at `~/.local/share/OpenInvoices/profiles/<Name>/` and NOT at `~/Library/Application Support/` (the macOS convention)
+- **THEN** the profile directory SHALL be at `~/.local/share/OpenAccounting/profiles/<Name>/` and NOT at `~/Library/Application Support/` (the macOS convention)
 

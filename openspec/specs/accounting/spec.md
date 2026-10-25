@@ -1,4 +1,4 @@
-# OpenInvoices — Accounting Specification
+# OpenAccounting — Accounting Specification
 
 ## Purpose
 Double-entry journal accounting with GoBD-compliant audit trail, account plan management, and fiscal period controls.
