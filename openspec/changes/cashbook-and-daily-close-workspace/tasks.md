@@ -18,6 +18,7 @@
 - [x] 0.16 Refactor retry behavior; keep focused and full suites green.
 - [x] 0.16a Resolve the second consecutive v26 implementation-review REVISE follow-up: add weakened-schema and saldo-only regressions, update the onboarding integration test to reject a conflicting retry while preserving source, journal, and saldo, and pass focused migration, setup, onboarding, and scoped-analysis checks.
 - [x] 0.16b Fix the independent currency GLOB case-sensitivity finding: reject lowercase-only `[a-z][a-z][a-z]` schema DDL while preserving SQL identifier and whitespace normalization and case-sensitive string literals; pass the focused migration suite and scoped analysis.
+- [x] 0.16c Resolve the second consecutive v26 schema-health review REVISE: strip line and block comments only after masking quoted SQL literals, reject weakened date and currency GLOB checks with expected fragments in comments, and pass the focused migration suite and scoped analysis.
 - [x] 0.17 Write failing test `test_fresh_and_upgraded_v27_close_schemas_match` in `test/db/cashbook_and_daily_close_workspace_migration_test.dart` for scenario "Fresh and upgraded v27 close schemas match"; confirm the red failure identifies the missing `zaehlung_json` column.
 - [x] 0.18 Implement v27 close-evidence fields and trigger parity in fresh and migrated schemas to pass 0.17; focused migration tests pass 7/7.
 - [x] 0.19 Refactor v27 schema declarations; keep focused and full suites green.

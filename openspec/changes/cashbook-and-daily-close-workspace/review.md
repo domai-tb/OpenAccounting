@@ -135,3 +135,41 @@ This approval is contract-only for the reviewed uncommitted diff. Implementation
 VERDICT: REVISE
 
 The reviewer did not run Flutter or Dart commands. `verify.md` records six setup tests passing after the retry repair at this base HEAD, and nine migration/setup tests passing at an earlier base HEAD; it also records that the full suite was not run. The unchanged integration test above was not covered by those focused runs.
+
+---
+
+## Independent Review Round 6 — v26 schema-health comment handling
+
+- **Reviewed checkout**: branch `dev` at HEAD `692493e9346057366980b5227f81341cb3d9930f`.
+- **Reviewed slice**: `5272cbaf128cb5feb6c6bb7674e85e92cd3d7ff9..692493e9346057366980b5227f81341cb3d9930f`.
+- **Scoped SHA-256**: `8e294594d3e54971ef6970e350d292dee8e028c0456b571d0a90c0ce92d2b779`.
+- **Review scope**: v26 schema-health validation. This was the second consecutive independent `REVISE` verdict for the validator slice.
+
+### Finding
+
+The validator uses `.contains()` against normalized table DDL. `_normalizeSqlDdl` collapsed whitespace and normalized identifiers but retained SQL comments, so a weakened `GLOB` check could be accepted when the full expected fragment appeared inside a comment. Strip comments before substring validation while preserving quoted SQL literals.
+
+### Verdict
+
+VERDICT: REVISE
+
+## Author remediation after Round 6
+
+- `_normalizeSqlDdl` now masks single-quoted SQL literals, strips line and block comments from the remaining DDL, then preserves the existing identifier case-folding and whitespace normalization before restoring literals.
+- Two regressions weaken the actual date or currency GLOB constraint and place its complete expected fragment in a block comment. Both failed before the repair because schema health returned healthy; the focused migration suite now passes 19/19, including the existing case-sensitive currency literal check.
+- The code and regression repair is recorded as task 0.16c. At this point, fresh independent post-repair review was pending; Round 6 remains `VERDICT: REVISE` for its reviewed checkout, and no broader implementation acceptance is claimed.
+
+---
+
+## Independent Review Round 7 — v26 validator repair
+
+- **Reviewer**: independent reviewer.
+- **Reviewed checkout**: branch `dev` at HEAD `692493e9346057366980b5227f81341cb3d9930f`.
+- **Reviewed six-path diff SHA-256**: `d8f91678158f3035e609fa49bf62e1673128aeee6807f98ab93c83050f69a238`.
+- **Review scope**: the v26 DDL comment-stripping repair, its date and currency regressions, and the scoped task/evidence records.
+
+### Verdict
+
+VERDICT: APPROVE
+
+This approval accepts task 0.16c only. It does not accept the overall cashbook implementation; 105 implementation tasks remain unchecked.

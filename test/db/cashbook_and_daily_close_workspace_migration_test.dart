@@ -338,6 +338,35 @@ CREATE TABLE IF NOT EXISTS tagesabschluesse (
       expect(report.malformedTables, contains('account_opening_balance_sources'));
     });
 
+    test('test_v26_schema_health_ignores_expected_opening_date_glob_in_comments', () async {
+      await _replaceOpeningSourceDdl(
+        db,
+        originalPattern: '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]',
+        weakenedPattern: '[0-9]*',
+        commentFragment:
+            "effective_date text not null check (effective_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]')",
+      );
+
+      final report = await runner.inspectSchemaHealth();
+
+      expect(report.isHealthy, isFalse);
+      expect(report.malformedTables, contains('account_opening_balance_sources'));
+    });
+
+    test('test_v26_schema_health_ignores_expected_opening_currency_glob_in_comments', () async {
+      await _replaceOpeningSourceDdl(
+        db,
+        originalPattern: '[A-Z][A-Z][A-Z]',
+        weakenedPattern: '[A-Z]*',
+        commentFragment: "currency_code text not null check (currency_code glob '[A-Z][A-Z][A-Z]')",
+      );
+
+      final report = await runner.inspectSchemaHealth();
+
+      expect(report.isHealthy, isFalse);
+      expect(report.malformedTables, contains('account_opening_balance_sources'));
+    });
+
     test('test_v26_schema_health_rejects_partial_opening_source_unique_index', () async {
       final List<Map<String, Object?>> tableRows = await db.executor.runSelect(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_opening_balance_sources'",
@@ -776,6 +805,7 @@ Future<void> _replaceOpeningSourceDdl(
   AppDatabase db, {
   required String originalPattern,
   required String weakenedPattern,
+  String? commentFragment,
 }) async {
   final List<Map<String, Object?>> tableRows = await db.executor.runSelect(
     "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_opening_balance_sources'",
@@ -783,8 +813,15 @@ Future<void> _replaceOpeningSourceDdl(
   );
   expect(tableRows, hasLength(1));
   final String tableSql = tableRows.single['sql']! as String;
-  final String weakenedTableSql = tableSql.replaceFirst(originalPattern, weakenedPattern);
+  String weakenedTableSql = tableSql.replaceFirst(originalPattern, weakenedPattern);
   expect(weakenedTableSql, isNot(tableSql), reason: 'The test fixture must mutate the declared table DDL.');
+  if (commentFragment != null) {
+    final int closingParenthesis = weakenedTableSql.lastIndexOf(')');
+    expect(closingParenthesis, greaterThanOrEqualTo(0));
+    weakenedTableSql =
+        '${weakenedTableSql.substring(0, closingParenthesis)} /* $commentFragment */ '
+        '${weakenedTableSql.substring(closingParenthesis)}';
+  }
 
   final List<Map<String, Object?>> triggers = await db.executor.runSelect(
     "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'account_opening_balance_sources'",

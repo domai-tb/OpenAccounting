@@ -84,11 +84,25 @@ Eleven of the 46 mapped delta-spec scenario rows are green for migration/setup, 
 - Non-executable checks run:
   - `openspec validate cashbook-and-daily-close-workspace --type change --strict --json` → valid, zero issues (structural validation only).
   - `git diff --check` → passed.
-  - Mechanical scenario mapping → 7 delta specs and 46 unique scenarios, each mapped to a named test-plan row using capability-relative paths, with every planned test name represented in tasks.md; the historical mapping snapshot had 28 checked and 117 unchecked tasks, while the current tasks.md count is 40 checked and 105 unchecked of 145 total. The supplementary v27 schema migration and v26/v27 trigger-semantic tests are tracked separately from those 46 scenario rows.
+  - Mechanical scenario mapping → 7 delta specs and 46 unique scenarios, each mapped to a named test-plan row using capability-relative paths, with every planned test name represented in tasks.md; the historical mapping snapshot had 28 checked and 117 unchecked tasks, while tasks.md now has 41 checked and 105 unchecked of 146 total after task 0.16c. The supplementary v27 schema migration and v26/v27 trigger-semantic tests are tracked separately from those 46 scenario rows.
 
-The Round 5 v26 implementation review is recorded as `VERDICT: REVISE`, and its 0.16a remediation remains separately documented. A later fresh independent v26 review found that lowercase-only currency GLOB DDL passed schema health; task 0.16b now has a passing regression, focused migration suite, and scoped analysis. A post-repair independent review is still required; no remediation disposition or implementation acceptance is recorded.
+The Round 5 v26 implementation review is recorded as `VERDICT: REVISE`, and its 0.16a remediation remains separately documented. A later independent review found that lowercase-only currency GLOB DDL passed schema health; task 0.16b records its passing regression and scoped analysis. Round 6 found that expected GLOB fragments in comments could still satisfy substring checks; Round 7 approved the repaired six-path v26 validator diff at base HEAD `692493e9346057366980b5227f81341cb3d9930f` with fingerprint `d8f91678158f3035e609fa49bf62e1673128aeee6807f98ab93c83050f69a238`. This accepts task 0.16c only; the full change remains incomplete with 105 unchecked tasks and no overall implementation acceptance.
+
+#### v26 comment-injection validator follow-up
+
+- Red: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/db/cashbook_and_daily_close_workspace_migration_test.dart --plain-name test_v26_schema_health_ignores_expected_opening` → both date and currency regressions failed because schema health reported `isHealthy == true` for weakened GLOB checks with the expected fragment in a block comment.
+- Green: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter test --dart-define=platform=vm test/db/cashbook_and_daily_close_workspace_migration_test.dart` → passed 19/19, including both comment regressions and the existing lowercase-only currency GLOB case-sensitivity regression.
+- Scoped analysis: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm flutter analyze lib/core/db/migrations.dart test/db/cashbook_and_daily_close_workspace_migration_test.dart` → `No issues found!`.
+- Formatter: `FVM_CACHE_PATH=/home/ubuntu/fvm FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true fvm dart format --line-length=120 lib/core/db/migrations.dart test/db/cashbook_and_daily_close_workspace_migration_test.dart` → passed; two files checked, one test file formatted.
+- Strict OpenSpec validation: `openspec validate cashbook-and-daily-close-workspace --strict --no-interactive` → valid.
+- Scoped `git diff --check` for `migrations.dart`, the migration test, and cashbook `tasks.md`, `test-plan.md`, `verify.md`, and `review.md` → passed.
+- The red run used Flutter 3.47.2 from `/home/ubuntu/fvm`. A prior attempt with a temporary cache was stopped during SDK download before tests loaded; it produced no test result.
 
 ### Review Integrity
+
+Round 7 independently accepted task 0.16c for the reviewed scoped diff. The checkboxes below remain the full-change review gate.
+
+- [x] Task 0.16c has independent approval for the exact reviewed six-path diff recorded in review.md.
 - [ ] review.md `VERDICT: APPROVE`, or `VERDICT: APPROVE_WITH_CHANGES` with `CHANGES_APPLIED: yes`
 - [ ] Verdict not stale: proposal.md, design.md, specs/ unchanged since the verdict (other than applied Required Changes)
 - [ ] All findings fixed or rebutted; Critical/Moderate rebuttals accepted by reviewer

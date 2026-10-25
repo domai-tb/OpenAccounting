@@ -86,13 +86,15 @@ The suite verifies exact integer cents under the app's two-decimal convention. I
 
 ### Supplementary v26 implementation-review regressions
 
-The original v26 remediation regressions supplement, rather than change, the 46 delta-spec scenario mapping above; the lowercase-only currency check records the later independent follow-up repair.
+The v26 remediation regressions supplement, rather than change, the 46 delta-spec scenario mapping above. The lowercase-only currency check and comment-injection checks record later independent validator findings and repairs.
 
 | Test File | Test Name | Current Result |
 |-----------|-----------|----------------|
 | test/db/cashbook_and_daily_close_workspace_migration_test.dart | test_v26_schema_health_rejects_weakened_opening_effective_date_glob | 🟢 passed |
 | test/db/cashbook_and_daily_close_workspace_migration_test.dart | test_v26_schema_health_rejects_weakened_opening_currency_code_glob | 🟢 passed |
 | test/db/cashbook_and_daily_close_workspace_migration_test.dart | test_v26_schema_health_rejects_lowercase_only_opening_currency_code_glob | 🟢 passed |
+| test/db/cashbook_and_daily_close_workspace_migration_test.dart | test_v26_schema_health_ignores_expected_opening_date_glob_in_comments | 🟢 passed |
+| test/db/cashbook_and_daily_close_workspace_migration_test.dart | test_v26_schema_health_ignores_expected_opening_currency_glob_in_comments | 🟢 passed |
 | test/features/setup/cashbook_opening_source_test.dart | test_setup_rejects_initial_nonzero_saldo_without_journal_history | 🟢 passed |
 | test/integration/audit/setup-onboarding-integrity_test.dart | test_setup_onboarding_integrity_4_1_conflicting_opening_retry_is_rejected | 🟢 passed |
 

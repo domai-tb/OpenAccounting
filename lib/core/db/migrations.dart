@@ -2213,6 +2213,7 @@ BEGIN SELECT RAISE(ABORT, 'category_mapping_history is append-only'); END''');
           literals.add(match.group(0)!);
           return '\u0000${literals.length - 1}\u0000';
         })
+        .replaceAll(RegExp(r'/\*[\s\S]*?\*/|--[^\r\n]*'), ' ')
         .toLowerCase()
         .replaceAll(RegExp(r'\s+'), ' ');
     return normalized.replaceAllMapped(
