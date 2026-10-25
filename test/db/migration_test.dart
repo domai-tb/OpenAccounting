@@ -71,7 +71,7 @@ void main() {
         profileDir: profileDirectory.path,
         requiredTables: AppDatabase.allTableNames,
       );
-      expect(await runner.getUserVersion(), 29);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
 
       final List<Map<String, Object?>> columns = await db.executor.runSelect(
         'PRAGMA table_info(rechnungspositionen)',
@@ -105,7 +105,7 @@ void main() {
         requiredTables: AppDatabase.allTableNames,
       );
       expect(await runner.run(createSchema: () async {}), isTrue);
-      expect(await runner.getUserVersion(), 29);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
 
       final List<Map<String, Object?>> rows = await db.executor.runSelect(
         'SELECT id, bezeichnung, ${_eInvoiceTaxEvidenceColumns.join(', ')} '
@@ -140,14 +140,35 @@ void main() {
       expect(names, isNot(contains('tax_legal_basis')));
     });
 
-    test('runs the v29 migration from the previous schema version', () async {
+    test('v28 schema upgrade runs v29 and v30 migrations', () async {
+      await _removeV29TaxEvidenceColumns(db);
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_insert_draft');
+      await db.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_correction_update_guard');
+      await db.executor.runCustom('ALTER TABLE mileage_trip_corrections DROP COLUMN applied_business_date');
       final runner = MigrationRunner(executor: db.executor, profileDir: profileDirectory.path);
-      await runner.setUserVersion(MigrationRunner.currentVersion - 1);
+      await runner.setUserVersion(28);
 
       final migrated = await runner.run(createSchema: () async {});
 
       expect(migrated, isTrue);
       expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
+      final List<Map<String, Object?>> correctionColumns = await db.executor.runSelect(
+        'PRAGMA table_info(mileage_trip_corrections)',
+        const <Object?>[],
+      );
+      expect(correctionColumns.map((Map<String, Object?> row) => row['name']), contains('applied_business_date'));
+      final List<Map<String, Object?>> correctionGuards = await db.executor.runSelect(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' "
+        "AND name IN ('trg_mileage_correction_insert_draft', 'trg_mileage_correction_update_guard')",
+        const <Object?>[],
+      );
+      expect(
+        correctionGuards.map((Map<String, Object?> row) => row['name']),
+        containsAll(<String>['trg_mileage_correction_insert_draft', 'trg_mileage_correction_update_guard']),
+      );
+      for (final Map<String, Object?> guard in correctionGuards) {
+        expect(guard['sql'], contains('applied_business_date'), reason: guard['name'].toString());
+      }
     });
 
     test('rejects a current-version database with a missing required table', () async {

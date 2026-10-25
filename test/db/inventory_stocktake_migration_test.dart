@@ -91,17 +91,32 @@ void main() {
       'statutory_timing_rules',
     };
 
+    const expectedV25FeatureTables = <String>{'mileage_posting_account_mapping', 'mileage_posting_period_closures'};
+    const expectedV26FeatureTables = <String>{'account_opening_balance_sources'};
+
     Set<String> expectedDeclaredTablesForVersion(int version) => switch (version) {
       18 => expectedV18BaseTables,
-      // v20-v24 are column-only migrations (konten.inhaber, occurrence review
-      // state, e-invoice output format, and mileage eligibility); the table inventory stays at the v19 set.
-      19 || 20 || 21 || 22 || 23 || 24 => <String>{...expectedV18BaseTables, ...unrelatedV19SettlementTables},
-      _ => throw ArgumentError.value(version, 'version', 'Expected schema version 18-24'),
+      // v20-v30 are column-only for the declared inventory; settlement tables remain from v19.
+      19 ||
+      20 ||
+      21 ||
+      22 ||
+      23 ||
+      24 ||
+      25 ||
+      26 ||
+      27 ||
+      28 ||
+      29 ||
+      30 => <String>{...expectedV18BaseTables, ...unrelatedV19SettlementTables},
+      _ => throw ArgumentError.value(version, 'version', 'Expected schema version 18-30'),
     };
 
     Set<String> expectedTablesForVersion(int version) => <String>{
       ...expectedDeclaredTablesForVersion(version),
       ...expectedVersionedFeatureTables,
+      if (version >= 25) ...expectedV25FeatureTables,
+      if (version >= 26) ...expectedV26FeatureTables,
     };
 
     Future<void> dropStocktakeTables() async {
@@ -126,7 +141,7 @@ void main() {
       final Set<String> expectedCurrentTables = expectedTablesForVersion(currentVersion);
       final names = await tableNames();
 
-      expect(currentVersion, anyOf(18, 19, 20, 21, 22, 23, 24));
+      expect(currentVersion, inInclusiveRange(18, 30));
       expect(expectedV18BaseTables, hasLength(41));
       expect(unrelatedV19SettlementTables, hasLength(3));
       expect(expectedVersionedFeatureTables, hasLength(7));
@@ -134,6 +149,8 @@ void main() {
       expect(expectedDeclaredTablesForVersion(19), hasLength(44));
       expect(expectedTablesForVersion(18), hasLength(48));
       expect(expectedTablesForVersion(19), hasLength(51));
+      expect(expectedTablesForVersion(25), hasLength(53));
+      expect(expectedTablesForVersion(26), hasLength(54));
       expect(AppDatabase.allTableNames.toSet(), expectedCurrentDeclaredTables);
       expect(names, expectedCurrentTables);
       expect(await userVersion(), currentVersion);
@@ -150,7 +167,11 @@ void main() {
         expect(await tableNames(), expectedTablesForVersion(18));
         expect(await userVersion(), 18);
       } else {
-        for (final tableName in unrelatedV19SettlementTables) {
+        for (final tableName in <String>{
+          ...unrelatedV19SettlementTables,
+          ...expectedV25FeatureTables,
+          ...expectedV26FeatureTables,
+        }) {
           await db.executor.runCustom('DROP TABLE $tableName');
         }
         await db.executor.runCustom('PRAGMA user_version = 18');

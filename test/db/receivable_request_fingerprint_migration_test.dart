@@ -189,7 +189,7 @@ void main() {
       );
       expect(rows, hasLength(1));
       expect(rows.single['idempotency_key'], 'constraint-1');
-      expect(await _allTableCount(native), AppDatabase.allTableNames.length + 7);
+      expect(await _allTableCount(native), AppDatabase.allTableNames.length + 10);
       for (final String table in AppDatabase.allTableNames) {
         expect(await _tableExists(native, table), isTrue, reason: 'base table $table preserved');
       }

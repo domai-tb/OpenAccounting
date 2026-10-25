@@ -158,6 +158,8 @@ void main() {
     Future<AppDatabase> openLegacyWithRows(List<String> inserts) async {
       final legacy = AppDatabase.createTestDatabase(profileDir: profileDirectory.path);
       await legacy.ensureOpen();
+      // This current-schema fixture is being reconstructed as v8, before the v25 posting guard.
+      await legacy.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
       await legacy.executor.runCustom('DROP TABLE kategorien');
       await legacy.executor.runCustom('''
 CREATE TABLE kategorien (
@@ -258,7 +260,7 @@ CREATE TABLE kategorien (
         const [],
       );
       final names = rows.map((row) => row['name'].toString()).toSet();
-      expect(names.length, 51);
+      expect(names.length, 54);
       for (final table in AppDatabase.allTableNames) {
         expect(names, contains(table));
       }
@@ -438,7 +440,7 @@ CREATE TABLE forderung_zahlungen (
         const [],
       );
       final names = rows.map((r) => r['name'].toString()).toSet();
-      expect(names.length, 51);
+      expect(names.length, 54);
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t));
       }

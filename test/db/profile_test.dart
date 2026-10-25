@@ -41,7 +41,7 @@ void main() {
         final tables = database.select(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         );
-        expect(tables, hasLength(AppDatabase.allTableNames.length + 6));
+        expect(tables, hasLength(AppDatabase.allTableNames.length + 9));
         expect(tables.map((row) => row['name']), contains('category_mapping_history'));
 
         final rates = database.select('SELECT satz FROM ust_saetze ORDER BY id');

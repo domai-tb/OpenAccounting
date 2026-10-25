@@ -48,6 +48,9 @@ void main() {
         for (final row in info)
           if (row['name'] != 'geschaeftsjahr_startmonat') row['name'].toString(),
       ];
+      // A real v10 profile predates the v26 table; dropping the current-schema fixture prevents
+      // SQLite from rewriting its foreign key when the company table is renamed.
+      await db.executor.runCustom('DROP TABLE account_opening_balance_sources');
       await db.executor.runCustom('ALTER TABLE unternehmen RENAME TO unternehmen_legacy');
       await db.executor.runCustom(legacyDdl);
       await db.executor.runCustom(

@@ -817,6 +817,9 @@ class MigrationRunner {
       "TEXT NOT NULL DEFAULT 'unknown' CHECK (vehicle_class IN ('kraftwagen','other_motor_vehicle','unsupported','unknown'))",
     );
 
+    // The current posting guard may reference category metadata that legacy profiles do not have yet.
+    // Remove it while demoting rows, then recreate it below after the update has completed.
+    await executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
     await executor.runCustom('''
 UPDATE mileage_trips
 SET state = 'unresolved',

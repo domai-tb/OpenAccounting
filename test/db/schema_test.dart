@@ -14,20 +14,20 @@ void main() {
       await db.close();
     });
 
-    test('50 non-payment tables exist after creation', () async {
+    test('53 non-payment tables exist after creation', () async {
       final rows = await db.executor.runSelect(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen' ORDER BY name",
         const [],
       );
       final names = rows.map((r) => r['name']?.toString() ?? '').toList()..sort();
-      expect(names.length, 50, reason: 'Expected 50 non-payment tables, got ${names.length}: $names');
+      expect(names.length, 53, reason: 'Expected 53 non-payment tables, got ${names.length}: $names');
       for (final t in AppDatabase.allTableNames) {
         expect(names, contains(t), reason: 'Missing table $t');
       }
       expect(names, contains('category_mapping_history'), reason: 'Missing feature table category_mapping_history');
     });
 
-    test('non-payment table count remains 50 after second open', () async {
+    test('non-payment table count remains 53 after second open', () async {
       await db.close();
       final db2 = AppDatabase.createTestDatabase();
       await db2.ensureOpen();
@@ -35,7 +35,7 @@ void main() {
         "SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != 'forderung_zahlungen'",
         const [],
       );
-      expect(rows.first['c'], 50);
+      expect(rows.first['c'], 53);
       await db2.close();
     });
 

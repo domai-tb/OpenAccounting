@@ -61,6 +61,7 @@ void main() {
           await original.ensureOpen();
           await _createSetupOpeningSource(original);
           await original.executor.runCustom('DROP TABLE account_opening_balance_sources');
+          await MigrationRunner(executor: original.executor, profileDir: persistentDirectory.path).setUserVersion(27);
         } finally {
           await original.close();
         }
@@ -248,7 +249,7 @@ CREATE TABLE IF NOT EXISTS tagesabschluesse (
 
       expect(migrated, isTrue, reason: 'The supported v25 profile must run v26.');
       if (!migrated) return;
-      expect(await runner.getUserVersion(), 27);
+      expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
       expect(
         await db.executor.runSelect(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'account_opening_balance_sources'",
@@ -298,8 +299,8 @@ CREATE TABLE IF NOT EXISTS tagesabschluesse (
         final bool migrated = await upgradedRunner.run(createSchema: () async {});
 
         expect(migrated, isTrue, reason: 'The v25 profile must be upgraded to v26.');
-        expect(await upgradedRunner.getUserVersion(), 27);
-        expect(await runner.getUserVersion(), 27);
+        expect(await upgradedRunner.getUserVersion(), MigrationRunner.currentVersion);
+        expect(await runner.getUserVersion(), MigrationRunner.currentVersion);
         expect(await _openingSourceSchema(upgradedDb), equals(await _openingSourceSchema(db)));
       } finally {
         await upgradedDb.close();
@@ -693,7 +694,7 @@ END
         final bool migrated = await upgradedRunner.run(createSchema: () async {});
 
         expect(migrated, isTrue, reason: 'A v26 profile must be upgraded to v27.');
-        expect(await upgradedRunner.getUserVersion(), 27);
+        expect(await upgradedRunner.getUserVersion(), MigrationRunner.currentVersion);
         expect(await _applicationTableNames(upgradedDb), tableNamesBefore);
         expect(await upgradedDb.executor.runSelect(legacyCloseProjection, <Object?>[legacyCloseId]), legacyCloseBefore);
         expect(await _dailyCloseEvidenceSchema(upgradedDb), freshSchema);

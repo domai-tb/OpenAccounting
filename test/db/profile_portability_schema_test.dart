@@ -32,7 +32,7 @@ void main() {
         'category_mapping_history',
       };
 
-      expect(tableNames, hasLength(51));
+      expect(tableNames, hasLength(54));
       expect(tableNames, containsAll(AppDatabase.allTableNames));
       expect(tableNames, contains('feature_table_state'));
       expect(tableNames, containsAll(migrationRequiredTables));
@@ -276,6 +276,8 @@ CREATE TABLE forderung_zahlungen (
         await profileDirectory.delete(recursive: true);
       });
       await legacyDatabase.ensureOpen();
+      // This current-schema fixture is being reconstructed as v8, before the v25 posting guard.
+      await legacyDatabase.executor.runCustom('DROP TRIGGER IF EXISTS trg_mileage_trip_posting_guard');
       await legacyDatabase.executor.runCustom('DROP TABLE category_mapping_history');
       await legacyDatabase.executor.runCustom('DROP TABLE mileage_trip_corrections');
       await legacyDatabase.executor.runCustom('DROP TABLE mileage_trips');
@@ -427,9 +429,9 @@ CREATE TABLE kategorien (
         const <Object?>[],
       );
       final Set<String> tableNames = <String>{for (final row in rows) row['name'].toString()};
-      // v19 inventory: 44 base + feature_table_state + 4 migration-required
-      // tables + 2 email tables + only the initialized lazy table.
-      expect(tableNames, hasLength(52));
+      // Current inventory: 44 base + 10 migration-required feature tables +
+      // 2 email tables + only the initialized lazy table.
+      expect(tableNames, hasLength(55));
       expect(tableNames, containsAll(AppDatabase.allTableNames));
       expect(
         tableNames,
