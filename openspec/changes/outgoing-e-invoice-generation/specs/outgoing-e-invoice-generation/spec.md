@@ -52,6 +52,8 @@ For the two supported §13b cases, v29 SHALL also persist the following nullable
 
 For §13b, `e_invoice_reverse_charge_evidence_source_ref` SHALL resolve to the immutable upstream tax assessment/evidence record from which the persisted recipient, supplier, service, place-of-supply, and taxability facts were established; a customer type or VAT-ID validation record alone is insufficient. The construction certificate reference SHALL resolve to the captured authority-issued certificate and its persisted recipient identifier, service scope, issue date, and validity-through date. If either reference cannot be resolved or contradicts the captured invoice facts, generation SHALL fail closed.
 
+The v29 position fields are typed claims and SHALL NOT count as a resolved assessment. Before positive §13b output, the owning tax-assessment/invoice-entry workflow SHALL persist an immutable reverse-charge assessment record in the next sequential migration slot after the mileage-owned v30 migration if v30 lands first; implementation SHALL recheck the live migration ledger and use its then-available next slot rather than hard-code v31 if v30 has not landed. The existing `e_invoice_reverse_charge_evidence_source_ref` SHALL identify exactly one record scoped to one invoice ID, persisted position ID, and buyer ID; the record SHALL carry the already specified treatment and case-specific `e_invoice_reverse_charge_*` values without adding statutory eligibility predicates. For §13b(2) no. 4, its existing certificate reference SHALL resolve to the captured authority-issued certificate with the already specified recipient VAT ID, construction scope, issue date, and validity-through date, and validity SHALL be checked against the already required `leistungsdatum`. Records are append-only: corrections create a new reference and cannot retarget or modify an existing record. The finalization transaction SHALL resolve the reference and compare its invoice, position, buyer, treatment, and every captured typed value before any finalization side effect. For §13b(2) no. 4, the existing certificate validity check also applies. A mismatch, missing record, or unresolved certificate SHALL fail closed with position/field diagnostics. Finalization SHALL freeze the resolved reference and accepted values in the immutable snapshot; committed UBL/CII generation SHALL use that frozen evidence and SHALL NOT re-resolve live records. Editing the buyer, position, or accepted facts requires a new matching assessment. Historical positions SHALL NOT be backfilled.
+
 The application SHALL validate stored tuples against the following closed mapping for both XRechnung 3.0 UBL 2.1 and ZUGFeRD 2.5.2 EN16931 CII:
 
 | Explicit treatment | Required legal basis | EN 16931 category | Exemption reason | Required evidence |
@@ -115,9 +117,17 @@ Other §4 exemptions, generic reverse-charge cases, outside-scope turnover, cust
 - **GIVEN** a line persists an ordinary §3a(2) B2B service with no place-of-supply exception, explicit German taxability, a German recipient business establishment, and a supplier establishment in another EU Member State
 - **AND** the persisted supplier-establishment basis and German fixed-establishment participation status establish that the supplier is EU-established for this transaction
 - **AND** the persisted recipient status is `entrepreneur_for_business`, and the place-of-supply basis, country, service kind, taxability, evidence-source reference, and seller/buyer VAT IDs are complete
+- **AND** the immutable assessment reference resolves to a record bound to this invoice, persisted position, buyer, treatment, and those exact persisted facts
 - **WHEN** either e-invoice format is generated
 - **THEN** the line and matching tax breakdown use `AE`, 0%, and `VATEX-EU-AE`
 - **AND** VAT IDs alone do not establish supplier establishment, recipient business status, place of supply, or taxability
+
+#### Scenario: §13b(1) assessment cannot be reused for another line
+
+- **GIVEN** a supported §13b(1) line has a non-empty reference to an immutable assessment recorded for another invoice, position, buyer, treatment, or set of persisted eligibility facts
+- **WHEN** finalization attempts to resolve the assessment
+- **THEN** finalization fails closed with a position/field diagnostic before numbering, stock, accounting, or artifact side effects
+- **AND** neither UBL nor CII output is produced from the mismatched assessment
 
 #### Scenario: §13b missing or unresolved eligibility evidence fails closed
 
